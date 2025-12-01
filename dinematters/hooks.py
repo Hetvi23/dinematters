@@ -137,13 +137,11 @@ app_license = "mit"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"File": {
+		"after_insert": "dinematters.dinematters.doctype.menu_product.menu_product.make_file_public_if_product_media"
+	}
+}
 
 # Scheduled Tasks
 # ---------------
