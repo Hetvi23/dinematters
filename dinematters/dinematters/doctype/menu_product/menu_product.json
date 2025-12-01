@@ -2,7 +2,7 @@
  "actions": [],
  "allow_rename": 1,
  "autoname": "field:product_id",
- "creation": "2024-01-15 10:00:00.000000",
+ "creation": "2024-01-15 10:00:00",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
@@ -189,7 +189,8 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-01-15 10:00:00.000000",
+ "make_attachments_public": 1,
+ "modified": "2025-12-01 17:14:23.709242",
  "modified_by": "Administrator",
  "module": "Dinematters",
  "name": "Menu Product",
@@ -221,8 +222,3 @@
  "states": [],
  "track_changes": 1
 }
-
-
-
-
-
