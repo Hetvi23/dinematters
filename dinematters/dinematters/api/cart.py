@@ -15,7 +15,7 @@ import string
 from datetime import datetime
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def add_to_cart(dish_id, quantity=1, customizations=None, session_id=None):
 	"""
 	POST /api/v1/cart/add
@@ -127,42 +127,20 @@ def add_to_cart(dish_id, quantity=1, customizations=None, session_id=None):
 		}
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def get_cart(session_id=None):
 	"""
 	GET /api/v1/cart
-	Get current cart
+	Get current cart (returns all cart entries for development)
 	"""
 	try:
-		user = frappe.session.user if frappe.session.user != "Guest" else None
-		if not user and not session_id:
-			session_id = frappe.session.get("session_id")
+		# For development: Return all cart entries without filtering
+		# TODO: Re-enable session_id/user filtering for production
 		
-		# Get cart entries
-		filters = {}
-		if user:
-			filters["user"] = user
-		elif session_id:
-			filters["session_id"] = session_id
-		else:
-			return {
-				"success": True,
-				"data": {
-					"items": [],
-					"summary": {
-						"subtotal": 0,
-						"discount": 0,
-						"tax": 0,
-						"deliveryFee": 0,
-						"total": 0
-					}
-				}
-			}
-		
+		# Get all cart entries
 		entries = frappe.get_all(
 			"Cart Entry",
 			fields=["*"],
-			filters=filters,
 			order_by="creation desc"
 		)
 		
@@ -187,8 +165,18 @@ def get_cart(session_id=None):
 			}
 			items.append(item)
 		
-		# Get cart summary
-		summary = get_cart_summary(user, session_id)
+		# Calculate summary from all items
+		subtotal = sum(item["totalPrice"] for item in items)
+		total_items = len(items)
+		
+		summary = {
+			"totalItems": total_items,
+			"subtotal": subtotal,
+			"discount": 0,
+			"tax": 0,
+			"deliveryFee": 0,
+			"total": subtotal
+		}
 		
 		return {
 			"success": True,
@@ -208,7 +196,7 @@ def get_cart(session_id=None):
 		}
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def update_cart_item(entry_id, quantity):
 	"""
 	PATCH /api/v1/cart/items/:entryId
@@ -244,7 +232,7 @@ def update_cart_item(entry_id, quantity):
 		}
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def remove_cart_item(entry_id):
 	"""
 	DELETE /api/v1/cart/items/:entryId
@@ -279,7 +267,7 @@ def remove_cart_item(entry_id):
 		}
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def clear_cart(session_id=None):
 	"""
 	DELETE /api/v1/cart

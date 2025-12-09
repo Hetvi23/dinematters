@@ -15,7 +15,7 @@ import string
 from datetime import datetime
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def create_order(items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None):
 	"""
 	POST /api/v1/orders
@@ -169,7 +169,7 @@ def create_order(items, cooking_requests=None, customer_info=None, delivery_info
 		}
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def get_orders(status=None, page=1, limit=20, session_id=None):
 	"""
 	GET /api/v1/orders
@@ -248,7 +248,7 @@ def get_orders(status=None, page=1, limit=20, session_id=None):
 		}
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def get_order(order_id):
 	"""
 	GET /api/v1/orders/:orderId

@@ -11,58 +11,6 @@ class MenuProduct(Document):
 		"""Validate Product Media constraints"""
 		self.validate_product_media()
 	
-	def after_insert(self):
-		"""Make all product media files public by default after insert"""
-		self.make_product_media_public()
-	
-	def on_update(self):
-		"""Make all product media files public by default after update"""
-		self.make_product_media_public()
-	
-	def make_product_media_public(self):
-		"""Make all files in product_media public"""
-		if not self.product_media:
-			return
-		
-		for media_item in self.product_media:
-			if media_item.media_url:
-				# Get the file document
-				file_url = media_item.media_url
-				
-				# Find the file document - try multiple ways
-				file_doc = None
-				
-				# Method 1: Find by attached_to info (for child table, field might be product_media)
-				file_doc = frappe.db.get_value(
-					"File",
-					{
-						"file_url": file_url,
-						"attached_to_doctype": self.doctype,
-						"attached_to_name": self.name
-					},
-					"name"
-				)
-				
-				# Method 2: Find by file_url only (might be attached to parent)
-				if not file_doc:
-					file_doc = frappe.db.get_value(
-						"File",
-						{"file_url": file_url},
-						"name"
-					)
-				
-				if file_doc:
-					try:
-						file_doc_obj = frappe.get_doc("File", file_doc)
-						# Make file public if it's private
-						if file_doc_obj.is_private:
-							file_doc_obj.is_private = 0
-							file_doc_obj.save(ignore_permissions=True)
-							frappe.db.commit()
-					except Exception as e:
-						# Log error but don't fail the document save
-						frappe.log_error(f"Error making file public: {str(e)}", "Product Media Public File Error")
-	
 	def validate_product_media(self):
 		"""Validate Product Media:
 		- Maximum 3 media items per product
@@ -128,31 +76,6 @@ class MenuProduct(Document):
 				_('Maximum 1 video allowed per product. Currently {0} videos found.').format(video_count),
 				title=_('Maximum Videos Exceeded')
 			)
-
-
-def make_file_public_if_product_media(doc, method):
-	"""
-	Hook function to make files public when attached to Menu Product's product_media
-	This is called when a File document is inserted
-	"""
-	try:
-		# Check if file is attached to Menu Product
-		if doc.attached_to_doctype == "Menu Product" and doc.attached_to_name:
-			# Check if this file is in the product_media child table
-			product = frappe.get_doc("Menu Product", doc.attached_to_name)
-			
-			if product.product_media:
-				for media_item in product.product_media:
-					if media_item.media_url == doc.file_url:
-						# This file is part of product_media, make it public
-						if doc.is_private:
-							doc.is_private = 0
-							doc.save(ignore_permissions=True)
-							frappe.db.commit()
-						break
-	except Exception as e:
-		# Log error but don't fail the file save
-		frappe.log_error(f"Error making product media file public: {str(e)}", "Product Media Public File Hook Error")
 
 
 

@@ -1,0 +1,2 @@
+# Menu Image Item DocType
+
