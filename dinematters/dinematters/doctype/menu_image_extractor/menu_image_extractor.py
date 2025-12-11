@@ -10,10 +10,44 @@ import json
 import time
 from datetime import datetime
 import os
+import re
 
 
 class MenuImageExtractor(Document):
 	pass
+
+
+def generate_product_id_from_name(product_name):
+	"""Generate a slug-like product_id from product_name"""
+	if not product_name:
+		return None
+	
+	# Convert to lowercase
+	product_id = product_name.lower()
+	
+	# Replace spaces and special characters with hyphens
+	product_id = re.sub(r'[^\w\s-]', '', product_id)  # Remove special chars
+	product_id = re.sub(r'[-\s]+', '-', product_id)  # Replace spaces and multiple hyphens with single hyphen
+	product_id = product_id.strip('-')  # Remove leading/trailing hyphens
+	
+	# Limit length to 140 characters (Frappe name field limit)
+	if len(product_id) > 140:
+		product_id = product_id[:140].rstrip('-')
+	
+	# Ensure uniqueness by checking if it exists
+	base_id = product_id
+	counter = 1
+	while frappe.db.exists("Menu Product", product_id):
+		product_id = f"{base_id}-{counter}"
+		counter += 1
+		# Prevent infinite loop
+		if counter > 1000:
+			# Use timestamp as fallback
+			import time
+			product_id = f"{base_id}-{int(time.time())}"
+			break
+	
+	return product_id
 
 
 @frappe.whitelist()
@@ -296,17 +330,16 @@ def extract_menu_data(docname):
 				"Menu Extraction - Data Preview"
 			)
 			
-			stats = process_extracted_data(result.get('data', {}), doc)
+			# Store extracted data in child tables instead of creating immediately
+			store_extracted_data(result.get('data', {}), doc)
 			
-			# Update document
-			doc.extraction_status = "Completed"
-			doc.extraction_log = "Extraction completed successfully!\n\n" + \
-				f"Categories created: {stats['categories_created']}\n" + \
-				f"Items created: {stats['items_created']}\n" + \
-				f"Items updated: {stats['items_updated']}\n" + \
-				f"Items skipped: {stats['items_skipped']}"
-			doc.items_created = stats['items_created']
-			doc.categories_created = stats['categories_created']
+			# Update document status to Pending Approval
+			doc.extraction_status = "Pending Approval"
+			doc.approval_status = "Pending"
+			doc.extraction_log = f"Extraction completed successfully!\n\n" + \
+				f"Categories extracted: {len(categories)}\n" + \
+				f"Dishes extracted: {len(dishes)}\n\n" + \
+				"Please review the extracted data below and click 'Approve and Create Menu Items' to add them to the database."
 			doc.extraction_date = datetime.now()
 			doc.processing_time = f"{processing_time:.2f} seconds"
 			doc.raw_response = json.dumps(result, indent=2)
@@ -319,9 +352,7 @@ def extract_menu_data(docname):
 			print("="*70)
 			print(f"Categories extracted: {len(categories)}")
 			print(f"Dishes extracted: {len(dishes)}")
-			print(f"Categories created: {stats['categories_created']}")
-			print(f"Items created: {stats['items_created']}")
-			print(f"Items updated: {stats['items_updated']}")
+			print("Data stored in child tables for review.")
 			print("="*70)
 			
 			# Safely get sample data
@@ -335,8 +366,7 @@ def extract_menu_data(docname):
 			
 			return {
 				'success': True,
-				'message': f"Successfully extracted and created {stats['items_created']} items and {stats['categories_created']} categories",
-				'stats': stats,
+				'message': f"Successfully extracted {len(dishes)} dishes and {len(categories)} categories. Please review and approve to add them to the database.",
 				'extracted_data_preview': {
 					'categories_count': len(categories),
 					'dishes_count': len(dishes),
@@ -381,9 +411,322 @@ def extract_menu_data(docname):
 		)
 
 
+def store_extracted_data(data, extractor_doc):
+	"""
+	Store extracted data in both HTML report format and editable child tables
+	"""
+	# Extract data sections
+	categories_data = data.get('categories', [])
+	dishes_data = data.get('dishes', [])
+	
+	# Ensure categories_data and dishes_data are lists
+	if not isinstance(categories_data, list):
+		if isinstance(categories_data, dict):
+			categories_data = list(categories_data.values())
+		else:
+			categories_data = []
+	
+	if not isinstance(dishes_data, list):
+		if isinstance(dishes_data, dict):
+			dishes_data = list(dishes_data.values())
+		else:
+			dishes_data = []
+	
+	# Clear existing child table data
+	extractor_doc.extracted_dishes = []
+	
+	# Populate editable child tables for dishes
+	for dish_data in dishes_data:
+		if not isinstance(dish_data, dict):
+			continue
+		
+		dish_name = dish_data.get('name')
+		
+		if not dish_name:
+			continue
+		
+		# Generate dish_id from dish_name
+		dish_id = generate_product_id_from_name(dish_name)
+		
+		# Store media and customizations as JSON strings
+		media_json = json.dumps(dish_data.get('media', [])) if dish_data.get('media') else None
+		customizations_json = json.dumps(dish_data.get('customizationQuestions', [])) if dish_data.get('customizationQuestions') else None
+		
+		extractor_doc.append('extracted_dishes', {
+			'dish_id': dish_id,
+			'dish_name': dish_name,
+			'price': dish_data.get('price', 0),
+			'original_price': dish_data.get('originalPrice'),
+			'category': dish_data.get('category', ''),
+			'description': dish_data.get('description', ''),
+			'calories': dish_data.get('calories'),
+			'is_vegetarian': 1 if dish_data.get('isVegetarian') else 0,
+			'estimated_time': dish_data.get('estimatedTime'),
+			'serving_size': dish_data.get('servingSize'),
+			'has_no_media': 1 if dish_data.get('hasNoMedia') else 0,
+			'main_category': dish_data.get('mainCategory', ''),
+			'media_json': media_json,
+			'customizations_json': customizations_json
+		})
+	
+	# Also store raw data in raw_response for backup
+	if not extractor_doc.raw_response:
+		extractor_doc.raw_response = json.dumps({'data': data}, indent=2)
+
+
+def generate_extraction_report_html(categories_data, dishes_data):
+	"""
+	Generate an Excel-like HTML report of extracted data
+	"""
+	html = """
+	<style>
+		.extraction-report {
+			font-family: 'Segoe UI', Arial, sans-serif;
+			width: 100%;
+			margin: 20px 0;
+			background-color: #ffffff;
+		}
+		.report-section {
+			margin-bottom: 40px;
+		}
+		.report-title {
+			font-size: 16px;
+			font-weight: bold;
+			margin-bottom: 15px;
+			color: #1a1a1a;
+			padding: 12px 15px;
+			background: linear-gradient(to right, #4472C4, #5B9BD5);
+			color: white;
+			border-radius: 4px 4px 0 0;
+		}
+		.data-table {
+			width: 100%;
+			border-collapse: collapse;
+			margin-top: 0;
+			background-color: white;
+			border: 2px solid #4472C4;
+			font-size: 13px;
+		}
+		.data-table th {
+			background: linear-gradient(to bottom, #4472C4, #5B9BD5);
+			color: white;
+			padding: 12px 10px;
+			text-align: left;
+			font-weight: bold;
+			border: 1px solid #2E5C8A;
+			white-space: nowrap;
+			position: sticky;
+			top: 0;
+			z-index: 10;
+		}
+		.data-table td {
+			padding: 10px;
+			border: 1px solid #D0D0D0;
+			background-color: white;
+			vertical-align: top;
+		}
+		.data-table tr:nth-child(even) td {
+			background-color: #F2F2F2;
+		}
+		.data-table tr:nth-child(odd) td {
+			background-color: #FFFFFF;
+		}
+		.data-table tr:hover td {
+			background-color: #D9E1F2;
+		}
+		.data-table tbody tr {
+			border-bottom: 1px solid #D0D0D0;
+		}
+		.text-center {
+			text-align: center;
+		}
+		.text-right {
+			text-align: right;
+		}
+		.badge {
+			display: inline-block;
+			padding: 4px 10px;
+			border-radius: 3px;
+			font-size: 11px;
+			font-weight: bold;
+			text-transform: uppercase;
+		}
+		.badge-yes {
+			background-color: #70AD47;
+			color: white;
+		}
+		.badge-no {
+			background-color: #C00000;
+			color: white;
+		}
+		.summary-box {
+			background: linear-gradient(to right, #E7F3FF, #D0E8FF);
+			padding: 18px 20px;
+			border-radius: 6px;
+			margin-bottom: 25px;
+			border: 2px solid #4472C4;
+			box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+		}
+		.summary-box strong {
+			color: #1a1a1a;
+			font-size: 14px;
+		}
+		.summary-box br {
+			line-height: 1.8;
+		}
+		.table-container {
+			overflow-x: auto;
+			border: 2px solid #4472C4;
+			border-radius: 0 0 4px 4px;
+		}
+	</style>
+	<div class="extraction-report">
+	"""
+	
+	# Summary section
+	html += f"""
+		<div class="summary-box">
+			<strong>Extraction Summary:</strong><br>
+			• Categories Found: <strong>{len(categories_data)}</strong><br>
+			• Dishes Found: <strong>{len(dishes_data)}</strong>
+		</div>
+	"""
+	
+	# Categories table
+	if categories_data:
+		html += """
+		<div class="report-section">
+			<div class="report-title">📁 Extracted Categories</div>
+			<div class="table-container">
+			<table class="data-table">
+				<thead>
+					<tr>
+						<th style="width: 50px;">#</th>
+						<th style="min-width: 120px;">Category ID</th>
+						<th style="min-width: 150px;">Category Name</th>
+						<th style="min-width: 150px;">Display Name</th>
+						<th style="min-width: 200px;">Description</th>
+						<th style="width: 100px;" class="text-center">Is Special</th>
+						<th style="min-width: 150px;">Image</th>
+					</tr>
+				</thead>
+				<tbody>
+		"""
+		
+		for idx, cat_data in enumerate(categories_data, 1):
+			if not isinstance(cat_data, dict):
+				continue
+			
+			category_id = cat_data.get('id', '')
+			category_name = cat_data.get('name', '')
+			display_name = cat_data.get('displayName', category_name)
+			cat_description = cat_data.get('description') or ''
+			description = cat_description[:100] + ('...' if len(cat_description) > 100 else '')
+			is_special = 'Yes' if cat_data.get('isSpecial') else 'No'
+			image = cat_data.get('image', '')
+			
+			html += f"""
+					<tr>
+						<td class="text-center">{idx}</td>
+						<td>{category_id}</td>
+						<td><strong>{category_name}</strong></td>
+						<td>{display_name}</td>
+						<td>{description}</td>
+						<td class="text-center"><span class="badge {'badge-yes' if cat_data.get('isSpecial') else 'badge-no'}">{is_special}</span></td>
+						<td>{image[:50] + ('...' if len(image) > 50 else '') if image else '-'}</td>
+					</tr>
+			"""
+		
+		html += """
+				</tbody>
+			</table>
+			</div>
+		</div>
+		"""
+	
+	# Dishes table
+	if dishes_data:
+		html += """
+		<div class="report-section">
+			<div class="report-title">🍽️ Extracted Dishes</div>
+			<div class="table-container">
+			<table class="data-table">
+				<thead>
+					<tr>
+						<th style="width: 50px;">#</th>
+						<th style="min-width: 180px;">Dish Name</th>
+						<th style="min-width: 120px;">Category</th>
+						<th style="width: 80px;" class="text-right">Price</th>
+						<th style="width: 100px;" class="text-right">Original Price</th>
+						<th style="width: 80px;" class="text-center">Calories</th>
+						<th style="width: 90px;" class="text-center">Vegetarian</th>
+						<th style="width: 100px;" class="text-center">Est. Time</th>
+						<th style="width: 100px;" class="text-center">Serving Size</th>
+						<th style="min-width: 200px;">Description</th>
+						<th style="width: 90px;" class="text-center">Media</th>
+						<th style="width: 110px;" class="text-center">Customizations</th>
+					</tr>
+				</thead>
+				<tbody>
+		"""
+		
+		for idx, dish_data in enumerate(dishes_data, 1):
+			if not isinstance(dish_data, dict):
+				continue
+			
+			dish_name = dish_data.get('name', '')
+			category = dish_data.get('category', '')
+			price = dish_data.get('price', 0)
+			original_price = dish_data.get('originalPrice', '')
+			calories = dish_data.get('calories', '')
+			is_vegetarian = 'Yes' if dish_data.get('isVegetarian') else 'No'
+			estimated_time = dish_data.get('estimatedTime', '')
+			serving_size = dish_data.get('servingSize', '')
+			dish_description = dish_data.get('description') or ''
+			description = dish_description[:80] + ('...' if len(dish_description) > 80 else '')
+			
+			# Safely get media and customizations, handling None values
+			media = dish_data.get('media')
+			media_count = len(media) if media is not None else 0
+			
+			customizations = dish_data.get('customizationQuestions')
+			customizations_count = len(customizations) if customizations is not None else 0
+			
+			html += f"""
+					<tr>
+						<td class="text-center">{idx}</td>
+						<td><strong>{dish_name}</strong></td>
+						<td>{category}</td>
+						<td class="text-right">{price if price else '-'}</td>
+						<td class="text-right">{original_price if original_price else '-'}</td>
+						<td class="text-center">{calories if calories else '-'}</td>
+						<td class="text-center"><span class="badge {'badge-yes' if dish_data.get('isVegetarian') else 'badge-no'}">{is_vegetarian}</span></td>
+						<td class="text-center">{estimated_time if estimated_time else '-'}</td>
+						<td class="text-center">{serving_size if serving_size else '-'}</td>
+						<td>{description}</td>
+						<td class="text-center">{media_count}</td>
+						<td class="text-center">{customizations_count}</td>
+					</tr>
+			"""
+		
+		html += """
+				</tbody>
+			</table>
+			</div>
+		</div>
+		"""
+	
+	html += """
+	</div>
+	"""
+	
+	return html
+
+
 def process_extracted_data(data, extractor_doc):
 	"""
 	Process extracted data and create Menu Categories and Menu Products
+	This is called after approval
 	"""
 	stats = {
 		'categories_created': 0,
@@ -448,17 +791,29 @@ def process_extracted_data(data, extractor_doc):
 			stats['items_skipped'] += 1
 			continue
 		
-		product_id = dish_data.get('id')
 		product_name = dish_data.get('name')
 		
-		if not product_id or not product_name:
+		if not product_name:
 			stats['items_skipped'] += 1
 			continue
 		
-		# Check if product exists
+		# Generate product_id from product_name
+		product_id = generate_product_id_from_name(product_name)
+		
+		# Check if product exists (by product_id or product_name)
+		existing_product = None
 		if frappe.db.exists("Menu Product", product_id):
+			existing_product = frappe.get_doc("Menu Product", product_id)
+		else:
+			# Also check by product_name in case product_id changed
+			existing_by_name = frappe.db.get_value("Menu Product", {"product_name": product_name}, "name")
+			if existing_by_name:
+				existing_product = frappe.get_doc("Menu Product", existing_by_name)
+				product_id = existing_product.name  # Use existing product_id
+		
+		if existing_product:
 			# Update existing product
-			product_doc = frappe.get_doc("Menu Product", product_id)
+			product_doc = existing_product
 			stats['items_updated'] += 1
 		else:
 			# Create new product
@@ -488,32 +843,199 @@ def process_extracted_data(data, extractor_doc):
 		if dish_data.get('calories'):
 			product_doc.calories = dish_data.get('calories')
 		
+		# Set estimated time and serving size
+		if dish_data.get('estimatedTime'):
+			product_doc.estimated_time = dish_data.get('estimatedTime')
+		if dish_data.get('servingSize'):
+			product_doc.serving_size = dish_data.get('servingSize')
+		
+		# Handle media if present
+		if dish_data.get('media'):
+			# Clear existing media
+			product_doc.product_media = []
+			
+			for idx, media_url in enumerate(dish_data.get('media', [])):
+				if not media_url:
+					continue
+				
+				# Determine media type from URL
+				media_type = 'video' if any(ext in media_url.lower() for ext in ['.mp4', '.mov', '.avi', '.webm']) else 'image'
+				
+				media_row = product_doc.append('product_media', {})
+				media_row.media_url = media_url
+				media_row.media_type = media_type
+				media_row.display_order = idx + 1
+		
 		# Handle customizations if present
-		if dish_data.get('customizations'):
+		if dish_data.get('customizationQuestions'):
 			# Clear existing customizations
 			product_doc.customization_questions = []
 			
-			for custom_data in dish_data.get('customizations', []):
+			for custom_data in dish_data.get('customizationQuestions', []):
+				if not isinstance(custom_data, dict):
+					continue
+				
 				custom_row = product_doc.append('customization_questions', {})
 				custom_row.question_id = custom_data.get('id', '')
-				custom_row.question = custom_data.get('question', '')
-				custom_row.is_required = 1 if custom_data.get('isRequired') else 0
-				custom_row.selection_type = custom_data.get('selectionType', 'single')
+				custom_row.title = custom_data.get('title', '')
+				custom_row.subtitle = custom_data.get('subtitle', '')
+				custom_row.question_type = custom_data.get('type', 'single')
+				custom_row.is_required = 1 if custom_data.get('required') else 0
+				custom_row.display_order = custom_data.get('displayOrder', 0)
 				
 				# Handle options
 				if custom_data.get('options'):
-					# Store options as JSON or in child table if you have one
-					pass
+					for option_data in custom_data.get('options', []):
+						if not isinstance(option_data, dict):
+							continue
+						
+						option_row = custom_row.append('options', {})
+						option_row.option_id = option_data.get('id', '')
+						option_row.label = option_data.get('label', '')
+						option_row.price = option_data.get('price', 0)
+						option_row.is_default = 1 if option_data.get('isDefault') else 0
+						option_row.is_vegetarian = 1 if option_data.get('isVegetarian') else 0
+						option_row.display_order = option_data.get('displayOrder', 0)
 		
 		try:
 			product_doc.save(ignore_permissions=True)
 		except Exception as e:
-			frappe.log_error(f"Error saving product {product_id}: {str(e)}", "Menu Product Save Error")
+			frappe.log_error(f"Error saving product {product_id} (name: {product_name}): {str(e)}", "Menu Product Save Error")
 			stats['items_skipped'] += 1
-			stats['items_created'] -= 1 if not frappe.db.exists("Menu Product", product_id) else 0
-			stats['items_updated'] -= 1 if frappe.db.exists("Menu Product", product_id) else 0
+			if not existing_product:
+				stats['items_created'] -= 1
+			else:
+				stats['items_updated'] -= 1
 	
 	frappe.db.commit()
 	
 	return stats
+
+
+@frappe.whitelist()
+def approve_extracted_data(docname):
+	"""
+	Approve extracted data and create Menu Categories and Menu Products
+	"""
+	try:
+		doc = frappe.get_doc("Menu Image Extractor", docname)
+		
+		# Check if document is in pending approval status
+		if doc.extraction_status != "Pending Approval":
+			frappe.throw(_("Only documents with 'Pending Approval' status can be approved."))
+		
+		# Get data from editable child tables (user may have edited the data)
+		# Convert child table data back to the format expected by process_extracted_data
+		data = {
+			'categories': [],
+			'dishes': []
+		}
+		
+		# Check if child tables have data
+		if not doc.extracted_dishes:
+			# Fallback to raw_response if child tables are empty
+			if not doc.raw_response:
+				frappe.throw(_("No extracted data found. Please extract menu data first."))
+			
+			try:
+				raw_data = json.loads(doc.raw_response)
+				if isinstance(raw_data, dict):
+					if 'data' in raw_data:
+						data = raw_data['data']
+					elif 'success' in raw_data and isinstance(raw_data.get('data'), dict):
+						data = raw_data['data']
+					else:
+						data = raw_data.get('data', raw_data)
+				else:
+					frappe.throw(_("Invalid data format. Please re-extract the menu data."))
+			except json.JSONDecodeError:
+				frappe.throw(_("Invalid data format. Please re-extract the menu data."))
+		else:
+			# Get categories from raw_response (categories are auto-created from dishes)
+			if doc.raw_response:
+				try:
+					raw_data = json.loads(doc.raw_response)
+					if isinstance(raw_data, dict):
+						if 'data' in raw_data:
+							raw_data_obj = raw_data['data']
+						elif 'success' in raw_data and isinstance(raw_data.get('data'), dict):
+							raw_data_obj = raw_data['data']
+						else:
+							raw_data_obj = raw_data.get('data', raw_data)
+						
+						# Get categories from raw data
+						categories_data = raw_data_obj.get('categories', [])
+						if not isinstance(categories_data, list):
+							if isinstance(categories_data, dict):
+								categories_data = list(categories_data.values())
+							else:
+								categories_data = []
+						
+						for cat_data in categories_data:
+							if isinstance(cat_data, dict):
+								data['categories'].append(cat_data)
+				except:
+					pass
+			
+			# Convert extracted dishes from child table
+			for dish_row in doc.extracted_dishes:
+				dish_data = {
+					'id': dish_row.dish_id,
+					'name': dish_row.dish_name,
+					'price': dish_row.price or 0,
+					'originalPrice': dish_row.original_price,
+					'category': dish_row.category or '',
+					'description': dish_row.description or '',
+					'calories': dish_row.calories,
+					'isVegetarian': bool(dish_row.is_vegetarian),
+					'estimatedTime': dish_row.estimated_time,
+					'servingSize': dish_row.serving_size,
+					'hasNoMedia': bool(dish_row.has_no_media),
+					'mainCategory': dish_row.main_category or ''
+				}
+				
+				# Parse media JSON if exists
+				if dish_row.media_json:
+					try:
+						dish_data['media'] = json.loads(dish_row.media_json)
+					except:
+						dish_data['media'] = []
+				
+				# Parse customizations JSON if exists
+				if dish_row.customizations_json:
+					try:
+						dish_data['customizationQuestions'] = json.loads(dish_row.customizations_json)
+					except:
+						dish_data['customizationQuestions'] = []
+				
+				data['dishes'].append(dish_data)
+		
+		if not data or (not data.get('categories') and not data.get('dishes')):
+			frappe.throw(_("No data found to approve. Please extract menu data first."))
+		
+		# Process the data and create categories/products
+		stats = process_extracted_data(data, doc)
+		
+		# Update document status
+		doc.extraction_status = "Completed"
+		doc.approval_status = "Approved"
+		doc.extraction_log = f"Data approved and created successfully!\n\n" + \
+			f"Categories created: {stats['categories_created']}\n" + \
+			f"Items created: {stats['items_created']}\n" + \
+			f"Items updated: {stats['items_updated']}\n" + \
+			f"Items skipped: {stats['items_skipped']}"
+		doc.items_created = stats['items_created']
+		doc.categories_created = stats['categories_created']
+		doc.save(ignore_permissions=True)
+		frappe.db.commit()
+		
+		return {
+			'success': True,
+			'message': f"Successfully approved and created {stats['items_created']} items and {stats['categories_created']} categories",
+			'stats': stats
+		}
+		
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Menu Approval Error")
+		frappe.throw(_("Approval failed: {0}").format(str(e)))
 

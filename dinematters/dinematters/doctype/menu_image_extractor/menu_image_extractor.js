@@ -37,10 +37,21 @@ frappe.ui.form.on('Menu Image Extractor', {
 				frappe.set_route('List', 'Menu Category');
 			});
 		}
+		
+		// Add approve button when status is Pending Approval
+		if (frm.doc.extraction_status == 'Pending Approval') {
+			frm.add_custom_button(__('Approve and Create Menu Items'), function() {
+				approve_extracted_data(frm);
+			}).addClass('btn-primary');
+		}
 	},
 	
 	extract_button: function(frm) {
 		extract_menu_data(frm);
+	},
+	
+	approve_button: function(frm) {
+		approve_extracted_data(frm);
 	},
 	
 	menu_images_add: function(frm) {
@@ -131,19 +142,22 @@ function extract_menu_data(frm) {
 								indicator: 'green'
 							}, 10);
 							
-							// Show detailed stats
+							// Show message about review
 							frappe.msgprint({
 								title: __('Extraction Completed'),
-								message: __('Categories created: {0}<br>Items created: {1}<br>Items updated: {2}<br>Items skipped: {3}', 
-									[r.message.stats.categories_created, 
-									 r.message.stats.items_created,
-									 r.message.stats.items_updated,
-									 r.message.stats.items_skipped]),
+								message: __('Extraction completed successfully!<br><br>Please review the extracted data below and click "Approve and Create Menu Items" to add them to the database.'),
 								indicator: 'green'
 							});
 							
-							// Reload the form
+							// Reload the form to show the HTML report
 							frm.reload_doc();
+							
+							// Force refresh of the HTML field after a short delay
+							setTimeout(function() {
+								if (frm.doc.extracted_data_report) {
+									frm.refresh_field('extracted_data_report');
+								}
+							}, 500);
 						} else {
 							console.error('❌ Extraction failed - no success in response');
 							console.log('Response message:', r.message);
@@ -187,6 +201,97 @@ function extract_menu_data(frm) {
 	);
 }
 
+function approve_extracted_data(frm) {
+	console.log('🔍 approve_extracted_data function called');
+	console.log('  Document:', frm.doc.name);
+	
+	// Validate that there's data to approve
+	if (!frm.doc.extracted_categories || frm.doc.extracted_categories.length == 0) {
+		if (!frm.doc.extracted_dishes || frm.doc.extracted_dishes.length == 0) {
+			frappe.msgprint({
+				title: __('No Data to Approve'),
+				message: __('No extracted data found. Please extract menu data first.'),
+				indicator: 'red'
+			});
+			return;
+		}
+	}
+	
+	// Count items
+	const dishes_count = frm.doc.extracted_dishes ? frm.doc.extracted_dishes.length : 0;
+	
+	// Confirm approval
+	frappe.confirm(
+		__('This will create/update {0} dishes in the database. Continue?', 
+		   [dishes_count]),
+		function() {
+			console.log('✅ User confirmed approval');
+			
+			// Call the approval method
+			frappe.call({
+				method: 'dinematters.dinematters.doctype.menu_image_extractor.menu_image_extractor.approve_extracted_data',
+				args: {
+					docname: frm.doc.name
+				},
+				freeze: true,
+				freeze_message: __('Approving and creating menu items...'),
+				callback: function(r) {
+					console.log('📥 Approval API Response:', r);
+					
+					if (r.message && r.message.success) {
+						console.log('✅ Approval successful!');
+						console.log('📊 Stats:', r.message.stats);
+						
+						// Reload the form first to get updated data
+						frm.reload_doc();
+						
+						// Show alert (non-blocking)
+						frappe.show_alert({
+							message: __(r.message.message),
+							indicator: 'green'
+						}, 5);
+						
+						// Show detailed stats in a non-blocking way after a short delay
+						if (r.message.stats) {
+							setTimeout(function() {
+								frappe.msgprint({
+									title: __('Approval Completed'),
+									message: __('Categories created: {0}<br>Items created: {1}<br>Items updated: {2}<br>Items skipped: {3}', 
+										[r.message.stats.categories_created, 
+										 r.message.stats.items_created,
+										 r.message.stats.items_updated,
+										 r.message.stats.items_skipped]),
+									indicator: 'green'
+								});
+							}, 500);
+						}
+					} else {
+						console.error('❌ Approval failed');
+						frappe.msgprint({
+							title: __('Approval Failed'),
+							message: __('An error occurred during approval. Please check the extraction log for details.'),
+							indicator: 'red'
+						});
+						frm.reload_doc();
+					}
+				},
+				error: function(r) {
+					console.error('❌ Approval API call failed:', r);
+					frappe.msgprint({
+						title: __('Approval Failed'),
+						message: __('An error occurred during approval. Please check the extraction log for details.'),
+						indicator: 'red'
+					});
+					frm.reload_doc();
+				}
+			});
+		},
+		function() {
+			console.log('❌ User cancelled approval');
+		}
+	);
+}
+
 function update_status_indicator(frm) {
 	let status = frm.doc.extraction_status;
 	let color = 'blue';
@@ -197,6 +302,8 @@ function update_status_indicator(frm) {
 		color = 'red';
 	} else if (status == 'Processing') {
 		color = 'orange';
+	} else if (status == 'Pending Approval') {
+		color = 'yellow';
 	}
 	
 	frm.dashboard.add_indicator(__('Status: {0}', [status]), color);

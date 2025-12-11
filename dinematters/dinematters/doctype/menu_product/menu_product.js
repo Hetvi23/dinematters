@@ -5,6 +5,14 @@
 // - File type must match media_type (image files for image, video files for video)
 
 frappe.ui.form.on('Menu Product', {
+	product_name: function(frm) {
+		// Auto-generate product_id from product_name when product_name changes
+		if (frm.doc.product_name && !frm.doc.__islocal) {
+			// Only update if document is saved (not new)
+			// The server-side before_save will handle the update
+		}
+	},
+	
 	product_media_add: function(frm) {
 		validate_product_media(frm);
 	},
@@ -22,6 +30,14 @@ frappe.ui.form.on('Menu Product', {
 	},
 	
 	refresh: function(frm) {
+		// Hide product_id field for new documents
+		if (frm.is_new()) {
+			frm.set_df_property('product_id', 'hidden', 1);
+		} else {
+			// Show product_id field for saved documents
+			frm.set_df_property('product_id', 'hidden', 0);
+		}
+		
 		// Validate media on refresh
 		validate_product_media(frm);
 	},

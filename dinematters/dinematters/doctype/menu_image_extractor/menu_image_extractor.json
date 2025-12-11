@@ -11,10 +11,13 @@
   "restaurant_name",
   "column_break_1",
   "extraction_status",
+  "approval_status",
   "section_break_images",
   "menu_images",
   "section_break_extraction",
   "extract_button",
+  "section_break_extracted_data",
+  "extracted_dishes",
   "section_break_results",
   "extraction_log",
   "items_created",
@@ -46,7 +49,15 @@
    "fieldname": "extraction_status",
    "fieldtype": "Select",
    "label": "Extraction Status",
-   "options": "Draft\nProcessing\nCompleted\nFailed",
+   "options": "Draft\nProcessing\nPending Approval\nCompleted\nFailed",
+   "read_only": 1
+  },
+  {
+   "default": "Pending",
+   "fieldname": "approval_status",
+   "fieldtype": "Select",
+   "label": "Approval Status",
+   "options": "Pending\nApproved\nRejected",
    "read_only": 1
   },
   {
@@ -70,6 +81,19 @@
    "fieldname": "extract_button",
    "fieldtype": "Button",
    "label": "Extract Menu Data"
+  },
+  {
+   "fieldname": "section_break_extracted_data",
+   "fieldtype": "Section Break",
+   "label": "Extracted Data (Review and Edit Before Approval)",
+   "depends_on": "eval:doc.extraction_status == 'Pending Approval'"
+  },
+  {
+   "fieldname": "extracted_dishes",
+   "fieldtype": "Table",
+   "label": "Extracted Dishes",
+   "options": "Extracted Dish",
+   "depends_on": "eval:doc.extraction_status == 'Pending Approval'"
   },
   {
    "fieldname": "section_break_results",
