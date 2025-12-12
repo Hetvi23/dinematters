@@ -60,6 +60,7 @@ def generate_product_id_from_name(product_name):
 def extract_menu_data(docname):
 	"""
 	Extract menu data from uploaded images using the external API
+	This function enqueues the extraction as a background job to avoid web server timeouts
 	"""
 	try:
 		doc = frappe.get_doc("Menu Image Extractor", docname)
@@ -71,10 +72,46 @@ def extract_menu_data(docname):
 		if len(doc.menu_images) > 20:
 			frappe.throw(_("Maximum 20 images allowed. Currently {0} images uploaded.").format(len(doc.menu_images)))
 		
-		# Update status
+		# Check if extraction is already in progress
+		if doc.extraction_status == "Processing":
+			frappe.throw(_("Extraction is already in progress. Please wait for it to complete."))
+		
+		# Update status to Processing
 		doc.extraction_status = "Processing"
 		doc.save(ignore_permissions=True)
 		frappe.db.commit()
+		
+		# Enqueue the actual extraction as a background job
+		# Use "long" queue with 3600 second timeout (1 hour)
+		frappe.enqueue(
+			"dinematters.dinematters.doctype.menu_image_extractor.menu_image_extractor._extract_menu_data_internal",
+			docname=docname,
+			queue="long",
+			timeout=3600,  # 1 hour timeout for the background job
+			job_id=f"menu_extraction_{docname}",
+			is_async=True
+		)
+		
+		return {
+			'success': True,
+			'message': _("Extraction started in the background. Please wait for it to complete. You can refresh this page to check the status."),
+			'status': 'queued'
+		}
+		
+	except frappe.exceptions.ValidationError:
+		raise
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Menu Extraction - Enqueue Error")
+		frappe.throw(_("Error starting extraction: {0}").format(str(e)))
+
+
+def _extract_menu_data_internal(docname):
+	"""
+	Internal function that performs the actual menu extraction
+	This runs as a background job to avoid web server timeouts
+	"""
+	try:
+		doc = frappe.get_doc("Menu Image Extractor", docname)
 		
 		start_time = time.time()
 		
@@ -405,21 +442,19 @@ def extract_menu_data(docname):
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Menu Extraction Error")
 		
-		# Update status to failed
+		# Update status to failed in background job
 		try:
 			doc = frappe.get_doc("Menu Image Extractor", docname)
 			doc.extraction_status = "Failed"
-			doc.extraction_log = f"Unexpected Error: {str(e)}\n\n{frappe.get_traceback()}"
+			doc.extraction_log = f"Extraction failed: {str(e)}\n\n{frappe.get_traceback()}"
 			doc.extraction_date = datetime.now()
 			doc.save(ignore_permissions=True)
 			frappe.db.commit()
 		except:
-			pass
+			pass  # If we can't update, at least log the error
 		
-		frappe.throw(
-			_("Extraction failed due to an unexpected error: {0}").format(str(e)),
-			title=_("Extraction Error")
-		)
+		# Re-raise to mark job as failed
+		raise
 
 
 def store_extracted_data(data, extractor_doc):

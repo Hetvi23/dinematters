@@ -160,43 +160,88 @@ function extract_menu_data(frm) {
 					callback: function(r) {
 						console.log('📥 Extraction API Response:', r);
 						clearInterval(progressInterval); // Stop progress updates
-						frappe.show_progress(__('Extracting Menu Data'), 100, 100, __('Extraction completed!'));
-						setTimeout(() => frappe.hide_progress(), 500); // Hide after brief delay
 						
 						if (r.message && r.message.success) {
-							console.log('✅ Extraction successful!');
-							console.log('📊 Stats:', r.message.stats);
-							
-							// Log extracted data preview
-							if (r.message.extracted_data_preview) {
-								console.log('\n📋 Extracted Data Preview:');
-								console.log('  Categories found:', r.message.extracted_data_preview.categories_count);
-								console.log('  Dishes found:', r.message.extracted_data_preview.dishes_count);
-								console.log('\n  Sample Categories:', r.message.extracted_data_preview.sample_categories);
-								console.log('\n  Sample Dishes:', r.message.extracted_data_preview.sample_dishes);
-							}
-							
-							frappe.show_alert({
-								message: __(r.message.message),
-								indicator: 'green'
-							}, 10);
-							
-							// Show message about review
-							frappe.msgprint({
-								title: __('Extraction Completed'),
-								message: __('Extraction completed successfully!<br><br>Please review the extracted data below and click "Approve and Create Menu Items" to add them to the database.'),
-								indicator: 'green'
-							});
-							
-							// Reload the form to show the HTML report
-							frm.reload_doc();
-							
-							// Force refresh of the HTML field after a short delay
-							setTimeout(function() {
-								if (frm.doc.extracted_data_report) {
-									frm.refresh_field('extracted_data_report');
+							// Check if extraction was queued (background job) or completed immediately
+							if (r.message.status === 'queued') {
+								// Background job was queued
+								frappe.hide_progress();
+								frappe.show_alert({
+									message: __(r.message.message || 'Extraction started in the background. Please refresh the page to check status.'),
+									indicator: 'blue'
+								}, 10);
+								
+								frappe.msgprint({
+									title: __('Extraction Started'),
+									message: __('Extraction has been started in the background. This may take several minutes.<br><br>Please refresh this page periodically to check the extraction status. The status will update automatically when extraction completes.'),
+									indicator: 'blue'
+								});
+								
+								// Reload document to show "Processing" status
+								frm.reload_doc();
+								
+								// Start polling for status updates
+								let pollCount = 0;
+								const maxPolls = 120; // Poll for up to 20 minutes (120 * 10 seconds)
+								const pollInterval = setInterval(() => {
+									pollCount++;
+									frm.reload_doc();
+									
+									// Stop polling if status changed from Processing
+									if (frm.doc.extraction_status !== 'Processing') {
+										clearInterval(pollInterval);
+										if (frm.doc.extraction_status === 'Pending Approval') {
+											frappe.show_alert({
+												message: __('Extraction completed! Please review and approve the data.'),
+												indicator: 'green'
+											}, 10);
+										}
+									} else if (pollCount >= maxPolls) {
+										clearInterval(pollInterval);
+										frappe.show_alert({
+											message: __('Extraction is taking longer than expected. Please check back later.'),
+											indicator: 'orange'
+										}, 10);
+									}
+								}, 10000); // Poll every 10 seconds
+								
+							} else {
+								// Immediate completion (shouldn't happen with background jobs, but handle it)
+								frappe.show_progress(__('Extracting Menu Data'), 100, 100, __('Extraction completed!'));
+								setTimeout(() => frappe.hide_progress(), 500);
+								
+								console.log('✅ Extraction successful!');
+								console.log('📊 Stats:', r.message.stats);
+								
+								// Log extracted data preview
+								if (r.message.extracted_data_preview) {
+									console.log('\n📋 Extracted Data Preview:');
+									console.log('  Categories found:', r.message.extracted_data_preview.categories_count);
+									console.log('  Dishes found:', r.message.extracted_data_preview.dishes_count);
 								}
-							}, 500);
+								
+								frappe.show_alert({
+									message: __(r.message.message),
+									indicator: 'green'
+								}, 10);
+								
+								// Show message about review
+								frappe.msgprint({
+									title: __('Extraction Completed'),
+									message: __('Extraction completed successfully!<br><br>Please review the extracted data below and click "Approve and Create Menu Items" to add them to the database.'),
+									indicator: 'green'
+								});
+								
+								// Reload the form to show the HTML report
+								frm.reload_doc();
+								
+								// Force refresh of the HTML field after a short delay
+								setTimeout(function() {
+									if (frm.doc.extracted_data_report) {
+										frm.refresh_field('extracted_data_report');
+									}
+								}, 500);
+							}
 						} else {
 							console.error('❌ Extraction failed - no success in response');
 							console.log('Response message:', r.message);
@@ -209,18 +254,58 @@ function extract_menu_data(frm) {
 						}
 						frappe.hide_progress();
 						
-						// Check if it's a timeout error
+						// Determine error message based on response
 						let errorMessage = __('An error occurred during extraction. Please check the extraction log for details.');
-						const errorMsgStr = r.message ? (typeof r.message === 'string' ? r.message : JSON.stringify(r.message)) : '';
-						if (errorMsgStr && errorMsgStr.includes('Timeout')) {
-							errorMessage = __('Request Timeout: The extraction took longer than 1 hour to complete. Please try with fewer images or check your network connection.');
+						let errorTitle = __('Extraction Failed');
+						
+						// Handle different error scenarios
+						if (!r) {
+							// No response object (network error, timeout, etc.)
+							errorMessage = __('Request Timed Out: The extraction request timed out. This may happen if the extraction takes too long. Please try with fewer images or check your network connection.');
+							errorTitle = __('Request Timed Out');
+						} else {
+							// Check for HTTP status codes
+							const statusCode = r.status || (r.xhr && r.xhr.status);
+							if (statusCode === 504 || statusCode === 408) {
+								errorMessage = __('Gateway Timeout: The extraction request timed out at the server. The extraction may still be processing. Please wait a few minutes and refresh the document to check the status.');
+								errorTitle = __('Request Timed Out');
+							} else if (statusCode === 500) {
+								errorMessage = __('Server Error: An error occurred on the server during extraction. Please check the extraction log for details.');
+							} else {
+								// Try to extract error message from response
+								let errorMsgStr = '';
+								if (r.message) {
+									errorMsgStr = typeof r.message === 'string' ? r.message : JSON.stringify(r.message);
+								} else if (r.error && r.error.message) {
+									errorMsgStr = typeof r.error.message === 'string' ? r.error.message : JSON.stringify(r.error.message);
+								} else if (r._server_messages) {
+									try {
+										const messages = JSON.parse(r._server_messages);
+										if (messages && messages.length > 0) {
+											const msg = JSON.parse(messages[0]);
+											errorMsgStr = msg.message || msg.exc || '';
+										}
+									} catch (e) {
+										console.error('Error parsing server messages:', e);
+									}
+								}
+								
+								if (errorMsgStr && errorMsgStr.includes('Timeout')) {
+									errorMessage = __('Request Timeout: The extraction took longer than 1 hour to complete. Please try with fewer images or check your network connection.');
+									errorTitle = __('Request Timed Out');
+								} else if (errorMsgStr) {
+									errorMessage = errorMsgStr.length > 200 ? errorMsgStr.substring(0, 200) + '...' : errorMsgStr;
+								}
+							}
 						}
 						
 						frappe.msgprint({
-							title: __('Extraction Failed'),
+							title: errorTitle,
 							message: errorMessage,
 							indicator: 'red'
 						});
+						
+						// Reload document to check if extraction status changed
 						frm.reload_doc();
 					}
 				});
