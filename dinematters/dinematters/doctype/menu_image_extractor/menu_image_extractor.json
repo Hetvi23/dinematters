@@ -26,8 +26,12 @@
   "column_break_stats",
   "extraction_date",
   "processing_time",
+  "column_break_batch",
+  "total_batches",
+  "completed_batches",
   "section_break_raw_response",
-  "raw_response"
+  "raw_response",
+  "batch_results"
  ],
  "fields": [
   {
@@ -149,6 +153,24 @@
    "read_only": 1
   },
   {
+   "fieldname": "column_break_batch",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "total_batches",
+   "fieldtype": "Int",
+   "label": "Total Batches",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "completed_batches",
+   "fieldtype": "Int",
+   "label": "Completed Batches",
+   "read_only": 1
+  },
+  {
    "collapsible": 1,
    "fieldname": "section_break_raw_response",
    "fieldtype": "Section Break",
@@ -160,6 +182,14 @@
    "label": "Raw Response",
    "options": "JSON",
    "read_only": 1
+  },
+  {
+   "fieldname": "batch_results",
+   "fieldtype": "Code",
+   "label": "Batch Results (Internal)",
+   "options": "JSON",
+   "read_only": 1,
+   "hidden": 1
   }
  ],
  "index_web_pages_for_search": 1,

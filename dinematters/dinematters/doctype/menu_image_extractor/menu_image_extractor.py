@@ -80,9 +80,11 @@ def generate_category_id_from_name(category_name):
 def extract_menu_data(docname):
 	"""
 	Extract menu data from uploaded images using the external API
-	This function enqueues the extraction as a background job to avoid web server timeouts
+	This function immediately enqueues batch processing jobs - no timeouts, no waiting
+	Returns instantly after queuing all batches
 	"""
 	try:
+		# Get document for validation
 		doc = frappe.get_doc("Menu Image Extractor", docname)
 		
 		# Validate images
@@ -96,33 +98,311 @@ def extract_menu_data(docname):
 		if doc.extraction_status == "Processing":
 			frappe.throw(_("Extraction is already in progress. Please wait for it to complete."))
 		
-		# Update status to Processing
-		doc.extraction_status = "Processing"
-		doc.save(ignore_permissions=True)
+		# Update status to Processing (minimal save)
+		doc.db_set('extraction_status', 'Processing', update_modified=False)
+		doc.db_set('extraction_log', _("Extraction started. Processing images in batches..."), update_modified=False)
 		frappe.db.commit()
 		
-		# Enqueue the actual extraction as a background job
-		# Use "long" queue with 3600 second timeout (1 hour)
-		frappe.enqueue(
-			"dinematters.dinematters.doctype.menu_image_extractor.menu_image_extractor._extract_menu_data_internal",
-			docname=docname,
-			queue="long",
-			timeout=3600,  # 1 hour timeout for the background job
-			job_id=f"menu_extraction_{docname}",
-			is_async=True
-		)
+		# Split images into batches (5 images per batch for optimal processing)
+		batch_size = 5
+		image_batches = []
+		for i in range(0, len(doc.menu_images), batch_size):
+			batch = doc.menu_images[i:i + batch_size]
+			image_batches.append([img.menu_image for img in batch])
 		
+		# Store batch information
+		doc.db_set('total_batches', len(image_batches), update_modified=False)
+		doc.db_set('completed_batches', 0, update_modified=False)
+		frappe.db.commit()
+		
+		# Enqueue each batch as a separate job - no timeout, process in parallel
+		for batch_idx, image_batch in enumerate(image_batches):
+			frappe.enqueue(
+				"dinematters.dinematters.doctype.menu_image_extractor.menu_image_extractor._extract_batch_internal",
+				docname=docname,
+				batch_images=image_batch,
+				batch_number=batch_idx + 1,
+				total_batches=len(image_batches),
+				queue="long",
+				timeout=7200,  # 2 hours per batch (very generous)
+				job_id=f"menu_extraction_{docname}_batch_{batch_idx + 1}",
+				is_async=True,
+				now=False  # Don't wait - queue immediately
+			)
+		
+		# Return immediately - all batches are queued
 		return {
 			'success': True,
-			'message': _("Extraction started in the background. Please wait for it to complete. You can refresh this page to check the status."),
-			'status': 'queued'
+			'message': _("Extraction started in the background. Processing {0} images in {1} batch(es). Please wait for it to complete.").format(
+				len(doc.menu_images), len(image_batches)
+			),
+			'status': 'queued',
+			'total_images': len(doc.menu_images),
+			'total_batches': len(image_batches)
 		}
 		
-	except frappe.exceptions.ValidationError:
+		except frappe.exceptions.ValidationError:
 		raise
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Menu Extraction - Enqueue Error")
 		frappe.throw(_("Error starting extraction: {0}").format(str(e)))
+
+
+def _extract_batch_internal(docname, batch_images, batch_number, total_batches):
+	"""
+	Process a single batch of images
+	This runs as a background job - no timeouts, processes in parallel with other batches
+	"""
+	try:
+		doc = frappe.get_doc("Menu Image Extractor", docname)
+		
+		# Check if document still exists and is in Processing status
+		if doc.extraction_status != "Processing":
+			frappe.log_error(
+				f"Batch {batch_number} skipped: Document status is {doc.extraction_status}, not Processing",
+				"Menu Extraction - Batch Skip"
+			)
+			return
+		
+		start_time = time.time()
+		
+		# Prepare form data
+		form_data = {}
+		restaurant_name_for_api = doc.restaurant_name
+		if not restaurant_name_for_api and doc.restaurant:
+			restaurant_name_for_api = frappe.db.get_value("Restaurant", doc.restaurant, "restaurant_name")
+		
+		if restaurant_name_for_api:
+			form_data['restaurant_name'] = restaurant_name_for_api
+		
+		form_data['save_to_disk'] = 'false'
+		
+		# Get image files for this batch
+		image_files = []
+		file_handles = []
+		
+		for image_url in batch_images:
+			try:
+				file_path = get_file_path(image_url)
+				if not file_path or not os.path.exists(file_path):
+					if image_url.startswith('/'):
+						image_url = image_url[1:]
+					file_path = frappe.get_site_path('public', 'files', image_url)
+					if not os.path.exists(file_path):
+						file_path = frappe.get_site_path('private', 'files', image_url)
+					if not os.path.exists(file_path):
+						file_path = frappe.get_site_path('public', image_url)
+				
+				if not file_path or not os.path.exists(file_path):
+					frappe.log_error(f"Image file not found: {image_url}", "Menu Extraction - Batch File Error")
+					continue
+				
+				file_handle = open(file_path, 'rb')
+				file_handles.append(file_handle)
+				filename = os.path.basename(file_path)
+				file_ext = os.path.splitext(filename)[1].lower()
+				content_type_map = {
+					'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+					'.webp': 'image/webp', '.gif': 'image/gif'
+				}
+				content_type = content_type_map.get(file_ext, 'image/jpeg')
+				image_files.append(('images', (filename, file_handle, content_type)))
+			except Exception as e:
+				frappe.log_error(f"Error processing image {image_url}: {str(e)}", "Menu Extraction - Batch Image Error")
+				continue
+		
+		if not image_files:
+			frappe.log_error(f"Batch {batch_number}: No valid image files found", "Menu Extraction - Batch Empty")
+			# Update batch completion
+			_update_batch_completion(docname, batch_number, total_batches, None, None)
+			return
+		
+		# Call the extraction API
+		api_url = "https://api.dinematters.com/menu-extraction/api/v1/extraction/extract"
+		headers = {'Expect': ''}
+		
+		try:
+			response = requests.post(
+				api_url,
+				files=image_files,
+				data=form_data,
+				headers=headers,
+				timeout=7200  # 2 hours per batch
+			)
+			
+			# Close file handles
+			for file_handle in file_handles:
+				try:
+					file_handle.close()
+				except:
+					pass
+			
+			response.raise_for_status()
+			result = response.json()
+			
+			processing_time = time.time() - start_time
+			
+			# Process batch result
+			if result.get('success'):
+				data = result.get('data', {})
+				# Store batch results temporarily
+				_store_batch_results(docname, batch_number, data, processing_time)
+			else:
+				frappe.log_error(
+					f"Batch {batch_number} API returned success=False: {result.get('message', 'Unknown error')}",
+					"Menu Extraction - Batch API Error"
+				)
+				_update_batch_completion(docname, batch_number, total_batches, None, None)
+		
+		except Exception as e:
+			# Close file handles on error
+			for file_handle in file_handles:
+				try:
+					file_handle.close()
+				except:
+					pass
+			
+			frappe.log_error(
+				f"Batch {batch_number} error: {str(e)}\n{frappe.get_traceback()}",
+				"Menu Extraction - Batch Error"
+			)
+			_update_batch_completion(docname, batch_number, total_batches, None, None)
+	
+	except Exception as e:
+		frappe.log_error(
+			f"Batch {batch_number} fatal error: {str(e)}\n{frappe.get_traceback()}",
+			"Menu Extraction - Batch Fatal Error"
+		)
+		_update_batch_completion(docname, batch_number, total_batches, None, None)
+
+
+def _store_batch_results(docname, batch_number, data, processing_time):
+	"""Store results from a single batch and check if all batches are complete"""
+	try:
+		doc = frappe.get_doc("Menu Image Extractor", docname)
+		
+		# Get existing batch results or initialize
+		batch_results = json.loads(doc.get('batch_results') or '{}')
+		batch_results[str(batch_number)] = {
+			'data': data,
+			'processing_time': processing_time,
+			'completed_at': datetime.now().isoformat()
+		}
+		
+		# Store batch results
+		doc.db_set('batch_results', json.dumps(batch_results), update_modified=False)
+		
+		# Update completed batches count
+		completed = doc.get('completed_batches') or 0
+		doc.db_set('completed_batches', completed + 1, update_modified=False)
+		
+		total_batches = doc.get('total_batches') or 1
+		
+		# Check if all batches are complete
+		if completed + 1 >= total_batches:
+			# All batches complete - aggregate and process
+			_aggregate_and_process_batches(docname)
+		else:
+			# Update progress log
+			doc.db_set('extraction_log', 
+				_("Processing batches... {0}/{1} completed").format(completed + 1, total_batches),
+				update_modified=False)
+		
+		frappe.db.commit()
+	
+	except Exception as e:
+		frappe.log_error(
+			f"Error storing batch {batch_number} results: {str(e)}\n{frappe.get_traceback()}",
+			"Menu Extraction - Store Batch Error"
+		)
+
+
+def _update_batch_completion(docname, batch_number, total_batches, data, processing_time):
+	"""Update batch completion status"""
+	try:
+		doc = frappe.get_doc("Menu Image Extractor", docname)
+		completed = doc.get('completed_batches') or 0
+		doc.db_set('completed_batches', completed + 1, update_modified=False)
+		
+		if completed + 1 >= total_batches:
+			# All batches complete (even if some failed)
+			_aggregate_and_process_batches(docname)
+		else:
+			doc.db_set('extraction_log',
+				_("Processing batches... {0}/{1} completed").format(completed + 1, total_batches),
+				update_modified=False)
+		
+		frappe.db.commit()
+	except Exception as e:
+		frappe.log_error(f"Error updating batch completion: {str(e)}", "Menu Extraction - Batch Update Error")
+
+
+def _aggregate_and_process_batches(docname):
+	"""Aggregate results from all batches and process them"""
+	try:
+		doc = frappe.get_doc("Menu Image Extractor", docname)
+		
+		# Get all batch results
+		batch_results = json.loads(doc.get('batch_results') or '{}')
+		
+		# Aggregate categories and dishes from all batches
+		all_categories = {}
+		all_dishes = []
+		
+		for batch_num, batch_data in batch_results.items():
+			data = batch_data.get('data', {})
+			categories = data.get('categories', [])
+			dishes = data.get('dishes', [])
+			
+			# Aggregate categories (deduplicate by id)
+			if isinstance(categories, list):
+				for cat in categories:
+					if isinstance(cat, dict) and cat.get('id'):
+						all_categories[cat['id']] = cat
+			
+			# Aggregate dishes
+			if isinstance(dishes, list):
+				all_dishes.extend(dishes)
+		
+		# Create aggregated data structure
+		aggregated_data = {
+			'categories': list(all_categories.values()),
+			'dishes': all_dishes,
+			'restaurantBrand': {}  # Can be merged if needed
+		}
+		
+		# Store aggregated data
+		store_extracted_data(aggregated_data, doc)
+		
+		# Update status
+		doc.extraction_status = "Pending Approval"
+		doc.approval_status = "Pending"
+		doc.extraction_log = f"Extraction completed successfully!\n\n" + \
+			f"Categories extracted: {len(all_categories)}\n" + \
+			f"Dishes extracted: {len(all_dishes)}\n\n" + \
+			"Please review the extracted data below and click 'Approve and Create Menu Items' to add them to the database."
+		doc.extraction_date = datetime.now()
+		
+		# Calculate total processing time
+		total_time = sum(b.get('processing_time', 0) for b in batch_results.values())
+		doc.processing_time = f"{total_time:.2f} seconds"
+		
+		# Store raw response
+		doc.raw_response = json.dumps({'data': aggregated_data}, indent=2)
+		
+		doc.save(ignore_permissions=True)
+		frappe.db.commit()
+		
+	except Exception as e:
+		frappe.log_error(
+			f"Error aggregating batches: {str(e)}\n{frappe.get_traceback()}",
+			"Menu Extraction - Aggregate Error"
+		)
+		doc = frappe.get_doc("Menu Image Extractor", docname)
+		doc.extraction_status = "Failed"
+		doc.extraction_log = f"Error aggregating batch results: {str(e)}"
+		doc.save(ignore_permissions=True)
+		frappe.db.commit()
 
 
 def _extract_menu_data_internal(docname):
