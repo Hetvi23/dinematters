@@ -141,7 +141,7 @@ def extract_menu_data(docname):
 			'total_batches': len(image_batches)
 		}
 		
-		except frappe.exceptions.ValidationError:
+	except frappe.exceptions.ValidationError:
 		raise
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Menu Extraction - Enqueue Error")
@@ -1109,47 +1109,51 @@ def process_extracted_data(data, extractor_doc):
 			title=_("Restaurant Required")
 		)
 	
-		# Extract data sections
-		categories_data = data.get('categories', [])
-		dishes_data = data.get('dishes', [])
-		restaurant_brand = data.get('restaurantBrand', {})
+	# Extract data sections
+	categories_data = data.get('categories', [])
+	dishes_data = data.get('dishes', [])
+	restaurant_brand = data.get('restaurantBrand', {})
+	
+	# Ensure categories_data and dishes_data are lists
+	if not isinstance(categories_data, list):
+		if isinstance(categories_data, dict):
+			categories_data = list(categories_data.values())
+		else:
+			categories_data = []
+	
+	if not isinstance(dishes_data, list):
+		if isinstance(dishes_data, dict):
+			dishes_data = list(dishes_data.values())
+		else:
+			dishes_data = []
+	
+	# If no categories in API response, extract unique categories from dishes
+	if not categories_data and dishes_data:
+		unique_categories = {}
+		for dish in dishes_data:
+			if isinstance(dish, dict):
+				category_name = dish.get('category') or dish.get('mainCategory')
+				if category_name and category_name not in unique_categories:
+					# Create a category entry from dish data
+					category_id = generate_category_id_from_name(category_name)
+					unique_categories[category_name] = {
+						'id': category_id,
+						'name': category_name,
+						'displayName': category_name,
+						'description': '',
+						'isSpecial': False
+					}
 		
-		# Ensure categories_data and dishes_data are lists
-		if not isinstance(categories_data, list):
-			if isinstance(categories_data, dict):
-				categories_data = list(categories_data.values())
-			else:
-				categories_data = []
-		
-		if not isinstance(dishes_data, list):
-			if isinstance(dishes_data, dict):
-				dishes_data = list(dishes_data.values())
-			else:
-				dishes_data = []
-		
-		# If no categories in API response, extract unique categories from dishes
-		if not categories_data and dishes_data:
-			unique_categories = {}
-			for dish in dishes_data:
-				if isinstance(dish, dict):
-					category_name = dish.get('category') or dish.get('mainCategory')
-					if category_name and category_name not in unique_categories:
-						# Create a category entry from dish data
-						category_id = generate_category_id_from_name(category_name)
-						unique_categories[category_name] = {
-							'id': category_id,
-							'name': category_name,
-							'displayName': category_name,
-							'description': '',
-							'isSpecial': False
-						}
-			
-			if unique_categories:
-				categories_data = list(unique_categories.values())
-				frappe.log_error(
-					f"Categories extracted from dishes: {len(categories_data)} categories found",
-					"Menu Category Auto-Extraction"
-				)
+		if unique_categories:
+			categories_data = list(unique_categories.values())
+			frappe.log_error(
+				f"Categories extracted from dishes: {len(categories_data)} categories found",
+				"Menu Category Auto-Extraction"
+			)
+	
+	# Ensure categories_data is always a list (safety check)
+	if not isinstance(categories_data, list):
+		categories_data = []
 	
 	# Create or update categories
 	category_map = {}  # Map category names to category IDs
@@ -1169,31 +1173,37 @@ def process_extracted_data(data, extractor_doc):
 				)
 				continue
 			
-			# Check if category exists (by category_id field, not by name)
-			existing_category = frappe.db.get_value(
-				"Menu Category",
-				{"category_id": category_id, "restaurant": restaurant},
-				"name"
-			)
+			# Check if category exists by category_id (globally unique)
+			# Since autoname is "field:category_id", the document name IS the category_id
+			# So we can check directly by document name
+			if frappe.db.exists("Menu Category", category_id):
+				# Category already exists - skip creation/update, just add to map
+				# This prevents duplicate entry errors
+				category_map[category_name] = category_id
+				# Don't log this as it's expected behavior - just continue
+				continue  # Skip to next category
 			
-			if existing_category:
-				# Update existing category
-				cat_doc = frappe.get_doc("Menu Category", existing_category)
-			else:
-				# Create new category
+			# Category doesn't exist - create new one
+			try:
 				cat_doc = frappe.new_doc("Menu Category")
 				cat_doc.category_id = category_id
+				cat_doc.restaurant = restaurant
+				cat_doc.category_name = category_name
+				cat_doc.display_name = cat_data.get('displayName', category_name)
+				cat_doc.description = cat_data.get('description', '')
+				cat_doc.is_special = 1 if cat_data.get('isSpecial') else 0
+				
+				cat_doc.save(ignore_permissions=True)
 				stats['categories_created'] += 1
-			
-			# Set restaurant (mandatory field)
-			cat_doc.restaurant = restaurant
-			cat_doc.category_name = category_name
-			cat_doc.display_name = cat_data.get('displayName', category_name)
-			cat_doc.description = cat_data.get('description', '')
-			cat_doc.is_special = 1 if cat_data.get('isSpecial') else 0
-			
-			cat_doc.save(ignore_permissions=True)
-			category_map[category_name] = category_id
+				category_map[category_name] = category_id
+			except frappe.exceptions.UniqueValidationError:
+				# Race condition: category was created by another process
+				# Just use the existing one
+				category_map[category_name] = category_id
+				frappe.log_error(
+					f"Category {category_id} was created by another process. Using existing category.",
+					"Menu Category - Race Condition"
+				)
 			
 		except Exception as e:
 			error_msg = f"Error creating/updating category {category_id or 'unknown'}: {str(e)[:140]}"
@@ -1306,13 +1316,18 @@ def process_extracted_data(data, extractor_doc):
 				if not options_list or len(options_list) == 0:
 					continue
 				
-				# Filter out invalid option entries
+				# Filter out invalid option entries (must have 'label' field)
 				valid_options = [opt for opt in options_list if isinstance(opt, dict) and opt.get('label')]
 				
-				# Skip if no valid options after filtering
-				if not valid_options:
+				# Skip if no valid options after filtering (options field is required)
+				if not valid_options or len(valid_options) == 0:
+					frappe.log_error(
+						f"Skipping customization question '{custom_data.get('title', 'unknown')}' - no valid options found",
+						"Menu Product - Skip Customization Question"
+					)
 					continue
 				
+				# Create customization question row
 				custom_row = product_doc.append('customization_questions', {})
 				custom_row.question_id = custom_data.get('id', '')
 				custom_row.title = custom_data.get('title', '')
@@ -1321,8 +1336,13 @@ def process_extracted_data(data, extractor_doc):
 				custom_row.is_required = 1 if custom_data.get('required') else 0
 				custom_row.display_order = custom_data.get('displayOrder', 0)
 				
-				# Handle options (we know they exist and are valid at this point)
+				# Append options - this is required, so we must have at least one
+				options_appended = 0
 				for option_data in valid_options:
+					# Double-check that label exists before appending
+					if not option_data.get('label'):
+						continue
+					
 					option_row = custom_row.append('options', {})
 					option_row.option_id = option_data.get('id', '')
 					option_row.label = option_data.get('label', '')
@@ -1330,6 +1350,17 @@ def process_extracted_data(data, extractor_doc):
 					option_row.is_default = 1 if option_data.get('isDefault') else 0
 					option_row.is_vegetarian = 1 if option_data.get('isVegetarian') else 0
 					option_row.display_order = option_data.get('displayOrder', 0)
+					options_appended += 1
+				
+				# Safety check: if no options were actually appended, remove the question
+				# This prevents "Data missing in table: Options" error
+				if options_appended == 0:
+					# Remove the last appended row (the one without options)
+					product_doc.customization_questions.pop()
+					frappe.log_error(
+						f"Removed customization question '{custom_data.get('title', 'unknown')}' - no options could be appended",
+						"Menu Product - Remove Empty Customization Question"
+					)
 		
 		try:
 			product_doc.save(ignore_permissions=True)

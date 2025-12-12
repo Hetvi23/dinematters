@@ -168,32 +168,26 @@ function extract_menu_data(frm) {
 								// Background job was queued
 								frappe.hide_progress();
 								
-								// Reload document to show "Processing" status
+								// Show success message with batch info
+								if (r.message.total_batches) {
+									frappe.show_alert({
+										message: __('Extraction started! Processing {0} images in {1} batch(es).').format(
+											r.message.total_images || '?',
+											r.message.total_batches
+										),
+										indicator: 'blue'
+									}, 10);
+								} else {
+									frappe.show_alert({
+										message: __(r.message.message || 'Extraction started in the background.'),
+										indicator: 'blue'
+									}, 10);
+								}
+								
+								// Reload document to show "Processing" status and batch info
 								frm.reload_doc();
 								
-								// Start enhanced progress bar for queued job
-								let progressPercent = 0;
-								let progressMessage = __('Extraction queued and starting...');
-								const progressUpdateInterval = setInterval(() => {
-									progressPercent = Math.min(progressPercent + 0.5, 95); // Gradually increase to 95%
-									
-									// Update message based on progress
-									if (progressPercent < 10) {
-										progressMessage = __('Initializing extraction...');
-									} else if (progressPercent < 30) {
-										progressMessage = __('Uploading images to API...');
-									} else if (progressPercent < 60) {
-										progressMessage = __('Analyzing menu images with AI...');
-									} else if (progressPercent < 85) {
-										progressMessage = __('Processing extracted data...');
-									} else {
-										progressMessage = __('Finalizing extraction...');
-									}
-									
-									frappe.show_progress(__('Extracting Menu Data'), Math.floor(progressPercent), 100, progressMessage);
-								}, 5000); // Update every 5 seconds
-								
-								// Start enhanced progress and polling
+								// Start enhanced progress and polling (with batch tracking)
 								startEnhancedProgressAndPolling(frm);
 								
 							} else {
