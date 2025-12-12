@@ -1,0 +1,235 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:restaurant",
+ "creation": "2025-01-15 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "issingle": 0,
+ "field_order": [
+  "restaurant",
+  "section_break_branding",
+  "restaurant_name",
+  "tagline",
+  "subtitle",
+  "description",
+  "column_break_branding",
+  "primary_color",
+  "default_theme",
+  "logo",
+  "hero_video",
+  "apple_touch_icon",
+  "section_break_color_palette",
+  "color_palette_violet",
+  "color_palette_indigo",
+  "color_palette_blue",
+  "color_palette_green",
+  "color_palette_yellow",
+  "color_palette_orange",
+  "color_palette_red",
+  "section_break_settings",
+  "currency",
+  "enable_table_booking",
+  "enable_banquet_booking",
+  "column_break_settings",
+  "enable_events",
+  "enable_offers",
+  "enable_coupons"
+ ],
+ "fields": [
+  {
+   "fieldname": "restaurant",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Restaurant",
+   "options": "Restaurant",
+   "reqd": 1,
+   "search_index": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "section_break_branding",
+   "fieldtype": "Section Break",
+   "label": "Branding"
+  },
+  {
+   "fieldname": "restaurant_name",
+   "fieldtype": "Data",
+   "label": "Restaurant Name"
+  },
+  {
+   "fieldname": "tagline",
+   "fieldtype": "Data",
+   "label": "Tagline"
+  },
+  {
+   "fieldname": "subtitle",
+   "fieldtype": "Data",
+   "label": "Subtitle"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "column_break_branding",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "primary_color",
+   "fieldtype": "Data",
+   "label": "Primary Color"
+  },
+  {
+   "fieldname": "default_theme",
+   "fieldtype": "Select",
+   "label": "Default Theme",
+   "options": "light\ndark"
+  },
+  {
+   "fieldname": "logo",
+   "fieldtype": "Attach Image",
+   "label": "Logo"
+  },
+  {
+   "fieldname": "hero_video",
+   "fieldtype": "Data",
+   "label": "Hero Video URL"
+  },
+  {
+   "fieldname": "apple_touch_icon",
+   "fieldtype": "Attach Image",
+   "label": "Apple Touch Icon"
+  },
+  {
+   "fieldname": "section_break_color_palette",
+   "fieldtype": "Section Break",
+   "label": "Color Palette"
+  },
+  {
+   "fieldname": "color_palette_violet",
+   "fieldtype": "Data",
+   "label": "Violet"
+  },
+  {
+   "fieldname": "color_palette_indigo",
+   "fieldtype": "Data",
+   "label": "Indigo"
+  },
+  {
+   "fieldname": "color_palette_blue",
+   "fieldtype": "Data",
+   "label": "Blue"
+  },
+  {
+   "fieldname": "color_palette_green",
+   "fieldtype": "Data",
+   "label": "Green"
+  },
+  {
+   "fieldname": "color_palette_yellow",
+   "fieldtype": "Data",
+   "label": "Yellow"
+  },
+  {
+   "fieldname": "color_palette_orange",
+   "fieldtype": "Data",
+   "label": "Orange"
+  },
+  {
+   "fieldname": "color_palette_red",
+   "fieldtype": "Data",
+   "label": "Red"
+  },
+  {
+   "fieldname": "section_break_settings",
+   "fieldtype": "Section Break",
+   "label": "Settings"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "default": "USD"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_table_booking",
+   "fieldtype": "Check",
+   "label": "Enable Table Booking"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_banquet_booking",
+   "fieldtype": "Check",
+   "label": "Enable Banquet Booking"
+  },
+  {
+   "fieldname": "column_break_settings",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_events",
+   "fieldtype": "Check",
+   "label": "Enable Events"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_offers",
+   "fieldtype": "Check",
+   "label": "Enable Offers"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_coupons",
+   "fieldtype": "Check",
+   "label": "Enable Coupons"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-01-15 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Dinematters",
+ "name": "Restaurant Config",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Restaurant Admin",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Restaurant Staff"
+  },
+  {
+   "read": 1,
+   "role": "All"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "restaurant",
+ "sort_order": "ASC",
+ "states": [],
+ "track_changes": 1
+}

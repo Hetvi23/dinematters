@@ -14,7 +14,13 @@ import re
 
 
 class MenuImageExtractor(Document):
-	pass
+	def validate(self):
+		"""Auto-fill restaurant_name from restaurant field if not provided"""
+		if self.restaurant and not self.restaurant_name:
+			# Get restaurant name from the selected restaurant
+			restaurant_name = frappe.db.get_value("Restaurant", self.restaurant, "restaurant_name")
+			if restaurant_name:
+				self.restaurant_name = restaurant_name
 
 
 def generate_product_id_from_name(product_name):
@@ -76,9 +82,14 @@ def extract_menu_data(docname):
 		files = []
 		form_data = {}
 		
-		# Add restaurant name if provided
-		if doc.restaurant_name:
-			form_data['restaurant_name'] = doc.restaurant_name
+		# Add restaurant name for API (use restaurant field if restaurant_name not provided)
+		restaurant_name_for_api = doc.restaurant_name
+		if not restaurant_name_for_api and doc.restaurant:
+			# Get restaurant name from the selected restaurant
+			restaurant_name_for_api = frappe.db.get_value("Restaurant", doc.restaurant, "restaurant_name")
+		
+		if restaurant_name_for_api:
+			form_data['restaurant_name'] = restaurant_name_for_api
 		
 		form_data['save_to_disk'] = 'false'
 		
@@ -148,7 +159,7 @@ def extract_menu_data(docname):
 			frappe.throw(_("No valid image files found"))
 		
 		# Call the extraction API
-		api_url = "https://dinematters-backend.onrender.com/menu-extraction/api/v1/extraction/extract"
+		api_url = "https://api.dinematters.com/menu-extraction/api/v1/extraction/extract"
 		
 		# Headers to prevent 417 Expectation Failed error
 		# Disable Expect: 100-continue header for file uploads
@@ -172,7 +183,7 @@ def extract_menu_data(docname):
 				files=image_files,
 				data=form_data,
 				headers=headers,
-				timeout=300  # 5 minutes timeout
+				timeout=3600  # 1 hour timeout (matches API server configuration)
 			)
 			
 			# Close all file handles
@@ -269,7 +280,7 @@ def extract_menu_data(docname):
 				except:
 					pass
 			frappe.throw(
-				_("Request Timeout: The API request took longer than 5 minutes to complete. "
+				_("Request Timeout: The API request took longer than 1 hour to complete. "
 				  "Please try with fewer images or check your network connection."),
 				title=_("Request Timeout")
 			)
@@ -735,6 +746,34 @@ def process_extracted_data(data, extractor_doc):
 		'items_skipped': 0
 	}
 	
+	# Get restaurant from extractor document
+	restaurant = None
+	
+	# First, try to use the restaurant Link field (preferred)
+	if extractor_doc.restaurant:
+		restaurant = extractor_doc.restaurant
+		# Validate restaurant exists
+		if not frappe.db.exists("Restaurant", restaurant):
+			frappe.throw(
+				_("Selected restaurant '{0}' does not exist. Please select a valid restaurant.").format(restaurant),
+				title=_("Invalid Restaurant")
+			)
+	
+	# Fallback: Try to find restaurant by restaurant_name (for backward compatibility)
+	if not restaurant and extractor_doc.restaurant_name:
+		# Try to find restaurant by restaurant_name or restaurant_id
+		restaurant = frappe.db.get_value("Restaurant", {"restaurant_name": extractor_doc.restaurant_name}, "name")
+		if not restaurant:
+			# Try by restaurant_id (slug format)
+			restaurant_id = extractor_doc.restaurant_name.lower().strip().replace(" ", "-")
+			restaurant = frappe.db.get_value("Restaurant", {"restaurant_id": restaurant_id}, "name")
+	
+	if not restaurant:
+		frappe.throw(
+			_("Restaurant is required. Please select a restaurant from the Restaurant field."),
+			title=_("Restaurant Required")
+		)
+	
 	# Extract data sections
 	categories_data = data.get('categories', [])
 	dishes_data = data.get('dishes', [])
@@ -776,6 +815,8 @@ def process_extracted_data(data, extractor_doc):
 			cat_doc.category_id = category_id
 			stats['categories_created'] += 1
 		
+		# Set restaurant (mandatory field)
+		cat_doc.restaurant = restaurant
 		cat_doc.category_name = category_name
 		cat_doc.display_name = cat_data.get('displayName', category_name)
 		cat_doc.description = cat_data.get('description', '')
@@ -820,6 +861,9 @@ def process_extracted_data(data, extractor_doc):
 			product_doc = frappe.new_doc("Menu Product")
 			product_doc.product_id = product_id
 			stats['items_created'] += 1
+		
+		# Set restaurant (mandatory field)
+		product_doc.restaurant = restaurant
 		
 		# Set basic fields
 		product_doc.product_name = product_name
@@ -875,6 +919,24 @@ def process_extracted_data(data, extractor_doc):
 				if not isinstance(custom_data, dict):
 					continue
 				
+				# Get options list
+				options_list = custom_data.get('options')
+				
+				# Ensure options_list is a list
+				if not isinstance(options_list, list):
+					options_list = []
+				
+				# Skip questions without options (options field is required in Customization Question)
+				if not options_list or len(options_list) == 0:
+					continue
+				
+				# Filter out invalid option entries
+				valid_options = [opt for opt in options_list if isinstance(opt, dict) and opt.get('label')]
+				
+				# Skip if no valid options after filtering
+				if not valid_options:
+					continue
+				
 				custom_row = product_doc.append('customization_questions', {})
 				custom_row.question_id = custom_data.get('id', '')
 				custom_row.title = custom_data.get('title', '')
@@ -883,24 +945,34 @@ def process_extracted_data(data, extractor_doc):
 				custom_row.is_required = 1 if custom_data.get('required') else 0
 				custom_row.display_order = custom_data.get('displayOrder', 0)
 				
-				# Handle options
-				if custom_data.get('options'):
-					for option_data in custom_data.get('options', []):
-						if not isinstance(option_data, dict):
-							continue
-						
-						option_row = custom_row.append('options', {})
-						option_row.option_id = option_data.get('id', '')
-						option_row.label = option_data.get('label', '')
-						option_row.price = option_data.get('price', 0)
-						option_row.is_default = 1 if option_data.get('isDefault') else 0
-						option_row.is_vegetarian = 1 if option_data.get('isVegetarian') else 0
-						option_row.display_order = option_data.get('displayOrder', 0)
+				# Handle options (we know they exist and are valid at this point)
+				for option_data in valid_options:
+					option_row = custom_row.append('options', {})
+					option_row.option_id = option_data.get('id', '')
+					option_row.label = option_data.get('label', '')
+					option_row.price = option_data.get('price', 0)
+					option_row.is_default = 1 if option_data.get('isDefault') else 0
+					option_row.is_vegetarian = 1 if option_data.get('isVegetarian') else 0
+					option_row.display_order = option_data.get('displayOrder', 0)
 		
 		try:
 			product_doc.save(ignore_permissions=True)
 		except Exception as e:
-			frappe.log_error(f"Error saving product {product_id} (name: {product_name}): {str(e)}", "Menu Product Save Error")
+			# Truncate error message to avoid CharacterLengthExceededError (max 140 chars)
+			error_msg = str(e)
+			# Create a concise error message
+			if len(error_msg) > 100:
+				error_msg = error_msg[:100] + "..."
+			
+			# Truncate product name if too long
+			display_name = product_name[:30] + "..." if len(product_name) > 30 else product_name
+			log_message = f"Error saving {display_name}: {error_msg}"
+			
+			# Ensure log message doesn't exceed 140 characters
+			if len(log_message) > 140:
+				log_message = log_message[:137] + "..."
+			
+			frappe.log_error(log_message, "Menu Product Save Error")
 			stats['items_skipped'] += 1
 			if not existing_product:
 				stats['items_created'] -= 1

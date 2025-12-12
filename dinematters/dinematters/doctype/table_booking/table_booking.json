@@ -1,24 +1,26 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:entry_id",
- "creation": "2024-01-15 10:00:00.000000",
+ "autoname": "field:booking_number",
+ "creation": "2025-01-15 10:00:00.000000",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
   "restaurant",
-  "entry_id",
+  "booking_number",
   "user",
   "session_id",
   "column_break_1",
-  "product",
-  "quantity",
-  "section_break_pricing",
-  "unit_price",
-  "total_price",
-  "section_break_customizations",
-  "customizations"
+  "number_of_diners",
+  "date",
+  "time_slot",
+  "status",
+  "section_break_customer",
+  "customer_name",
+  "customer_phone",
+  "customer_email",
+  "notes"
  ],
  "fields": [
   {
@@ -32,12 +34,11 @@
    "search_index": 1
   },
   {
-   "fieldname": "entry_id",
+   "fieldname": "booking_number",
    "fieldtype": "Data",
-   "in_global_search": 1,
    "in_list_view": 1,
-   "label": "Entry ID",
-   "reqd": 1,
+   "label": "Booking Number",
+   "read_only": 1,
    "unique": 1
   },
   {
@@ -57,59 +58,70 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "product",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Product",
-   "options": "Menu Product",
-   "reqd": 1
-  },
-  {
-   "default": "1",
-   "fieldname": "quantity",
+   "fieldname": "number_of_diners",
    "fieldtype": "Int",
    "in_list_view": 1,
-   "label": "Quantity",
-   "non_negative": 1,
-   "reqd": 1
+   "label": "Number of Diners",
+   "reqd": 1,
+   "non_negative": 1
   },
   {
-   "fieldname": "section_break_pricing",
-   "fieldtype": "Section Break",
-   "label": "Pricing"
-  },
-  {
-   "fieldname": "unit_price",
-   "fieldtype": "Currency",
+   "fieldname": "date",
+   "fieldtype": "Date",
    "in_list_view": 1,
-   "label": "Unit Price",
+   "label": "Date",
    "reqd": 1
   },
   {
-   "fieldname": "total_price",
-   "fieldtype": "Currency",
+   "fieldname": "time_slot",
+   "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Total Price",
-   "read_only": 1,
+   "label": "Time Slot",
    "reqd": 1
   },
   {
-   "fieldname": "section_break_customizations",
-   "fieldtype": "Section Break",
-   "label": "Customizations"
+   "default": "pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "pending\nconfirmed\ncancelled\ncompleted",
+   "reqd": 1
   },
   {
-   "fieldname": "customizations",
-   "fieldtype": "JSON",
-   "label": "Customizations"
+   "fieldname": "section_break_customer",
+   "fieldtype": "Section Break",
+   "label": "Customer Information"
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name"
+  },
+  {
+   "fieldname": "customer_phone",
+   "fieldtype": "Data",
+   "label": "Customer Phone",
+   "options": "Phone"
+  },
+  {
+   "fieldname": "customer_email",
+   "fieldtype": "Data",
+   "label": "Customer Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-01-15 10:00:00.000000",
+ "modified": "2025-01-15 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Dinematters",
- "name": "Cart Entry",
+ "name": "Table Booking",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
@@ -128,18 +140,21 @@
   {
    "create": 1,
    "read": 1,
-   "role": "All",
+   "role": "Restaurant Admin",
    "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Restaurant Staff"
+  },
+  {
+   "read": 1,
+   "role": "All"
   }
  ],
  "row_format": "Dynamic",
- "sort_field": "modified",
+ "sort_field": "date",
  "sort_order": "DESC",
  "states": [],
  "track_changes": 1
 }
-
-
-
-
-

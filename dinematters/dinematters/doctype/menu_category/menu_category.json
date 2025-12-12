@@ -7,6 +7,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "restaurant",
   "category_id",
   "category_name",
   "display_name",
@@ -19,6 +20,16 @@
   "category_image"
  ],
  "fields": [
+  {
+   "fieldname": "restaurant",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Restaurant",
+   "options": "Restaurant",
+   "reqd": 1,
+   "search_index": 1
+  },
   {
    "fieldname": "category_id",
    "fieldtype": "Data",

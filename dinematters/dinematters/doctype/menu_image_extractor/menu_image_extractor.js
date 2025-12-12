@@ -104,13 +104,50 @@ function extract_menu_data(frm) {
 			// Function to proceed with extraction
 			const proceed_with_extraction = () => {
 				console.log('✅ Proceeding with extraction');
-				// Show progress dialog
-				frappe.show_progress(__('Extracting Menu Data'), 0, 100, 
-					__('Processing images... This may take a few minutes.'));
+				
+				// Calculate estimated time based on number of images (roughly 3-5 minutes per image)
+				const imageCount = frm.doc.menu_images.length;
+				const estimatedMinutes = Math.max(5, Math.min(60, imageCount * 3)); // 3 min per image, max 60 min
+				const estimatedSeconds = estimatedMinutes * 60;
+				
+				// Track start time and progress
+				const startTime = Date.now();
+				let progressValue = 0;
+				let progressInterval = null;
+				
+				// Show progress dialog with initial message
+				frappe.show_progress(__('Extracting Menu Data'), progressValue, 100, 
+					__('Initializing extraction... Processing {0} image(s). This may take up to {1} minutes.', [imageCount, estimatedMinutes]));
+				
+				// Progress update interval - update every 10 seconds
+				// Progress will go from 0% to 90% over estimated time, then jump to 100% on completion
+				progressInterval = setInterval(() => {
+					// Calculate progress based on elapsed time (up to 90%)
+					const elapsed = (Date.now() - startTime) / 1000; // seconds
+					const progressPercent = Math.min(90, (elapsed / estimatedSeconds) * 90);
+					
+					// Update progress with appropriate message
+					let message = '';
+					if (progressPercent < 10) {
+						message = __('Uploading images to API...');
+					} else if (progressPercent < 30) {
+						message = __('Analyzing menu images with AI...');
+					} else if (progressPercent < 60) {
+						message = __('Extracting menu items and categories...');
+					} else if (progressPercent < 85) {
+						message = __('Processing and formatting data...');
+					} else {
+						message = __('Finalizing extraction...');
+					}
+					
+					progressValue = Math.floor(progressPercent);
+					frappe.show_progress(__('Extracting Menu Data'), progressValue, 100, message);
+				}, 10000); // Update every 10 seconds
 				
 				// Call the extraction method
 				console.log('🚀 Starting menu extraction for document:', frm.doc.name);
-				console.log('📸 Images to extract:', frm.doc.menu_images.length);
+				console.log('📸 Images to extract:', imageCount);
+				console.log('⏱️ Estimated time: ~' + estimatedMinutes + ' minutes');
 				console.log('📞 Calling server method: dinematters.dinematters.doctype.menu_image_extractor.menu_image_extractor.extract_menu_data');
 				
 				frappe.call({
@@ -119,10 +156,12 @@ function extract_menu_data(frm) {
 						docname: frm.doc.name
 					},
 					freeze: true,
-					freeze_message: __('Extracting menu data from images...'),
+					freeze_message: __('Extracting menu data from images... This may take up to 1 hour for large batches.'),
 					callback: function(r) {
 						console.log('📥 Extraction API Response:', r);
-						frappe.hide_progress();
+						clearInterval(progressInterval); // Stop progress updates
+						frappe.show_progress(__('Extracting Menu Data'), 100, 100, __('Extraction completed!'));
+						setTimeout(() => frappe.hide_progress(), 500); // Hide after brief delay
 						
 						if (r.message && r.message.success) {
 							console.log('✅ Extraction successful!');
@@ -165,10 +204,21 @@ function extract_menu_data(frm) {
 					},
 					error: function(r) {
 						console.error('❌ Extraction API call failed:', r);
+						if (progressInterval) {
+							clearInterval(progressInterval); // Stop progress updates on error
+						}
 						frappe.hide_progress();
+						
+						// Check if it's a timeout error
+						let errorMessage = __('An error occurred during extraction. Please check the extraction log for details.');
+						const errorMsgStr = r.message ? (typeof r.message === 'string' ? r.message : JSON.stringify(r.message)) : '';
+						if (errorMsgStr && errorMsgStr.includes('Timeout')) {
+							errorMessage = __('Request Timeout: The extraction took longer than 1 hour to complete. Please try with fewer images or check your network connection.');
+						}
+						
 						frappe.msgprint({
 							title: __('Extraction Failed'),
-							message: __('An error occurred during extraction. Please check the extraction log for details.'),
+							message: errorMessage,
 							indicator: 'red'
 						});
 						frm.reload_doc();

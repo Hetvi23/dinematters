@@ -117,13 +117,37 @@ app_license = "mit"
 # -----------
 # Permissions evaluated in scripted ways
 
-# permission_query_conditions = {
-# 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
-# }
-#
-# has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
-# }
+permission_query_conditions = {
+	"Menu Product": "dinematters.dinematters.utils.permission_helpers.get_menu_product_permissions",
+	"Menu Category": "dinematters.dinematters.utils.permission_helpers.get_menu_category_permissions",
+	"Order": "dinematters.dinematters.utils.permission_helpers.get_order_permissions",
+	"Cart Entry": "dinematters.dinematters.utils.permission_helpers.get_cart_entry_permissions",
+	"Coupon": "dinematters.dinematters.utils.permission_helpers.get_restaurant_permission_query_conditions",
+	"Offer": "dinematters.dinematters.utils.permission_helpers.get_restaurant_permission_query_conditions",
+	"Event": "dinematters.dinematters.utils.permission_helpers.get_restaurant_permission_query_conditions",
+	"Game": "dinematters.dinematters.utils.permission_helpers.get_restaurant_permission_query_conditions",
+	"Table Booking": "dinematters.dinematters.utils.permission_helpers.get_restaurant_permission_query_conditions",
+	"Banquet Booking": "dinematters.dinematters.utils.permission_helpers.get_restaurant_permission_query_conditions",
+	"Restaurant Config": "dinematters.dinematters.utils.permission_helpers.get_restaurant_permission_query_conditions",
+	"Home Feature": "dinematters.dinematters.utils.permission_helpers.get_restaurant_permission_query_conditions",
+	"Legacy Content": "dinematters.dinematters.utils.permission_helpers.get_restaurant_permission_query_conditions",
+}
+
+has_permission = {
+	"Menu Product": "dinematters.dinematters.utils.permission_helpers.has_menu_product_permission",
+	"Menu Category": "dinematters.dinematters.utils.permission_helpers.has_menu_category_permission",
+	"Order": "dinematters.dinematters.utils.permission_helpers.has_order_permission",
+	"Cart Entry": "dinematters.dinematters.utils.permission_helpers.has_cart_entry_permission",
+	"Coupon": "dinematters.dinematters.utils.permission_helpers.has_restaurant_permission",
+	"Offer": "dinematters.dinematters.utils.permission_helpers.has_restaurant_permission",
+	"Event": "dinematters.dinematters.utils.permission_helpers.has_restaurant_permission",
+	"Game": "dinematters.dinematters.utils.permission_helpers.has_restaurant_permission",
+	"Table Booking": "dinematters.dinematters.utils.permission_helpers.has_restaurant_permission",
+	"Banquet Booking": "dinematters.dinematters.utils.permission_helpers.has_restaurant_permission",
+	"Restaurant Config": "dinematters.dinematters.utils.permission_helpers.has_restaurant_permission",
+	"Home Feature": "dinematters.dinematters.utils.permission_helpers.has_restaurant_permission",
+	"Legacy Content": "dinematters.dinematters.utils.permission_helpers.has_restaurant_permission",
+}
 
 # DocType Class
 # ---------------

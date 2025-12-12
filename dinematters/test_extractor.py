@@ -17,7 +17,7 @@ def run_tests():
     # Test 1: API Connectivity
     print("\n[1/5] Testing API Connectivity...")
     try:
-        api_url = "https://dinematters-backend.onrender.com/menu-extraction/health"
+        api_url = "https://api.dinematters.com/menu-extraction/health"
         response = requests.get(api_url, timeout=10)
         if response.status_code == 200:
             print("  ✓ API is accessible and healthy")

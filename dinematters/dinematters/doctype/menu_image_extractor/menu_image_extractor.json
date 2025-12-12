@@ -8,6 +8,7 @@
  "engine": "InnoDB",
  "field_order": [
   "section_break_upload",
+  "restaurant",
   "restaurant_name",
   "column_break_1",
   "extraction_status",
@@ -35,10 +36,20 @@
    "label": "Upload Information"
   },
   {
+   "fieldname": "restaurant",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Restaurant",
+   "options": "Restaurant",
+   "reqd": 1,
+   "description": "Select the restaurant for this menu extraction"
+  },
+  {
    "fieldname": "restaurant_name",
    "fieldtype": "Data",
-   "label": "Restaurant Name",
-   "description": "Optional: Helps improve extraction accuracy"
+   "label": "Restaurant Name (Optional)",
+   "description": "Optional: Restaurant name for API extraction accuracy (auto-filled from Restaurant field)"
   },
   {
    "fieldname": "column_break_1",

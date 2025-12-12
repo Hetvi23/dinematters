@@ -7,6 +7,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "restaurant",
   "order_id",
   "order_number",
   "customer",
@@ -41,6 +42,16 @@
   "cooking_requests"
  ],
  "fields": [
+  {
+   "fieldname": "restaurant",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Restaurant",
+   "options": "Restaurant",
+   "reqd": 1,
+   "search_index": 1
+  },
   {
    "fieldname": "order_id",
    "fieldtype": "Data",
