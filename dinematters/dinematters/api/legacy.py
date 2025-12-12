@@ -79,13 +79,29 @@ def get_legacy_content(restaurant_id):
 		testimonials = []
 		for testimonial in legacy_doc.testimonials:
 			dish_images = []
-			if testimonial.dish_images:
+			# Handle new table structure
+			if hasattr(testimonial, 'dish_images') and testimonial.dish_images:
+				for img_row in testimonial.dish_images:
+					img_url = img_row.image
+					if img_url:
+						if img_url.startswith("/files/"):
+							img_url = get_url(img_url)
+						dish_images.append(img_url)
+			# Fallback: handle old JSON format for backward compatibility
+			elif hasattr(testimonial, 'dish_images') and isinstance(testimonial.dish_images, str):
 				try:
-					dish_images = json.loads(testimonial.dish_images) if isinstance(testimonial.dish_images, str) else testimonial.dish_images
-					# Convert to full URLs
+					dish_images = json.loads(testimonial.dish_images)
 					dish_images = [get_url(img) if img.startswith("/files/") else img for img in dish_images]
 				except:
 					pass
+			
+			# Get avatar image URL
+			avatar_url = ""
+			if testimonial.avatar:
+				if testimonial.avatar.startswith("/files/"):
+					avatar_url = get_url(testimonial.avatar)
+				else:
+					avatar_url = testimonial.avatar
 			
 			testimonials.append({
 				"id": int(testimonial.idx) if hasattr(testimonial, 'idx') else len(testimonials) + 1,
@@ -94,7 +110,7 @@ def get_legacy_content(restaurant_id):
 				"rating": int(testimonial.rating) if testimonial.rating else 5,
 				"text": testimonial.text,
 				"dishImages": dish_images,
-				"avatar": testimonial.avatar or testimonial.name[:2].upper()
+				"avatar": avatar_url or testimonial.name[:2].upper()
 			})
 		
 		# Format members
@@ -114,10 +130,22 @@ def get_legacy_content(restaurant_id):
 		
 		# Format gallery
 		gallery_images = []
-		if legacy_doc.gallery_featured_images:
+		# Handle new table structure
+		if hasattr(legacy_doc, 'gallery_featured_images') and legacy_doc.gallery_featured_images:
+			for img_row in legacy_doc.gallery_featured_images:
+				img_url = img_row.image
+				if img_url:
+					if img_url.startswith("/files/"):
+						img_url = get_url(img_url)
+					gallery_images.append({
+						"src": img_url,
+						"title": img_row.title or ""
+					})
+		# Fallback: handle old JSON format for backward compatibility
+		elif hasattr(legacy_doc, 'gallery_featured_images') and isinstance(legacy_doc.gallery_featured_images, str):
 			try:
-				gallery_images = json.loads(legacy_doc.gallery_featured_images) if isinstance(legacy_doc.gallery_featured_images, str) else legacy_doc.gallery_featured_images
-				gallery_images = [get_url(img) if img.startswith("/files/") else img for img in gallery_images]
+				img_list = json.loads(legacy_doc.gallery_featured_images)
+				gallery_images = [{"src": get_url(img) if img.startswith("/files/") else img, "title": ""} for img in img_list]
 			except:
 				pass
 		
@@ -245,31 +273,62 @@ def update_legacy_content(restaurant_id, hero=None, content=None, signature_dish
 		if testimonials:
 			legacy_doc.testimonials = []
 			for test_data in testimonials:
-				dish_images = test_data.get("dishImages", [])
-				legacy_doc.append("testimonials", {
+				testimonial_row = legacy_doc.append("testimonials", {
 					"name": test_data.get("name"),
 					"location": test_data.get("location", ""),
 					"rating": test_data.get("rating", 5),
 					"text": test_data.get("text"),
-					"dish_images": json.dumps(dish_images) if dish_images else None,
 					"avatar": test_data.get("avatar", test_data.get("name", "")[:2].upper()),
 					"display_order": test_data.get("displayOrder", 0)
 				})
+				
+				# Handle dish images (new table structure)
+				dish_images = test_data.get("dishImages", [])
+				if dish_images:
+					for img_url in dish_images:
+						testimonial_row.append("dish_images", {
+							"image": img_url,
+							"display_order": len(testimonial_row.dish_images) + 1
+						})
 		
 		# Update members
 		if members:
 			legacy_doc.members = []
 			for member_data in members:
+				member_image = member_data.get("image", "")
+				# Extract file path if full URL provided
+				if member_image and "://" in member_image:
+					# Extract path from URL (e.g., "http://domain/files/image.jpg" -> "/files/image.jpg")
+					import re
+					match = re.search(r'/files/[^/]+', member_image)
+					if match:
+						member_image = match.group(0)
+				
 				legacy_doc.append("members", {
 					"name": member_data.get("name"),
-					"image": member_data.get("image", ""),
+					"image": member_image,
 					"role": member_data.get("role", ""),
 					"display_order": member_data.get("displayOrder", 0)
 				})
 		
 		# Update gallery
 		if gallery and "featuredImages" in gallery:
-			legacy_doc.gallery_featured_images = json.dumps(gallery["featuredImages"])
+			legacy_doc.gallery_featured_images = []
+			for img_data in gallery["featuredImages"]:
+				# Handle both new format (object with src/title) and old format (string URL)
+				if isinstance(img_data, dict):
+					img_url = img_data.get("src", "")
+					img_title = img_data.get("title", "")
+				else:
+					img_url = img_data
+					img_title = ""
+				
+				if img_url:
+					legacy_doc.append("gallery_featured_images", {
+						"image": img_url,
+						"title": img_title,
+						"display_order": len(legacy_doc.gallery_featured_images) + 1
+					})
 		
 		# Update Instagram reels
 		if instagram_reels:

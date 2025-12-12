@@ -56,6 +56,26 @@ def generate_product_id_from_name(product_name):
 	return product_id
 
 
+def generate_category_id_from_name(category_name):
+	"""Generate a slug-like category_id from category_name"""
+	if not category_name:
+		return None
+	
+	# Convert to lowercase
+	category_id = category_name.lower()
+	
+	# Replace spaces and special characters with hyphens
+	category_id = re.sub(r'[^\w\s-]', '', category_id)  # Remove special chars
+	category_id = re.sub(r'[-\s]+', '-', category_id)  # Replace spaces and multiple hyphens with single hyphen
+	category_id = category_id.strip('-')  # Remove leading/trailing hyphens
+	
+	# Limit length to 140 characters (Frappe name field limit)
+	if len(category_id) > 140:
+		category_id = category_id[:140].rstrip('-')
+	
+	return category_id
+
+
 @frappe.whitelist()
 def extract_menu_data(docname):
 	"""
@@ -809,56 +829,97 @@ def process_extracted_data(data, extractor_doc):
 			title=_("Restaurant Required")
 		)
 	
-	# Extract data sections
-	categories_data = data.get('categories', [])
-	dishes_data = data.get('dishes', [])
-	restaurant_brand = data.get('restaurantBrand', {})
-	
-	# Ensure categories_data and dishes_data are lists
-	if not isinstance(categories_data, list):
-		if isinstance(categories_data, dict):
-			categories_data = list(categories_data.values())
-		else:
-			categories_data = []
-	
-	if not isinstance(dishes_data, list):
-		if isinstance(dishes_data, dict):
-			dishes_data = list(dishes_data.values())
-		else:
-			dishes_data = []
+		# Extract data sections
+		categories_data = data.get('categories', [])
+		dishes_data = data.get('dishes', [])
+		restaurant_brand = data.get('restaurantBrand', {})
+		
+		# Ensure categories_data and dishes_data are lists
+		if not isinstance(categories_data, list):
+			if isinstance(categories_data, dict):
+				categories_data = list(categories_data.values())
+			else:
+				categories_data = []
+		
+		if not isinstance(dishes_data, list):
+			if isinstance(dishes_data, dict):
+				dishes_data = list(dishes_data.values())
+			else:
+				dishes_data = []
+		
+		# If no categories in API response, extract unique categories from dishes
+		if not categories_data and dishes_data:
+			unique_categories = {}
+			for dish in dishes_data:
+				if isinstance(dish, dict):
+					category_name = dish.get('category') or dish.get('mainCategory')
+					if category_name and category_name not in unique_categories:
+						# Create a category entry from dish data
+						category_id = generate_category_id_from_name(category_name)
+						unique_categories[category_name] = {
+							'id': category_id,
+							'name': category_name,
+							'displayName': category_name,
+							'description': '',
+							'isSpecial': False
+						}
+			
+			if unique_categories:
+				categories_data = list(unique_categories.values())
+				frappe.log_error(
+					f"Categories extracted from dishes: {len(categories_data)} categories found",
+					"Menu Category Auto-Extraction"
+				)
 	
 	# Create or update categories
 	category_map = {}  # Map category names to category IDs
 	
 	for cat_data in categories_data:
-		# Ensure cat_data is a dict
-		if not isinstance(cat_data, dict):
+		try:
+			# Ensure cat_data is a dict
+			if not isinstance(cat_data, dict):
+				continue
+			category_id = cat_data.get('id')
+			category_name = cat_data.get('name')
+			
+			if not category_id or not category_name:
+				frappe.log_error(
+					f"Skipping category: missing id or name. id={category_id}, name={category_name}",
+					"Menu Category Creation Skip"
+				)
+				continue
+			
+			# Check if category exists (by category_id field, not by name)
+			existing_category = frappe.db.get_value(
+				"Menu Category",
+				{"category_id": category_id, "restaurant": restaurant},
+				"name"
+			)
+			
+			if existing_category:
+				# Update existing category
+				cat_doc = frappe.get_doc("Menu Category", existing_category)
+			else:
+				# Create new category
+				cat_doc = frappe.new_doc("Menu Category")
+				cat_doc.category_id = category_id
+				stats['categories_created'] += 1
+			
+			# Set restaurant (mandatory field)
+			cat_doc.restaurant = restaurant
+			cat_doc.category_name = category_name
+			cat_doc.display_name = cat_data.get('displayName', category_name)
+			cat_doc.description = cat_data.get('description', '')
+			cat_doc.is_special = 1 if cat_data.get('isSpecial') else 0
+			
+			cat_doc.save(ignore_permissions=True)
+			category_map[category_name] = category_id
+			
+		except Exception as e:
+			error_msg = f"Error creating/updating category {category_id or 'unknown'}: {str(e)[:140]}"
+			frappe.log_error(error_msg, "Menu Category Creation Error")
+			# Continue with next category instead of failing completely
 			continue
-		category_id = cat_data.get('id')
-		category_name = cat_data.get('name')
-		
-		if not category_id or not category_name:
-			continue
-		
-		# Check if category exists
-		if frappe.db.exists("Menu Category", category_id):
-			# Update existing category
-			cat_doc = frappe.get_doc("Menu Category", category_id)
-		else:
-			# Create new category
-			cat_doc = frappe.new_doc("Menu Category")
-			cat_doc.category_id = category_id
-			stats['categories_created'] += 1
-		
-		# Set restaurant (mandatory field)
-		cat_doc.restaurant = restaurant
-		cat_doc.category_name = category_name
-		cat_doc.display_name = cat_data.get('displayName', category_name)
-		cat_doc.description = cat_data.get('description', '')
-		cat_doc.is_special = 1 if cat_data.get('isSpecial') else 0
-		
-		cat_doc.save(ignore_permissions=True)
-		category_map[category_name] = category_id
 	
 	# Create or update dishes/products
 	for dish_data in dishes_data:
@@ -1058,7 +1119,7 @@ def approve_extracted_data(docname):
 			except json.JSONDecodeError:
 				frappe.throw(_("Invalid data format. Please re-extract the menu data."))
 		else:
-			# Get categories from raw_response (categories are auto-created from dishes)
+			# Get categories from raw_response (categories come from API response)
 			if doc.raw_response:
 				try:
 					raw_data = json.loads(doc.raw_response)
@@ -1081,8 +1142,17 @@ def approve_extracted_data(docname):
 						for cat_data in categories_data:
 							if isinstance(cat_data, dict):
 								data['categories'].append(cat_data)
-				except:
-					pass
+					
+					# Log if no categories found
+					if not data.get('categories'):
+						frappe.log_error(
+							f"No categories found in raw_response for {docname}. Raw data keys: {list(raw_data_obj.keys()) if isinstance(raw_data_obj, dict) else 'N/A'}",
+							"Menu Category Extraction Warning"
+						)
+				except Exception as e:
+					error_msg = f"Error parsing categories from raw_response for {docname}: {str(e)[:140]}"
+					frappe.log_error(error_msg, "Menu Category Parsing Error")
+					# Don't silently fail - log the error so we can debug
 			
 			# Convert extracted dishes from child table
 			for dish_row in doc.extracted_dishes:
@@ -1116,6 +1186,30 @@ def approve_extracted_data(docname):
 						dish_data['customizationQuestions'] = []
 				
 				data['dishes'].append(dish_data)
+		
+		# If no categories found in raw_response, extract from dishes
+		if not data.get('categories') and data.get('dishes'):
+			unique_categories = {}
+			for dish in data['dishes']:
+				if isinstance(dish, dict):
+					category_name = dish.get('category') or dish.get('mainCategory')
+					if category_name and category_name not in unique_categories:
+						# Create a category entry from dish data
+						category_id = generate_category_id_from_name(category_name)
+						unique_categories[category_name] = {
+							'id': category_id,
+							'name': category_name,
+							'displayName': category_name,
+							'description': '',
+							'isSpecial': False
+						}
+			
+			if unique_categories:
+				data['categories'] = list(unique_categories.values())
+				frappe.log_error(
+					f"Categories auto-extracted from dishes for {docname}: {len(data['categories'])} categories found",
+					"Menu Category Auto-Extraction from Dishes"
+				)
 		
 		if not data or (not data.get('categories') and not data.get('dishes')):
 			frappe.throw(_("No data found to approve. Please extract menu data first."))

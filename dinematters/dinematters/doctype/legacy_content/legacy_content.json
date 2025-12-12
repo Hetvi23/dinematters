@@ -60,13 +60,15 @@
   },
   {
    "fieldname": "hero_media_src",
-   "fieldtype": "Data",
-   "label": "Hero Media Src"
+   "fieldtype": "Attach",
+   "label": "Hero Media (Image/Video)",
+   "description": "Upload image or video file for hero section"
   },
   {
    "fieldname": "hero_fallback_image",
-   "fieldtype": "Data",
-   "label": "Hero Fallback Image"
+   "fieldtype": "Attach Image",
+   "label": "Hero Fallback Image",
+   "description": "Fallback image if video fails to load"
   },
   {
    "fieldname": "hero_title",
@@ -133,8 +135,9 @@
   },
   {
    "fieldname": "gallery_featured_images",
-   "fieldtype": "JSON",
-   "label": "Gallery Featured Images"
+   "fieldtype": "Table",
+   "label": "Gallery Featured Images",
+   "options": "Legacy Gallery Image"
   },
   {
    "fieldname": "section_break_instagram",
@@ -154,8 +157,9 @@
   },
   {
    "fieldname": "footer_media_src",
-   "fieldtype": "Data",
-   "label": "Footer Media Src"
+   "fieldtype": "Attach",
+   "label": "Footer Media (Image/Video)",
+   "description": "Upload image or video file for footer section"
   },
   {
    "fieldname": "footer_title",

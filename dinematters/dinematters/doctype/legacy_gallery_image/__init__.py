@@ -1,0 +1,1 @@
+# Legacy Gallery Image DocType

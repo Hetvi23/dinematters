@@ -22,8 +22,9 @@
   },
   {
    "fieldname": "image",
-   "fieldtype": "Data",
-   "label": "Image"
+   "fieldtype": "Attach Image",
+   "label": "Image",
+   "reqd": 1
   },
   {
    "fieldname": "role",

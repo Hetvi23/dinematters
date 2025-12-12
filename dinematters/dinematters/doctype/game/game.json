@@ -39,8 +39,9 @@
   },
   {
    "fieldname": "image_src",
-   "fieldtype": "Data",
-   "label": "Image Src"
+   "fieldtype": "Attach Image",
+   "label": "Image",
+   "reqd": 1
   },
   {
    "fieldname": "image_alt",
