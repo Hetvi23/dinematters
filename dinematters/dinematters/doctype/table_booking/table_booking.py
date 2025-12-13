@@ -24,3 +24,4 @@ class TableBooking(Document):
 		sequence = str(count + 1).zfill(3)
 		return f"TB-{year}-{sequence}"
 
+

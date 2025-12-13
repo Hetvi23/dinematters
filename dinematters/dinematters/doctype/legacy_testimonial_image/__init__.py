@@ -1,1 +1,2 @@
 # Legacy Testimonial Image DocType
+

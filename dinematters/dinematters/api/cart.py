@@ -9,6 +9,7 @@ Matches format from BACKEND_API_DOCUMENTATION.md
 import frappe
 from frappe import _
 from frappe.utils import flt, now_datetime, get_datetime_str
+from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api, validate_product_belongs_to_restaurant
 import json
 import random
 import string
@@ -16,12 +17,16 @@ from datetime import datetime
 
 
 @frappe.whitelist(allow_guest=True)
-def add_to_cart(dish_id, quantity=1, customizations=None, session_id=None):
+def add_to_cart(restaurant_id, dish_id, quantity=1, customizations=None, session_id=None):
 	"""
 	POST /api/v1/cart/add
 	Add item to cart
+	Requires restaurant_id for SaaS multi-tenancy
 	"""
 	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
 		# Get user or use session_id
 		user = frappe.session.user if frappe.session.user != "Guest" else None
 		if not user and not session_id:
@@ -38,6 +43,16 @@ def add_to_cart(dish_id, quantity=1, customizations=None, session_id=None):
 			}
 		
 		product = frappe.get_doc("Menu Product", dish_id)
+		
+		# Validate product belongs to restaurant
+		if product.restaurant != restaurant:
+			return {
+				"success": False,
+				"error": {
+					"code": "PRODUCT_NOT_FOUND",
+					"message": f"Product {dish_id} not found for restaurant {restaurant_id}"
+				}
+			}
 		
 		if not product.is_active:
 			return {
@@ -72,8 +87,8 @@ def add_to_cart(dish_id, quantity=1, customizations=None, session_id=None):
 								unit_price += flt(option.price) or 0
 								break
 		
-		# Check if identical item exists in cart
-		existing_entry = find_existing_cart_entry(user, session_id, dish_id, customizations)
+		# Check if identical item exists in cart (for same restaurant)
+		existing_entry = find_existing_cart_entry(user, session_id, restaurant, dish_id, customizations)
 		
 		if existing_entry:
 			# Update quantity
@@ -89,6 +104,7 @@ def add_to_cart(dish_id, quantity=1, customizations=None, session_id=None):
 			entry_doc = frappe.get_doc({
 				"doctype": "Cart Entry",
 				"entry_id": entry_id,
+				"restaurant": restaurant,
 				"user": user,
 				"session_id": session_id,
 				"product": dish_id,
@@ -99,8 +115,8 @@ def add_to_cart(dish_id, quantity=1, customizations=None, session_id=None):
 			})
 			entry_doc.insert(ignore_permissions=True)
 		
-		# Get cart summary
-		cart_summary = get_cart_summary(user, session_id)
+		# Get cart summary (for this restaurant)
+		cart_summary = get_cart_summary(user, session_id, restaurant)
 		
 		return {
 			"success": True,
@@ -128,19 +144,33 @@ def add_to_cart(dish_id, quantity=1, customizations=None, session_id=None):
 
 
 @frappe.whitelist(allow_guest=True)
-def get_cart(session_id=None):
+def get_cart(restaurant_id, session_id=None):
 	"""
 	GET /api/v1/cart
-	Get current cart (returns all cart entries for development)
+	Get current cart for restaurant
+	Requires restaurant_id for SaaS multi-tenancy
 	"""
 	try:
-		# For development: Return all cart entries without filtering
-		# TODO: Re-enable session_id/user filtering for production
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
 		
-		# Get all cart entries
+		# Get user or use session_id
+		user = frappe.session.user if frappe.session.user != "Guest" else None
+		if not user and not session_id:
+			session_id = frappe.session.get("session_id")
+		
+		# Build filters
+		filters = {"restaurant": restaurant}
+		if user:
+			filters["user"] = user
+		elif session_id:
+			filters["session_id"] = session_id
+		
+		# Get cart entries for this restaurant
 		entries = frappe.get_all(
 			"Cart Entry",
 			fields=["*"],
+			filters=filters,
 			order_by="creation desc"
 		)
 		
@@ -197,12 +227,16 @@ def get_cart(session_id=None):
 
 
 @frappe.whitelist(allow_guest=True)
-def update_cart_item(entry_id, quantity):
+def update_cart_item(restaurant_id, entry_id, quantity):
 	"""
 	PATCH /api/v1/cart/items/:entryId
 	Update cart item quantity
+	Requires restaurant_id for SaaS multi-tenancy
 	"""
 	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
 		if not frappe.db.exists("Cart Entry", entry_id):
 			return {
 				"success": False,
@@ -213,6 +247,17 @@ def update_cart_item(entry_id, quantity):
 			}
 		
 		entry_doc = frappe.get_doc("Cart Entry", entry_id)
+		
+		# Validate entry belongs to restaurant
+		if entry_doc.restaurant != restaurant:
+			return {
+				"success": False,
+				"error": {
+					"code": "CART_ITEM_NOT_FOUND",
+					"message": f"Cart item {entry_id} not found for restaurant {restaurant_id}"
+				}
+			}
+		
 		entry_doc.quantity = cint(quantity)
 		entry_doc.total_price = entry_doc.unit_price * cint(quantity)
 		entry_doc.save(ignore_permissions=True)
@@ -233,18 +278,34 @@ def update_cart_item(entry_id, quantity):
 
 
 @frappe.whitelist(allow_guest=True)
-def remove_cart_item(entry_id):
+def remove_cart_item(restaurant_id, entry_id):
 	"""
 	DELETE /api/v1/cart/items/:entryId
 	Remove item from cart
+	Requires restaurant_id for SaaS multi-tenancy
 	"""
 	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
 		if not frappe.db.exists("Cart Entry", entry_id):
 			return {
 				"success": False,
 				"error": {
 					"code": "CART_ITEM_NOT_FOUND",
 					"message": f"Cart item {entry_id} not found"
+				}
+			}
+		
+		entry_doc = frappe.get_doc("Cart Entry", entry_id)
+		
+		# Validate entry belongs to restaurant
+		if entry_doc.restaurant != restaurant:
+			return {
+				"success": False,
+				"error": {
+					"code": "CART_ITEM_NOT_FOUND",
+					"message": f"Cart item {entry_id} not found for restaurant {restaurant_id}"
 				}
 			}
 		
@@ -268,17 +329,21 @@ def remove_cart_item(entry_id):
 
 
 @frappe.whitelist(allow_guest=True)
-def clear_cart(session_id=None):
+def clear_cart(restaurant_id, session_id=None):
 	"""
 	DELETE /api/v1/cart
-	Clear entire cart
+	Clear entire cart for restaurant
+	Requires restaurant_id for SaaS multi-tenancy
 	"""
 	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
 		user = frappe.session.user if frappe.session.user != "Guest" else None
 		if not user and not session_id:
 			session_id = frappe.session.get("session_id")
 		
-		filters = {}
+		filters = {"restaurant": restaurant}
 		if user:
 			filters["user"] = user
 		elif session_id:
@@ -307,9 +372,9 @@ def clear_cart(session_id=None):
 
 # Helper functions
 
-def find_existing_cart_entry(user, session_id, dish_id, customizations):
-	"""Find existing cart entry with same product and customizations"""
-	filters = {"product": dish_id}
+def find_existing_cart_entry(user, session_id, restaurant, dish_id, customizations):
+	"""Find existing cart entry with same product, restaurant, and customizations"""
+	filters = {"product": dish_id, "restaurant": restaurant}
 	if user:
 		filters["user"] = user
 	elif session_id:
@@ -340,9 +405,9 @@ def generate_session_id():
 	return ''.join(random.choices(string.ascii_letters + string.digits, k=32))
 
 
-def get_cart_summary(user, session_id):
-	"""Calculate cart summary (subtotal, discount, tax, total)"""
-	filters = {}
+def get_cart_summary(user, session_id, restaurant):
+	"""Calculate cart summary (subtotal, discount, tax, total) for restaurant"""
+	filters = {"restaurant": restaurant}
 	if user:
 		filters["user"] = user
 	elif session_id:

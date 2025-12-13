@@ -9,17 +9,22 @@ Matches format from BACKEND_API_DOCUMENTATION.md
 import frappe
 from frappe import _
 from frappe.utils import cint, flt
+from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
 
 
 @frappe.whitelist(allow_guest=True)
-def get_products(category=None, type=None, vegetarian=None, search=None, page=1, limit=50):
+def get_products(restaurant_id, category=None, type=None, vegetarian=None, search=None, page=1, limit=50):
 	"""
 	GET /api/v1/products
 	Get all products/dishes with filters and pagination
+	Requires restaurant_id for SaaS multi-tenancy
 	"""
 	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
 		# Build filters
-		filters = {"is_active": 1}
+		filters = {"is_active": 1, "restaurant": restaurant}
 		
 		if category:
 			filters["category_name"] = category
@@ -110,12 +115,16 @@ def get_products(category=None, type=None, vegetarian=None, search=None, page=1,
 
 
 @frappe.whitelist(allow_guest=True)
-def get_product(product_id):
+def get_product(restaurant_id, product_id):
 	"""
 	GET /api/v1/products/:productId
 	Get single product by ID
+	Requires restaurant_id for SaaS multi-tenancy
 	"""
 	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
 		if not frappe.db.exists("Menu Product", product_id):
 			return {
 				"success": False,
@@ -126,6 +135,16 @@ def get_product(product_id):
 			}
 		
 		product_doc = frappe.get_doc("Menu Product", product_id)
+		
+		# Validate product belongs to restaurant
+		if product_doc.restaurant != restaurant:
+			return {
+				"success": False,
+				"error": {
+					"code": "PRODUCT_NOT_FOUND",
+					"message": f"Product {product_id} not found for restaurant {restaurant_id}"
+				}
+			}
 		
 		if not product_doc.is_active:
 			return {

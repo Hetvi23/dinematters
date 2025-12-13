@@ -72,3 +72,4 @@ class RestaurantUser(Document):
 		except Exception as e:
 			frappe.log_error(f"Error adding role to user: {str(e)}", "Restaurant User Role Assignment")
 
+

@@ -459,3 +459,4 @@ def get_banquet_available_time_slots(restaurant_id, date, number_of_guests=None,
 			}
 		}
 
+

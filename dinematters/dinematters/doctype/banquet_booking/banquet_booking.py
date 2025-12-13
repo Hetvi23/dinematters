@@ -24,3 +24,4 @@ class BanquetBooking(Document):
 		sequence = str(count + 1).zfill(3)
 		return f"BQ-{year}-{sequence}"
 
+

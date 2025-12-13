@@ -11,3 +11,4 @@ class HomeFeature(Document):
 		if self.is_mandatory and not self.is_enabled:
 			frappe.throw("Mandatory features cannot be disabled")
 
+

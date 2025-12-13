@@ -130,3 +130,4 @@ def get_restaurant_from_category(category_id):
 	restaurant = frappe.db.get_value("Menu Category", category_id, "restaurant")
 	return restaurant
 
+

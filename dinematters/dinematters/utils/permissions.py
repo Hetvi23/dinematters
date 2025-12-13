@@ -130,3 +130,4 @@ def validate_restaurant_access(user, restaurant):
 	restaurant_ids = get_user_restaurant_ids(user)
 	return restaurant in restaurant_ids
 
+

@@ -8,15 +8,20 @@ Matches format from BACKEND_API_DOCUMENTATION.md
 
 import frappe
 from frappe.utils import get_url
+from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
 
 
 @frappe.whitelist(allow_guest=True)
-def get_categories():
+def get_categories(restaurant_id):
 	"""
 	GET /api/v1/categories
 	Get all categories with product counts
+	Requires restaurant_id for SaaS multi-tenancy
 	"""
 	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
 		categories = frappe.get_all(
 			"Menu Category",
 			fields=[
@@ -27,16 +32,17 @@ def get_categories():
 				"is_special as isSpecial",
 				"category_image"
 			],
+			filters={"restaurant": restaurant},
 			order_by="display_order, category_name"
 		)
 		
 		# Format categories and calculate product counts
 		formatted_categories = []
 		for cat in categories:
-			# Count products in this category
+			# Count products in this category for this restaurant
 			product_count = frappe.db.count(
 				"Menu Product",
-				filters={"category_name": cat["name"], "is_active": 1}
+				filters={"category_name": cat["name"], "is_active": 1, "restaurant": restaurant}
 			)
 			
 			category_data = {

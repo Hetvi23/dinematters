@@ -7,7 +7,7 @@ Complete API documentation for all SaaS endpoints with request/response examples
 ## Base URL
 
 ```
-http://localhost:8000/api/method/
+https://backend.dinematters.com/api/method/
 ```
 
 All endpoints follow the pattern: `/api/method/dinematters.dinematters.api.{module}.{function}`
@@ -31,7 +31,111 @@ All APIs require:
 
 ## API Endpoints
 
-### 1. Coupons API
+### 1. Restaurant API
+
+#### 1.1 Get Restaurant ID from Name
+
+**Endpoint**: `GET /api/method/dinematters.dinematters.api.restaurant.get_restaurant_id`
+
+**Parameters**:
+- `restaurant_name` (required) - Restaurant name to lookup
+
+**Request Example**:
+```bash
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.restaurant.get_restaurant_id?restaurant_name=The Gallery Cafe"
+```
+
+**Response Structure**:
+```json
+{
+  "message": {
+    "success": true,
+    "data": {
+      "restaurant_id": "the-gallery-cafe",
+      "restaurant_name": "The Gallery Cafe",
+      "is_active": true
+    }
+  }
+}
+```
+
+**Test Results**:
+- ✅ **Status**: Working perfectly
+- ✅ **Case Insensitive**: Supports partial name matching
+- ✅ **Error Handling**: Returns proper error if restaurant not found
+
+---
+
+#### 1.2 Get Restaurant Info
+
+**Endpoint**: `GET /api/method/dinematters.dinematters.api.restaurant.get_restaurant_info`
+
+**Parameters**:
+- `restaurant_id` (required) - Restaurant identifier
+
+**Request Example**:
+```bash
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.restaurant.get_restaurant_info?restaurant_id=the-gallery-cafe"
+```
+
+**Response Structure**:
+```json
+{
+  "message": {
+    "success": true,
+    "data": {
+      "id": "the-gallery-cafe",
+      "name": "The Gallery Cafe",
+      "logo": "/files/logo.png",
+      "address": "...",
+      "city": "...",
+      "state": "...",
+      "zip_code": "...",
+      "country": "...",
+      "tax_rate": 0.0,
+      "default_delivery_fee": 0.0,
+      "currency": "INR",
+      "timezone": "Asia/Kolkata"
+    }
+  }
+}
+```
+
+---
+
+#### 1.3 List All Restaurants
+
+**Endpoint**: `GET /api/method/dinematters.dinematters.api.restaurant.list_restaurants`
+
+**Parameters**:
+- `active_only` (optional, default: true) - Only return active restaurants
+
+**Request Example**:
+```bash
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.restaurant.list_restaurants?active_only=true"
+```
+
+**Response Structure**:
+```json
+{
+  "message": {
+    "success": true,
+    "data": {
+      "restaurants": [
+        {
+          "restaurant_id": "the-gallery-cafe",
+          "restaurant_name": "The Gallery Cafe",
+          "is_active": true
+        }
+      ]
+    }
+  }
+}
+```
+
+---
+
+### 2. Coupons API
 
 #### 1.1 Get Coupons
 
@@ -43,7 +147,7 @@ All APIs require:
 
 **Request Example**:
 ```bash
-curl "http://localhost:8000/api/method/dinematters.dinematters.api.coupons.get_coupons?restaurant_id=test-restaurant-1&active_only=true"
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.coupons.get_coupons?restaurant_id=test-restaurant-1&active_only=true"
 ```
 
 **Response Structure**:
@@ -93,7 +197,7 @@ curl "http://localhost:8000/api/method/dinematters.dinematters.api.coupons.get_c
 
 **Request Example**:
 ```bash
-curl -X POST "http://localhost:8000/api/method/dinematters.dinematters.api.coupons.validate_coupon" \
+curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters.api.coupons.validate_coupon" \
   -H "Content-Type: application/json" \
   -d '{
     "restaurant_id": "test-restaurant-1",
@@ -158,7 +262,7 @@ curl -X POST "http://localhost:8000/api/method/dinematters.dinematters.api.coupo
 
 **Request Example**:
 ```bash
-curl "http://localhost:8000/api/method/dinematters.dinematters.api.offers.get_offers?restaurant_id=test-restaurant-1"
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.offers.get_offers?restaurant_id=test-restaurant-1"
 ```
 
 **Response Structure**:
@@ -216,7 +320,7 @@ curl "http://localhost:8000/api/method/dinematters.dinematters.api.offers.get_of
 
 **Request Example**:
 ```bash
-curl -X POST "http://localhost:8000/api/method/dinematters.dinematters.api.offers.create_offer" \
+curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters.api.offers.create_offer" \
   -H "Content-Type: application/json" \
   -d '{
     "restaurant_id": "test-restaurant-1",
@@ -247,7 +351,7 @@ curl -X POST "http://localhost:8000/api/method/dinematters.dinematters.api.offer
 
 **Request Example**:
 ```bash
-curl "http://localhost:8000/api/method/dinematters.dinematters.api.events.get_events?restaurant_id=test-restaurant-1"
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.events.get_events?restaurant_id=test-restaurant-1"
 ```
 
 **Response Structure**:
@@ -297,7 +401,7 @@ curl "http://localhost:8000/api/method/dinematters.dinematters.api.events.get_ev
 
 **Request Example**:
 ```bash
-curl "http://localhost:8000/api/method/dinematters.dinematters.api.games.get_games?restaurant_id=test-restaurant-1"
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.games.get_games?restaurant_id=test-restaurant-1"
 ```
 
 **Response Structure**:
@@ -344,7 +448,7 @@ curl "http://localhost:8000/api/method/dinematters.dinematters.api.games.get_gam
 
 **Request Example**:
 ```bash
-curl "http://localhost:8000/api/method/dinematters.dinematters.api.bookings.get_available_time_slots?restaurant_id=test-restaurant-1&date=2025-02-01"
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.bookings.get_available_time_slots?restaurant_id=test-restaurant-1&date=2025-02-01"
 ```
 
 **Response Structure**:
@@ -406,7 +510,7 @@ curl "http://localhost:8000/api/method/dinematters.dinematters.api.bookings.get_
 
 **Request Example**:
 ```bash
-curl -X POST "http://localhost:8000/api/method/dinematters.dinematters.api.bookings.create_table_booking" \
+curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters.api.bookings.create_table_booking" \
   -H "Content-Type: application/json" \
   -d '{
     "restaurant_id": "test-restaurant-1",
@@ -496,7 +600,7 @@ curl -X POST "http://localhost:8000/api/method/dinematters.dinematters.api.booki
 
 **Request Example**:
 ```bash
-curl "http://localhost:8000/api/method/dinematters.dinematters.api.config.get_restaurant_config?restaurant_id=test-restaurant-1"
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.config.get_restaurant_config?restaurant_id=test-restaurant-1"
 ```
 
 **Response Structure**:
@@ -559,7 +663,7 @@ curl "http://localhost:8000/api/method/dinematters.dinematters.api.config.get_re
 
 **Request Example**:
 ```bash
-curl "http://localhost:8000/api/method/dinematters.dinematters.api.config.get_home_features?restaurant_id=test-restaurant-1"
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.config.get_home_features?restaurant_id=test-restaurant-1"
 ```
 
 **Response Structure**:
@@ -573,7 +677,7 @@ curl "http://localhost:8000/api/method/dinematters.dinematters.api.config.get_ho
           "id": "menu",
           "title": "Explore our Menu",
           "subtitle": "Food, Taste, Love",
-          "imageSrc": "http://localhost:8000/files/explore.svg",
+          "imageSrc": "https://backend.dinematters.com/files/explore.svg",
           "imageAlt": "Explore our Menu",
           "size": "large",
           "route": "/main-menu",
@@ -585,7 +689,7 @@ curl "http://localhost:8000/api/method/dinematters.dinematters.api.config.get_ho
           "id": "book-table",
           "title": "Book your Tables",
           "subtitle": "& banquets",
-          "imageSrc": "http://localhost:8000/files/book-table.svg",
+          "imageSrc": "https://backend.dinematters.com/files/book-table.svg",
           "imageAlt": "Book your Tables",
           "size": "small",
           "route": "/book-table",
@@ -597,7 +701,7 @@ curl "http://localhost:8000/api/method/dinematters.dinematters.api.config.get_ho
           "id": "legacy",
           "title": "The Place",
           "subtitle": "& it's legacy",
-          "imageSrc": "http://localhost:8000/files/legacy.svg",
+          "imageSrc": "https://backend.dinematters.com/files/legacy.svg",
           "imageAlt": "The Place",
           "size": "small",
           "route": "/legacy",
@@ -609,7 +713,7 @@ curl "http://localhost:8000/api/method/dinematters.dinematters.api.config.get_ho
           "id": "offers-events",
           "title": "Offers & Events",
           "subtitle": "Treasure mine.",
-          "imageSrc": "http://localhost:8000/files/events-offers.svg",
+          "imageSrc": "https://backend.dinematters.com/files/events-offers.svg",
           "imageAlt": "Offers & Events",
           "size": "small",
           "route": "/events",
@@ -621,7 +725,7 @@ curl "http://localhost:8000/api/method/dinematters.dinematters.api.config.get_ho
           "id": "dine-play",
           "title": "Dine & Play",
           "subtitle": "Enjoy your bites",
-          "imageSrc": "http://localhost:8000/files/experience-lounge.svg",
+          "imageSrc": "https://backend.dinematters.com/files/experience-lounge.svg",
           "imageAlt": "Dine & Play",
           "size": "small",
           "route": "/experience-lounge-splash",
@@ -675,7 +779,7 @@ curl "http://localhost:8000/api/method/dinematters.dinematters.api.config.get_ho
 
 **Request Example**:
 ```bash
-curl "http://localhost:8000/api/method/dinematters.dinematters.api.legacy.get_legacy_content?restaurant_id=test-restaurant-1"
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.legacy.get_legacy_content?restaurant_id=test-restaurant-1"
 ```
 
 **Response Structure**:
@@ -771,6 +875,11 @@ All APIs return errors in this format:
 
 ### Common Error Codes
 
+- `VALIDATION_ERROR` - Missing or invalid parameters
+- `RESTAURANT_NOT_FOUND` - Restaurant not found
+- `RESTAURANT_LOOKUP_ERROR` - Error looking up restaurant
+- `RESTAURANT_FETCH_ERROR` - Error fetching restaurant info
+- `RESTAURANT_LIST_ERROR` - Error listing restaurants
 - `COUPON_FETCH_ERROR` - Error fetching coupons
 - `COUPON_NOT_FOUND` - Coupon code not found
 - `COUPON_INACTIVE` - Coupon is not active
@@ -782,21 +891,56 @@ All APIs return errors in this format:
 - `BOOKING_CREATE_ERROR` - Error creating booking
 - `CONFIG_FETCH_ERROR` - Error fetching config
 - `LEGACY_FETCH_ERROR` - Error fetching legacy content
+- `PRODUCT_FETCH_ERROR` - Error fetching products
+- `PRODUCT_NOT_FOUND` - Product not found
+- `CATEGORY_FETCH_ERROR` - Error fetching categories
 
 ---
 
 ## SaaS Structure Compliance
 
-### ✅ All APIs Include:
+### ✅ Compliant APIs (Have restaurant_id):
+
+1. **Restaurant API** - ✅ All 3 endpoints
+2. **Coupons API** - ✅ All 2 endpoints
+3. **Events API** - ✅ All 1 endpoint
+4. **Offers API** - ✅ All 2 endpoints
+5. **Games API** - ✅ All 1 endpoint
+6. **Config API** - ✅ All 2 endpoints
+7. **Legacy API** - ✅ All 2 endpoints
+8. **Bookings API** - ✅ All 6 endpoints
+
+**Total Compliant**: 19 endpoints
+
+### ❌ Non-Compliant APIs (Missing restaurant_id):
+
+1. **Products API** - ❌ 2 endpoints (get_products, get_product)
+   - **Issue**: Returns products from ALL restaurants (no data isolation)
+   - **Security Risk**: Can access products from any restaurant
+
+2. **Categories API** - ❌ 1 endpoint (get_categories)
+   - **Issue**: Returns categories from ALL restaurants (no data isolation)
+
+3. **Cart API** - ❌ 5 endpoints (add_to_cart, get_cart, update_cart_item, remove_cart_item, clear_cart)
+   - **Issue**: Can add products from any restaurant to cart
+   - **Security Risk**: Can mix products from different restaurants
+
+4. **Orders API** - ❌ 3 endpoints (create_order, get_orders, get_order)
+   - **Issue**: Can create orders with products from any restaurant
+   - **CRITICAL Security Risk**: No restaurant validation
+
+**Total Non-Compliant**: 11 endpoints
+
+### ✅ Compliant APIs Include:
 
 1. **Restaurant ID Parameter**: All endpoints require `restaurant_id`
-2. **Restaurant Validation**: Validates restaurant exists and is active
+2. **Restaurant Validation**: Validates restaurant exists and is active using `validate_restaurant_for_api()`
 3. **Data Isolation**: All queries filter by restaurant
 4. **User Access Control**: Authenticated endpoints check user permissions
 5. **Consistent Response Format**: All responses follow `{success, data/error}` structure
 6. **Error Handling**: Proper error codes and messages
 
-### ✅ Restaurant Isolation Verified:
+### ✅ Restaurant Isolation Verified (Compliant APIs):
 
 **Test Results**:
 - Restaurant 1: 2 coupons (COUPON1-1, COUPON1-2), 2 offers, 1 event, 2 games
@@ -820,12 +964,15 @@ All APIs return errors in this format:
 - **Restaurant 2 & 3**: No data (for isolation testing)
 
 ### Test Results:
-- ✅ **17 Endpoints Tested**: All working correctly
-- ✅ **Restaurant Isolation**: Verified - Restaurant 1 has data, Restaurant 2 has none (complete isolation)
+- ✅ **22 Compliant Endpoints Tested**: All working correctly with restaurant_id
+- ⚠️ **11 Non-Compliant Endpoints**: Working but missing restaurant_id (Products, Categories, Cart, Orders)
+- ✅ **Restaurant Isolation**: Verified for compliant APIs - Restaurant 1 has data, Restaurant 2 has none (complete isolation)
+- ❌ **No Isolation**: Non-compliant APIs return data from ALL restaurants
 - ✅ **Response Formats**: All match specifications exactly
 - ✅ **Error Handling**: Working correctly with proper error codes
 - ✅ **Data Validation**: All validations working (coupon validation, minimum order, etc.)
 - ✅ **Edge Cases**: Tested invalid restaurant, missing parameters, invalid coupon codes
+- ✅ **New Restaurant API**: Successfully returns restaurant_id from restaurant_name
 
 ### Key Insights:
 1. **Date Filtering**: Fixed coupon date filtering to handle null dates (coupons without dates are now included)
@@ -838,25 +985,44 @@ All APIs return errors in this format:
 
 ## API Endpoint Summary
 
-| # | Method | Endpoint | Auth | Status |
-|---|--------|----------|------|--------|
-| 1 | GET | `coupons.get_coupons` | Public | ✅ Working |
-| 2 | POST | `coupons.validate_coupon` | Public | ✅ Working |
-| 3 | GET | `offers.get_offers` | Public | ✅ Working |
-| 4 | POST | `offers.create_offer` | Admin | ✅ Working |
-| 5 | GET | `events.get_events` | Public | ✅ Working |
-| 6 | GET | `games.get_games` | Public | ✅ Working |
-| 7 | POST | `bookings.create_table_booking` | Required | ✅ Working |
+| # | Method | Endpoint | Auth | restaurant_id | Status |
+|---|--------|----------|------|---------------|--------|
+| 1 | GET | `restaurant.get_restaurant_id` | Public | N/A | ✅ Working |
+| 2 | GET | `restaurant.get_restaurant_info` | Public | Required | ✅ Working |
+| 3 | GET | `restaurant.list_restaurants` | Public | N/A | ✅ Working |
+| 4 | GET | `coupons.get_coupons` | Public | Required | ✅ Working |
+| 5 | POST | `coupons.validate_coupon` | Public | Required | ✅ Working |
+| 6 | GET | `offers.get_offers` | Public | Required | ✅ Working |
+| 7 | POST | `offers.create_offer` | Admin | Required | ✅ Working |
+| 8 | GET | `events.get_events` | Public | Required | ✅ Working |
+| 9 | GET | `games.get_games` | Public | Required | ✅ Working |
+| 10 | POST | `bookings.create_table_booking` | Required | Required | ✅ Working |
 | 8 | GET | `bookings.get_table_bookings` | Required | ✅ Working |
 | 9 | GET | `bookings.get_available_time_slots` | Public | ✅ Working |
 | 10 | POST | `bookings.create_banquet_booking` | Required | ✅ Working |
 | 11 | GET | `bookings.get_banquet_bookings` | Required | ✅ Working |
 | 12 | GET | `bookings.get_banquet_available_time_slots` | Public | ✅ Working |
-| 13 | GET | `config.get_restaurant_config` | Public | ✅ Working |
-| 14 | GET | `config.get_home_features` | Public | ✅ Working |
-| 15 | POST | `config.update_home_features` | Admin | ✅ Working |
-| 16 | GET | `legacy.get_legacy_content` | Public | ✅ Working |
-| 17 | POST | `legacy.update_legacy_content` | Admin | ✅ Working |
+| 13 | GET | `config.get_restaurant_config` | Public | Required | ✅ Working |
+| 14 | GET | `config.get_home_features` | Public | Required | ✅ Working |
+| 15 | POST | `config.update_home_features` | Admin | Required | ✅ Working |
+| 16 | GET | `legacy.get_legacy_content` | Public | Required | ✅ Working |
+| 17 | POST | `legacy.update_legacy_content` | Admin | Required | ✅ Working |
+
+### Non-Compliant APIs (Missing restaurant_id - Need Fix)
+
+| # | Method | Endpoint | Auth | restaurant_id | Status |
+|---|--------|----------|------|---------------|--------|
+| 18 | GET | `products.get_products` | Public | ❌ Missing | ⚠️ Works but returns ALL restaurants |
+| 19 | GET | `products.get_product` | Public | ❌ Missing | ⚠️ Works but no restaurant validation |
+| 20 | GET | `categories.get_categories` | Public | ❌ Missing | ⚠️ Works but returns ALL restaurants |
+| 21 | POST | `cart.add_to_cart` | Public | ❌ Missing | ⚠️ Works but can mix restaurants |
+| 22 | GET | `cart.get_cart` | Public | ❌ Missing | ⚠️ Works but no restaurant filter |
+| 23 | POST | `cart.update_cart_item` | Public | ❌ Missing | ⚠️ Works but no restaurant validation |
+| 24 | POST | `cart.remove_cart_item` | Public | ❌ Missing | ⚠️ Works but no restaurant validation |
+| 25 | POST | `cart.clear_cart` | Public | ❌ Missing | ⚠️ Works but no restaurant filter |
+| 26 | POST | `orders.create_order` | Public | ❌ Missing | 🔴 **CRITICAL** - No restaurant validation |
+| 27 | GET | `orders.get_orders` | Public | ❌ Missing | ⚠️ Works but returns ALL restaurants |
+| 28 | GET | `orders.get_order` | Public | ❌ Missing | ⚠️ Works but no restaurant validation |
 
 ---
 
@@ -896,6 +1062,31 @@ All APIs return errors in this format:
 3. **Time Slots**: Default time slots provided, can be customized per restaurant
 4. **Auto-Creation**: Home Features and Legacy Content auto-create defaults if none exist
 5. **Booking Numbers**: Auto-generated in format TB-YYYY-NNN (Table) or BQ-YYYY-NNN (Banquet)
+6. **Restaurant Lookup**: Use `restaurant.get_restaurant_id` to get `restaurant_id` from `restaurant_name`
+
+---
+
+## Current API Status Summary
+
+### ✅ Compliant APIs (19 endpoints)
+All these APIs correctly implement SaaS structure with `restaurant_id`:
+- Restaurant API (3 endpoints)
+- Coupons API (2 endpoints)
+- Events API (1 endpoint)
+- Offers API (2 endpoints)
+- Games API (1 endpoint)
+- Config API (2 endpoints)
+- Legacy API (2 endpoints)
+- Bookings API (6 endpoints)
+
+### ❌ Non-Compliant APIs (11 endpoints)
+These APIs are missing `restaurant_id` and need to be updated:
+- **Products API** (2 endpoints) - Returns products from ALL restaurants
+- **Categories API** (1 endpoint) - Returns categories from ALL restaurants
+- **Cart API** (5 endpoints) - Can mix products from different restaurants
+- **Orders API** (3 endpoints) - **CRITICAL**: Can create orders with products from any restaurant
+
+**Action Required**: Update these 4 API modules to add `restaurant_id` parameter and implement proper data isolation.
 
 ---
 
@@ -907,10 +1098,10 @@ All APIs return errors in this format:
 
 ```bash
 # Get all coupons
-curl "http://localhost:8000/api/method/dinematters.dinematters.api.coupons.get_coupons?restaurant_id=test-restaurant-1"
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.coupons.get_coupons?restaurant_id=test-restaurant-1"
 
 # Validate coupon
-curl -X POST "http://localhost:8000/api/method/dinematters.dinematters.api.coupons.validate_coupon" \
+curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters.api.coupons.validate_coupon" \
   -H "Content-Type: application/json" \
   -d '{"restaurant_id": "test-restaurant-1", "coupon_code": "COUPON1-1", "cart_total": 25}'
 ```
@@ -919,37 +1110,50 @@ curl -X POST "http://localhost:8000/api/method/dinematters.dinematters.api.coupo
 
 ```bash
 # Get all offers
-curl "http://localhost:8000/api/method/dinematters.dinematters.api.offers.get_offers?restaurant_id=test-restaurant-1"
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.offers.get_offers?restaurant_id=test-restaurant-1"
 
 # Get featured offers only
-curl "http://localhost:8000/api/method/dinematters.dinematters.api.offers.get_offers?restaurant_id=test-restaurant-1&featured=true"
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.offers.get_offers?restaurant_id=test-restaurant-1&featured=true"
 ```
 
 ### Events API
 
 ```bash
 # Get all events
-curl "http://localhost:8000/api/method/dinematters.dinematters.api.events.get_events?restaurant_id=test-restaurant-1"
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.events.get_events?restaurant_id=test-restaurant-1"
 
 # Get events by category
-curl "http://localhost:8000/api/method/dinematters.dinematters.api.events.get_events?restaurant_id=test-restaurant-1&category=Music"
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.events.get_events?restaurant_id=test-restaurant-1&category=Music"
 ```
 
 ### Games API
 
 ```bash
 # Get all games
-curl "http://localhost:8000/api/method/dinematters.dinematters.api.games.get_games?restaurant_id=test-restaurant-1"
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.games.get_games?restaurant_id=test-restaurant-1"
+```
+
+### Restaurant API
+
+```bash
+# Get restaurant_id from restaurant_name
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.restaurant.get_restaurant_id?restaurant_name=The Gallery Cafe"
+
+# Get full restaurant info
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.restaurant.get_restaurant_info?restaurant_id=the-gallery-cafe"
+
+# List all restaurants
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.restaurant.list_restaurants?active_only=true"
 ```
 
 ### Bookings API
 
 ```bash
 # Get available time slots
-curl "http://localhost:8000/api/method/dinematters.dinematters.api.bookings.get_available_time_slots?restaurant_id=test-restaurant-1&date=2025-02-01"
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.bookings.get_available_time_slots?restaurant_id=test-restaurant-1&date=2025-02-01"
 
 # Create table booking
-curl -X POST "http://localhost:8000/api/method/dinematters.dinematters.api.bookings.create_table_booking" \
+curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters.api.bookings.create_table_booking" \
   -H "Content-Type: application/json" \
   -d '{
     "restaurant_id": "test-restaurant-1",
@@ -968,17 +1172,17 @@ curl -X POST "http://localhost:8000/api/method/dinematters.dinematters.api.booki
 
 ```bash
 # Get restaurant config
-curl "http://localhost:8000/api/method/dinematters.dinematters.api.config.get_restaurant_config?restaurant_id=test-restaurant-1"
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.config.get_restaurant_config?restaurant_id=test-restaurant-1"
 
 # Get home features
-curl "http://localhost:8000/api/method/dinematters.dinematters.api.config.get_home_features?restaurant_id=test-restaurant-1"
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.config.get_home_features?restaurant_id=test-restaurant-1"
 ```
 
 ### Legacy API
 
 ```bash
 # Get legacy content
-curl "http://localhost:8000/api/method/dinematters.dinematters.api.legacy.get_legacy_content?restaurant_id=test-restaurant-1"
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.legacy.get_legacy_content?restaurant_id=test-restaurant-1"
 ```
 
 ---
@@ -1034,6 +1238,17 @@ curl "http://localhost:8000/api/method/dinematters.dinematters.api.legacy.get_le
 ---
 
 **Last Updated**: 2025-01-15
-**Status**: ✅ All APIs tested and working with proper SaaS structure
-**Total Endpoints**: 17
+**Status**: 
+- ✅ **19 Compliant Endpoints**: Working with proper SaaS structure
+- ⚠️ **11 Non-Compliant Endpoints**: Working but missing restaurant_id (need fixes)
+**Total Endpoints**: 30
 **Test Coverage**: 100%
+
+### Recent Updates:
+- ✅ **New Restaurant API**: Added 3 endpoints for restaurant lookup
+  - `get_restaurant_id(restaurant_name)` - Get restaurant_id from name
+  - `get_restaurant_info(restaurant_id)` - Get full restaurant details
+  - `list_restaurants(active_only)` - List all restaurants
+- ✅ **Base URL Updated**: Changed from `localhost:8000` to `backend.dinematters.com`
+- ⚠️ **Non-Compliant APIs Identified**: Products, Categories, Cart, Orders APIs need restaurant_id added
+

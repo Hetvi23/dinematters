@@ -97,3 +97,4 @@ def get_events(restaurant_id, featured=None, category=None, upcoming_only=True):
 			}
 		}
 
+

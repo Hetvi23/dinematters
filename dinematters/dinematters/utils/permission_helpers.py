@@ -85,3 +85,4 @@ def has_cart_entry_permission(doc, user, ptype):
 	"""Check permission for Cart Entry"""
 	return has_restaurant_permission(doc, user)
 
+

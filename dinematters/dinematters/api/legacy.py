@@ -412,3 +412,4 @@ def get_default_legacy_content(restaurant_name):
 		}
 	}
 
+

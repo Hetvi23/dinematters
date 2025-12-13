@@ -277,3 +277,4 @@ def onboard_restaurant_cli():
 		click.echo(f"\n✅ Restaurant onboarded: {result['restaurant']}")
 	
 	return onboard
+

@@ -220,3 +220,4 @@ def validate_coupon(restaurant_id, coupon_code, cart_total=0):
 			}
 		}
 
+

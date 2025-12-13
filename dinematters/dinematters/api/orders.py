@@ -9,6 +9,7 @@ Matches format from BACKEND_API_DOCUMENTATION.md
 import frappe
 from frappe import _
 from frappe.utils import flt, now_datetime, get_datetime_str, add_to_date
+from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api, validate_product_belongs_to_restaurant
 import json
 import random
 import string
@@ -16,12 +17,16 @@ from datetime import datetime
 
 
 @frappe.whitelist(allow_guest=True)
-def create_order(items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None):
+def create_order(restaurant_id, items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None):
 	"""
 	POST /api/v1/orders
 	Place a new order
+	Requires restaurant_id for SaaS multi-tenancy
 	"""
 	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
 		# Parse JSON strings if needed
 		if isinstance(items, str):
 			items = json.loads(items)
@@ -74,6 +79,16 @@ def create_order(items, cooking_requests=None, customer_info=None, delivery_info
 			
 			product = frappe.get_doc("Menu Product", dish_id)
 			
+			# Validate product belongs to restaurant
+			if product.restaurant != restaurant:
+				return {
+					"success": False,
+					"error": {
+						"code": "PRODUCT_NOT_FOUND",
+						"message": f"Product {dish_id} does not belong to restaurant {restaurant_id}"
+					}
+				}
+			
 			# Calculate unit price
 			unit_price = flt(product.price)
 			original_price = flt(product.original_price) if product.original_price else unit_price
@@ -119,6 +134,7 @@ def create_order(items, cooking_requests=None, customer_info=None, delivery_info
 			"doctype": "Order",
 			"order_id": order_id,
 			"order_number": order_number,
+			"restaurant": restaurant,
 			"customer": user,
 			"customer_name": customer_info.get("name") if customer_info else None,
 			"customer_email": customer_info.get("email") if customer_info else None,
@@ -148,9 +164,9 @@ def create_order(items, cooking_requests=None, customer_info=None, delivery_info
 		# Format response
 		formatted_order = format_order(order_doc)
 		
-		# Clear cart after order placement
+		# Clear cart after order placement (for this restaurant)
 		from dinematters.dinematters.api.cart import clear_cart
-		clear_cart(session_id)
+		clear_cart(restaurant_id, session_id)
 		
 		return {
 			"success": True,
@@ -170,18 +186,22 @@ def create_order(items, cooking_requests=None, customer_info=None, delivery_info
 
 
 @frappe.whitelist(allow_guest=True)
-def get_orders(status=None, page=1, limit=20, session_id=None):
+def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None):
 	"""
 	GET /api/v1/orders
-	Get user's orders
+	Get user's orders for restaurant
+	Requires restaurant_id for SaaS multi-tenancy
 	"""
 	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
 		user = frappe.session.user if frappe.session.user != "Guest" else None
 		if not user and not session_id:
 			session_id = frappe.session.get("session_id")
 		
 		# Build filters
-		filters = {}
+		filters = {"restaurant": restaurant}
 		if user:
 			filters["customer"] = user
 		elif session_id:
@@ -249,12 +269,16 @@ def get_orders(status=None, page=1, limit=20, session_id=None):
 
 
 @frappe.whitelist(allow_guest=True)
-def get_order(order_id):
+def get_order(restaurant_id, order_id):
 	"""
 	GET /api/v1/orders/:orderId
 	Get single order details
+	Requires restaurant_id for SaaS multi-tenancy
 	"""
 	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
 		if not frappe.db.exists("Order", order_id):
 			return {
 				"success": False,
@@ -265,6 +289,17 @@ def get_order(order_id):
 			}
 		
 		order_doc = frappe.get_doc("Order", order_id)
+		
+		# Validate order belongs to restaurant
+		if order_doc.restaurant != restaurant:
+			return {
+				"success": False,
+				"error": {
+					"code": "ORDER_NOT_FOUND",
+					"message": f"Order {order_id} not found for restaurant {restaurant_id}"
+				}
+			}
+		
 		formatted_order = format_order(order_doc)
 		
 		return {
