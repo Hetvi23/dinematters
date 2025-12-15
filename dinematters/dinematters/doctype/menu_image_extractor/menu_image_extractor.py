@@ -1280,11 +1280,20 @@ def process_extracted_data(data, extractor_doc):
 			product_doc.serving_size = dish_data.get('servingSize')
 		
 		# Handle media if present
-		if dish_data.get('media'):
+		media_list = dish_data.get('media', [])
+		if media_list and isinstance(media_list, list) and len(media_list) > 0:
 			# Clear existing media
 			product_doc.product_media = []
 			
-			for idx, media_url in enumerate(dish_data.get('media', [])):
+			media_added = 0
+			for idx, media_item in enumerate(media_list):
+				# Handle both string URLs and object formats
+				media_url = None
+				if isinstance(media_item, str):
+					media_url = media_item
+				elif isinstance(media_item, dict):
+					media_url = media_item.get('url') or media_item.get('media_url') or media_item.get('src')
+				
 				if not media_url:
 					continue
 				
@@ -1295,6 +1304,13 @@ def process_extracted_data(data, extractor_doc):
 				media_row.media_url = media_url
 				media_row.media_type = media_type
 				media_row.display_order = idx + 1
+				media_added += 1
+			
+			if media_added == 0:
+				frappe.log_error(
+					f"No valid media URLs found for product {product_doc.product_name} (dish_id: {dish_data.get('id')}). Media list: {json.dumps(media_list[:3])}",
+					"Menu Product - Media Processing Warning"
+				)
 		
 		# Handle customizations if present
 		if dish_data.get('customizationQuestions'):
@@ -1425,6 +1441,17 @@ def approve_extracted_data(docname):
 						data = raw_data['data']
 					else:
 						data = raw_data.get('data', raw_data)
+					
+					# Ensure media is included in dishes from raw_response
+					if data.get('dishes'):
+						dishes_list = data['dishes']
+						if not isinstance(dishes_list, list):
+							dishes_list = list(dishes_list.values()) if isinstance(dishes_list, dict) else []
+						
+						for dish in dishes_list:
+							if isinstance(dish, dict) and not dish.get('media'):
+								# Try to ensure media array exists (even if empty)
+								dish['media'] = dish.get('media', [])
 				else:
 					frappe.throw(_("Invalid data format. Please re-extract the menu data."))
 			except json.JSONDecodeError:
@@ -1465,6 +1492,24 @@ def approve_extracted_data(docname):
 					frappe.log_error(error_msg, "Menu Category Parsing Error")
 					# Don't silently fail - log the error so we can debug
 			
+			# Get raw dishes data for media fallback
+			raw_dishes_map = {}
+			if doc.raw_response:
+				try:
+					raw_data = json.loads(doc.raw_response)
+					if isinstance(raw_data, dict):
+						raw_data_obj = raw_data.get('data', raw_data)
+						if isinstance(raw_data_obj, dict) and 'dishes' in raw_data_obj:
+							raw_dishes = raw_data_obj['dishes']
+							if isinstance(raw_dishes, list):
+								for raw_dish in raw_dishes:
+									if isinstance(raw_dish, dict) and raw_dish.get('id'):
+										raw_dishes_map[raw_dish['id']] = raw_dish
+							elif isinstance(raw_dishes, dict):
+								raw_dishes_map = raw_dishes
+				except Exception as e:
+					frappe.log_error(f"Error parsing raw_response for media fallback: {str(e)}", "Menu Approval - Media Fallback Error")
+			
 			# Convert extracted dishes from child table
 			for dish_row in doc.extracted_dishes:
 				dish_data = {
@@ -1488,6 +1533,11 @@ def approve_extracted_data(docname):
 						dish_data['media'] = json.loads(dish_row.media_json)
 					except:
 						dish_data['media'] = []
+				else:
+					# Fallback: Try to get media from raw_response
+					raw_dish = raw_dishes_map.get(dish_row.dish_id) or raw_dishes_map.get(dish_row.dish_name)
+					if raw_dish and isinstance(raw_dish, dict):
+						dish_data['media'] = raw_dish.get('media', [])
 				
 				# Parse customizations JSON if exists
 				if dish_row.customizations_json:
@@ -1495,6 +1545,11 @@ def approve_extracted_data(docname):
 						dish_data['customizationQuestions'] = json.loads(dish_row.customizations_json)
 					except:
 						dish_data['customizationQuestions'] = []
+				else:
+					# Fallback: Try to get customizations from raw_response
+					raw_dish = raw_dishes_map.get(dish_row.dish_id) or raw_dishes_map.get(dish_row.dish_name)
+					if raw_dish and isinstance(raw_dish, dict):
+						dish_data['customizationQuestions'] = raw_dish.get('customizationQuestions', [])
 				
 				data['dishes'].append(dish_data)
 		
