@@ -98,6 +98,23 @@ def extract_menu_data(docname):
 		if doc.extraction_status == "Processing":
 			frappe.throw(_("Extraction is already in progress. Please wait for it to complete."))
 		
+		# Reset extraction data if re-extracting (status is Completed or Failed)
+		if doc.extraction_status in ["Completed", "Failed"]:
+			# Clear previous extraction data
+			# For child tables, we need to reload the doc and clear the child table
+			doc.reload()
+			doc.extracted_dishes = []
+			doc.extraction_log = ''
+			doc.categories_created = 0
+			doc.items_created = 0
+			doc.items_updated = 0
+			doc.items_skipped = 0
+			doc.extraction_date = None
+			doc.processing_time = None
+			doc.approval_status = 'Pending'
+			doc.save(ignore_permissions=True)
+			frappe.db.commit()
+		
 		# Update status to Processing (minimal save)
 		doc.db_set('extraction_status', 'Processing', update_modified=False)
 		doc.db_set('extraction_log', _("Extraction started. Processing images in batches..."), update_modified=False)
@@ -154,6 +171,14 @@ def _extract_batch_internal(docname, batch_images, batch_number, total_batches):
 	This runs as a background job - no timeouts, processes in parallel with other batches
 	"""
 	try:
+		# Log that batch processing started
+		frappe.log_error(
+			f"Batch {batch_number}/{total_batches} started processing\n"
+			f"Document: {docname}\n"
+			f"Images in batch: {len(batch_images)}",
+			"Menu Extraction - Batch Start"
+		)
+		
 		doc = frappe.get_doc("Menu Image Extractor", docname)
 		
 		# Check if document still exists and is in Processing status
@@ -221,6 +246,16 @@ def _extract_batch_internal(docname, batch_images, batch_number, total_batches):
 		api_url = "https://api.dinematters.com/menu-extraction/api/v1/extraction/extract"
 		headers = {'Expect': ''}
 		
+		# Log API call details for debugging
+		frappe.log_error(
+			f"Batch {batch_number}: Calling API\n"
+			f"URL: {api_url}\n"
+			f"Images count: {len(image_files)}\n"
+			f"Form data: {form_data}\n"
+			f"Image URLs: {batch_images[:3]}...",  # First 3 URLs
+			"Menu Extraction - API Call Start"
+		)
+		
 		try:
 			response = requests.post(
 				api_url,
@@ -237,8 +272,26 @@ def _extract_batch_internal(docname, batch_images, batch_number, total_batches):
 				except:
 					pass
 			
+			# Log response status
+			frappe.log_error(
+				f"Batch {batch_number}: API Response\n"
+				f"Status Code: {response.status_code}\n"
+				f"Response Headers: {dict(response.headers)}\n"
+				f"Response Preview: {response.text[:500]}",
+				"Menu Extraction - API Response"
+			)
+			
 			response.raise_for_status()
 			result = response.json()
+			
+			# Log successful result
+			frappe.log_error(
+				f"Batch {batch_number}: API Success\n"
+				f"Success: {result.get('success')}\n"
+				f"Categories: {len(result.get('data', {}).get('categories', []))}\n"
+				f"Dishes: {len(result.get('data', {}).get('dishes', []))}",
+				"Menu Extraction - API Success"
+			)
 			
 			processing_time = time.time() - start_time
 			
@@ -354,15 +407,25 @@ def _aggregate_and_process_batches(docname):
 			categories = data.get('categories', [])
 			dishes = data.get('dishes', [])
 			
+			# Handle categories - can be list or dict
+			if isinstance(categories, dict):
+				categories = list(categories.values())
+			elif not isinstance(categories, list):
+				categories = []
+			
 			# Aggregate categories (deduplicate by id)
-			if isinstance(categories, list):
-				for cat in categories:
-					if isinstance(cat, dict) and cat.get('id'):
-						all_categories[cat['id']] = cat
+			for cat in categories:
+				if isinstance(cat, dict) and cat.get('id'):
+					all_categories[cat['id']] = cat
+			
+			# Handle dishes - can be list or dict
+			if isinstance(dishes, dict):
+				dishes = list(dishes.values())
+			elif not isinstance(dishes, list):
+				dishes = []
 			
 			# Aggregate dishes
-			if isinstance(dishes, list):
-				all_dishes.extend(dishes)
+			all_dishes.extend(dishes)
 		
 		# Create aggregated data structure
 		aggregated_data = {

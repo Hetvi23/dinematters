@@ -2,9 +2,10 @@ import { useFrappeGetDocList, useFrappeGetDoc, useFrappeGetCall, useFrappePostCa
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import { Loader2, CheckCircle, XCircle, Clock, FileText } from 'lucide-react'
 import { toast } from 'sonner'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface ReviewExtractionProps {
   restaurantId: string
@@ -28,13 +29,23 @@ export default function ReviewExtraction({ restaurantId }: ReviewExtractionProps
   const latestExtraction = extractions?.[0]
 
   // Get extraction document with full data
-  const { data: extractionDoc } = useFrappeGetDoc(
+  const { data: extractionDoc, mutate: refreshExtraction } = useFrappeGetDoc(
     'Menu Image Extractor',
     latestExtraction?.name || '',
     {
       enabled: !!latestExtraction?.name
     }
   )
+
+  // Auto-refresh if processing
+  useEffect(() => {
+    if (latestExtraction?.extraction_status === 'Processing') {
+      const interval = setInterval(() => {
+        refreshExtraction()
+      }, 5000) // Refresh every 5 seconds
+      return () => clearInterval(interval)
+    }
+  }, [latestExtraction?.extraction_status, refreshExtraction])
 
   const { call: approveExtraction } = useFrappePostCall(
     'dinematters.dinematters.doctype.menu_image_extractor.menu_image_extractor.approve_extracted_data'
@@ -106,26 +117,79 @@ export default function ReviewExtraction({ restaurantId }: ReviewExtractionProps
   
   if (extractionDoc) {
     try {
+      // First, try to get dishes from child table (most reliable)
+      if (extractionDoc.extracted_dishes && Array.isArray(extractionDoc.extracted_dishes) && extractionDoc.extracted_dishes.length > 0) {
+        dishes = extractionDoc.extracted_dishes.map((d: any) => ({
+          name: d.dish_name || d.product_name || d.name,
+          product_name: d.dish_name || d.product_name || d.name,
+          description: d.description,
+          price: d.price,
+          category: d.category || d.main_category
+        }))
+      }
+      
+      // Parse raw_response for categories and dishes (if child table is empty)
       if (extractionDoc.raw_response) {
         const rawData = typeof extractionDoc.raw_response === 'string' 
           ? JSON.parse(extractionDoc.raw_response) 
           : extractionDoc.raw_response
-        const data = rawData?.data || rawData
-        categories = data?.categories || []
-        dishes = data?.dishes || []
+        
+        // Handle different response structures
+        let data = rawData
+        if (rawData?.data) {
+          data = rawData.data
+        } else if (rawData?.success && rawData?.data) {
+          data = rawData.data
+        }
+        
+        // Extract categories
+        if (data?.categories) {
+          let cats = data.categories
+          if (!Array.isArray(cats)) {
+            // Convert dict to array
+            if (typeof cats === 'object') {
+              cats = Object.values(cats)
+            } else {
+              cats = []
+            }
+          }
+          categories = cats.filter((c: any) => c && typeof c === 'object')
+        }
+        
+        // Extract dishes if not already from child table
+        if (dishes.length === 0 && data?.dishes) {
+          let dishesData = data.dishes
+          if (!Array.isArray(dishesData)) {
+            // Convert dict to array
+            if (typeof dishesData === 'object') {
+              dishesData = Object.values(dishesData)
+            } else {
+              dishesData = []
+            }
+          }
+          dishes = dishesData.map((d: any) => ({
+            name: d.name || d.product_name || d.dish_name,
+            product_name: d.name || d.product_name || d.dish_name,
+            description: d.description,
+            price: d.price,
+            category: d.category || d.mainCategory
+          }))
+        }
       }
-      // Also check child tables if available
-      if (extractionDoc.extracted_dishes && extractionDoc.extracted_dishes.length > 0) {
-        dishes = extractionDoc.extracted_dishes.map((d: any) => ({
-          name: d.product_name || d.name,
-          product_name: d.product_name || d.name,
-          description: d.description,
-          price: d.price,
-          category: d.category
-        }))
+      
+      // Extract unique categories from dishes if no categories found
+      if (categories.length === 0 && dishes.length > 0) {
+        const uniqueCategories = new Set<string>()
+        dishes.forEach((dish: any) => {
+          if (dish.category) {
+            uniqueCategories.add(dish.category)
+          }
+        })
+        categories = Array.from(uniqueCategories).map(cat => ({ name: cat, category_name: cat }))
       }
     } catch (e) {
       console.error('Error parsing extraction data:', e)
+      console.error('ExtractionDoc:', extractionDoc)
     }
   }
 

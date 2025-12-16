@@ -75,10 +75,29 @@ def update_document(doctype, name, doc_data):
 		# Get existing document
 		doc = frappe.get_doc(doctype, name)
 		
+		# Get table fields from meta
+		table_fields = [f.fieldname for f in doc.meta.get_table_fields()]
+		
 		# Update fields
 		for key, value in doc_data.items():
 			if key not in ['doctype', 'name']:
-				doc.set(key, value)
+				# Handle child tables
+				if key in table_fields:
+					# Clear existing child table
+					doc.set(key, [])
+					# Add new rows if value is a list
+					if isinstance(value, list):
+						for row_data in value:
+							if isinstance(row_data, dict):
+								# Ensure doctype is set for child table rows
+								row_data['doctype'] = doc.meta.get_field(key).options
+								doc.append(key, row_data)
+					elif value is None or (isinstance(value, list) and len(value) == 0):
+						# Already cleared above
+						pass
+				else:
+					# Regular field
+					doc.set(key, value)
 		
 		doc.save()
 		

@@ -1,49 +1,33 @@
 import { useState, useEffect } from 'react'
-import { useFrappeGetDocList, useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe'
-import { toast } from 'sonner'
+import { useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Loader2, CheckCircle, XCircle, Clock, Play, Check } from 'lucide-react'
+import { toast } from 'sonner'
 import DynamicForm from './DynamicForm'
 import EditableExtractedDishesTable from './EditableExtractedDishesTable'
 
-interface MenuExtractionProps {
-  restaurantId: string
-  onExtractionComplete?: (data: any) => void
-  onNavigateToReview?: () => void
+interface MenuImageExtractorFormProps {
+  docname?: string
+  restaurantId?: string
+  onComplete?: (data: any) => void
 }
 
-export default function MenuExtraction({ restaurantId, onExtractionComplete, onNavigateToReview }: MenuExtractionProps) {
-  // Get selected document from localStorage or use latest
-  const [selectedDocName, setSelectedDocName] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(`menu-extraction-${restaurantId}`)
-      return stored || null
-    }
-    return null
-  })
-
-  // Get all extractions for this restaurant
-  const { data: extractions, isLoading: isLoadingList } = useFrappeGetDocList(
-    'Menu Image Extractor',
-    {
-      fields: ['name', 'restaurant', 'extraction_status', 'creation', 'modified'],
-      filters: { restaurant: restaurantId },
-      orderBy: { field: 'creation', order: 'desc' },
-      limit: 100
-    },
-    restaurantId ? `menu-extractions-list-${restaurantId}` : null
-  )
-
-  // Get the selected extraction document
+export default function MenuImageExtractorForm({ 
+  docname, 
+  restaurantId,
+  onComplete 
+}: MenuImageExtractorFormProps) {
+  const [extractionDocName, setExtractionDocName] = useState<string | undefined>(docname)
+  
+  // Get extraction document
   const { data: extractionDoc, mutate: refreshExtraction } = useFrappeGetDoc(
     'Menu Image Extractor',
-    selectedDocName || '',
+    extractionDocName || '',
     {
-      enabled: !!selectedDocName
+      enabled: !!extractionDocName
     }
   )
 
@@ -55,18 +39,9 @@ export default function MenuExtraction({ restaurantId, onExtractionComplete, onN
     'dinematters.dinematters.doctype.menu_image_extractor.menu_image_extractor.approve_extracted_data'
   )
 
-  // Auto-select latest extraction if none selected
+  // Auto-refresh if processing
   useEffect(() => {
-    if (!selectedDocName && extractions && extractions.length > 0) {
-      const latest = extractions[0]
-      setSelectedDocName(latest.name)
-      localStorage.setItem(`menu-extraction-${restaurantId}`, latest.name)
-    }
-  }, [extractions, selectedDocName, restaurantId])
-
-  // Auto-refresh if processing or pending approval (to catch when extraction completes)
-  useEffect(() => {
-    if (extractionDoc?.extraction_status === 'Processing' || extractionDoc?.extraction_status === 'Pending Approval') {
+    if (extractionDoc?.extraction_status === 'Processing') {
       const interval = setInterval(() => {
         refreshExtraction()
       }, 5000)
@@ -74,24 +49,13 @@ export default function MenuExtraction({ restaurantId, onExtractionComplete, onN
     }
   }, [extractionDoc?.extraction_status, refreshExtraction])
 
-  const handleSelectDocument = (docName: string) => {
-    setSelectedDocName(docName)
-    localStorage.setItem(`menu-extraction-${restaurantId}`, docName)
-  }
-
   const handleExtract = async () => {
-    if (!selectedDocName) {
-      toast.error('Please select or create a Menu Image Extractor document first')
+    if (!extractionDocName) {
+      toast.error('Please save the document first')
       return
     }
 
-    // Ensure document is loaded
-    if (!extractionDoc) {
-      toast.error('Please wait for document to load')
-      return
-    }
-
-    if (!extractionDoc.menu_images || extractionDoc.menu_images.length === 0) {
+    if (!extractionDoc?.menu_images || extractionDoc.menu_images.length === 0) {
       toast.error('Please upload at least one menu image before extraction')
       return
     }
@@ -106,9 +70,7 @@ export default function MenuExtraction({ restaurantId, onExtractionComplete, onN
     }
 
     try {
-      // Call the API with docname as a parameter object
-      // The backend function expects: extract_menu_data(docname)
-      const result = await extractMenuData({ docname: selectedDocName })
+      const result = await extractMenuData({ docname: extractionDocName })
       let message = 'Extraction started in the background'
       if (result) {
         if (typeof result === 'string') {
@@ -120,32 +82,15 @@ export default function MenuExtraction({ restaurantId, onExtractionComplete, onN
         }
       }
       toast.success(message)
-      // Refresh immediately to show Processing status
       refreshExtraction()
     } catch (error: any) {
-      console.error('Extraction error:', error)
-      // Better error handling for 417 and other errors
-      let errorMessage = 'Failed to start extraction'
-      if (error?.exc) {
-        try {
-          const excData = typeof error.exc === 'string' ? JSON.parse(error.exc) : error.exc
-          errorMessage = Array.isArray(excData) ? excData[0] : (excData?.message || String(excData))
-        } catch {
-          errorMessage = String(error.exc)
-        }
-      } else if (error?.message) {
-        errorMessage = String(error.message)
-      } else if (error?.data?.message) {
-        errorMessage = String(error.data.message)
-      } else if (error?.response?.data?.message) {
-        errorMessage = String(error.response.data.message)
-      }
-      toast.error(errorMessage)
+      const errorMessage = error?.message || error?.data?.message || 'Failed to start extraction'
+      toast.error(typeof errorMessage === 'string' ? errorMessage : 'Failed to start extraction')
     }
   }
 
   const handleApprove = async () => {
-    if (!selectedDocName) {
+    if (!extractionDocName) {
       toast.error('Document not found')
       return
     }
@@ -155,7 +100,7 @@ export default function MenuExtraction({ restaurantId, onExtractionComplete, onN
     }
 
     try {
-      const result = await approveExtraction({ docname: selectedDocName })
+      const result = await approveExtraction({ docname: extractionDocName })
       let message = 'Extracted data approved and categories/products created successfully'
       if (result) {
         if (typeof result === 'string') {
@@ -168,20 +113,11 @@ export default function MenuExtraction({ restaurantId, onExtractionComplete, onN
       }
       toast.success(message)
       refreshExtraction()
-      onExtractionComplete?.(extractionDoc)
+      onComplete?.(extractionDoc)
     } catch (error: any) {
       const errorMessage = error?.message || error?.data?.message || 'Failed to approve extraction'
       toast.error(typeof errorMessage === 'string' ? errorMessage : 'Failed to approve extraction')
     }
-  }
-
-  if (isLoadingList) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-        Loading...
-      </div>
-    )
   }
 
   const status = extractionDoc?.extraction_status || 'Draft'
@@ -193,47 +129,7 @@ export default function MenuExtraction({ restaurantId, onExtractionComplete, onN
 
   return (
     <div className="space-y-6">
-      {/* Document Selector */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Select Menu Image Extractor</CardTitle>
-          <CardDescription>
-            Choose an existing extraction or create a new one
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
-              <label className="text-sm font-medium mb-2 block">Select Document</label>
-              <Select
-                value={selectedDocName || ''}
-                onValueChange={(value) => {
-                  if (value === 'new') {
-                    setSelectedDocName(null)
-                    localStorage.removeItem(`menu-extraction-${restaurantId}`)
-                  } else {
-                    handleSelectDocument(value)
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select or create a document" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="new">+ Create New Extraction</SelectItem>
-                  {extractions?.map((ext: any) => (
-                    <SelectItem key={ext.name} value={ext.name}>
-                      {ext.name} - {ext.extraction_status || 'Draft'} ({new Date(ext.creation).toLocaleDateString()})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Main Form - Just like the doctype */}
+      {/* Main Form - All Fields */}
       <Card className="border-2">
         <CardHeader>
           <CardTitle>Menu Image Extractor</CardTitle>
@@ -244,12 +140,11 @@ export default function MenuExtraction({ restaurantId, onExtractionComplete, onN
         <CardContent>
           <DynamicForm
             doctype="Menu Image Extractor"
-            docname={selectedDocName || undefined}
-            mode={selectedDocName ? 'edit' : 'create'}
-            initialData={{ restaurant: restaurantId }}
+            docname={extractionDocName}
+            mode={extractionDocName ? 'edit' : 'create'}
+            initialData={restaurantId ? { restaurant: restaurantId } : {}}
             onSave={(data) => {
-              setSelectedDocName(data.name)
-              localStorage.setItem(`menu-extraction-${restaurantId}`, data.name)
+              setExtractionDocName(data.name)
               refreshExtraction()
               toast.success('Document saved successfully')
             }}
@@ -258,7 +153,7 @@ export default function MenuExtraction({ restaurantId, onExtractionComplete, onN
       </Card>
 
       {/* Extraction Status and Actions */}
-      {selectedDocName && extractionDoc && (
+      {extractionDocName && extractionDoc && (
         <Card className="border-2">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -317,26 +212,9 @@ export default function MenuExtraction({ restaurantId, onExtractionComplete, onN
             {!isProcessing && (
               <Button 
                 onClick={handleExtract} 
-                disabled={
-                  !selectedDocName || 
-                  !extractionDoc || 
-                  !extractionDoc.menu_images || 
-                  extractionDoc.menu_images.length === 0 || 
-                  isPendingApproval
-                }
+                disabled={!extractionDoc?.menu_images?.length || isPendingApproval}
                 size="lg"
                 className="w-full"
-                title={
-                  !selectedDocName 
-                    ? 'Please select or create a document first'
-                    : !extractionDoc 
-                    ? 'Please wait for document to load'
-                    : !extractionDoc.menu_images || extractionDoc.menu_images.length === 0
-                    ? 'Please upload at least one menu image'
-                    : isPendingApproval
-                    ? 'Extraction is pending approval. Please approve or extract again.'
-                    : 'Click to extract menu data from uploaded images'
-                }
               >
                 <Play className="mr-2 h-4 w-4" />
                 {isCompleted || hasError ? 'Extract Again' : 'Extract Menu Data'}
@@ -368,33 +246,21 @@ export default function MenuExtraction({ restaurantId, onExtractionComplete, onN
         </Card>
       )}
 
-      {/* Extracted Dishes - Review and Edit - Only show when status is Pending Approval (fresh from API) */}
-      {isPendingApproval && extractionDoc?.extracted_dishes && Array.isArray(extractionDoc.extracted_dishes) && extractionDoc.extracted_dishes.length > 0 && (
+      {/* Extracted Dishes - Review and Edit */}
+      {isPendingApproval && extractionDoc?.extracted_dishes && extractionDoc.extracted_dishes.length > 0 && (
         <Card className="border-2 border-primary/20">
           <CardHeader>
             <CardTitle>Extracted Dishes - Review and Edit</CardTitle>
             <CardDescription>
-              {extractionDoc.extracted_dishes.length} dish{extractionDoc.extracted_dishes.length !== 1 ? 'es' : ''} extracted from API processing. 
-              Review and edit before approval. Changes will be saved automatically.
+              Review and edit the extracted dishes before approval. Changes will be saved automatically.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <EditableExtractedDishesTable
               dishes={extractionDoc.extracted_dishes}
-              docname={selectedDocName!}
+              docname={extractionDocName!}
               onUpdate={refreshExtraction}
             />
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Show message when extraction is completed (old data hidden) */}
-      {isCompleted && (!extractionDoc?.extracted_dishes || extractionDoc.extracted_dishes.length === 0) && (
-        <Card className="border-2">
-          <CardContent className="py-6">
-            <p className="text-sm text-muted-foreground text-center">
-              Extraction completed and data approved. Click "Extract Again" to process new images.
-            </p>
           </CardContent>
         </Card>
       )}
@@ -425,3 +291,4 @@ export default function MenuExtraction({ restaurantId, onExtractionComplete, onN
     </div>
   )
 }
+

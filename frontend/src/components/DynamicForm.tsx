@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ColorPaletteSelector } from '@/components/ui/color-palette-selector'
-import { useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe'
+import { useFrappeGetDoc, useFrappePostCall, useFrappeGetDocList } from '@/lib/frappe'
 import { toast } from 'sonner'
 import { Loader2, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -23,6 +23,8 @@ interface DynamicFormProps {
   onCancel?: () => void
   mode?: 'create' | 'edit' | 'view'
   initialData?: Record<string, any>
+  onFieldChange?: (fieldname: string, value: any) => void
+  hideFields?: string[] // Fields to hide from the form
 }
 
 export default function DynamicForm({ 
@@ -31,7 +33,8 @@ export default function DynamicForm({
   onSave, 
   onCancel,
   mode = 'create',
-  initialData = {}
+  initialData = {},
+  onFieldChange
 }: DynamicFormProps) {
   const { meta, isLoading: metaLoading, error: metaError } = useDocTypeMeta(doctype)
   const { permissions, isLoading: permLoading } = usePermissions(doctype)
@@ -140,6 +143,8 @@ export default function DynamicForm({
       }
       return { ...prev, [fieldname]: value }
     })
+    // Notify parent component of field changes
+    onFieldChange?.(fieldname, value)
   }
 
   const validateForm = (): { isValid: boolean; errors: string[] } => {
@@ -367,23 +372,13 @@ export default function DynamicForm({
         )
 
       case 'Link':
-        // For Link fields, we'd need to fetch options - simplified for now
-        return (
-          <div key={field.fieldname} className="space-y-2">
-            <Label htmlFor={field.fieldname}>
-              {field.label}
-              {field.required && <span className="text-destructive">*</span>}
-            </Label>
-            <Input
-              id={field.fieldname}
-              value={value}
-              onChange={(e) => handleFieldChange(field.fieldname, e.target.value)}
-              readOnly={isReadOnly}
-              required={field.required}
-              placeholder={field.description || `Enter ${field.options || field.label}`}
-            />
-          </div>
-        )
+        return <LinkField
+          key={field.fieldname}
+          field={field}
+          value={value}
+          onChange={(val) => handleFieldChange(field.fieldname, val)}
+          isReadOnly={isReadOnly}
+        />
 
       case 'Select':
         const options = field.options ? field.options.split('\n').filter(Boolean) : []
@@ -466,6 +461,16 @@ export default function DynamicForm({
         )
 
       case 'Datetime':
+        // Convert datetime string from backend (YYYY-MM-DD HH:mm:ss) to datetime-local format (YYYY-MM-DDTHH:mm)
+        const formatDatetimeForInput = (dt: any) => {
+          if (!dt) return ''
+          if (typeof dt === 'string') {
+            // Handle formats like "2025-12-14 16:38:33.426288" or "2025-12-14T16:38:33"
+            const normalized = dt.replace(' ', 'T').split('.')[0] // Remove microseconds
+            return normalized.substring(0, 16) // Keep only YYYY-MM-DDTHH:mm
+          }
+          return ''
+        }
         return (
           <div key={field.fieldname} className="space-y-2">
             <Label htmlFor={field.fieldname}>
@@ -475,7 +480,7 @@ export default function DynamicForm({
             <Input
               id={field.fieldname}
               type="datetime-local"
-              value={value}
+              value={formatDatetimeForInput(value)}
               onChange={(e) => handleFieldChange(field.fieldname, e.target.value)}
               readOnly={isReadOnly}
               required={field.required}
@@ -689,6 +694,112 @@ export default function DynamicForm({
           </Button>
         )}
       </div>
+    </div>
+  )
+}
+
+// Link Field Component - Fetches and displays linked doctype records
+function LinkField({ 
+  field, 
+  value, 
+  onChange, 
+  isReadOnly 
+}: { 
+  field: DocTypeField
+  value: any
+  onChange: (value: string) => void
+  isReadOnly: boolean
+}) {
+  const linkedDoctype = field.options || ''
+  
+  // Determine which fields to fetch based on common doctype patterns
+  const getFieldsForDoctype = (doctype: string) => {
+    switch (doctype) {
+      case 'Restaurant':
+        return ['name', 'restaurant_name']
+      default:
+        // Try to get name field and common title fields
+        return ['name']
+    }
+  }
+  
+  const fields = getFieldsForDoctype(linkedDoctype)
+  
+  // Fetch linked records
+  const { data: linkedRecords, isLoading } = useFrappeGetDocList(
+    linkedDoctype,
+    {
+      fields: fields,
+      limit: 1000,
+      orderBy: { field: fields[1] || 'name', order: 'asc' }
+    },
+    linkedDoctype ? `link-${linkedDoctype}` : null
+  )
+  
+  // Get display value for selected record
+  const getDisplayValue = (record: any) => {
+    if (!record) return ''
+    // For Restaurant, use restaurant_name
+    if (linkedDoctype === 'Restaurant' && record.restaurant_name) {
+      return record.restaurant_name
+    }
+    // Fallback to name or first available field
+    return record[fields[1]] || record.name || ''
+  }
+  
+  // Get selected record
+  const selectedRecord = linkedRecords?.find((r: any) => r.name === value)
+  const displayValue = selectedRecord ? getDisplayValue(selectedRecord) : value
+  
+  if (isLoading) {
+    return (
+      <div key={field.fieldname} className="space-y-2">
+        <Label htmlFor={field.fieldname}>
+          {field.label}
+          {field.required && <span className="text-destructive">*</span>}
+        </Label>
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-sm text-muted-foreground">Loading options...</span>
+        </div>
+      </div>
+    )
+  }
+  
+  return (
+    <div key={field.fieldname} className="space-y-2">
+      <Label htmlFor={field.fieldname}>
+        {field.label}
+        {field.required && <span className="text-destructive">*</span>}
+      </Label>
+      <Select
+        value={value || ''}
+        onValueChange={onChange}
+        disabled={isReadOnly}
+      >
+        <SelectTrigger id={field.fieldname}>
+          <SelectValue placeholder={`Select ${field.label}`}>
+            {displayValue || `Select ${field.label}`}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {linkedRecords && linkedRecords.length > 0 ? (
+            linkedRecords.map((record: any) => {
+              const display = getDisplayValue(record)
+              return (
+                <SelectItem key={record.name} value={record.name}>
+                  {display}
+                </SelectItem>
+              )
+            })
+          ) : (
+            <SelectItem value="" disabled>No options available</SelectItem>
+          )}
+        </SelectContent>
+      </Select>
+      {field.description && (
+        <p className="text-xs text-muted-foreground">{field.description}</p>
+      )}
     </div>
   )
 }

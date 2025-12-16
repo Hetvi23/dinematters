@@ -5,6 +5,8 @@ import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Trash2, Upload, Image as ImageIcon } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 interface MenuImageItem {
   name?: string
@@ -114,7 +116,18 @@ export default function MenuImagesTable({ value = [], onChange, required, disabl
         />
         <Label
           htmlFor="menu-images-upload"
-          className="flex items-center gap-2 px-4 py-2 border rounded-md cursor-pointer hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 border rounded-md transition-colors",
+            (disabled || uploading || currentValue.length >= 20) 
+              ? "opacity-50 cursor-not-allowed" 
+              : "cursor-pointer hover:bg-accent"
+          )}
+          onClick={(e) => {
+            if (disabled || uploading || currentValue.length >= 20) {
+              e.preventDefault()
+              return false
+            }
+          }}
         >
           <Upload className="h-4 w-4" />
           {uploading ? 'Uploading...' : 'Upload Images'}
