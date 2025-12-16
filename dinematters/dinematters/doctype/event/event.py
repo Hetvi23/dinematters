@@ -8,8 +8,8 @@ from frappe.model.document import Document
 class Event(Document):
 	"""
 	Custom Event doctype for Dinematters.
-	This class handles the case where Frappe's Google Calendar integration
-	tries to access fields that don't exist in this custom Event doctype.
+	This class handles the case where Frappe/ERPNext integrations try to access
+	fields that don't exist in this custom Event doctype.
 	"""
 	
 	@property
@@ -26,5 +26,10 @@ class Event(Document):
 	def google_calendar(self):
 		"""Return None since this custom Event doesn't support Google Calendar sync."""
 		return None
+	
+	@property
+	def event_participants(self):
+		"""Return empty list since this custom Event doesn't have event participants."""
+		return []
 
 
