@@ -11,6 +11,7 @@
   "entry_id",
   "user",
   "session_id",
+  "table_number",
   "column_break_1",
   "product",
   "quantity",
@@ -51,6 +52,12 @@
    "fieldtype": "Data",
    "label": "Session ID",
    "search_index": 1
+  },
+  {
+   "fieldname": "table_number",
+   "fieldtype": "Int",
+   "label": "Table Number",
+   "description": "Table number from scanned QR code (format: restaurant-id/table-number)"
   },
   {
    "fieldname": "column_break_1",

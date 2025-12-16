@@ -32,6 +32,8 @@
   "column_break_settings",
   "timezone",
   "currency",
+  "tables",
+  "qr_codes_pdf_url",
   "section_break_branding",
   "logo",
   "section_break_metadata",
@@ -184,6 +186,20 @@
    "label": "Currency",
    "options": "Currency",
    "default": "USD"
+  },
+  {
+   "default": "0",
+   "fieldname": "tables",
+   "fieldtype": "Int",
+   "label": "Tables",
+   "description": "Number of tables in the restaurant. QR codes will be generated when this field is updated."
+  },
+  {
+   "fieldname": "qr_codes_pdf_url",
+   "fieldtype": "Data",
+   "label": "QR Codes PDF URL",
+   "read_only": 1,
+   "hidden": 1
   },
   {
    "fieldname": "section_break_branding",

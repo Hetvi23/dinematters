@@ -17,7 +17,7 @@ from datetime import datetime
 
 
 @frappe.whitelist(allow_guest=True)
-def create_order(restaurant_id, items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None):
+def create_order(restaurant_id, items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None, table_number=None):
 	"""
 	POST /api/v1/orders
 	Place a new order
@@ -129,6 +129,12 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 		delivery_fee = flt(delivery_info.get("deliveryFee", 0)) if delivery_info else 0
 		total = subtotal - discount + tax + delivery_fee
 		
+		# Parse table_number from QR code if provided
+		parsed_table_number = None
+		if table_number:
+			from dinematters.dinematters.api.cart import parse_table_number_from_qr
+			parsed_table_number = parse_table_number_from_qr(table_number, restaurant_id)
+		
 		# Create order document
 		order_doc = frappe.get_doc({
 			"doctype": "Order",
@@ -147,6 +153,7 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 			"cooking_requests": json.dumps(cooking_requests) if cooking_requests else None,
 			"status": "pending",
 			"payment_status": "pending",
+			"table_number": parsed_table_number,
 			"delivery_address": delivery_info.get("address") if delivery_info else None,
 			"delivery_city": delivery_info.get("city") if delivery_info else None,
 			"delivery_state": delivery_info.get("state") if delivery_info else None,
@@ -413,6 +420,10 @@ def format_order(order_doc):
 		"createdAt": get_datetime_str(order_doc.creation),
 		"estimatedDelivery": get_datetime_str(order_doc.estimated_delivery) if order_doc.estimated_delivery else None
 	}
+	
+	# Add table_number if available
+	if order_doc.table_number:
+		order_data["tableNumber"] = order_doc.table_number
 	
 	# Add customer info if available
 	if order_doc.customer_name:

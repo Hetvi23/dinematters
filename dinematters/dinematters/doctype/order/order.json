@@ -15,6 +15,7 @@
   "customer_name",
   "customer_email",
   "customer_phone",
+  "table_number",
   "section_break_items",
   "order_items",
   "section_break_totals",
@@ -96,6 +97,12 @@
    "fieldtype": "Data",
    "label": "Customer Phone",
    "options": "Phone"
+  },
+  {
+   "fieldname": "table_number",
+   "fieldtype": "Int",
+   "label": "Table Number",
+   "description": "Table number from scanned QR code (format: restaurant-id/table-number)"
   },
   {
    "fieldname": "section_break_items",

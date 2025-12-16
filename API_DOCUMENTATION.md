@@ -857,6 +857,394 @@ curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.leg
 
 ---
 
+### 8. Cart API
+
+#### 8.1 Add Item to Cart
+
+**Endpoint**: `POST /api/method/dinematters.dinematters.api.cart.add_to_cart`
+
+**Parameters**:
+- `restaurant_id` (required) - Restaurant identifier
+- `dish_id` (required) - Product/Menu Product ID
+- `quantity` (optional, default: 1) - Quantity to add
+- `customizations` (optional) - JSON object with customization selections
+- `session_id` (optional) - For guest users
+- `table_number` (optional) - Table number from scanned QR code (format: `restaurant-id/table-number` or just the number)
+
+**Request Example**:
+```bash
+curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters.api.cart.add_to_cart" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "restaurant_id": "test-restaurant-1",
+    "dish_id": "dish-123",
+    "quantity": 2,
+    "customizations": {
+      "question-id-1": ["option-id-1", "option-id-2"]
+    },
+    "table_number": "test-restaurant-1/5"
+  }'
+```
+
+**Response Structure**:
+```json
+{
+  "message": {
+    "success": true,
+    "data": {
+      "cartItem": {
+        "entryId": "dish-123-1234567890-abc123",
+        "dishId": "dish-123",
+        "quantity": 2,
+        "customizations": {
+          "question-id-1": ["option-id-1", "option-id-2"]
+        },
+        "unitPrice": 15.99,
+        "totalPrice": 31.98,
+        "tableNumber": 5
+      },
+      "cart": {
+        "totalItems": 1,
+        "subtotal": 31.98,
+        "discount": 0,
+        "tax": 0,
+        "deliveryFee": 0,
+        "total": 31.98
+      }
+    }
+  }
+}
+```
+
+**Notes**:
+- If `table_number` is provided in QR code format (`restaurant-id/table-number`), it will be parsed automatically
+- If an identical item already exists in cart, quantity will be updated instead of creating a new entry
+- `tableNumber` is included in response if table was specified
+
+---
+
+#### 8.2 Get Cart
+
+**Endpoint**: `GET /api/method/dinematters.dinematters.api.cart.get_cart`
+
+**Parameters**:
+- `restaurant_id` (required) - Restaurant identifier
+- `session_id` (optional) - For guest users
+
+**Request Example**:
+```bash
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.cart.get_cart?restaurant_id=test-restaurant-1&session_id=abc123"
+```
+
+**Response Structure**:
+```json
+{
+  "message": {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "entryId": "dish-123-1234567890-abc123",
+          "dishId": "dish-123",
+          "dish": {
+            "id": "dish-123",
+            "name": "Pizza Margherita",
+            "price": 15.99,
+            "imageSrc": "https://backend.dinematters.com/files/pizza.jpg"
+          },
+          "quantity": 2,
+          "customizations": {},
+          "unitPrice": 15.99,
+          "totalPrice": 31.98,
+          "tableNumber": 5
+        }
+      ],
+      "summary": {
+        "totalItems": 1,
+        "subtotal": 31.98,
+        "discount": 0,
+        "tax": 0,
+        "deliveryFee": 0,
+        "total": 31.98
+      }
+    }
+  }
+}
+```
+
+**Notes**:
+- `tableNumber` is included in each item if table was specified when adding to cart
+- Cart is restaurant-specific and isolated per user/session
+
+---
+
+#### 8.3 Update Cart Item
+
+**Endpoint**: `POST /api/method/dinematters.dinematters.api.cart.update_cart_item`
+
+**Parameters**:
+- `restaurant_id` (required) - Restaurant identifier
+- `entry_id` (required) - Cart entry ID
+- `quantity` (required) - New quantity
+
+**Request Example**:
+```bash
+curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters.api.cart.update_cart_item" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "restaurant_id": "test-restaurant-1",
+    "entry_id": "dish-123-1234567890-abc123",
+    "quantity": 3
+  }'
+```
+
+---
+
+#### 8.4 Remove Cart Item
+
+**Endpoint**: `POST /api/method/dinematters.dinematters.api.cart.remove_cart_item`
+
+**Parameters**:
+- `restaurant_id` (required) - Restaurant identifier
+- `entry_id` (required) - Cart entry ID to remove
+
+---
+
+#### 8.5 Clear Cart
+
+**Endpoint**: `POST /api/method/dinematters.dinematters.api.cart.clear_cart`
+
+**Parameters**:
+- `restaurant_id` (required) - Restaurant identifier
+- `session_id` (optional) - For guest users
+
+---
+
+### 9. Orders API
+
+#### 9.1 Create Order
+
+**Endpoint**: `POST /api/method/dinematters.dinematters.api.orders.create_order`
+
+**Parameters** (JSON Body):
+- `restaurant_id` (required) - Restaurant identifier
+- `items` (required) - Array of order items:
+  ```json
+  [
+    {
+      "dishId": "dish-123",
+      "quantity": 2,
+      "customizations": {}
+    }
+  ]
+  ```
+- `cooking_requests` (optional) - Array of cooking instructions
+- `customer_info` (optional) - Object with `name`, `email`, `phone`
+- `delivery_info` (optional) - Object with delivery address details
+- `session_id` (optional) - For guest users
+- `table_number` (optional) - Table number from scanned QR code (format: `restaurant-id/table-number` or just the number)
+
+**Request Example**:
+```bash
+curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters.api.orders.create_order" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "restaurant_id": "test-restaurant-1",
+    "items": [
+      {
+        "dishId": "dish-123",
+        "quantity": 2,
+        "customizations": {}
+      }
+    ],
+    "customer_info": {
+      "name": "John Doe",
+      "email": "john@example.com",
+      "phone": "+1234567890"
+    },
+    "table_number": "test-restaurant-1/5"
+  }'
+```
+
+**Response Structure**:
+```json
+{
+  "message": {
+    "success": true,
+    "data": {
+      "order": {
+        "id": "order-1234567890-abc123",
+        "orderNumber": "ORD-2025-001",
+        "items": [
+          {
+            "dishId": "dish-123",
+            "dish": {
+              "id": "dish-123",
+              "name": "Pizza Margherita",
+              "price": 15.99
+            },
+            "quantity": 2,
+            "customizations": {},
+            "unitPrice": 15.99,
+            "totalPrice": 31.98
+          }
+        ],
+        "subtotal": 31.98,
+        "discount": 0,
+        "tax": 0,
+        "deliveryFee": 0,
+        "total": 31.98,
+        "cookingRequests": [],
+        "status": "pending",
+        "tableNumber": 5,
+        "createdAt": "2025-01-15 10:30:00",
+        "estimatedDelivery": "2025-01-15 11:00:00",
+        "customerInfo": {
+          "name": "John Doe",
+          "email": "john@example.com",
+          "phone": "+1234567890"
+        }
+      }
+    }
+  }
+}
+```
+
+**Notes**:
+- If `table_number` is provided in QR code format (`restaurant-id/table-number`), it will be parsed automatically
+- `tableNumber` is included in response if table was specified
+- Cart is automatically cleared after successful order creation
+
+---
+
+#### 9.2 Get Orders
+
+**Endpoint**: `GET /api/method/dinematters.dinematters.api.orders.get_orders`
+
+**Parameters**:
+- `restaurant_id` (required) - Restaurant identifier
+- `status` (optional) - Filter by status (pending, confirmed, preparing, ready, delivered, cancelled)
+- `page` (optional, default: 1) - Page number
+- `limit` (optional, default: 20) - Items per page
+- `session_id` (optional) - For guest users
+
+**Response Structure**:
+```json
+{
+  "message": {
+    "success": true,
+    "data": {
+      "orders": [
+        {
+          "id": "order-1234567890-abc123",
+          "orderNumber": "ORD-2025-001",
+          "status": "pending",
+          "total": 31.98,
+          "createdAt": "2025-01-15 10:30:00",
+          "estimatedDelivery": "2025-01-15 11:00:00"
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 1,
+        "totalPages": 1
+      }
+    }
+  }
+}
+```
+
+---
+
+#### 9.3 Get Order Details
+
+**Endpoint**: `GET /api/method/dinematters.dinematters.api.orders.get_order`
+
+**Parameters**:
+- `restaurant_id` (required) - Restaurant identifier
+- `order_id` (required) - Order ID
+
+**Response Structure**:
+```json
+{
+  "message": {
+    "success": true,
+    "data": {
+      "order": {
+        "id": "order-1234567890-abc123",
+        "orderNumber": "ORD-2025-001",
+        "items": [...],
+        "subtotal": 31.98,
+        "discount": 0,
+        "tax": 0,
+        "deliveryFee": 0,
+        "total": 31.98,
+        "cookingRequests": [],
+        "status": "pending",
+        "tableNumber": 5,
+        "createdAt": "2025-01-15 10:30:00",
+        "estimatedDelivery": "2025-01-15 11:00:00",
+        "customerInfo": {...},
+        "deliveryInfo": {...}
+      }
+    }
+  }
+}
+```
+
+**Notes**:
+- `tableNumber` is included in response if table was specified when creating the order
+
+---
+
+### 10. QR Code API
+
+#### 10.1 Parse QR Code
+
+**Endpoint**: `POST /api/method/dinematters.dinematters.api.cart.parse_qr_code`
+
+**Parameters**:
+- `qr_data` (required) - QR code data in format `restaurant-id/table-number`
+
+**Request Example**:
+```bash
+curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters.api.cart.parse_qr_code" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "qr_data": "test-restaurant-1/5"
+  }'
+```
+
+**Response Structure**:
+```json
+{
+  "message": {
+    "success": true,
+    "data": {
+      "restaurantId": "test-restaurant-1",
+      "tableNumber": 5,
+      "qrData": "test-restaurant-1/5"
+    }
+  }
+}
+```
+
+**Error Response** (Invalid QR Code):
+```json
+{
+  "message": {
+    "success": false,
+    "error": {
+      "code": "INVALID_QR_FORMAT",
+      "message": "Invalid QR code format. Expected: restaurant-id/table-number"
+    }
+  }
+}
+```
+
+---
+
 ## Error Responses
 
 All APIs return errors in this format:
@@ -894,6 +1282,21 @@ All APIs return errors in this format:
 - `PRODUCT_FETCH_ERROR` - Error fetching products
 - `PRODUCT_NOT_FOUND` - Product not found
 - `CATEGORY_FETCH_ERROR` - Error fetching categories
+- `CART_ADD_ERROR` - Error adding item to cart
+- `CART_FETCH_ERROR` - Error fetching cart
+- `CART_UPDATE_ERROR` - Error updating cart item
+- `CART_REMOVE_ERROR` - Error removing cart item
+- `CART_CLEAR_ERROR` - Error clearing cart
+- `CART_ITEM_NOT_FOUND` - Cart item not found
+- `ORDER_CREATE_ERROR` - Error creating order
+- `ORDER_FETCH_ERROR` - Error fetching order(s)
+- `ORDER_NOT_FOUND` - Order not found
+- `ORDER_UPDATE_ERROR` - Error updating order
+- `INVALID_STATUS` - Invalid order status
+- `INVALID_QR_CODE` - QR code data is required
+- `INVALID_QR_FORMAT` - Invalid QR code format
+- `INVALID_TABLE_NUMBER` - Table number is invalid for this restaurant
+- `QR_PARSE_ERROR` - Error parsing QR code
 
 ---
 
@@ -909,8 +1312,11 @@ All APIs return errors in this format:
 6. **Config API** - ✅ All 2 endpoints
 7. **Legacy API** - ✅ All 2 endpoints
 8. **Bookings API** - ✅ All 6 endpoints
+9. **Cart API** - ✅ All 5 endpoints (with restaurant_id and table_number support)
+10. **Orders API** - ✅ All 3 endpoints (with restaurant_id and table_number support)
+11. **QR Code API** - ✅ All 1 endpoint
 
-**Total Compliant**: 19 endpoints
+**Total Compliant**: 28 endpoints
 
 ### ❌ Non-Compliant APIs (Missing restaurant_id):
 
@@ -921,15 +1327,7 @@ All APIs return errors in this format:
 2. **Categories API** - ❌ 1 endpoint (get_categories)
    - **Issue**: Returns categories from ALL restaurants (no data isolation)
 
-3. **Cart API** - ❌ 5 endpoints (add_to_cart, get_cart, update_cart_item, remove_cart_item, clear_cart)
-   - **Issue**: Can add products from any restaurant to cart
-   - **Security Risk**: Can mix products from different restaurants
-
-4. **Orders API** - ❌ 3 endpoints (create_order, get_orders, get_order)
-   - **Issue**: Can create orders with products from any restaurant
-   - **CRITICAL Security Risk**: No restaurant validation
-
-**Total Non-Compliant**: 11 endpoints
+**Total Non-Compliant**: 3 endpoints
 
 ### ✅ Compliant APIs Include:
 
@@ -1015,14 +1413,15 @@ All APIs return errors in this format:
 | 18 | GET | `products.get_products` | Public | ❌ Missing | ⚠️ Works but returns ALL restaurants |
 | 19 | GET | `products.get_product` | Public | ❌ Missing | ⚠️ Works but no restaurant validation |
 | 20 | GET | `categories.get_categories` | Public | ❌ Missing | ⚠️ Works but returns ALL restaurants |
-| 21 | POST | `cart.add_to_cart` | Public | ❌ Missing | ⚠️ Works but can mix restaurants |
-| 22 | GET | `cart.get_cart` | Public | ❌ Missing | ⚠️ Works but no restaurant filter |
-| 23 | POST | `cart.update_cart_item` | Public | ❌ Missing | ⚠️ Works but no restaurant validation |
-| 24 | POST | `cart.remove_cart_item` | Public | ❌ Missing | ⚠️ Works but no restaurant validation |
-| 25 | POST | `cart.clear_cart` | Public | ❌ Missing | ⚠️ Works but no restaurant filter |
-| 26 | POST | `orders.create_order` | Public | ❌ Missing | 🔴 **CRITICAL** - No restaurant validation |
-| 27 | GET | `orders.get_orders` | Public | ❌ Missing | ⚠️ Works but returns ALL restaurants |
-| 28 | GET | `orders.get_order` | Public | ❌ Missing | ⚠️ Works but no restaurant validation |
+| 21 | POST | `cart.add_to_cart` | Public | ✅ Present | ✅ Supports restaurant_id and table_number |
+| 22 | GET | `cart.get_cart` | Public | ✅ Present | ✅ Restaurant-specific with table_number support |
+| 23 | POST | `cart.update_cart_item` | Public | ✅ Present | ✅ Restaurant validation included |
+| 24 | POST | `cart.remove_cart_item` | Public | ✅ Present | ✅ Restaurant validation included |
+| 25 | POST | `cart.clear_cart` | Public | ✅ Present | ✅ Restaurant-specific |
+| 26 | POST | `cart.parse_qr_code` | Public | N/A | ✅ QR code parsing for table numbers |
+| 27 | POST | `orders.create_order` | Public | ✅ Present | ✅ Restaurant validation with table_number support |
+| 28 | GET | `orders.get_orders` | Public | ✅ Present | ✅ Restaurant-specific |
+| 29 | GET | `orders.get_order` | Public | ✅ Present | ✅ Restaurant validation included |
 
 ---
 
@@ -1063,12 +1462,14 @@ All APIs return errors in this format:
 4. **Auto-Creation**: Home Features and Legacy Content auto-create defaults if none exist
 5. **Booking Numbers**: Auto-generated in format TB-YYYY-NNN (Table) or BQ-YYYY-NNN (Banquet)
 6. **Restaurant Lookup**: Use `restaurant.get_restaurant_id` to get `restaurant_id` from `restaurant_name`
+7. **Table Numbers**: Table numbers can be provided in QR code format (`restaurant-id/table-number`) or as a direct number. The QR code format is automatically parsed when provided in Cart and Order APIs.
+8. **QR Codes**: Restaurant owners can generate QR code PDFs for tables. Each QR code contains `restaurant-id/table-number` format and can be scanned to automatically set the table number in cart and orders.
 
 ---
 
 ## Current API Status Summary
 
-### ✅ Compliant APIs (19 endpoints)
+### ✅ Compliant APIs (28 endpoints)
 All these APIs correctly implement SaaS structure with `restaurant_id`:
 - Restaurant API (3 endpoints)
 - Coupons API (2 endpoints)
@@ -1078,15 +1479,16 @@ All these APIs correctly implement SaaS structure with `restaurant_id`:
 - Config API (2 endpoints)
 - Legacy API (2 endpoints)
 - Bookings API (6 endpoints)
+- Cart API (5 endpoints) - ✅ Now includes `restaurant_id` and `table_number` support
+- Orders API (3 endpoints) - ✅ Now includes `restaurant_id` and `table_number` support
+- QR Code API (1 endpoint) - ✅ For parsing table QR codes
 
-### ❌ Non-Compliant APIs (11 endpoints)
+### ❌ Non-Compliant APIs (3 endpoints)
 These APIs are missing `restaurant_id` and need to be updated:
 - **Products API** (2 endpoints) - Returns products from ALL restaurants
 - **Categories API** (1 endpoint) - Returns categories from ALL restaurants
-- **Cart API** (5 endpoints) - Can mix products from different restaurants
-- **Orders API** (3 endpoints) - **CRITICAL**: Can create orders with products from any restaurant
 
-**Action Required**: Update these 4 API modules to add `restaurant_id` parameter and implement proper data isolation.
+**Action Required**: Update these 2 API modules to add `restaurant_id` parameter and implement proper data isolation.
 
 ---
 
