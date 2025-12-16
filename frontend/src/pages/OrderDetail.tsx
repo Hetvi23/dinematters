@@ -73,6 +73,14 @@ export default function OrderDetail() {
               <p className="text-sm text-muted-foreground">Restaurant</p>
               <p className="font-medium">{order.restaurant || 'N/A'}</p>
             </div>
+            {order.table_number && (
+              <div>
+                <p className="text-sm text-muted-foreground">Table Number</p>
+                <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800">
+                  Table {order.table_number}
+                </span>
+              </div>
+            )}
             <div>
               <p className="text-sm text-muted-foreground">Created</p>
               <p>{order.creation ? new Date(order.creation).toLocaleString() : 'N/A'}</p>

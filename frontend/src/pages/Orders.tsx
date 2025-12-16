@@ -7,7 +7,7 @@ import { Eye } from 'lucide-react'
 
 export default function Orders() {
   const { data: orders, isLoading } = useFrappeGetDocList('Order', {
-    fields: ['name', 'order_id', 'order_number', 'status', 'total', 'creation', 'restaurant'],
+    fields: ['name', 'order_id', 'order_number', 'status', 'total', 'creation', 'restaurant', 'table_number'],
     limit: 100,
     orderBy: { field: 'creation', order: 'desc' }
   })
@@ -38,6 +38,7 @@ export default function Orders() {
                   <TableHead>Order Number</TableHead>
                   <TableHead>Order ID</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Table</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Restaurant</TableHead>
                   <TableHead>Date</TableHead>
@@ -58,6 +59,15 @@ export default function Orders() {
                       }`}>
                         {order.status || 'N/A'}
                       </span>
+                    </TableCell>
+                    <TableCell>
+                      {order.table_number ? (
+                        <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800">
+                          Table {order.table_number}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell>₹{order.total || 0}</TableCell>
                     <TableCell>{order.restaurant || 'N/A'}</TableCell>

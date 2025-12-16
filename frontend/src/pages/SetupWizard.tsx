@@ -4,8 +4,6 @@ import { Stepper, Step } from '@/components/ui/stepper'
 import DynamicForm from '@/components/DynamicForm'
 import StaffMembersList from '@/components/StaffMembersList'
 import RestaurantDataList from '@/components/RestaurantDataList'
-import ReviewExtraction from '@/components/ReviewExtraction'
-import MenuExtraction from '@/components/MenuExtraction'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -152,8 +150,6 @@ export default function SetupWizard() {
         'restaurant': 'restaurant',
         'config': 'config',
         'users': 'users',
-        'menu_extraction': 'menu_extraction',
-        'review_extraction': 'review_extraction',
         'categories': 'categories',
         'products': 'products',
         'offers': 'offers',
@@ -530,33 +526,8 @@ export default function SetupWizard() {
               />
             )}
 
-            {/* Menu Extraction - Use MenuExtraction component */}
-            {currentStepData.id === 'menu_extraction' && restaurantId && (
-              <MenuExtraction 
-                restaurantId={restaurantId}
-                onExtractionComplete={(data) => {
-                  setStepData(prev => ({ ...prev, menu_extraction: data }))
-                  setCompletedSteps(prev => new Set([...prev, currentStep]))
-                }}
-                onNavigateToReview={() => {
-                  // Find the review_extraction step index
-                  const reviewStepIndex = steps.findIndex(s => s.id === 'review_extraction')
-                  if (reviewStepIndex !== -1) {
-                    setCurrentStep(reviewStepIndex)
-                  } else {
-                    toast.error('Review step not found')
-                  }
-                }}
-              />
-            )}
-
-            {/* Review Extraction - Show extracted data */}
-            {currentStepData.id === 'review_extraction' && restaurantId && (
-              <ReviewExtraction restaurantId={restaurantId} />
-            )}
-
             {/* Default - Use DynamicForm for other steps */}
-            {!['users', 'categories', 'products', 'menu_extraction', 'review_extraction'].includes(currentStepData.id) && (
+            {!['users', 'categories', 'products'].includes(currentStepData.id) && (
               <div className="bg-muted/30 rounded-lg p-6 border">
                 <DynamicForm
                   doctype={currentStepData.doctype}

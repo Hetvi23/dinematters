@@ -200,8 +200,6 @@ def get_restaurant_setup_progress(restaurant_id):
 			'restaurant': frappe.db.exists("Restaurant", restaurant_id),
 			'config': frappe.db.exists("Restaurant Config", {"restaurant": restaurant_id}),
 			'users': frappe.db.exists("Restaurant User", {"restaurant": restaurant_id}),
-			'menu_extraction': frappe.db.exists("Menu Image Extractor", {"restaurant": restaurant_id, "extraction_status": ["in", ["Completed", "Processing"]]}),
-			'review_extraction': frappe.db.exists("Menu Image Extractor", {"restaurant": restaurant_id, "extraction_status": "Completed"}),
 			'categories': frappe.db.exists("Menu Category", {"restaurant": restaurant_id}),
 			'products': frappe.db.exists("Menu Product", {"restaurant": restaurant_id}),
 			'offers': frappe.db.exists("Offer", {"restaurant": restaurant_id}),
@@ -250,23 +248,6 @@ def get_setup_wizard_steps():
 				'required': False,
 				'depends_on': 'restaurant',
 				'view_only': True,  # Show list instead of form
-			},
-			{
-				'id': 'menu_extraction',
-				'title': 'Extract Menu from Images',
-				'description': 'Upload menu images to automatically extract categories and products',
-				'doctype': 'Menu Image Extractor',
-				'required': False,
-				'depends_on': 'restaurant',
-			},
-			{
-				'id': 'review_extraction',
-				'title': 'Review Extracted Data',
-				'description': 'Review and edit the extracted menu data before creating categories and products',
-				'doctype': 'Menu Image Extractor',
-				'required': False,
-				'depends_on': 'menu_extraction',
-				'view_only': True,
 			},
 			{
 				'id': 'categories',
