@@ -8,7 +8,7 @@ All endpoints require restaurant_id for SaaS multi-tenancy
 
 import frappe
 from frappe import _
-from frappe.utils import get_url
+from frappe.utils import get_url, formatdate, format_time, getdate
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
 
 
@@ -49,7 +49,17 @@ def get_events(restaurant_id, featured=None, category=None, upcoming_only=True):
 				"category",
 				"featured",
 				"status",
-				"is_active"
+				"is_active",
+				"repeat_this_event",
+				"repeat_on",
+				"repeat_till",
+				"monday",
+				"tuesday",
+				"wednesday",
+				"thursday",
+				"friday",
+				"saturday",
+				"sunday"
 			],
 			filters=filters,
 			order_by="display_order asc, title asc"
@@ -58,17 +68,59 @@ def get_events(restaurant_id, featured=None, category=None, upcoming_only=True):
 		# Format events
 		formatted_events = []
 		for event in events:
+			# Format date and time as strings (maintain API structure)
+			date_str = ""
+			if event.get("date"):
+				date_str = formatdate(event["date"], "yyyy-mm-dd")
+			
+			time_str = ""
+			if event.get("time"):
+				time_str = format_time(event["time"], "HH:mm:ss")
+			
 			event_data = {
 				"id": str(event["id"]),
 				"title": event["title"],
 				"description": event.get("description", ""),
-				"date": event.get("date", ""),
-				"time": event.get("time", ""),
+				"date": date_str,
+				"time": time_str,
 				"location": event.get("location", ""),
 				"category": event.get("category", ""),
 				"featured": bool(event.get("featured", False)),
 				"status": event.get("status", "upcoming")
 			}
+			
+			# Add recurring event information if applicable
+			if event.get("repeat_this_event"):
+				event_data["recurring"] = {
+					"repeatThisEvent": True,
+					"repeatOn": event.get("repeat_on", ""),
+					"repeatTill": formatdate(event["repeat_till"], "yyyy-mm-dd") if event.get("repeat_till") else None
+				}
+				
+				# Add day-of-week information for weekly recurrence
+				if event.get("repeat_on") == "Weekly":
+					weekdays = []
+					if event.get("monday"):
+						weekdays.append("Monday")
+					if event.get("tuesday"):
+						weekdays.append("Tuesday")
+					if event.get("wednesday"):
+						weekdays.append("Wednesday")
+					if event.get("thursday"):
+						weekdays.append("Thursday")
+					if event.get("friday"):
+						weekdays.append("Friday")
+					if event.get("saturday"):
+						weekdays.append("Saturday")
+					if event.get("sunday"):
+						weekdays.append("Sunday")
+					
+					if weekdays:
+						event_data["recurring"]["weekdays"] = weekdays
+			else:
+				event_data["recurring"] = {
+					"repeatThisEvent": False
+				}
 			
 			if event.get("image_src"):
 				image_src = event["image_src"]
