@@ -24,7 +24,10 @@ interface DynamicFormProps {
   mode?: 'create' | 'edit' | 'view'
   initialData?: Record<string, any>
   onFieldChange?: (fieldname: string, value: any) => void
+  onChange?: (hasChanges: boolean) => void // Notify parent when form has changes
   hideFields?: string[] // Fields to hide from the form
+  showSaveButton?: boolean // Control whether to show save button
+  triggerSave?: number // Increment this to trigger save
 }
 
 export default function DynamicForm({ 
@@ -34,7 +37,10 @@ export default function DynamicForm({
   onCancel,
   mode = 'create',
   initialData = {},
-  onFieldChange
+  onFieldChange,
+  onChange,
+  showSaveButton = true,
+  triggerSave
 }: DynamicFormProps) {
   const { meta, isLoading: metaLoading, error: metaError } = useDocTypeMeta(doctype)
   const { permissions, isLoading: permLoading } = usePermissions(doctype)
@@ -67,11 +73,14 @@ export default function DynamicForm({
   const [formDataInitialized, setFormDataInitialized] = useState(false)
   const initialDataRef = useRef(initialData || {})
   const hasUserDataRef = useRef(false)
+  const originalDataRef = useRef<Record<string, any>>({}) // Track original data for change detection
 
-  // Update ref when initialData changes (but don't trigger re-initialization)
+  // Update ref when initialData changes
   useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
-      initialDataRef.current = { ...initialDataRef.current, ...initialData }
+      initialDataRef.current = { ...initialData }
+    } else {
+      initialDataRef.current = {}
     }
   }, [JSON.stringify(initialData)])
 
@@ -83,19 +92,31 @@ export default function DynamicForm({
 
     if (docData && mode !== 'create' && !formDataInitialized) {
       // Load existing document data
-      setFormData(docData)
+      const cleanDocData = { ...docData }
+      // Remove metadata fields that shouldn't be compared
+      delete cleanDocData.name
+      delete cleanDocData.creation
+      delete cleanDocData.modified
+      delete cleanDocData.modified_by
+      delete cleanDocData.owner
+      setFormData(cleanDocData)
+      originalDataRef.current = { ...cleanDocData } // Store original data for comparison
       setFormDataInitialized(true)
-      hasUserDataRef.current = true
+      hasUserDataRef.current = false // Reset - user hasn't made changes yet
     } else if (meta && !formDataInitialized && mode === 'create') {
       // Initialize form with defaults and initial data only once
+      // Start with initialData (pre-filled data), then add defaults
       const defaults: Record<string, any> = { ...initialDataRef.current }
       meta.fields.forEach(field => {
-        if (field.default !== undefined && field.default !== null && !defaults[field.fieldname]) {
+        // Only use default if field doesn't have a value in initialData
+        if (field.default !== undefined && field.default !== null && !(field.fieldname in defaults)) {
           defaults[field.fieldname] = field.default
         }
       })
       setFormData(defaults)
+      originalDataRef.current = { ...defaults } // Store original data for comparison
       setFormDataInitialized(true)
+      hasUserDataRef.current = false // Reset - user hasn't made changes yet
     } else if (Object.keys(initialDataRef.current).length > 0 && !formDataInitialized && !meta && mode === 'create') {
       // If we have initial data but no meta yet, set it
       setFormData(prev => {
@@ -106,21 +127,106 @@ export default function DynamicForm({
             merged[key] = initialDataRef.current[key]
           }
         })
+        originalDataRef.current = { ...merged } // Store original data for comparison
+        hasUserDataRef.current = false // Reset - user hasn't made changes yet
         return merged
       })
       setFormDataInitialized(true)
     }
-  }, [docData, meta, mode, formDataInitialized])
+  }, [docData, meta, mode, formDataInitialized, initialDataRef.current])
 
-  // Reset initialization flag when mode or docname changes
+  // Reset initialization flag when mode or docname changes (but not when initialData changes)
   useEffect(() => {
     setFormDataInitialized(false)
     hasUserDataRef.current = false
     setFormData({})
-    if (initialData) {
-      initialDataRef.current = { ...initialData }
-    }
+    originalDataRef.current = {}
   }, [docname, mode])
+  
+  // Update initialDataRef when initialData changes (separate effect to avoid resetting form)
+  useEffect(() => {
+    if (initialData && Object.keys(initialData).length > 0) {
+      initialDataRef.current = { ...initialData }
+      // If form is not initialized yet, trigger re-initialization with new initialData
+      if (!formDataInitialized && mode === 'create') {
+        setFormDataInitialized(false) // Force re-initialization
+      }
+    } else {
+      initialDataRef.current = {}
+    }
+  }, [JSON.stringify(initialData)])
+
+  // Trigger save when parent requests it
+  useEffect(() => {
+    if (triggerSave && triggerSave > 0 && canSave) {
+      handleSave()
+    }
+  }, [triggerSave])
+
+  // Check for changes and notify parent
+  useEffect(() => {
+    if (!onChange) return
+    
+    if (!formDataInitialized) {
+      // If not initialized yet, notify that there are no changes
+      onChange(false)
+      return
+    }
+    
+    const hasChanges = (() => {
+      const original = originalDataRef.current
+      const current = formData
+      
+      // If both are empty, no changes
+      if (Object.keys(original).length === 0 && Object.keys(current).length === 0) {
+        return false
+      }
+      
+      // If original is empty and current has data, check if it's meaningful data
+      if (Object.keys(original).length === 0) {
+        // For new forms, only consider it changed if user has actually entered data
+        // Check if any field has a non-empty value
+        const hasData = Object.values(current).some(val => {
+          if (val === null || val === undefined || val === '') return false
+          if (Array.isArray(val)) return val.length > 0
+          if (typeof val === 'object') return Object.keys(val).length > 0
+          return true
+        })
+        return hasData && hasUserDataRef.current
+      }
+      
+      // Compare all keys
+      const allKeys = new Set([...Object.keys(original), ...Object.keys(current)])
+      
+      for (const key of allKeys) {
+        const origValue = original[key]
+        const currValue = current[key]
+        
+        // Skip comparison for undefined/null/empty differences that don't matter
+        if ((origValue === undefined || origValue === null || origValue === '') && 
+            (currValue === undefined || currValue === null || currValue === '')) {
+          continue
+        }
+        
+        // Deep comparison for arrays and objects
+        if (Array.isArray(origValue) && Array.isArray(currValue)) {
+          if (JSON.stringify(origValue) !== JSON.stringify(currValue)) {
+            return true
+          }
+        } else if (typeof origValue === 'object' && typeof currValue === 'object' && origValue !== null && currValue !== null) {
+          if (JSON.stringify(origValue) !== JSON.stringify(currValue)) {
+            return true
+          }
+        } else if (origValue !== currValue) {
+          return true
+        }
+      }
+      
+      return false
+    })()
+    
+    onChange(hasChanges)
+  }, [formData, formDataInitialized, onChange])
 
   const isLoading = metaLoading || permLoading || (docLoading && mode !== 'create')
 
@@ -300,7 +406,17 @@ export default function DynamicForm({
     if (actualMode === 'view' && field.read_only) return null
 
     const value = formData[field.fieldname] ?? field.default ?? ''
-    const isReadOnly = field.read_only || actualMode === 'view'
+    
+    // Make certain fields read-only after creation (restaurant owner perspective)
+    let isReadOnly = field.read_only || actualMode === 'view'
+    
+    // For Restaurant doctype, make IDs read-only after creation
+    if (doctype === 'Restaurant' && mode === 'edit' && docname) {
+      const lockedFields = ['restaurant_id', 'slug', 'subdomain']
+      if (lockedFields.includes(field.fieldname)) {
+        isReadOnly = true
+      }
+    }
 
     switch (field.fieldtype) {
       case 'Data':
@@ -460,6 +576,24 @@ export default function DynamicForm({
           </div>
         )
 
+      case 'Time':
+        return (
+          <div key={field.fieldname} className="space-y-2">
+            <Label htmlFor={field.fieldname}>
+              {field.label}
+              {field.required && <span className="text-destructive">*</span>}
+            </Label>
+            <Input
+              id={field.fieldname}
+              type="time"
+              value={value}
+              onChange={(e) => handleFieldChange(field.fieldname, e.target.value)}
+              readOnly={isReadOnly}
+              required={field.required}
+            />
+          </div>
+        )
+
       case 'Datetime':
         // Convert datetime string from backend (YYYY-MM-DD HH:mm:ss) to datetime-local format (YYYY-MM-DDTHH:mm)
         const formatDatetimeForInput = (dt: any) => {
@@ -485,6 +619,99 @@ export default function DynamicForm({
               readOnly={isReadOnly}
               required={field.required}
             />
+          </div>
+        )
+
+      case 'Attach Image':
+      case 'Attach':
+        return (
+          <div key={field.fieldname} className="space-y-2">
+            <Label htmlFor={field.fieldname}>
+              {field.label}
+              {field.required && <span className="text-destructive">*</span>}
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id={field.fieldname}
+                type="file"
+                accept={
+                  field.fieldtype === 'Attach Image' || 
+                  (field.fieldtype === 'Attach' && (field.fieldname?.includes('image') || field.label?.toLowerCase().includes('image')))
+                    ? 'image/*' 
+                    : undefined
+                }
+                onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+
+                  try {
+                    // Upload file to Frappe
+                    const formData = new FormData()
+                    formData.append('file', file)
+                    formData.append('is_private', '0')
+                    formData.append('folder', 'Home/Attachments')
+
+                    const csrfToken = (window as any).frappe?.csrf_token || (window as any).csrf_token
+
+                    const response = await fetch('/api/method/upload_file', {
+                      method: 'POST',
+                      body: formData,
+                      headers: {
+                        'X-Frappe-CSRF-Token': csrfToken,
+                      },
+                    })
+
+                    if (!response.ok) {
+                      const error = await response.json()
+                      throw new Error(error.message?.message || error.message || 'Upload failed')
+                    }
+
+                    const result = await response.json()
+                    const fileUrl = result.message?.file_url || result.message?.name || ''
+                    handleFieldChange(field.fieldname, fileUrl)
+                    toast.success('File uploaded successfully')
+                  } catch (error: any) {
+                    toast.error(error?.message || 'Failed to upload file')
+                  } finally {
+                    // Reset input
+                    e.target.value = ''
+                  }
+                }}
+                readOnly={isReadOnly}
+                required={field.required}
+                disabled={isReadOnly}
+                className="cursor-pointer"
+              />
+              {value && (
+                <div className="flex items-center gap-2">
+                  {(field.fieldtype === 'Attach Image' || (field.fieldtype === 'Attach' && field.fieldname?.includes('image'))) && (
+                    <img 
+                      src={value.startsWith('http') ? value : `/${value}`} 
+                      alt={field.label}
+                      className="h-16 w-16 object-cover rounded border"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none'
+                      }}
+                    />
+                  )}
+                  <span className="text-sm text-muted-foreground truncate max-w-xs">
+                    {value.split('/').pop() || value}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleFieldChange(field.fieldname, '')}
+                    disabled={isReadOnly}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              )}
+            </div>
+            {field.description && (
+              <p className="text-xs text-muted-foreground">{field.description}</p>
+            )}
           </div>
         )
 

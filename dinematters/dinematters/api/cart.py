@@ -131,12 +131,12 @@ def add_to_cart(restaurant_id, dish_id, quantity=1, customizations=None, session
 		cart_summary = get_cart_summary(user, session_id, restaurant)
 		
 		cart_item_data = {
-			"entryId": entry_id,
-			"dishId": dish_id,
-			"quantity": cint(quantity) if not existing_entry else entry_doc.quantity,
-			"customizations": customizations,
-			"unitPrice": unit_price,
-			"totalPrice": entry_doc.total_price
+					"entryId": entry_id,
+					"dishId": dish_id,
+					"quantity": cint(quantity) if not existing_entry else entry_doc.quantity,
+					"customizations": customizations,
+					"unitPrice": unit_price,
+					"totalPrice": entry_doc.total_price
 		}
 		
 		# Add tableNumber if available

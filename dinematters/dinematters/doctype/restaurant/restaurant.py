@@ -206,7 +206,7 @@ class Restaurant(Document):
 				indicator="red"
 			)
 			return None
-	
+
 	def generate_table_qr_codes_pdf(self):
 		"""Generate PDF with QR codes for all tables"""
 		try:

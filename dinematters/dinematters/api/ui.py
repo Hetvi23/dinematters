@@ -112,46 +112,118 @@ def get_user_permissions(doctype):
 def get_all_doctypes():
 	"""Get list of all dinematters doctypes"""
 	try:
+		# Try both 'Dinematters' and 'dinematters' module names
 		doctypes = frappe.get_all('DocType', 
-			filters={'module': 'Dinematters'},
-			fields=['name', 'label'],
+			filters={'module': ('in', ['Dinematters', 'dinematters'])},
+			fields=['name'],
 			order_by='name'
 		)
 		
-		# Group by category
+		# If no results, try without module filter to see what we have
+		if not doctypes:
+			# Log for debugging
+			all_modules = frappe.get_all('Module Def', fields=['name'], filters={'app_name': 'dinematters'})
+			frappe.log_error(f"No doctypes found. Available modules: {all_modules}", "get_all_doctypes")
+		
+		# Get labels from DocType meta and filter by permissions
+		doctypes_with_labels = []
+		user = frappe.session.user
+		is_administrator = user == "Administrator"
+		
+		# Get user's restaurant access for restaurant-based doctypes (skip for Administrator)
+		from dinematters.dinematters.utils.permissions import get_user_restaurant_ids
+		user_restaurant_ids = get_user_restaurant_ids(user) if not is_administrator else []
+		
+		# Restaurant-based doctypes (from hooks.py)
+		restaurant_based_doctypes = [
+			"Menu Product", "Menu Category", "Order", "Cart Entry",
+			"Coupon", "Offer", "Event", "Game", "Table Booking", 
+			"Banquet Booking", "Restaurant Config", "Home Feature", "Legacy Content"
+		]
+		
+		for dt in doctypes:
+			try:
+				# Administrator has access to all doctypes - skip permission checks
+				if is_administrator:
+					# Administrator can see all modules
+					meta = frappe.get_meta(dt['name'])
+					label = getattr(meta, 'label', None)
+					if not label:
+						label = dt['name'].replace('_', ' ').replace('-', ' ').title()
+					doctypes_with_labels.append({
+						'name': dt['name'],
+						'label': label
+					})
+					continue
+				
+				# For non-administrator users:
+				# For restaurant-based doctypes, check if user has access to any restaurant
+				if dt['name'] in restaurant_based_doctypes:
+					if not user_restaurant_ids:
+						continue  # User has no restaurant access
+				
+				# Check if user has read permission for this doctype (role-based)
+				# This checks Role Permissions table
+				if not frappe.has_permission(dt['name'], 'read', raise_exception=False):
+					continue
+				
+				meta = frappe.get_meta(dt['name'])
+				# Get label from meta - it's a property
+				label = getattr(meta, 'label', None)
+				if not label:
+					# Fallback to formatted name
+					label = dt['name'].replace('_', ' ').replace('-', ' ').title()
+				doctypes_with_labels.append({
+					'name': dt['name'],
+					'label': label
+				})
+			except Exception as e:
+				# If permission check fails or meta not available, skip this doctype
+				frappe.log_error(f"Error processing {dt['name']}: {str(e)}", "get_all_doctypes")
+				continue
+		
+		doctypes = doctypes_with_labels
+		
+		# If no doctypes found, return empty result
+		if not doctypes:
+			return {}
+		
+		# Group by category - includes all setup wizard doctypes
 		categories = {
 			'Restaurant Setup': ['Restaurant', 'Restaurant Config', 'Restaurant User'],
 			'Menu Management': ['Menu Product', 'Menu Category', 'Product Media', 'Customization Question', 'Customization Option'],
 			'Orders': ['Order', 'Order Item', 'Cart Entry'],
 			'Bookings': ['Table Booking', 'Banquet Booking'],
-			'Marketing': ['Offer', 'Coupon', 'Event', 'Game', 'Home Feature'],
+			'Marketing & Promotions': ['Offer', 'Coupon', 'Event', 'Game', 'Home Feature'],
 			'Legacy': ['Legacy Content', 'Legacy Gallery Image', 'Legacy Instagram Reel', 'Legacy Member', 'Legacy Signature Dish', 'Legacy Testimonial', 'Legacy Testimonial Image'],
 			'Tools': ['Menu Image Extractor', 'Menu Image Item', 'Extracted Category', 'Extracted Dish'],
 		}
 		
 		result = {}
 		for category, doctype_list in categories.items():
-			result[category] = [dt for dt in doctypes if dt.name in doctype_list]
+			matching = [dt for dt in doctypes if dt['name'] in doctype_list]
+			if matching:  # Only add category if it has items
+				result[category] = matching
 		
-		# Add uncategorized
+		# Add uncategorized - all doctypes that don't match any category
 		all_categorized = []
 		for doctype_list in categories.values():
-			all_categorized.extend([dt['name'] for dt in doctype_list])
+			all_categorized.extend(doctype_list)
 		
-		uncategorized = [dt for dt in doctypes if dt.name not in all_categorized]
+		uncategorized = [dt for dt in doctypes if dt['name'] not in all_categorized]
 		if uncategorized:
 			result['Other'] = uncategorized
 		
-		return {
-			'success': True,
-			'data': result
-		}
+		# Log result for debugging
+		if not result or sum(len(v) for v in result.values()) == 0:
+			frappe.log_error(f"No doctypes in result. Found {len(doctypes)} doctypes: {[d['name'] for d in doctypes]}", "get_all_doctypes")
+		
+		return result
 	except Exception as e:
-		frappe.log_error(f"Error getting doctypes: {str(e)}")
-		return {
-			'success': False,
-			'error': str(e)
-		}
+		import traceback
+		frappe.log_error(f"Error getting doctypes: {str(e)}\n{traceback.format_exc()}", "get_all_doctypes")
+		# Return empty result structure instead of error dict
+		return {}
 
 
 @frappe.whitelist()

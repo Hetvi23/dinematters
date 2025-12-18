@@ -1236,37 +1236,56 @@ def process_extracted_data(data, extractor_doc):
 				)
 				continue
 			
-			# Check if category exists by category_id (globally unique)
-			# Since autoname is "field:category_id", the document name IS the category_id
-			# So we can check directly by document name
+			# Check if category exists for THIS restaurant (by category_id AND restaurant)
+			existing_category = None
 			if frappe.db.exists("Menu Category", category_id):
-				# Category already exists - skip creation/update, just add to map
-				# This prevents duplicate entry errors
-				category_map[category_name] = category_id
-				# Don't log this as it's expected behavior - just continue
-				continue  # Skip to next category
+				existing_category = frappe.get_doc("Menu Category", category_id)
+				# Verify restaurant matches - if not, treat as new category
+				if existing_category.restaurant != restaurant:
+					existing_category = None  # Different restaurant, create new category
+			else:
+				# Also check by category_name AND restaurant in case category_id changed
+				existing_by_name = frappe.db.get_value(
+					"Menu Category", 
+					{"category_name": category_name, "restaurant": restaurant}, 
+					"name"
+				)
+				if existing_by_name:
+					existing_category = frappe.get_doc("Menu Category", existing_by_name)
+					category_id = existing_category.name  # Use existing category_id
 			
-			# Category doesn't exist - create new one
-			try:
-				cat_doc = frappe.new_doc("Menu Category")
-				cat_doc.category_id = category_id
-				cat_doc.restaurant = restaurant
-				cat_doc.category_name = category_name
+			if existing_category and existing_category.restaurant == restaurant:
+				# Update existing category (only if restaurant matches)
+				cat_doc = existing_category
 				cat_doc.display_name = cat_data.get('displayName', category_name)
 				cat_doc.description = cat_data.get('description', '')
 				cat_doc.is_special = 1 if cat_data.get('isSpecial') else 0
 				
 				cat_doc.save(ignore_permissions=True)
-				stats['categories_created'] += 1
+				stats['categories_created'] += 1  # Track as created for stats (could add categories_updated if needed)
 				category_map[category_name] = category_id
-			except frappe.exceptions.UniqueValidationError:
-				# Race condition: category was created by another process
-				# Just use the existing one
-				category_map[category_name] = category_id
-				frappe.log_error(
-					f"Category {category_id} was created by another process. Using existing category.",
-					"Menu Category - Race Condition"
-				)
+			else:
+				# Create new category (either doesn't exist or belongs to different restaurant)
+				try:
+					cat_doc = frappe.new_doc("Menu Category")
+					cat_doc.category_id = category_id
+					cat_doc.restaurant = restaurant
+					cat_doc.category_name = category_name
+					cat_doc.display_name = cat_data.get('displayName', category_name)
+					cat_doc.description = cat_data.get('description', '')
+					cat_doc.is_special = 1 if cat_data.get('isSpecial') else 0
+					
+					cat_doc.save(ignore_permissions=True)
+					stats['categories_created'] += 1
+					category_map[category_name] = category_id
+				except frappe.exceptions.UniqueValidationError:
+					# Race condition: category was created by another process
+					# Just use the existing one
+					category_map[category_name] = category_id
+					frappe.log_error(
+						f"Category {category_id} was created by another process. Using existing category.",
+						"Menu Category - Race Condition"
+					)
 			
 		except Exception as e:
 			error_msg = f"Error creating/updating category {category_id or 'unknown'}: {str(e)[:140]}"
@@ -1290,23 +1309,30 @@ def process_extracted_data(data, extractor_doc):
 		# Generate product_id from product_name
 		product_id = generate_product_id_from_name(product_name)
 		
-		# Check if product exists (by product_id or product_name)
+		# Check if product exists for THIS restaurant (by product_id AND restaurant)
 		existing_product = None
 		if frappe.db.exists("Menu Product", product_id):
 			existing_product = frappe.get_doc("Menu Product", product_id)
+			# Verify restaurant matches - if not, treat as new product
+			if existing_product.restaurant != restaurant:
+				existing_product = None  # Different restaurant, create new product
 		else:
-			# Also check by product_name in case product_id changed
-			existing_by_name = frappe.db.get_value("Menu Product", {"product_name": product_name}, "name")
+			# Also check by product_name AND restaurant in case product_id changed
+			existing_by_name = frappe.db.get_value(
+				"Menu Product", 
+				{"product_name": product_name, "restaurant": restaurant}, 
+				"name"
+			)
 			if existing_by_name:
 				existing_product = frappe.get_doc("Menu Product", existing_by_name)
 				product_id = existing_product.name  # Use existing product_id
 		
-		if existing_product:
-			# Update existing product
+		if existing_product and existing_product.restaurant == restaurant:
+			# Update existing product (only if restaurant matches)
 			product_doc = existing_product
 			stats['items_updated'] += 1
 		else:
-			# Create new product
+			# Create new product (either doesn't exist or belongs to different restaurant)
 			product_doc = frappe.new_doc("Menu Product")
 			product_doc.product_id = product_id
 			stats['items_created'] += 1

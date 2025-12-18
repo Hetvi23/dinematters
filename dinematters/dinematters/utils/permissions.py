@@ -102,19 +102,19 @@ def get_default_restaurant(user):
 
 
 def get_user_restaurant_ids(user):
-	"""Get list of restaurant IDs user has access to"""
+	"""Get list of restaurant IDs user has access to based on Restaurant User records"""
 	if user == "Administrator":
 		# Administrator has access to all restaurants
 		restaurants = frappe.get_all("Restaurant", filters={"is_active": 1}, pluck="name")
 		return restaurants
 	
-	# Get restaurants from User Permissions
-	user_perms = frappe.get_all(
-		"User Permission",
-		filters={"user": user, "allow": "Restaurant"},
-		pluck="for_value"
+	# Get restaurants from Restaurant User records (role-based approach)
+	restaurant_users = frappe.get_all(
+		"Restaurant User",
+		filters={"user": user, "is_active": 1},
+		pluck="restaurant"
 	)
-	return user_perms
+	return restaurant_users
 
 
 def validate_restaurant_access(user, restaurant):

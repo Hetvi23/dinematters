@@ -118,6 +118,7 @@ app_license = "mit"
 # Permissions evaluated in scripted ways
 
 permission_query_conditions = {
+	"Restaurant": "dinematters.dinematters.utils.permission_helpers.get_restaurant_permission_query_conditions",
 	"Menu Product": "dinematters.dinematters.utils.permission_helpers.get_menu_product_permissions",
 	"Menu Category": "dinematters.dinematters.utils.permission_helpers.get_menu_category_permissions",
 	"Order": "dinematters.dinematters.utils.permission_helpers.get_order_permissions",
@@ -131,9 +132,12 @@ permission_query_conditions = {
 	"Restaurant Config": "dinematters.dinematters.utils.permission_helpers.get_restaurant_permission_query_conditions",
 	"Home Feature": "dinematters.dinematters.utils.permission_helpers.get_restaurant_permission_query_conditions",
 	"Legacy Content": "dinematters.dinematters.utils.permission_helpers.get_restaurant_permission_query_conditions",
+	"Menu Image Extractor": "dinematters.dinematters.utils.permission_helpers.get_restaurant_permission_query_conditions",
+	"Restaurant User": "dinematters.dinematters.utils.permission_helpers.get_restaurant_user_permission_query_conditions",
 }
 
 has_permission = {
+	"Restaurant": "dinematters.dinematters.utils.permission_helpers.has_restaurant_permission",
 	"Menu Product": "dinematters.dinematters.utils.permission_helpers.has_menu_product_permission",
 	"Menu Category": "dinematters.dinematters.utils.permission_helpers.has_menu_category_permission",
 	"Order": "dinematters.dinematters.utils.permission_helpers.has_order_permission",
@@ -147,6 +151,8 @@ has_permission = {
 	"Restaurant Config": "dinematters.dinematters.utils.permission_helpers.has_restaurant_permission",
 	"Home Feature": "dinematters.dinematters.utils.permission_helpers.has_restaurant_permission",
 	"Legacy Content": "dinematters.dinematters.utils.permission_helpers.has_restaurant_permission",
+	"Menu Image Extractor": "dinematters.dinematters.utils.permission_helpers.has_restaurant_permission",
+	"Restaurant User": "dinematters.dinematters.utils.permission_helpers.has_restaurant_user_permission",
 }
 
 # DocType Class

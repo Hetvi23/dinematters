@@ -120,7 +120,7 @@ def get_events(restaurant_id, featured=None, category=None, upcoming_only=True):
 			else:
 				event_data["recurring"] = {
 					"repeatThisEvent": False
-				}
+			}
 			
 			if event.get("image_src"):
 				image_src = event["image_src"]
