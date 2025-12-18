@@ -236,7 +236,7 @@ def get_available_time_slots(restaurant_id, date, number_of_diners=None):
 
 # ========== BANQUET BOOKING APIs ==========
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def create_banquet_booking(restaurant_id, number_of_guests, event_type, date, time_slot, customer_info=None, session_id=None):
 	"""
 	POST /api/method/dinematters.dinematters.api.bookings.create_banquet_booking
@@ -311,15 +311,15 @@ def create_banquet_booking(restaurant_id, number_of_guests, event_type, date, ti
 		}
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def get_banquet_bookings(restaurant_id, status=None, event_type=None, date_from=None, date_to=None, page=1, limit=20, session_id=None):
 	"""
 	GET /api/method/dinematters.dinematters.api.bookings.get_banquet_bookings
 	Get user's banquet bookings
 	"""
 	try:
-		# Validate restaurant access
-		restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user)
+		# Validate restaurant (allow guest access for public bookings)
+		restaurant = validate_restaurant_for_api(restaurant_id)
 		
 		# Get user
 		user = frappe.session.user if frappe.session.user != "Guest" else None
