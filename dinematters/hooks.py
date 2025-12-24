@@ -5,6 +5,8 @@ app_description = "POS and backend for Dinematters"
 app_email = "hetvipatel2302@gmail.com"
 app_license = "mit"
 
+# CI/CD: Auto-deployment enabled via GitHub Actions
+
 # Apps
 # ------------------
 
