@@ -201,6 +201,7 @@ def _extract_batch_internal(docname, batch_images, batch_number, total_batches):
 			form_data['restaurant_name'] = restaurant_name_for_api
 		
 		form_data['save_to_disk'] = 'false'
+		form_data['generate_descriptions'] = 'true' if doc.generate_descriptions else 'false'
 		
 		# Get image files for this batch
 		image_files = []
@@ -492,6 +493,7 @@ def _extract_menu_data_internal(docname):
 			form_data['restaurant_name'] = restaurant_name_for_api
 		
 		form_data['save_to_disk'] = 'false'
+		form_data['generate_descriptions'] = 'true' if doc.generate_descriptions else 'false'
 		
 		# Get image files from Frappe
 		image_files = []
@@ -1343,7 +1345,15 @@ def process_extracted_data(data, extractor_doc):
 		# Set basic fields
 		product_doc.product_name = product_name
 		product_doc.price = dish_data.get('price', 0)
-		product_doc.description = dish_data.get('description', '')
+		
+		# Handle description: Only set if product doesn't already have one
+		# The API will generate descriptions only for items missing them when generate_descriptions=true
+		api_description = dish_data.get('description', '').strip()
+		if not product_doc.description or not product_doc.description.strip():
+			# Product doesn't have description - use API description (may be generated or extracted)
+			product_doc.description = api_description
+		# Else: Product already has description - preserve it (don't overwrite)
+		
 		product_doc.is_vegetarian = 1 if dish_data.get('isVegetarian') else 0
 		product_doc.has_no_media = 1 if dish_data.get('hasNoMedia') else 0
 		
@@ -1694,4 +1704,160 @@ def approve_extracted_data(docname):
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Menu Approval Error")
 		frappe.throw(_("Approval failed: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def generate_recommendations(docname):
+	"""
+	Generate recommendations for all products of the restaurant from this extraction
+	"""
+	try:
+		doc = frappe.get_doc("Menu Image Extractor", docname)
+		
+		# Check if extraction is completed
+		if doc.extraction_status != "Completed":
+			frappe.throw(_("Recommendations can only be generated after extraction is completed."))
+		
+		# Get restaurant
+		if not doc.restaurant:
+			frappe.throw(_("Restaurant is required to generate recommendations."))
+		
+		restaurant = doc.restaurant
+		
+		# Get restaurant name for API
+		restaurant_name = doc.restaurant_name
+		if not restaurant_name:
+			restaurant_name = frappe.db.get_value("Restaurant", restaurant, "restaurant_name")
+		
+		# Get all active products for this restaurant
+		products = frappe.get_all(
+			"Menu Product",
+			fields=["product_id", "product_name", "category_name", "main_category", "price", 
+			        "description", "is_vegetarian", "name"],
+			filters={"restaurant": restaurant, "is_active": 1}
+		)
+		
+		if not products:
+			frappe.throw(_("No active products found for this restaurant. Please create products first."))
+		
+		# Get categories
+		categories = frappe.get_all(
+			"Menu Category",
+			fields=["category_id", "category_name"],
+			filters={"restaurant": restaurant}
+		)
+		
+		# Prepare dishes data for API
+		dishes = []
+		for product in products:
+			dishes.append({
+				"id": product.product_id,
+				"name": product.product_name,
+				"category": product.category_name or "",
+				"mainCategory": product.main_category or "food",
+				"price": float(product.price or 0),
+				"description": product.description or "",
+				"isVegetarian": bool(product.is_vegetarian)
+			})
+		
+		# Prepare categories data for API
+		categories_data = []
+		for cat in categories:
+			categories_data.append({
+				"id": cat.category_id or cat.category_name.lower().replace(" ", "-"),
+				"name": cat.category_name
+			})
+		
+		# Call recommendations API
+		api_url = "https://api.dinematters.com/menu-extraction/api/v1/recommendations/generate"
+		
+		payload = {
+			"dishes": dishes,
+			"categories": categories_data,
+			"restaurant_name": restaurant_name,
+			"min_recommendations": 9,
+			"save_to_disk": False
+		}
+		
+		# Update status
+		doc.db_set('extraction_log', _("Generating recommendations..."), update_modified=False)
+		frappe.db.commit()
+		
+		response = requests.post(
+			api_url,
+			json=payload,
+			headers={"Content-Type": "application/json"},
+			timeout=600  # 10 minutes timeout
+		)
+		
+		response.raise_for_status()
+		result = response.json()
+		
+		if not result.get('success'):
+			frappe.throw(_("Recommendations API failed: {0}").format(result.get('message', 'Unknown error')))
+		
+		# Store recommendations in products
+		recommendations_data = result.get('data', {}).get('recommendations', [])
+		
+		# Create a map of product_id to product name for lookup
+		product_id_to_name = {p.product_id: p.name for p in products}
+		
+		updated_count = 0
+		for rec_item in recommendations_data:
+			product_id = rec_item.get('id')
+			if not product_id or product_id not in product_id_to_name:
+				continue
+			
+			product_name = product_id_to_name[product_id]
+			recommendations = rec_item.get('recommendations', [])
+			
+			# Format recommendations for storage
+			formatted_recommendations = []
+			for rec in recommendations:
+				formatted_recommendations.append({
+					"id": rec.get('id'),
+					"name": rec.get('name'),
+					"category": rec.get('category', ''),
+					"mainCategory": rec.get('mainCategory', ''),
+					"isVegetarian": rec.get('isVegetarian', False),
+					"price": rec.get('price', 0),
+					"reason": rec.get('reason', ''),
+					"score": rec.get('score', 0)
+				})
+			
+			# Update product with recommendations
+			try:
+				product_doc = frappe.get_doc("Menu Product", product_name)
+				product_doc.recommendations = json.dumps(formatted_recommendations)
+				product_doc.save(ignore_permissions=True)
+				updated_count += 1
+			except Exception as e:
+				frappe.log_error(
+					f"Error updating recommendations for product {product_id}: {str(e)}",
+					"Menu Recommendations - Update Error"
+				)
+				continue
+		
+		frappe.db.commit()
+		
+		# Update extraction log
+		doc.db_set('extraction_log', 
+			f"Recommendations generated successfully!\n\n"
+			f"Products updated: {updated_count}\n"
+			f"Total recommendations generated: {len(recommendations_data)}",
+			update_modified=False)
+		frappe.db.commit()
+		
+		return {
+			'success': True,
+			'message': _("Successfully generated recommendations for {0} products.").format(updated_count),
+			'updated_count': updated_count,
+			'total_products': len(products)
+		}
+		
+	except frappe.exceptions.ValidationError:
+		raise
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Menu Recommendations Generation Error")
+		frappe.throw(_("Recommendations generation failed: {0}").format(str(e)))
 

@@ -10,6 +10,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
+import json
 
 
 @frappe.whitelist(allow_guest=True)
@@ -269,6 +270,16 @@ def format_product(product_doc):
 		
 		if customization_questions:
 			product["customizationQuestions"] = customization_questions
+	
+	# Recommendations
+	if product_doc.recommendations:
+		try:
+			recommendations = json.loads(product_doc.recommendations) if isinstance(product_doc.recommendations, str) else product_doc.recommendations
+			if recommendations and isinstance(recommendations, list):
+				product["recommendations"] = recommendations
+		except:
+			# If JSON parsing fails, skip recommendations
+			pass
 	
 	return product
 

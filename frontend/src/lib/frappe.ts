@@ -3,13 +3,15 @@ import {
   useFrappeGetDocList, 
   useFrappeGetDoc,
   useFrappeGetCall,
-  useFrappePostCall
+  useFrappePostCall,
+  useFrappeUpdateDoc
 } from 'frappe-react-sdk'
 
 export { 
   useFrappeGetDocList, 
   useFrappeGetDoc,
   useFrappeGetCall,
-  useFrappePostCall
+  useFrappePostCall,
+  useFrappeUpdateDoc
 }
 

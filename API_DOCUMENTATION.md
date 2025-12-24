@@ -747,7 +747,78 @@ curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.con
 
 ---
 
-#### 6.3 Update Home Features (Admin)
+#### 6.3 Get Filters
+
+**Endpoint**: `GET /api/method/dinematters.dinematters.api.config.get_filters`
+
+**Parameters**:
+- `restaurant_id` (required) - Restaurant identifier
+
+**Request Example**:
+```bash
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.config.get_filters?restaurant_id=test-restaurant-1"
+```
+
+**Response Structure**:
+```json
+{
+  "message": {
+    "success": true,
+    "data": {
+      "filters": [
+        {
+          "id": "veg",
+          "label": "Vegetarian",
+          "shortLabel": "Veg",
+          "description": "Show only vegetarian dishes",
+          "color": "#9AAF7A"
+        },
+        {
+          "id": "nonVeg",
+          "label": "Non-Vegetarian",
+          "shortLabel": "Non-Veg",
+          "description": "Show only non-vegetarian dishes",
+          "color": "#D68989"
+        },
+        {
+          "id": "topPicks",
+          "label": "Top Picks",
+          "shortLabel": "Top Picks",
+          "description": "Show chef's recommended dishes",
+          "color": "#DB782F"
+        },
+        {
+          "id": "offer",
+          "label": "Offers",
+          "shortLabel": "Offers",
+          "description": "Show dishes with special offers and discounts",
+          "color": "#E0C682"
+        }
+      ]
+    }
+  }
+}
+```
+
+**Filter Details**:
+- **veg**: Filters products where `is_vegetarian = 1`
+- **nonVeg**: Filters products where `is_vegetarian = 0`
+- **topPicks**: Filters products where `product_type = "top-picks"`
+- **offer**: Filters products where `original_price > price` (products with discounts)
+
+**Color Customization**:
+- Filter colors are automatically pulled from the restaurant's color palette if configured
+- Default colors use the standard color palette (green for veg, red for non-veg, orange for top picks, yellow for offers)
+- If `Restaurant Config` has custom colors set, those will be used instead
+
+**Notes**:
+- All filters are available for guest access
+- Colors can be customized per restaurant through the Restaurant Config
+- Filter IDs match the frontend filter configuration structure
+
+---
+
+#### 6.4 Update Home Features (Admin)
 
 **Endpoint**: `POST /api/method/dinematters.dinematters.api.config.update_home_features`
 
@@ -1043,6 +1114,7 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
 - `delivery_info` (optional) - Object with delivery address details
 - `session_id` (optional) - For guest users
 - `table_number` (optional) - Table number from scanned QR code (format: `restaurant-id/table-number` or just the number)
+- `coupon_code` (optional) - Coupon code to apply discount (e.g., "COUPON1-1")
 
 **Request Example**:
 ```bash
@@ -1062,7 +1134,8 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
       "email": "john@example.com",
       "phone": "+1234567890"
     },
-    "table_number": "test-restaurant-1/5"
+    "table_number": "test-restaurant-1/5",
+    "coupon_code": "COUPON1-1"
   }'
 ```
 
@@ -1090,10 +1163,10 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
           }
         ],
         "subtotal": 31.98,
-        "discount": 0,
+        "discount": 3.20,
         "tax": 0,
         "deliveryFee": 0,
-        "total": 31.98,
+        "total": 28.78,
         "cookingRequests": [],
         "status": "pending",
         "tableNumber": 5,
@@ -1103,6 +1176,13 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
           "name": "John Doe",
           "email": "john@example.com",
           "phone": "+1234567890"
+        },
+        "coupon": {
+          "id": "COUPON1-1",
+          "code": "COUPON1-1",
+          "discount": 10,
+          "type": "percent",
+          "description": "10% off discount"
         }
       }
     }
@@ -1114,6 +1194,9 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
 - If `table_number` is provided in QR code format (`restaurant-id/table-number`), it will be parsed automatically
 - `tableNumber` is included in response if table was specified
 - Cart is automatically cleared after successful order creation
+- If `coupon_code` is provided, it will be validated and applied to the order. The discount will be included in the total calculation
+- Coupon details (if applied) are included in the response with discount amount and type
+- If coupon validation fails, the order continues without the coupon discount
 
 ---
 
@@ -1402,7 +1485,8 @@ All APIs return errors in this format:
 | 12 | GET | `bookings.get_banquet_available_time_slots` | Public | ✅ Working |
 | 13 | GET | `config.get_restaurant_config` | Public | Required | ✅ Working |
 | 14 | GET | `config.get_home_features` | Public | Required | ✅ Working |
-| 15 | POST | `config.update_home_features` | Admin | Required | ✅ Working |
+| 15 | GET | `config.get_filters` | Public | Required | ✅ Working |
+| 16 | POST | `config.update_home_features` | Admin | Required | ✅ Working |
 | 16 | GET | `legacy.get_legacy_content` | Public | Required | ✅ Working |
 | 17 | POST | `legacy.update_legacy_content` | Admin | Required | ✅ Working |
 
@@ -1578,6 +1662,9 @@ curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.con
 
 # Get home features
 curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.config.get_home_features?restaurant_id=test-restaurant-1"
+
+# Get filter configurations
+curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.config.get_filters?restaurant_id=test-restaurant-1"
 ```
 
 ### Legacy API

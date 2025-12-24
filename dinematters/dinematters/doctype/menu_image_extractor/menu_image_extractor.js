@@ -44,6 +44,13 @@ frappe.ui.form.on('Menu Image Extractor', {
 				approve_extracted_data(frm);
 			}).addClass('btn-primary');
 		}
+		
+		// Add generate recommendations button when status is Completed
+		if (frm.doc.extraction_status == 'Completed') {
+			frm.add_custom_button(__('Generate Recommendations'), function() {
+				generate_recommendations(frm);
+			}).addClass('btn-primary');
+		}
 	},
 	
 	extract_button: function(frm) {
@@ -52,6 +59,10 @@ frappe.ui.form.on('Menu Image Extractor', {
 	
 	approve_button: function(frm) {
 		approve_extracted_data(frm);
+	},
+	
+	generate_recommendations_button: function(frm) {
+		generate_recommendations(frm);
 	},
 	
 	menu_images_add: function(frm) {
@@ -533,5 +544,84 @@ function update_status_indicator(frm) {
 	}
 	
 	frm.dashboard.add_indicator(__('Status: {0}', [status]), color);
+}
+
+function generate_recommendations(frm) {
+	console.log('🔍 generate_recommendations function called');
+	console.log('  Document:', frm.doc.name);
+	
+	// Validate status
+	if (frm.doc.extraction_status != 'Completed') {
+		frappe.msgprint({
+			title: __('Cannot Generate Recommendations'),
+			message: __('Recommendations can only be generated after extraction is completed.'),
+			indicator: 'red'
+		});
+		return;
+	}
+	
+	// Confirm generation
+	frappe.confirm(
+		__('This will generate AI recommendations for all products of this restaurant. This may take a few minutes. Continue?'),
+		function() {
+			console.log('✅ User confirmed recommendations generation');
+			
+			// Call the generation method
+			frappe.call({
+				method: 'dinematters.dinematters.doctype.menu_image_extractor.menu_image_extractor.generate_recommendations',
+				args: {
+					docname: frm.doc.name
+				},
+				freeze: true,
+				freeze_message: __('Generating recommendations... This may take a few minutes.'),
+				callback: function(r) {
+					console.log('📥 Recommendations API Response:', r);
+					
+					if (r.message && r.message.success) {
+						console.log('✅ Recommendations generation successful!');
+						
+						// Reload the form
+						frm.reload_doc();
+						
+						// Show alert
+						frappe.show_alert({
+							message: __(r.message.message),
+							indicator: 'green'
+						}, 5);
+						
+						// Show detailed message
+						setTimeout(function() {
+							frappe.msgprint({
+								title: __('Recommendations Generated'),
+								message: __('Successfully generated recommendations for {0} out of {1} products.', 
+									[r.message.updated_count || 0, r.message.total_products || 0]),
+								indicator: 'green'
+							});
+						}, 500);
+					} else {
+						console.error('❌ Recommendations generation failed');
+						frappe.msgprint({
+							title: __('Generation Failed'),
+							message: __('An error occurred during recommendations generation. Please check the extraction log for details.'),
+							indicator: 'red'
+						});
+						frm.reload_doc();
+					}
+				},
+				error: function(r) {
+					console.error('❌ Recommendations API call failed:', r);
+					frappe.msgprint({
+						title: __('Generation Failed'),
+						message: __('An error occurred during recommendations generation. Please check the extraction log for details.'),
+						indicator: 'red'
+					});
+					frm.reload_doc();
+				}
+			});
+		},
+		function() {
+			console.log('❌ User cancelled recommendations generation');
+		}
+	);
 }
 

@@ -2,11 +2,10 @@
  "actions": [],
  "allow_rename": 1,
  "autoname": "field:restaurant",
- "creation": "2025-01-15 10:00:00.000000",
+ "creation": "2025-01-15 10:00:00",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
- "issingle": 0,
  "field_order": [
   "restaurant",
   "section_break_hero",
@@ -44,7 +43,6 @@
    "label": "Restaurant",
    "options": "Restaurant",
    "reqd": 1,
-   "search_index": 1,
    "unique": 1
   },
   {
@@ -59,16 +57,16 @@
    "options": "video\nimage"
   },
   {
+   "description": "Upload image or video file for hero section",
    "fieldname": "hero_media_src",
    "fieldtype": "Attach",
-   "label": "Hero Media (Image/Video)",
-   "description": "Upload image or video file for hero section"
+   "label": "Hero Media (Image/Video)"
   },
   {
+   "description": "Fallback image if video fails to load",
    "fieldname": "hero_fallback_image",
    "fieldtype": "Attach Image",
-   "label": "Hero Fallback Image",
-   "description": "Fallback image if video fails to load"
+   "label": "Hero Fallback Image"
   },
   {
    "fieldname": "hero_title",
@@ -156,10 +154,10 @@
    "label": "Footer"
   },
   {
+   "description": "Upload image or video file for footer section",
    "fieldname": "footer_media_src",
    "fieldtype": "Attach",
-   "label": "Footer Media (Image/Video)",
-   "description": "Upload image or video file for footer section"
+   "label": "Footer Media (Image/Video)"
   },
   {
    "fieldname": "footer_title",
@@ -184,7 +182,8 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-01-15 10:00:00.000000",
+ "make_attachments_public": 1,
+ "modified": "2025-12-18 16:30:00.408590",
  "modified_by": "Administrator",
  "module": "Dinematters",
  "name": "Legacy Content",

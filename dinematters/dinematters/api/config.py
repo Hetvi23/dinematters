@@ -323,3 +323,82 @@ def update_home_features(restaurant_id, features):
 		}
 
 
+@frappe.whitelist(allow_guest=True)
+def get_filters(restaurant_id):
+	"""
+	GET /api/method/dinematters.dinematters.api.config.get_filters
+	Get filter configurations for menu products
+	Returns filter definitions with labels, descriptions, and colors
+	"""
+	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
+		# Define filter configurations
+		filters = [
+			{
+				"id": "veg",
+				"label": "Vegetarian",
+				"shortLabel": "Veg",
+				"description": "Show only vegetarian dishes",
+				"color": "#9AAF7A"  # Green from color palette
+			},
+			{
+				"id": "nonVeg",
+				"label": "Non-Vegetarian",
+				"shortLabel": "Non-Veg",
+				"description": "Show only non-vegetarian dishes",
+				"color": "#D68989"  # Red from color palette
+			},
+			{
+				"id": "topPicks",
+				"label": "Top Picks",
+				"shortLabel": "Top Picks",
+				"description": "Show chef's recommended dishes",
+				"color": "#DB782F"  # Orange (primary color)
+			},
+			{
+				"id": "offer",
+				"label": "Offers",
+				"shortLabel": "Offers",
+				"description": "Show dishes with special offers and discounts",
+				"color": "#E0C682"  # Yellow from color palette
+			}
+		]
+		
+		# Try to get custom colors from restaurant config if available
+		config = frappe.db.get_value(
+			"Restaurant Config",
+			{"restaurant": restaurant},
+			["color_palette_green", "color_palette_red", "primary_color", "color_palette_yellow"],
+			as_dict=True
+		)
+		
+		if config:
+			# Update filter colors if custom colors are set
+			if config.get("color_palette_green"):
+				filters[0]["color"] = config["color_palette_green"]
+			if config.get("color_palette_red"):
+				filters[1]["color"] = config["color_palette_red"]
+			if config.get("primary_color"):
+				filters[2]["color"] = config["primary_color"]
+			if config.get("color_palette_yellow"):
+				filters[3]["color"] = config["color_palette_yellow"]
+		
+		return {
+			"success": True,
+			"data": {
+				"filters": filters
+			}
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in get_filters: {str(e)}")
+		return {
+			"success": False,
+			"error": {
+				"code": "FILTERS_FETCH_ERROR",
+				"message": str(e)
+			}
+		}
+
+

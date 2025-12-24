@@ -25,6 +25,7 @@
   "column_break_totals",
   "delivery_fee",
   "total",
+  "coupon",
   "section_break_status",
   "status",
   "column_break_status",
@@ -133,6 +134,12 @@
    "fieldname": "discount",
    "fieldtype": "Currency",
    "label": "Discount"
+  },
+  {
+   "fieldname": "coupon",
+   "fieldtype": "Link",
+   "label": "Coupon",
+   "options": "Coupon"
   },
   {
    "default": "0",

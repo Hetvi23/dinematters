@@ -110,3 +110,5 @@ All doctypes should have role permissions configured in the Role Permission Mana
 - Verify the user has the correct role assigned
 - Check if the role has the required permissions for that doctype
 
+
+

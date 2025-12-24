@@ -17,11 +17,12 @@ from datetime import datetime
 
 
 @frappe.whitelist(allow_guest=True)
-def create_order(restaurant_id, items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None, table_number=None):
+def create_order(restaurant_id, items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None, table_number=None, coupon_code=None):
 	"""
 	POST /api/v1/orders
 	Place a new order
 	Requires restaurant_id for SaaS multi-tenancy
+	Optional: coupon_code for applying discount
 	"""
 	try:
 		# Validate restaurant
@@ -127,6 +128,25 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 		# Calculate tax and delivery fee (can be configured)
 		tax = calculate_tax(subtotal)
 		delivery_fee = flt(delivery_info.get("deliveryFee", 0)) if delivery_info else 0
+		
+		# Apply coupon discount if provided
+		coupon_discount = 0
+		applied_coupon = None
+		if coupon_code:
+			try:
+				# Validate coupon
+				from dinematters.dinematters.api.coupons import validate_coupon
+				coupon_result = validate_coupon(restaurant_id, coupon_code, subtotal)
+				
+				if coupon_result.get("success"):
+					coupon_data = coupon_result.get("data", {}).get("coupon", {})
+					coupon_discount = flt(coupon_data.get("discountAmount", 0))
+					applied_coupon = coupon_data.get("id")
+					discount += coupon_discount
+			except Exception as e:
+				frappe.log_error(f"Coupon validation error: {str(e)}")
+				# Continue without coupon if validation fails
+		
 		total = subtotal - discount + tax + delivery_fee
 		
 		# Parse table_number from QR code if provided
@@ -150,6 +170,7 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 			"tax": tax,
 			"delivery_fee": delivery_fee,
 			"total": total,
+			"coupon": applied_coupon,
 			"cooking_requests": json.dumps(cooking_requests) if cooking_requests else None,
 			"status": "pending",
 			"payment_status": "pending",
@@ -331,6 +352,7 @@ def update_order_status(order_id, status):
 	"""
 	PATCH /api/v1/orders/:orderId/status
 	Update order status (admin/backend only)
+	Simple status update using db.set_value to avoid validation issues
 	"""
 	try:
 		if not frappe.db.exists("Order", order_id):
@@ -353,15 +375,15 @@ def update_order_status(order_id, status):
 				}
 			}
 		
-		order_doc = frappe.get_doc("Order", order_id)
-		order_doc.status = status
-		order_doc.save(ignore_permissions=True)
+		# Use db.set_value to update only the status field without full validation
+		frappe.db.set_value("Order", order_id, "status", status)
+		frappe.db.commit()
 		
 		return {
 			"success": True,
 			"message": "Order status updated",
 			"data": {
-				"order": format_order(order_doc)
+				"status": status
 			}
 		}
 	except Exception as e:
@@ -442,6 +464,22 @@ def format_order(order_doc):
 			"zipCode": order_doc.delivery_zip_code,
 			"instructions": order_doc.delivery_instructions
 		}
+	
+	# Add coupon info if available
+	if order_doc.coupon:
+		try:
+			coupon_doc = frappe.get_doc("Coupon", order_doc.coupon)
+			order_data["coupon"] = {
+				"id": str(coupon_doc.name),
+				"code": coupon_doc.code,
+				"discount": flt(coupon_doc.discount_value),
+				"type": coupon_doc.discount_type or "flat",
+				"description": coupon_doc.description,
+				"detailedDescription": coupon_doc.detailed_description
+			}
+		except frappe.DoesNotExistError:
+			# Coupon was deleted, just include the reference
+			order_data["coupon"] = order_doc.coupon
 	
 	return order_data
 

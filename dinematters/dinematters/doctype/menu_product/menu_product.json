@@ -32,7 +32,9 @@
   "section_break_media",
   "product_media",
   "section_break_customizations",
-  "customization_questions"
+  "customization_questions",
+  "section_break_recommendations",
+  "recommendations"
  ],
  "fields": [
   {
@@ -196,6 +198,17 @@
    "fieldtype": "Table",
    "label": "Customization Questions",
    "options": "Customization Question"
+  },
+  {
+   "fieldname": "section_break_recommendations",
+   "fieldtype": "Section Break",
+   "label": "Recommendations"
+  },
+  {
+   "fieldname": "recommendations",
+   "fieldtype": "JSON",
+   "label": "Recommendations",
+   "description": "AI-generated recommendations for this product (stored as JSON array)"
   }
  ],
  "index_web_pages_for_search": 1,

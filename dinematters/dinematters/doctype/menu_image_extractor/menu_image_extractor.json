@@ -10,6 +10,7 @@
   "section_break_upload",
   "restaurant",
   "restaurant_name",
+  "generate_descriptions",
   "column_break_1",
   "extraction_status",
   "approval_status",
@@ -17,6 +18,7 @@
   "menu_images",
   "section_break_extraction",
   "extract_button",
+  "generate_recommendations_button",
   "section_break_extracted_data",
   "extracted_dishes",
   "section_break_results",
@@ -54,6 +56,13 @@
    "fieldtype": "Data",
    "label": "Restaurant Name (Optional)",
    "description": "Optional: Restaurant name for API extraction accuracy (auto-filled from Restaurant field)"
+  },
+  {
+   "default": "1",
+   "fieldname": "generate_descriptions",
+   "fieldtype": "Check",
+   "label": "Generate Descriptions Automatically",
+   "description": "Automatically generate premium descriptions for dishes missing descriptions"
   },
   {
    "fieldname": "column_break_1",
@@ -96,6 +105,12 @@
    "fieldname": "extract_button",
    "fieldtype": "Button",
    "label": "Extract Menu Data"
+  },
+  {
+   "fieldname": "generate_recommendations_button",
+   "fieldtype": "Button",
+   "label": "Generate Recommendations",
+   "depends_on": "eval:doc.extraction_status == 'Completed'"
   },
   {
    "fieldname": "section_break_extracted_data",
