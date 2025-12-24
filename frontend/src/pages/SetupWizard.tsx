@@ -784,6 +784,7 @@ export default function SetupWizard() {
                   onChange={setFormHasChanges}
                   showSaveButton={false}
                   doctype={currentStepData.doctype}
+                  hideFields={currentStepData.id === 'restaurant' ? ['restaurant_id', 'company'] : undefined}
                   docname={(() => {
                     const savedData = stepData[currentStepData.id]
                     // For restaurant, use the selected restaurant name

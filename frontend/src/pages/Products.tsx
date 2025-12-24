@@ -1,24 +1,50 @@
 import { Link } from 'react-router-dom'
-import { useFrappeGetDocList } from '@/lib/frappe'
+import { useFrappeGetDocList, useFrappeDeleteDoc } from '@/lib/frappe'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { Eye } from 'lucide-react'
+import { Eye, Pencil, Trash2, Plus } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function Products() {
-  const { data: products, isLoading } = useFrappeGetDocList('Menu Product', {
-    fields: ['name', 'product_id', 'product_name', 'price', 'original_price', 'category_name', 'is_active', 'restaurant'],
+  const { data: products, isLoading, mutate } = useFrappeGetDocList('Menu Product', {
+    fields: ['name', 'product_name', 'price', 'original_price', 'is_active'],
     limit: 100,
     orderBy: { field: 'product_name', order: 'asc' }
   })
 
+  const { deleteDoc } = useFrappeDeleteDoc()
+
+  const handleDelete = async (productId: string, productName: string) => {
+    if (!confirm(`Are you sure you want to delete "${productName}"?`)) {
+      return
+    }
+
+    try {
+      await deleteDoc('Menu Product', productId)
+      toast.success('Product deleted successfully')
+      mutate()
+    } catch (error: any) {
+      console.error('Failed to delete product:', error)
+      toast.error(error?.message || 'Failed to delete product')
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Products</h2>
-        <p className="text-muted-foreground">
-          View and manage menu products (filtered by your restaurant permissions)
-        </p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Products</h2>
+          <p className="text-muted-foreground">
+            View and manage menu products (filtered by your restaurant permissions)
+          </p>
+        </div>
+        <Button asChild>
+          <Link to="/products/new">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Product
+          </Link>
+        </Button>
       </div>
 
       <Card>
@@ -36,11 +62,8 @@ export default function Products() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Product Name</TableHead>
-                  <TableHead>Product ID</TableHead>
-                  <TableHead>Category</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Original Price</TableHead>
-                  <TableHead>Restaurant</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -49,13 +72,10 @@ export default function Products() {
                 {products.map((product: any) => (
                   <TableRow key={product.name}>
                     <TableCell className="font-medium">{product.product_name || product.name}</TableCell>
-                    <TableCell className="font-mono text-xs">{product.product_id || product.name}</TableCell>
-                    <TableCell>{product.category_name || 'N/A'}</TableCell>
                     <TableCell>₹{product.price || 0}</TableCell>
                     <TableCell>
                       {product.original_price ? `₹${product.original_price}` : '-'}
                     </TableCell>
-                    <TableCell>{product.restaurant || 'N/A'}</TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
                         product.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
@@ -64,11 +84,27 @@ export default function Products() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Link to={`/products/${product.name}`}>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
+                      <div className="flex gap-2">
+                        <Link to={`/products/${product.name}`}>
+                          <Button variant="ghost" size="sm" title="View">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Link to={`/products/${product.name}/edit`}>
+                          <Button variant="ghost" size="sm" title="Edit">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          title="Delete"
+                          onClick={() => handleDelete(product.name, product.product_name || product.name)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                      </Link>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

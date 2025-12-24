@@ -48,7 +48,7 @@
    "label": "Restaurant ID",
    "read_only": 1,
    "unique": 1,
-   "description": "Auto-generated unique identifier (generated from Restaurant Name)"
+   "description": "Automatically generated unique identifier for your restaurant"
   },
   {
    "fieldname": "restaurant_name",
@@ -57,14 +57,14 @@
    "in_list_view": 1,
    "label": "Restaurant Name",
    "reqd": 1,
-   "description": "Display name (can have duplicates)"
+   "description": "Your restaurant's name as it will appear to customers"
   },
   {
    "fieldname": "company",
    "fieldtype": "Link",
    "label": "Company",
    "options": "Company",
-   "description": "Optional link to ERPNext Company"
+   "description": "Link to your company profile (optional)"
   },
   {
    "fieldname": "column_break_1",
@@ -75,14 +75,14 @@
    "fieldtype": "Data",
    "label": "Subdomain",
    "unique": 1,
-   "description": "For subdomain routing (e.g., pizza-palace-nyc)"
+   "description": "Unique web address for your restaurant (e.g., pizza-palace-nyc)"
   },
   {
    "fieldname": "slug",
    "fieldtype": "Data",
    "label": "Slug",
    "unique": 1,
-   "description": "URL-friendly identifier"
+   "description": "Short name for links and URLs (use lowercase letters and hyphens)"
   },
   {
    "default": "1",
@@ -101,7 +101,7 @@
    "fieldtype": "Data",
    "label": "Owner Email",
    "options": "Email",
-   "description": "Restaurant owner email (will auto-create user permission)"
+   "description": "Email address of the restaurant owner for system access"
   },
   {
    "fieldname": "owner_phone",
@@ -162,13 +162,15 @@
    "default": "0",
    "fieldname": "tax_rate",
    "fieldtype": "Percent",
-   "label": "Tax Rate"
+   "label": "Tax Rate",
+   "description": "Tax percentage applied to orders (e.g., 18 for 18% GST)"
   },
   {
    "default": "0",
    "fieldname": "default_delivery_fee",
    "fieldtype": "Currency",
-   "label": "Default Delivery Fee"
+   "label": "Default Delivery Fee",
+   "description": "Standard delivery charge for orders"
   },
   {
    "fieldname": "column_break_settings",

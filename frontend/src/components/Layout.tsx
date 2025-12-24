@@ -1,7 +1,8 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, TrendingUp } from 'lucide-react'
+import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList } from '@/lib/frappe'
+import { useState } from 'react'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -19,22 +20,13 @@ const navigation = [
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // Fetch quick stats for navigation (limited for performance)
+  // Fetch orders for pending count badge
   const { data: orders } = useFrappeGetDocList('Order', {
-    fields: ['name', 'status', 'total'],
-    limit: 100 // Get enough to calculate stats
-  })
-
-  const { data: restaurants } = useFrappeGetDocList('Restaurant', {
-    fields: ['name', 'is_active'],
+    fields: ['name', 'status'],
     limit: 100
   })
-
-  // Calculate quick stats
-  const totalOrders = orders?.length || 0
-  const totalRestaurants = restaurants?.length || 0
-  const totalRevenue = orders?.reduce((sum: number, order: any) => sum + (order.total || 0), 0) || 0
 
   // Get pending orders count
   const pendingOrders = orders?.filter((order: any) => 
@@ -42,76 +34,94 @@ export default function Layout({ children }: LayoutProps) {
   )?.length || 0
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link to="/dashboard" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                <h1 className="text-2xl font-bold text-primary">Dinematters</h1>
-              </Link>
-              {/* Quick Stats */}
-              <div className="hidden md:flex items-center gap-4 text-sm text-muted-foreground">
-                {totalRestaurants > 0 && (
-                  <div className="flex items-center gap-1">
-                    <Store className="h-3.5 w-3.5" />
-                    <span>{totalRestaurants} Restaurant{totalRestaurants !== 1 ? 's' : ''}</span>
-                  </div>
-                )}
-                {totalOrders > 0 && (
-                  <div className="flex items-center gap-1">
-                    <ShoppingCart className="h-3.5 w-3.5" />
-                    <span>{totalOrders} Order{totalOrders !== 1 ? 's' : ''}</span>
-                  </div>
-                )}
-                {totalRevenue > 0 && (
-                  <div className="flex items-center gap-1">
-                    <TrendingUp className="h-3.5 w-3.5" />
-                    <span>₹{totalRevenue.toFixed(0)}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-            <nav className="flex items-center gap-1">
-              {navigation.map((item) => {
-                const Icon = item.icon
-                const isActive = location.pathname === item.href || 
-                  (item.href !== '/dashboard' && location.pathname.startsWith(item.href))
-                
-                // Add badge for pending orders
-                const showBadge = item.href === '/orders' && pendingOrders > 0
-                
-                return (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    className={cn(
-                      "relative flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                    )}
-                  >
-                    <Icon className="size-4" />
-                    <span className="hidden sm:inline">{item.name}</span>
-                    {showBadge && (
-                      <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold">
-                        {pendingOrders > 9 ? '9+' : pendingOrders}
-                      </span>
-                    )}
-                  </Link>
-                )
-              })}
-            </nav>
+    <div className="min-h-screen bg-gray-50">
+      {/* Sidebar */}
+      <aside className={cn(
+        "fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ease-in-out",
+        sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+      )}>
+        <div className="flex flex-col h-full">
+          {/* Logo */}
+          <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
+            <Link to="/dashboard" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+              <h1 className="text-xl font-bold text-orange-600">Dinematters</h1>
+            </Link>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden p-1 rounded-md hover:bg-gray-100"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+            {navigation.map((item) => {
+              const Icon = item.icon
+              const isActive = location.pathname === item.href || 
+                (item.href !== '/dashboard' && location.pathname.startsWith(item.href))
+              
+              const showBadge = item.href === '/orders' && pendingOrders > 0
+              
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  onClick={() => setSidebarOpen(false)}
+                  className={cn(
+                    "relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
+                    isActive
+                      ? "bg-orange-50 text-orange-600"
+                      : "text-gray-700 hover:bg-gray-100"
+                  )}
+                >
+                  <Icon className="h-5 w-5 flex-shrink-0" />
+                  <span>{item.name}</span>
+                  {showBadge && (
+                    <span className="ml-auto h-5 min-w-[20px] px-1.5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold">
+                      {pendingOrders > 9 ? '9+' : pendingOrders}
+                    </span>
+                  )}
+                </Link>
+              )
+            })}
+          </nav>
         </div>
-      </header>
+      </aside>
+
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-6">
-        {children}
-      </main>
+      <div className="lg:pl-64">
+        {/* Top Header */}
+        <header className="sticky top-0 z-30 h-16 bg-white border-b border-gray-200 flex items-center px-4 lg:px-6">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="lg:hidden p-2 -ml-2 rounded-md hover:bg-gray-100"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <div className="flex-1 lg:ml-0 ml-2">
+            <h2 className="text-lg font-semibold text-gray-900">
+              {navigation.find(item => 
+                location.pathname === item.href || 
+                (item.href !== '/dashboard' && location.pathname.startsWith(item.href))
+              )?.name || 'Dashboard'}
+            </h2>
+          </div>
+        </header>
+
+        {/* Page Content */}
+        <main className="p-4 lg:p-6">
+          {children}
+        </main>
+      </div>
     </div>
   )
 }

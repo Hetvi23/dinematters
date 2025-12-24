@@ -12,6 +12,11 @@ import Products from './pages/Products'
 import Categories from './pages/Categories'
 import OrderDetail from './pages/OrderDetail'
 import ProductDetail from './pages/ProductDetail'
+import ProductEdit from './pages/ProductEdit'
+import ProductNew from './pages/ProductNew'
+import CategoryDetail from './pages/CategoryDetail'
+import CategoryEdit from './pages/CategoryEdit'
+import CategoryNew from './pages/CategoryNew'
 
 function App() {
 	return (
@@ -34,8 +39,13 @@ function App() {
 						<Route path="/orders" element={<Orders />} />
 						<Route path="/orders/:orderId" element={<OrderDetail />} />
 						<Route path="/products" element={<Products />} />
+						<Route path="/products/new" element={<ProductNew />} />
+						<Route path="/products/:productId/edit" element={<ProductEdit />} />
 						<Route path="/products/:productId" element={<ProductDetail />} />
 						<Route path="/categories" element={<Categories />} />
+						<Route path="/categories/new" element={<CategoryNew />} />
+						<Route path="/categories/:categoryId/edit" element={<CategoryEdit />} />
+						<Route path="/categories/:categoryId" element={<CategoryDetail />} />
 					</Routes>
 				</Layout>
 			</BrowserRouter>

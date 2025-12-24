@@ -39,6 +39,7 @@ export default function DynamicForm({
   initialData = {},
   onFieldChange,
   onChange,
+  hideFields = [],
   showSaveButton = true,
   triggerSave
 }: DynamicFormProps) {
@@ -812,7 +813,7 @@ export default function DynamicForm({
   }
 
   // Group fields by sections (simplified - in real implementation, parse section breaks)
-  const visibleFields = (meta.fields || []).filter(f => !f.hidden)
+  const visibleFields = (meta.fields || []).filter(f => !f.hidden && !hideFields.includes(f.fieldname))
 
   // Calculate required fields validation
   const requiredFields = visibleFields.filter(f => f.required)

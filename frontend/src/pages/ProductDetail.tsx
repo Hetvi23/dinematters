@@ -107,7 +107,7 @@ export default function ProductDetail() {
                 <p className="font-medium">{product.is_vegetarian ? 'Vegetarian' : 'Non-Vegetarian'}</p>
               </div>
             )}
-            {product.calories && (
+            {product.calories != null && product.calories > 0 && (
               <div>
                 <p className="text-sm text-muted-foreground">Calories</p>
                 <p className="font-medium">{product.calories} kcal</p>
