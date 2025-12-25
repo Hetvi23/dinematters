@@ -206,12 +206,14 @@ function DroppableStatusColumn({
   status, 
   orders, 
   onCheckOrder,
-  onCancelOrder 
+  onCancelOrder,
+  activeId
 }: { 
   status: typeof STATUSES[0]
   orders: Order[]
   onCheckOrder: (orderId: string) => void
   onCancelOrder?: (orderId: string) => void
+  activeId?: string | null
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: status.value,
@@ -386,6 +388,7 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
               orders={statusOrders}
               onCheckOrder={onCheckOrder}
               onCancelOrder={onCancelOrder || handleCancelOrder}
+              activeId={activeId}
             />
           )
         })}
