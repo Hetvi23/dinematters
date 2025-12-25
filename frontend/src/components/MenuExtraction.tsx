@@ -345,7 +345,7 @@ export default function MenuExtraction({ restaurantId, onExtractionComplete, onN
 
             {/* Extraction Results Stats */}
             {(isCompleted || isPendingApproval) && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted rounded-lg">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted rounded-md">
                 <div>
                   <div className="text-sm text-muted-foreground">Categories</div>
                   <div className="text-2xl font-bold">{extractionDoc.categories_created || 0}</div>

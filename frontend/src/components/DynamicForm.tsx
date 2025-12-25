@@ -749,7 +749,7 @@ export default function DynamicForm({
               {field.label}
               {field.required && <span className="text-destructive">*</span>}
             </Label>
-            <div className="p-4 border rounded-lg bg-muted/30 text-sm text-muted-foreground">
+            <div className="p-4 border rounded-md bg-muted/30 text-sm text-muted-foreground">
               Table field: {field.options || field.fieldname} (not yet implemented)
             </div>
           </div>
@@ -829,7 +829,7 @@ export default function DynamicForm({
       {/* Validation Status */}
       {actualMode !== 'view' && requiredFieldsCount > 0 && (
         <div className={cn(
-          "p-4 rounded-lg border",
+          "p-4 rounded-md border",
           allRequiredFieldsFilled 
             ? "bg-green-50 border-green-200" 
             : "bg-amber-50 border-amber-200"
@@ -856,7 +856,7 @@ export default function DynamicForm({
 
       {/* Saving Progress */}
       {saving && progress > 0 && (
-        <div className="space-y-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="space-y-2 p-4 bg-blue-50 border border-blue-200 rounded-md">
           <div className="flex justify-between text-sm font-medium text-blue-900">
             <span>Saving...</span>
             <span>{progress}%</span>

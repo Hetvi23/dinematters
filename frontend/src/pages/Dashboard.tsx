@@ -74,37 +74,39 @@ export default function Dashboard() {
     switch (status?.toLowerCase()) {
       case 'completed':
       case 'delivered':
-        return 'bg-green-100 text-green-800'
+        return 'bg-[#dff6dd] text-[#107c10] border border-[#92c5f7]'
       case 'cancelled':
       case 'rejected':
-        return 'bg-red-100 text-red-800'
+        return 'bg-[#fde7e9] text-[#d13438] border border-[#f4c2c4]'
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800'
+        return 'bg-[#fff4ce] text-[#ca5010] border border-[#ffe69d]'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-[#f3f2f1] text-[#605e5c] border border-[#edebe9]'
     }
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-xl sm:text-2xl font-semibold text-[#323130] tracking-tight">Dashboard</h2>
+          <p className="text-[#605e5c] text-sm mt-1">
             Overview of your restaurant operations
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" asChild className="flex-1 sm:flex-initial">
             <Link to="/setup">
-              <LinkIcon className="mr-2 h-4 w-4" />
-              Setup Wizard
+              <LinkIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Setup Wizard</span>
+              <span className="sm:hidden">Setup</span>
             </Link>
           </Button>
-          <Button variant="outline" asChild>
+          <Button variant="outline" size="sm" asChild className="flex-1 sm:flex-initial">
             <Link to="/modules">
-              <Package className="mr-2 h-4 w-4" />
-              All Modules
+              <Package className="h-4 w-4" />
+              <span className="hidden sm:inline">All Modules</span>
+              <span className="sm:hidden">Modules</span>
             </Link>
           </Button>
         </div>
@@ -114,14 +116,14 @@ export default function Dashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Restaurants</CardTitle>
-            <Store className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold text-[#323130]">Restaurants</CardTitle>
+            <Store className="h-4 w-4 text-[#605e5c]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-semibold text-[#323130]">
               {restaurantsLoading ? '...' : `${activeRestaurants}/${totalRestaurants}`}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[#605e5c] mt-1">
               Active / Total restaurants
             </p>
           </CardContent>
@@ -129,14 +131,14 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today's Orders</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold text-[#323130]">Today's Orders</CardTitle>
+            <Clock className="h-4 w-4 text-[#605e5c]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-semibold text-[#323130]">
               {ordersLoading ? '...' : todayOrders.length}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[#605e5c] mt-1">
               Revenue: ₹{todayRevenue.toFixed(2)}
             </p>
           </CardContent>
@@ -144,14 +146,14 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold text-[#323130]">Total Orders</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-[#605e5c]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-semibold text-[#323130]">
               {ordersLoading ? '...' : totalOrders}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[#605e5c] mt-1">
               All time orders
             </p>
           </CardContent>
@@ -159,14 +161,14 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold text-[#323130]">Total Revenue</CardTitle>
+            <TrendingUp className="h-4 w-4 text-[#605e5c]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-semibold text-[#323130]">
               {ordersLoading ? '...' : `₹${totalRevenue.toFixed(2)}`}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[#605e5c] mt-1">
               Total revenue from orders
             </p>
           </CardContent>
@@ -177,14 +179,14 @@ export default function Dashboard() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Menu Products</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold text-[#323130]">Menu Products</CardTitle>
+            <Package className="h-4 w-4 text-[#605e5c]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-semibold text-[#323130]">
               {productsLoading ? '...' : totalProducts}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[#605e5c] mt-1">
               Active menu products
             </p>
           </CardContent>
@@ -192,14 +194,14 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Categories</CardTitle>
-            <FolderTree className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold text-[#323130]">Categories</CardTitle>
+            <FolderTree className="h-4 w-4 text-[#605e5c]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-semibold text-[#323130]">
               {categoriesLoading ? '...' : totalCategories}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[#605e5c] mt-1">
               Menu categories
             </p>
           </CardContent>
@@ -207,19 +209,19 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Order Status</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold text-[#323130]">Order Status</CardTitle>
+            <AlertCircle className="h-4 w-4 text-[#605e5c]" />
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               {Object.entries(orderStatusCounts).map(([status, count]) => (
                 <div key={status} className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">{status}</span>
-                  <span className="text-sm font-semibold">{count as number}</span>
+                  <span className="text-sm text-[#605e5c]">{status}</span>
+                  <span className="text-sm font-semibold text-[#323130]">{count as number}</span>
                 </div>
               ))}
               {Object.keys(orderStatusCounts).length === 0 && (
-                <p className="text-sm text-muted-foreground">No orders yet</p>
+                <p className="text-sm text-[#605e5c]">No orders yet</p>
               )}
             </div>
           </CardContent>
@@ -230,30 +232,30 @@ export default function Dashboard() {
         {/* Restaurants List */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <CardTitle>Restaurants</CardTitle>
                 <CardDescription>Your restaurant locations</CardDescription>
               </div>
-              <Button variant="outline" size="sm" asChild>
+              <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
                 <Link to="/Restaurant">View All</Link>
               </Button>
             </div>
           </CardHeader>
           <CardContent>
             {restaurantsLoading ? (
-              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+              <div className="text-center py-8 text-[#605e5c]">Loading...</div>
             ) : restaurants && restaurants.length > 0 ? (
               <div className="space-y-3">
                 {restaurants.slice(0, 5).map((restaurant: any) => (
                   <Link
                     key={restaurant.name}
                     to={`/Restaurant/${restaurant.name}`}
-                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors"
+                    className="flex items-center justify-between p-3 rounded border border-[#edebe9] hover:bg-[#faf9f8] hover:border-[#c8c6c4] transition-colors"
                   >
                     <div className="flex-1">
-                      <p className="font-medium">{restaurant.restaurant_name || restaurant.name}</p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="font-medium text-[#323130]">{restaurant.restaurant_name || restaurant.name}</p>
+                      <p className="text-sm text-[#605e5c]">
                         {restaurant.city && restaurant.state
                           ? `${restaurant.city}, ${restaurant.state}`
                           : restaurant.owner_email || 'No details'}
@@ -261,11 +263,11 @@ export default function Dashboard() {
                     </div>
                     <div className="ml-4">
                       {restaurant.is_active ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-[#dff6dd] text-[#107c10] border border-[#92c5f7]">
                           Active
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-[#f3f2f1] text-[#605e5c] border border-[#edebe9]">
                           Inactive
                         </span>
                       )}
@@ -279,7 +281,7 @@ export default function Dashboard() {
                 )}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-8 text-[#605e5c]">
                 <p>No restaurants found</p>
                 <Button variant="outline" size="sm" className="mt-4" asChild>
                   <Link to="/setup">Create Restaurant</Link>
@@ -292,32 +294,32 @@ export default function Dashboard() {
         {/* Recent Orders */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <CardTitle>Recent Orders</CardTitle>
                 <CardDescription>Latest orders from your restaurants</CardDescription>
               </div>
-              <Button variant="outline" size="sm" asChild>
+              <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
                 <Link to="/orders">View All</Link>
               </Button>
             </div>
           </CardHeader>
           <CardContent>
             {ordersLoading ? (
-              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+              <div className="text-center py-8 text-[#605e5c]">Loading...</div>
             ) : recentOrders && recentOrders.length > 0 ? (
               <div className="space-y-3">
                 {recentOrders.map((order: any) => (
                   <Link
                     key={order.name}
                     to={`/orders/${order.name}`}
-                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors"
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded border border-[#edebe9] hover:bg-[#faf9f8] hover:border-[#c8c6c4] transition-colors"
                   >
-                    <div className="flex items-center gap-3 flex-1">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
                       {getStatusIcon(order.status)}
-                      <div className="flex-1">
-                        <p className="font-medium">{order.name}</p>
-                        <p className="text-sm text-muted-foreground">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-[#323130] truncate">{order.name}</p>
+                        <p className="text-sm text-[#605e5c] truncate">
                           {order.restaurant && (
                             <span>{order.restaurant}</span>
                           )}
@@ -327,20 +329,22 @@ export default function Dashboard() {
                         </p>
                       </div>
                     </div>
-                    <div className="text-right ml-4">
-                      <p className="font-medium">₹{order.total || 0}</p>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between sm:flex-col sm:items-end sm:text-right sm:ml-4 gap-2">
+                      <p className="font-medium text-[#323130]">₹{order.total || 0}</p>
+                      <div className="flex flex-col sm:block items-end sm:items-start gap-1">
+                        <p className="text-sm text-[#605e5c]">
                         {new Date(order.creation).toLocaleDateString()}
                       </p>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mt-1 ${getStatusColor(order.status || 'Pending')}`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(order.status || 'Pending')}`}>
                         {order.status || 'Pending'}
                       </span>
+                      </div>
                     </div>
                   </Link>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">No orders found</div>
+              <div className="text-center py-8 text-[#605e5c]">No orders found</div>
             )}
           </CardContent>
         </Card>

@@ -146,7 +146,7 @@ export default function QRCodeScanner({ onScan, restaurantId, open, onOpenChange
           {/* Camera Scanner (Optional - can be enhanced with actual QR scanning library) */}
           <div className="space-y-2">
             <Label>Camera Scanner</Label>
-            <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+            <div className="relative bg-black rounded-md overflow-hidden aspect-video">
               {isScanning ? (
                 <>
                   <video
@@ -156,7 +156,7 @@ export default function QRCodeScanner({ onScan, restaurantId, open, onOpenChange
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="border-2 border-white rounded-lg w-64 h-64" />
+                    <div className="border-2 border-white rounded-md w-64 h-64" />
                   </div>
                   <Button
                     variant="destructive"

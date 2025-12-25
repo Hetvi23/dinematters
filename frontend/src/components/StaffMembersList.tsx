@@ -128,7 +128,7 @@ export default function StaffMembersList({ restaurantId, onAdd }: StaffMembersLi
             <CardTitle>Add New Staff Member</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="bg-muted/30 rounded-lg p-6 border">
+            <div className="bg-muted/30 rounded-md p-6 border">
               <DynamicForm
                 doctype="Restaurant User"
                 mode="create"

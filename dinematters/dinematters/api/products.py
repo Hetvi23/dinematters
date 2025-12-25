@@ -272,7 +272,7 @@ def format_product(product_doc):
 			product["customizationQuestions"] = customization_questions
 	
 	# Recommendations
-	if product_doc.recommendations:
+	if hasattr(product_doc, 'recommendations') and product_doc.recommendations:
 		try:
 			recommendations = json.loads(product_doc.recommendations) if isinstance(product_doc.recommendations, str) else product_doc.recommendations
 			if recommendations and isinstance(recommendations, list):

@@ -67,7 +67,7 @@ export function ColorPaletteSelector({
               {/* Color Swatch */}
               <div
                 className={cn(
-                  "h-12 w-12 rounded-lg border-2 shadow-md transition-all",
+                  "h-12 w-12 rounded-md border-2 shadow-md transition-all",
                   isSelected
                     ? "border-blue-500 ring-2 ring-blue-300 ring-offset-2 scale-110"
                     : "border-gray-300 hover:border-gray-400 hover:scale-105",

@@ -6,7 +6,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Trash2, Upload, Image as ImageIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { cn } from '@/lib/utils'
 
 interface MenuImageItem {
   name?: string
@@ -139,7 +138,7 @@ export default function MenuImagesTable({ value = [], onChange, required, disabl
 
       {/* Images List */}
       {currentValue.length > 0 && (
-        <div className="border rounded-lg overflow-hidden">
+        <div className="border rounded-md overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
@@ -190,7 +189,7 @@ export default function MenuImagesTable({ value = [], onChange, required, disabl
       )}
 
       {currentValue.length === 0 && (
-        <div className="text-center py-8 text-muted-foreground border rounded-lg">
+        <div className="text-center py-8 text-muted-foreground border rounded-md">
           <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
           <p>No images uploaded yet</p>
           <p className="text-sm mt-1">Upload PNG, JPEG, or WebP images (max 20)</p>

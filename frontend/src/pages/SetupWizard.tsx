@@ -708,23 +708,25 @@ export default function SetupWizard() {
         </Button>
       </div>
 
-      <Card className="border-2">
+      <Card className="border border-[#edebe9]">
         <CardHeader className="pb-4">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
             <div>
-              <CardTitle className="text-xl">Setup Progress</CardTitle>
-              <CardDescription className="mt-1">
+              <CardTitle className="text-xl font-semibold text-[#323130]">Setup Progress</CardTitle>
+              <CardDescription className="mt-1 text-sm text-[#605e5c]">
                 Step {currentStep + 1} of {steps.length}
               </CardDescription>
             </div>
-            <div className="text-right">
-              <div className="text-3xl font-bold text-primary">{Math.round(progressPercentage)}%</div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wide">Complete</div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <div className="text-2xl sm:text-3xl font-bold text-[#ea580c]">{Math.round(progressPercentage)}%</div>
+                <div className="text-xs text-[#605e5c] uppercase tracking-wide">Complete</div>
+              </div>
             </div>
           </div>
           <Progress value={progressPercentage} className="h-2" />
         </CardHeader>
-        <CardContent className="pt-6 pb-8">
+        <CardContent className="pt-4 pb-6 px-4 sm:px-6">
           <Stepper 
             steps={stepperSteps} 
             currentStep={currentStep}
@@ -779,7 +781,7 @@ export default function SetupWizard() {
 
             {/* Default - Use DynamicForm for other steps */}
             {currentStepData && !['users', 'categories', 'products'].includes(currentStepData.id) && (
-              <div className="bg-muted/30 rounded-lg p-6 border">
+              <div className="bg-muted/30 rounded-md p-6 border">
                 <DynamicForm
                   onChange={setFormHasChanges}
                   showSaveButton={false}

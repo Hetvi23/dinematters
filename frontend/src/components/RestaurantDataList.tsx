@@ -60,7 +60,7 @@ export default function RestaurantDataList({ doctype, restaurantId, titleField }
       </div>
 
       {items.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground border rounded-lg">
+        <div className="text-center py-12 text-muted-foreground border rounded-md">
           <p>No {doctype.replace(/_/g, ' ')} found for this restaurant.</p>
           {permissions.create && (
             <Button 
@@ -74,7 +74,7 @@ export default function RestaurantDataList({ doctype, restaurantId, titleField }
           )}
         </div>
       ) : (
-        <div className="border rounded-lg overflow-hidden">
+        <div className="border rounded-md overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>

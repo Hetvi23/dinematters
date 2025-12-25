@@ -66,7 +66,7 @@ export function ColorInput({
         {/* Clickable Color Swatch */}
         <div
           className={cn(
-            "h-12 w-20 rounded-lg border-2 border-gray-300 shadow-md cursor-pointer transition-all hover:shadow-lg hover:scale-105",
+            "h-12 w-20 rounded-md border-2 border-gray-300 shadow-md cursor-pointer transition-all hover:shadow-lg hover:scale-105",
             readOnly && "cursor-not-allowed opacity-60 hover:scale-100 hover:shadow-md"
           )}
           style={{ backgroundColor: colorValue }}

@@ -257,7 +257,7 @@ export default function ReviewExtraction({ restaurantId }: ReviewExtractionProps
               {categories.length > 0 ? (
                 <div className="space-y-2">
                   {categories.slice(0, 10).map((cat: any, idx: number) => (
-                    <div key={idx} className="p-3 border rounded-lg">
+                    <div key={idx} className="p-3 border rounded-md">
                       <div className="font-medium">{cat.name || cat.category_name}</div>
                       {cat.description && (
                         <div className="text-sm text-muted-foreground mt-1">{cat.description}</div>
@@ -287,7 +287,7 @@ export default function ReviewExtraction({ restaurantId }: ReviewExtractionProps
               {dishes.length > 0 ? (
                 <div className="space-y-2">
                   {dishes.slice(0, 10).map((dish: any, idx: number) => (
-                    <div key={idx} className="p-3 border rounded-lg">
+                    <div key={idx} className="p-3 border rounded-md">
                       <div className="font-medium">{dish.name || dish.product_name}</div>
                       {dish.description && (
                         <div className="text-sm text-muted-foreground mt-1">{dish.description}</div>

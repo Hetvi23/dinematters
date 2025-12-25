@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
-import { useFrappeGetDocList } from '@/lib/frappe'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useState, useMemo, useEffect } from 'react'
+import { useFrappeGetDocList, useFrappePostCall } from '@/lib/frappe'
+import { Card, CardContent } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,11 +15,48 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { toast } from 'sonner'
 
 type ViewType = 'kanban' | 'list'
 
 export default function Orders() {
-  const [viewType, setViewType] = useState<ViewType>('kanban')
+  // Load view preference from localStorage, default to 'list' on mobile, 'kanban' on desktop
+  const [viewType, setViewType] = useState<ViewType>(() => {
+    // Check if mobile (screen width < 768px)
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return 'list' // Force list view on mobile
+    }
+    // Load from localStorage or default to 'kanban' on desktop
+    try {
+      const saved = localStorage.getItem('dinematters-orders-view-type')
+      return (saved === 'kanban' || saved === 'list') ? saved as ViewType : 'kanban'
+    } catch {
+      return 'kanban'
+    }
+  })
+
+  // Save view preference to localStorage
+  useEffect(() => {
+    // Only save if not on mobile
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      try {
+        localStorage.setItem('dinematters-orders-view-type', viewType)
+      } catch (error) {
+        console.error('Failed to save view preference:', error)
+      }
+    }
+  }, [viewType])
+
+  // Force list view on mobile
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768 && viewType === 'kanban') {
+        setViewType('list')
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [viewType])
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   
@@ -31,10 +69,40 @@ export default function Orders() {
   const [showFilters, setShowFilters] = useState(false)
 
   const { data: orders, isLoading, mutate } = useFrappeGetDocList('Order', {
-    fields: ['name', 'order_number', 'status', 'total', 'creation', 'table_number', 'coupon'],
+    fields: ['name', 'order_number', 'status', 'total', 'creation', 'restaurant', 'table_number', 'coupon', 'customer_name', 'customer_phone', 'payment_method', 'payment_status', 'subtotal', 'discount', 'tax', 'delivery_fee'],
     limit: 100,
     orderBy: { field: 'creation', order: 'desc' }
   })
+
+  // Status update API call
+  const { call: updateOrderStatus } = useFrappePostCall('dinematters.dinematters.api.order_status.update_status')
+
+  // Handle status change
+  const handleStatusChange = async (orderId: string, newStatus: string) => {
+    try {
+      await updateOrderStatus({
+        order_id: orderId,
+        status: newStatus
+      })
+      
+      const statusLabels: Record<string, string> = {
+        'pending': 'Pending',
+        'confirmed': 'Confirmed',
+        'preparing': 'Preparing',
+        'ready': 'Ready',
+        'delivered': 'Delivered',
+        'cancelled': 'Cancelled'
+      }
+      
+      toast.success(`Order status updated to ${statusLabels[newStatus] || newStatus}`)
+      
+      // Refresh orders list
+      mutate()
+    } catch (error: any) {
+      console.error('Failed to update order status:', error)
+      toast.error(error?.message || 'Failed to update order status')
+    }
+  }
 
   // Get unique table numbers for filter
   const uniqueTables = useMemo(() => {
@@ -112,33 +180,42 @@ export default function Orders() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-3xl font-bold tracking-tight">Orders</h2>
-        <div className="flex gap-2">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-semibold text-[#323130] tracking-tight">Orders</h2>
+          <p className="text-[#605e5c] text-sm mt-1">
+            Manage and track all restaurant orders
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
           <Button
             variant={showFilters ? 'default' : 'outline'}
             size="sm"
             onClick={() => setShowFilters(!showFilters)}
+            className="flex-1 sm:flex-initial"
           >
-            <Filter className="h-4 w-4 mr-2" />
-            Filters
+            <Filter className="h-4 w-4" />
+            <span className="hidden sm:inline">Filters</span>
           </Button>
+          {/* Hide Kanban button on mobile */}
           <Button
             variant={viewType === 'kanban' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setViewType('kanban')}
+            className="hidden md:flex flex-1 sm:flex-initial"
           >
-            <LayoutGrid className="h-4 w-4 mr-2" />
-            Kanban
+            <LayoutGrid className="h-4 w-4" />
+            <span className="hidden sm:inline">Kanban</span>
           </Button>
           <Button
             variant={viewType === 'list' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setViewType('list')}
+            className="flex-1 sm:flex-initial"
           >
-            <List className="h-4 w-4 mr-2" />
-            List
+            <List className="h-4 w-4" />
+            <span className="hidden sm:inline">List</span>
           </Button>
         </div>
       </div>
@@ -150,7 +227,7 @@ export default function Orders() {
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {/* Search */}
               <div className="relative md:col-span-2">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-[#605e5c]" />
                 <Input
                   placeholder="Search order number..."
                   value={searchQuery}
@@ -211,7 +288,7 @@ export default function Orders() {
             </div>
 
             {/* Second Row for Clear Button */}
-            <div className="mt-4 flex items-center justify-between">
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="text-sm text-muted-foreground">
                 {hasActiveFilters ? (
                   <>Showing {filteredOrders.length} of {orders?.length || 0} orders</>
@@ -224,6 +301,7 @@ export default function Orders() {
                 onClick={clearFilters}
                 disabled={!hasActiveFilters}
                 size="sm"
+                className="w-full sm:w-auto"
               >
                 <X className="h-4 w-4 mr-2" />
                 Clear Filters
@@ -236,89 +314,194 @@ export default function Orders() {
       <Card>
         <CardContent className="pt-6">
           {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading orders...</div>
+            <div className="text-center py-8 text-[#605e5c]">Loading orders...</div>
           ) : filteredOrders && filteredOrders.length > 0 ? (
-            viewType === 'kanban' ? (
-              <OrdersKanban 
-                orders={filteredOrders} 
-                onCheckOrder={handleCheckOrder}
-                onOrderUpdate={() => mutate()}
-              />
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Order Number</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Table</TableHead>
-                    <TableHead>Coupon</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Food Order</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+            <>
+              {/* Kanban View - Desktop Only */}
+              {viewType === 'kanban' && (
+                <div className="hidden md:block">
+                  <OrdersKanban 
+                    orders={filteredOrders} 
+                    onCheckOrder={handleCheckOrder}
+                    onOrderUpdate={() => mutate()}
+                  />
+                </div>
+              )}
+              
+              {/* List View - Mobile Card View or Desktop Table View */}
+              {viewType === 'list' && (
+                <>
+                  {/* Mobile Card View */}
+                  <div className="md:hidden space-y-3">
                   {filteredOrders.map((order: any) => (
-                    <TableRow key={order.name}>
-                      <TableCell className="font-medium">{order.order_number || order.name}</TableCell>
-                      <TableCell>
-                        <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                          order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                          order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                          order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          order.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
-                          order.status === 'preparing' ? 'bg-purple-100 text-purple-800' :
-                          order.status === 'ready' ? 'bg-indigo-100 text-indigo-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {order.status || 'N/A'}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {order.table_number ? (
-                          <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800">
+                    <div key={order.name} className="p-4 border border-[#edebe9] rounded-md bg-white hover:border-[#c8c6c4] transition-colors">
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-[#323130] truncate">{order.order_number || order.name}</h3>
+                          <p className="text-sm text-[#605e5c] mt-1">
+                            {order.creation ? new Date(order.creation).toLocaleString('en-IN', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            }) : 'N/A'}
+                          </p>
+                        </div>
+                        <Select
+                          value={order.status || 'pending'}
+                          onValueChange={(newStatus) => handleStatusChange(order.name, newStatus)}
+                        >
+                          <SelectTrigger className={cn(
+                            "h-7 w-[110px] text-xs border-0 shadow-none",
+                            order.status === 'delivered' ? 'bg-[#dff6dd] text-[#107c10] hover:bg-[#c8e6c9]' :
+                            order.status === 'cancelled' ? 'bg-[#fde7e9] text-[#d13438] hover:bg-[#fcc5c9]' :
+                            order.status === 'pending' ? 'bg-[#fff4ce] text-[#ca5010] hover:bg-[#ffe69d]' :
+                            order.status === 'confirmed' ? 'bg-orange-50 text-[#ea580c] hover:bg-orange-100' :
+                            order.status === 'preparing' ? 'bg-[#e8d5ff] text-[#8764b8] hover:bg-[#d4b9e8]' :
+                            order.status === 'ready' ? 'bg-[#cce5ff] text-[#004578] hover:bg-[#99ccff]' :
+                            'bg-[#f3f2f1] text-[#605e5c] hover:bg-[#edebe9]'
+                          )}>
+                            <SelectValue>
+                              <span className="capitalize">{order.status || 'pending'}</span>
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="confirmed">Confirmed</SelectItem>
+                            <SelectItem value="preparing">Preparing</SelectItem>
+                            <SelectItem value="ready">Ready</SelectItem>
+                            <SelectItem value="delivered">Delivered</SelectItem>
+                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center gap-3 mb-3 flex-wrap">
+                        {order.table_number && (
+                          <span className="inline-flex items-center rounded px-2 py-1 text-xs font-medium bg-[#e8d5ff] text-[#8764b8] border border-[#d4b9e8]">
                             Table {order.table_number}
                           </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        {order.coupon ? (
-                          <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-green-100 text-green-800">
+                        {order.coupon && (
+                          <span className="inline-flex items-center rounded px-2 py-1 text-xs font-medium bg-[#dff6dd] text-[#107c10] border border-[#92c5f7]">
                             {order.coupon}
                           </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
                         )}
-                      </TableCell>
-                      <TableCell>₹{order.total || 0}</TableCell>
-                      <TableCell>
-                        {order.creation ? new Date(order.creation).toLocaleString('en-IN', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        }) : 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => handleCheckOrder(order.name)}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          Check Order
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                        <span className="text-lg font-semibold text-[#323130] ml-auto">₹{order.total || 0}</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCheckOrder(order.name)}
+                        className="w-full"
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        View Order Details
+                      </Button>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
-            )
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Order Number</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Table</TableHead>
+                        <TableHead>Coupon</TableHead>
+                        <TableHead>Total</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Food Order</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredOrders.map((order: any) => (
+                        <TableRow key={order.name}>
+                          <TableCell className="font-medium">{order.order_number || order.name}</TableCell>
+                          <TableCell>
+                            <Select
+                              value={order.status || 'pending'}
+                              onValueChange={(newStatus) => handleStatusChange(order.name, newStatus)}
+                            >
+                              <SelectTrigger className={cn(
+                                "h-7 w-[120px] text-xs border-0 shadow-none",
+                                order.status === 'delivered' ? 'bg-[#dff6dd] text-[#107c10] hover:bg-[#c8e6c9]' :
+                                order.status === 'cancelled' ? 'bg-[#fde7e9] text-[#d13438] hover:bg-[#fcc5c9]' :
+                                order.status === 'pending' ? 'bg-[#fff4ce] text-[#ca5010] hover:bg-[#ffe69d]' :
+                                order.status === 'confirmed' ? 'bg-orange-50 text-[#ea580c] hover:bg-orange-100' :
+                                order.status === 'preparing' ? 'bg-[#e8d5ff] text-[#8764b8] hover:bg-[#d4b9e8]' :
+                                order.status === 'ready' ? 'bg-[#cce5ff] text-[#004578] hover:bg-[#99ccff]' :
+                                'bg-[#f3f2f1] text-[#605e5c] hover:bg-[#edebe9]'
+                              )}>
+                                <SelectValue>
+                                  <span className="capitalize">{order.status || 'pending'}</span>
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="confirmed">Confirmed</SelectItem>
+                                <SelectItem value="preparing">Preparing</SelectItem>
+                                <SelectItem value="ready">Ready</SelectItem>
+                                <SelectItem value="delivered">Delivered</SelectItem>
+                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            {order.table_number ? (
+                              <span className="inline-flex items-center rounded px-2 py-1 text-xs font-medium bg-[#e8d5ff] text-[#8764b8] border border-[#d4b9e8]">
+                                Table {order.table_number}
+                              </span>
+                            ) : (
+                              <span className="text-[#605e5c]">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {order.coupon ? (
+                              <span className="inline-flex items-center rounded px-2 py-1 text-xs font-medium bg-[#dff6dd] text-[#107c10] border border-[#92c5f7]">
+                                {order.coupon}
+                              </span>
+                            ) : (
+                              <span className="text-[#605e5c]">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="font-medium text-[#323130]">₹{order.total || 0}</TableCell>
+                          <TableCell className="text-[#605e5c]">
+                            {order.creation ? new Date(order.creation).toLocaleString('en-IN', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            }) : 'N/A'}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleCheckOrder(order.name)}
+                            >
+                              <Eye className="h-4 w-4" />
+                              <span className="hidden sm:inline ml-1">View</span>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                </>
+              )}
+            </>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">No orders found</div>
+            <div className="text-center py-12 text-[#605e5c]">
+              <p className="text-sm">No orders found</p>
+              {hasActiveFilters && (
+                <p className="text-xs mt-2 text-[#a19f9d]">Try adjusting your filters</p>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

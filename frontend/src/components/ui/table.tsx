@@ -6,7 +6,7 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div className="relative w-full overflow-x-auto">
       <table
-        className={cn("w-full caption-bottom text-sm", className)}
+        className={cn("w-full caption-bottom text-sm border-collapse", className)}
         {...props}
       />
     </div>
@@ -16,7 +16,7 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
 function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
-      className={cn("[&_tr]:border-b", className)}
+      className={cn("[&_tr]:border-b [&_tr]:border-[#edebe9]", className)}
       {...props}
     />
   )
@@ -35,7 +35,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
   return (
     <tr
       className={cn(
-        "hover:bg-muted/50 border-b transition-colors",
+        "hover:bg-[#faf9f8] border-b border-[#edebe9] transition-colors",
         className
       )}
       {...props}
@@ -47,7 +47,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   return (
     <th
       className={cn(
-        "text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap",
+        "text-[#323130] h-10 px-4 text-left align-middle font-semibold text-xs uppercase tracking-wide bg-[#faf9f8] whitespace-nowrap",
         className
       )}
       {...props}
@@ -59,7 +59,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
   return (
     <td
       className={cn(
-        "p-2 align-middle whitespace-nowrap",
+        "p-4 align-middle text-sm text-[#323130] whitespace-nowrap",
         className
       )}
       {...props}

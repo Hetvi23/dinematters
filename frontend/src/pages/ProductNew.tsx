@@ -50,17 +50,17 @@ export default function ProductNew() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <Link to="/products">
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" className="w-full sm:w-auto">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
         </Link>
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Add New Product</h2>
-          <p className="text-muted-foreground">Create a new product for your menu</p>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Add New Product</h2>
+          <p className="text-muted-foreground text-sm sm:text-base">Create a new product for your menu</p>
         </div>
       </div>
 
@@ -139,12 +139,12 @@ export default function ProductNew() {
               </Label>
             </div>
 
-            <div className="flex gap-2 pt-4">
-              <Button type="submit" disabled={loading}>
+            <div className="flex flex-col sm:flex-row gap-2 pt-4">
+              <Button type="submit" disabled={loading} className="w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
                 {loading ? 'Creating...' : 'Create Product'}
               </Button>
-              <Button type="button" variant="outline" onClick={() => navigate('/products')}>
+              <Button type="button" variant="outline" onClick={() => navigate('/products')} className="w-full sm:w-auto">
                 Cancel
               </Button>
             </div>

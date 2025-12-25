@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useFrappeGetCall } from '@/lib/frappe'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { usePermissions } from '@/lib/permissions'
 import { 
   Loader2, 
@@ -8,16 +8,17 @@ import {
   ShoppingCart, 
   Settings, 
   Calendar, 
-  Ticket, 
-  Gift, 
-  Sparkles, 
-  Gamepad2, 
-  Home,
   Lock,
   Grid3x3,
   TrendingUp,
-  UtensilsCrossed
+  UtensilsCrossed,
+  ChevronRight,
+  Package,
+  Users,
+  FileText,
+  BarChart3
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export default function Modules() {
   const { data, isLoading } = useFrappeGetCall<{ message: Record<string, Array<{ name: string; label: string }>> }>(
@@ -31,49 +32,90 @@ export default function Modules() {
   // Check if we have any categories with items
   const hasCategories = Object.keys(categories).length > 0 && 
     Object.values(categories).some((doctypes: any) => Array.isArray(doctypes) && doctypes.length > 0)
-  
-  // Debug: Log categories to console
-  if (data && !isLoading) {
-    console.log('Modules data:', data)
-    console.log('Categories:', categories)
-    console.log('Has categories:', hasCategories)
-  }
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="flex items-center justify-center py-16">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-[#605e5c]" />
+          <p className="text-sm text-[#605e5c]">Loading modules...</p>
+        </div>
       </div>
     )
   }
 
-  // Category icons mapping
-  const categoryIcons: Record<string, any> = {
-    'Restaurant Setup': Building2,
-    'Menu Management': UtensilsCrossed,
-    'Orders': ShoppingCart,
-    'Bookings': Calendar,
-    'Marketing & Promotions': TrendingUp,
-    'Legacy': Grid3x3,
-    'Tools': Settings,
-    'Other': Grid3x3,
+  // Category configuration with icons and colors
+  const categoryConfig: Record<string, { 
+    icon: any
+    color: string
+    bgColor: string
+    borderColor: string
+  }> = {
+    'Restaurant Setup': { 
+      icon: Building2, 
+      color: 'text-[#ea580c]', 
+      bgColor: 'bg-orange-50',
+      borderColor: 'border-orange-200'
+    },
+    'Menu Management': { 
+      icon: UtensilsCrossed, 
+      color: 'text-[#107c10]', 
+      bgColor: 'bg-[#dff6dd]',
+      borderColor: 'border-[#92c5f7]'
+    },
+    'Orders': { 
+      icon: ShoppingCart, 
+      color: 'text-[#004578]', 
+      bgColor: 'bg-[#cce5ff]',
+      borderColor: 'border-[#99ccff]'
+    },
+    'Bookings': { 
+      icon: Calendar, 
+      color: 'text-[#8764b8]', 
+      bgColor: 'bg-[#e8d5ff]',
+      borderColor: 'border-[#d4b9e8]'
+    },
+    'Marketing & Promotions': { 
+      icon: TrendingUp, 
+      color: 'text-[#d13438]', 
+      bgColor: 'bg-[#fde7e9]',
+      borderColor: 'border-[#f4c2c4]'
+    },
+    'Legacy': { 
+      icon: Grid3x3, 
+      color: 'text-[#605e5c]', 
+      bgColor: 'bg-[#f3f2f1]',
+      borderColor: 'border-[#edebe9]'
+    },
+    'Tools': { 
+      icon: Settings, 
+      color: 'text-[#ca5010]', 
+      bgColor: 'bg-[#fff4ce]',
+      borderColor: 'border-[#ffe69d]'
+    },
+    'Other': { 
+      icon: Package, 
+      color: 'text-[#605e5c]', 
+      bgColor: 'bg-[#f3f2f1]',
+      borderColor: 'border-[#edebe9]'
+    },
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* Header Section */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Grid3x3 className="h-6 w-6 text-primary" />
-            </div>
-            <h2 className="text-3xl font-bold tracking-tight">All Modules</h2>
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-md bg-orange-50">
+            <Grid3x3 className="h-5 w-5 text-[#ea580c]" />
           </div>
-          <p className="text-muted-foreground text-sm">
-            Access all dinematters modules. Permissions are automatically enforced.
-          </p>
+          <h1 className="text-2xl sm:text-3xl font-semibold text-[#323130] tracking-tight">
+            All Modules
+          </h1>
         </div>
+        <p className="text-sm text-[#605e5c] pl-11">
+          Access and manage all dinematters modules. Permissions are automatically enforced based on your role.
+        </p>
       </div>
 
       {/* Categories */}
@@ -81,34 +123,51 @@ export default function Modules() {
         const doctypeArray = Array.isArray(doctypes) ? doctypes : []
         if (doctypeArray.length === 0) return null
         
-        const CategoryIcon = categoryIcons[category] || Grid3x3
+        const config = categoryConfig[category] || categoryConfig['Other']
+        const CategoryIcon = config.icon
         
         return (
           <div key={category} className="space-y-4">
-            <div className="flex items-center gap-3 pb-2 border-b">
-              <CategoryIcon className="h-5 w-5 text-primary" />
-              <h3 className="text-xl font-semibold text-foreground">{category}</h3>
-              <span className="text-sm text-muted-foreground">({doctypeArray.length})</span>
+            {/* Category Header */}
+            <div className="flex items-center gap-3 pb-3 border-b border-[#edebe9]">
+              <div className={cn("p-2 rounded-md", config.bgColor, config.borderColor, "border")}>
+                <CategoryIcon className={cn("h-4 w-4", config.color)} />
+              </div>
+              <div className="flex items-center gap-3 flex-1">
+                <h2 className="text-lg font-semibold text-[#323130]">{category}</h2>
+                <span className="text-xs text-[#605e5c] font-medium bg-[#f3f2f1] px-2 py-0.5 rounded-md">
+                  {doctypeArray.length} {doctypeArray.length === 1 ? 'module' : 'modules'}
+                </span>
+              </div>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            
+            {/* Module Grid */}
+            <div className="grid gap-2.5 sm:gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {doctypeArray.map((doctype) => (
-                <ModuleCard key={doctype.name} doctype={doctype.name} label={doctype.label} />
+                <ModuleCard 
+                  key={doctype.name} 
+                  doctype={doctype.name} 
+                  label={doctype.label}
+                  categoryColor={config.color}
+                  categoryBgColor={config.bgColor}
+                />
               ))}
             </div>
           </div>
         )
       })}
       
+      {/* Empty State */}
       {!hasCategories && (
-        <Card className="border-dashed">
-          <CardContent className="py-16 text-center">
-            <div className="flex flex-col items-center gap-4">
-              <div className="p-4 rounded-full bg-muted">
-                <Grid3x3 className="h-8 w-8 text-muted-foreground" />
+        <Card className="border border-[#edebe9]">
+          <CardContent className="py-16 sm:py-20 text-center">
+            <div className="flex flex-col items-center gap-4 max-w-md mx-auto">
+              <div className="p-4 rounded-full bg-[#f3f2f1]">
+                <Grid3x3 className="h-8 w-8 text-[#605e5c]" />
               </div>
               <div className="space-y-2">
-                <p className="text-lg font-medium">No modules available</p>
-                <p className="text-sm text-muted-foreground max-w-md">
+                <h3 className="text-lg font-semibold text-[#323130]">No modules available</h3>
+                <p className="text-sm text-[#605e5c]">
                   Please check your permissions or contact your administrator to get access to modules.
                 </p>
               </div>
@@ -120,39 +179,101 @@ export default function Modules() {
   )
 }
 
-
-function ModuleCard({ doctype, label }: { doctype: string; label: string }) {
+function ModuleCard({ 
+  doctype, 
+  label, 
+  categoryColor,
+  categoryBgColor
+}: { 
+  doctype: string
+  label: string
+  categoryColor: string
+  categoryBgColor: string
+}) {
   const { permissions } = usePermissions(doctype)
 
-  // Show all modules, but indicate if user doesn't have access
   const hasAccess = permissions.read
 
+  const displayLabel = label || doctype.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+
+  // Get appropriate icon based on doctype name
+  const getModuleIcon = () => {
+    const lowerName = doctype.toLowerCase()
+    if (lowerName.includes('product') || lowerName.includes('item')) return Package
+    if (lowerName.includes('order')) return ShoppingCart
+    if (lowerName.includes('user') || lowerName.includes('staff') || lowerName.includes('employee')) return Users
+    if (lowerName.includes('report') || lowerName.includes('analytics') || lowerName.includes('dashboard')) return BarChart3
+    if (lowerName.includes('document') || lowerName.includes('file')) return FileText
+    return Grid3x3
+  }
+
+  const ModuleIcon = getModuleIcon()
+
   return (
-    <Link to={`/${doctype}`} className={hasAccess ? 'block' : 'pointer-events-none block'}>
-      <Card className={`
-        group relative h-full transition-all duration-200
-        ${hasAccess 
-          ? 'hover:shadow-lg hover:border-primary/50 cursor-pointer border' 
-          : 'opacity-60 border-dashed'
-        }
-      `}>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <CardTitle className="text-base font-semibold capitalize leading-tight">
-                {label || doctype.replace(/_/g, ' ')}
-              </CardTitle>
+    <Link 
+      to={`/${doctype}`} 
+      className={cn(
+        "block group",
+        !hasAccess && "pointer-events-none"
+      )}
+    >
+      <Card className={cn(
+        "h-full transition-all duration-200 border border-[#edebe9] bg-white",
+        "hover:shadow-md hover:border-[#c8c6c4]",
+        hasAccess 
+          ? "cursor-pointer hover:bg-[#faf9f8]" 
+          : "opacity-50 border-dashed"
+      )}>
+        <CardContent className="p-3">
+          <div className="flex items-center gap-2.5">
+            {/* Icon */}
+            <div className={cn(
+              "p-1.5 rounded-md flex-shrink-0",
+              hasAccess ? categoryBgColor : "bg-[#f3f2f1]"
+            )}>
+              <ModuleIcon className={cn(
+                "h-3.5 w-3.5",
+                hasAccess ? categoryColor : "text-[#a19f9d]"
+              )} />
             </div>
-            {!hasAccess && (
-              <Lock className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-1" />
-            )}
+
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className={cn(
+                  "text-sm font-semibold text-[#323130] leading-snug",
+                  "group-hover:text-[#201f1e] transition-colors",
+                  "line-clamp-1"
+                )}>
+                  {displayLabel}
+                </h3>
+                {!hasAccess && (
+                  <Lock className="h-3.5 w-3.5 text-[#a19f9d] flex-shrink-0" />
+                )}
+                {hasAccess && (
+                  <ChevronRight className={cn(
+                    "h-3.5 w-3.5 transition-all duration-200 flex-shrink-0",
+                    categoryColor,
+                    "opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0"
+                  )} />
+                )}
+              </div>
+              <p className="text-xs text-[#605e5c] font-normal truncate mt-0.5">
+                {doctype}
+              </p>
+            </div>
           </div>
-        </CardHeader>
-        {hasAccess && (
-          <div className="absolute inset-0 rounded-lg border-2 border-primary opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-        )}
+          
+          {/* Hover indicator */}
+          {hasAccess && (
+            <div className={cn(
+              "mt-2.5 h-0.5 rounded-full transition-all duration-200",
+              categoryColor.replace('text-', 'bg-'),
+              "w-0 group-hover:w-full"
+            )} />
+          )}
+        </CardContent>
       </Card>
     </Link>
   )
 }
-
