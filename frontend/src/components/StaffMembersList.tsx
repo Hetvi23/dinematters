@@ -49,12 +49,6 @@ export default function StaffMembersList({ restaurantId, onAdd }: StaffMembersLi
                 {members.length} member{members.length !== 1 ? 's' : ''} assigned
               </CardDescription>
             </div>
-            {!showAddForm && (
-              <Button onClick={() => setShowAddForm(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Staff Member
-              </Button>
-            )}
           </div>
         </CardHeader>
         <CardContent>

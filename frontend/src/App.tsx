@@ -30,6 +30,7 @@ function AppContent() {
 						<Route path="/" element={<Navigate to="/dashboard" replace />} />
 						<Route path="/dashboard" element={<Dashboard />} />
 						<Route path="/setup" element={<SetupWizard />} />
+						<Route path="/setup/:restaurantName" element={<SetupWizard />} />
 						<Route path="/modules" element={<Modules />} />
 						<Route path="/:doctype" element={<ModuleList />} />
 						<Route path="/:doctype/:docname" element={<ModuleDetail />} />

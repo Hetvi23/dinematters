@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DatePicker } from '@/components/ui/date-picker'
 import { Eye, LayoutGrid, List, Filter, X, Search } from 'lucide-react'
 import { OrdersKanban } from '@/components/OrdersKanban'
 import { OrderDetailsDialog } from '@/components/OrderDetailsDialog'
@@ -268,21 +269,19 @@ export default function Orders() {
 
               {/* Date From */}
               <div>
-                <Input
-                  type="date"
-                  placeholder="From Date"
+                <DatePicker
                   value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
+                  onChange={(value) => setDateFrom(value)}
+                  placeholder="From Date"
                 />
               </div>
 
               {/* Date To */}
               <div>
-                <Input
-                  type="date"
-                  placeholder="To Date"
+                <DatePicker
                   value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
+                  onChange={(value) => setDateTo(value)}
+                  placeholder="To Date"
                 />
               </div>
             </div>

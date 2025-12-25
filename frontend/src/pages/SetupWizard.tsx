@@ -1,14 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
 import { useFrappeGetCall, useFrappeGetDocList, useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe'
-import { Stepper, Step } from '@/components/ui/stepper'
 import DynamicForm from '@/components/DynamicForm'
 import StaffMembersList from '@/components/StaffMembersList'
 import RestaurantDataList from '@/components/RestaurantDataList'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { ArrowLeft, ArrowRight, Check, Info, Plus, Building2 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Stepper, Step } from '@/components/ui/stepper'
+import { ArrowLeft, ArrowRight, Check, Plus, Building2, Loader2 } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 interface WizardStep {
@@ -31,34 +34,75 @@ interface Restaurant {
   modified: string
 }
 
+// Helper function to truncate text to a specific number of characters
+const truncateText = (text: string, maxLength: number): string => {
+  if (!text || text.length <= maxLength) return text
+  return text.substring(0, maxLength) + '...'
+}
+
 export default function SetupWizard() {
   const navigate = useNavigate()
+  const params = useParams<{ restaurantName?: string }>()
   
-  // Restaurant selection state - initialize from localStorage only once using function initializer
-  const [selectedRestaurant, setSelectedRestaurant] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem('dinematters-setup-restaurant')
-    } catch {
-      return null
-    }
-  })
+  // Get restaurant name from URL params
+  const restaurantNameFromUrl = params.restaurantName ? decodeURIComponent(params.restaurantName) : null
+  
+  // Restaurant selection state - only use URL params, not localStorage
+  const [selectedRestaurant, setSelectedRestaurant] = useState<string | null>(null)
+  
   const [showRestaurantSelection, setShowRestaurantSelection] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem('dinematters-setup-show-selection')
-      return saved !== 'false'
-    } catch {
-      return true
+    // If URL has restaurant name, don't show selection
+    if (restaurantNameFromUrl) {
+      return false
     }
+    // If no restaurant name in URL, always show selection
+    return true
   })
+  
+  // Modal state for creating new restaurant
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [newRestaurantData, setNewRestaurantData] = useState({
+    restaurant_name: '',
+    owner_email: '',
+    owner_phone: ''
+  })
+  const [isCreating, setIsCreating] = useState(false)
+  
+  // API call for creating restaurant
+  const { call: createRestaurant } = useFrappePostCall('frappe.client.insert')
   
   // Get user's restaurants
-  const { data: restaurantsData, isLoading: restaurantsLoading } = useFrappeGetCall<{ message: { restaurants: Restaurant[] } }>(
+  const { data: restaurantsData, isLoading: restaurantsLoading, mutate: refreshRestaurants } = useFrappeGetCall<{ message: { restaurants: Restaurant[] } }>(
     'dinematters.dinematters.api.ui.get_user_restaurants',
     {},
     'user-restaurants'
   )
   
   const restaurants = restaurantsData?.message?.restaurants || []
+  
+  // Find restaurant by name from URL and set as selected
+  useEffect(() => {
+    if (restaurantNameFromUrl && restaurants.length > 0) {
+      // Find restaurant by restaurant_name (case-insensitive, URL-friendly)
+      const restaurant = restaurants.find(r => 
+        r.restaurant_name.toLowerCase().replace(/\s+/g, '-') === restaurantNameFromUrl.toLowerCase() ||
+        r.restaurant_id.toLowerCase() === restaurantNameFromUrl.toLowerCase() ||
+        r.name === restaurantNameFromUrl
+      )
+      if (restaurant) {
+        setSelectedRestaurant(restaurant.name)
+        setShowRestaurantSelection(false)
+      } else {
+        // Restaurant not found, show selection screen
+        setSelectedRestaurant(null)
+        setShowRestaurantSelection(true)
+      }
+    } else if (!restaurantNameFromUrl) {
+      // No restaurant name in URL, show selection screen
+      setSelectedRestaurant(null)
+      setShowRestaurantSelection(true)
+    }
+  }, [restaurantNameFromUrl, restaurants])
   
   // Get setup wizard steps
   const { data: stepsData } = useFrappeGetCall<{ message: { steps: WizardStep[] } }>(
@@ -89,7 +133,7 @@ export default function SetupWizard() {
   const restaurantId = selectedRestaurant || null
   
   // Get restaurant data if editing existing
-  const { data: restaurantData, mutate: refreshRestaurantData } = useFrappeGetDoc('Restaurant', selectedRestaurant || '', {
+  const { data: restaurantData } = useFrappeGetDoc('Restaurant', selectedRestaurant || '', {
     enabled: !!selectedRestaurant && showRestaurantSelection === false
   })
   
@@ -131,6 +175,7 @@ export default function SetupWizard() {
   const [stepData, setStepData] = useState<Record<string, any>>({})
   const [formHasChanges, setFormHasChanges] = useState(false) // Track if current form has unsaved changes
   const [triggerSave, setTriggerSave] = useState(0) // Trigger save in DynamicForm
+  const [showProgressModal, setShowProgressModal] = useState(false) // Control progress modal visibility
 
   // Use ref to track if this is the initial mount (prevent saving on initial load)
   const isInitialMount = useRef(true)
@@ -225,7 +270,8 @@ export default function SetupWizard() {
         try {
           const saved = localStorage.getItem('dinematters-setup-completed-steps')
           if (saved) {
-            return new Set(JSON.parse(saved))
+            const parsed = JSON.parse(saved) as number[]
+            return new Set<number>(parsed)
           }
         } catch {
           // Ignore errors
@@ -234,7 +280,7 @@ export default function SetupWizard() {
       })()
       
       // Merge: backend progress + persisted completed steps
-      const merged = new Set([...completed, ...persistedCompleted])
+      const merged = new Set<number>([...completed, ...persistedCompleted])
       setCompletedSteps(merged)
       
       // Load restaurant data
@@ -398,7 +444,7 @@ export default function SetupWizard() {
     'Restaurant User',
     {
       fields: ['name', 'user', 'restaurant', 'role'],
-      filters: { restaurant: finalRestaurantId || '' },
+      filters: finalRestaurantId ? ({ restaurant: finalRestaurantId } as any) : undefined,
     },
     finalRestaurantId ? `restaurant-users-${finalRestaurantId}` : null
   )
@@ -420,28 +466,93 @@ export default function SetupWizard() {
   }, [currentStep])
 
   const handleRestaurantSelect = (restaurantId: string) => {
-    // Reset initialization flag to reload all data for the new restaurant
-    progressInitialized.current = null
-    setSelectedRestaurant(restaurantId)
-    setShowRestaurantSelection(false)
-    // Clear step data to force reload
-    setStepData({})
-    setCompletedSteps(new Set())
-    // Persist the selection
-    try {
-      localStorage.setItem('dinematters-setup-restaurant', restaurantId)
-      localStorage.setItem('dinematters-setup-show-selection', 'false')
-    } catch (e) {
-      console.error('Failed to save restaurant selection to localStorage:', e)
+    // Find restaurant to get its name
+    const restaurant = restaurants.find(r => r.name === restaurantId || r.restaurant_id === restaurantId)
+    if (restaurant) {
+      // Create URL-friendly restaurant name (lowercase, replace spaces with hyphens)
+      const urlFriendlyName = restaurant.restaurant_name.toLowerCase().replace(/\s+/g, '-')
+      // Navigate to URL with restaurant name
+      navigate(`/setup/${encodeURIComponent(urlFriendlyName)}`)
+    } else {
+      // Fallback: navigate to /setup if restaurant not found
+      navigate('/setup')
     }
   }
 
   const handleCreateNew = () => {
-    setSelectedRestaurant(null)
+    // Open the create restaurant modal
+    setShowCreateModal(true)
+    setNewRestaurantData({
+      restaurant_name: '',
+      owner_email: '',
+      owner_phone: ''
+    })
+  }
+
+  const handleCreateRestaurant = async () => {
+    // Validate required fields
+    if (!newRestaurantData.restaurant_name.trim()) {
+      toast.error('Restaurant name is required')
+      return
+    }
+    if (!newRestaurantData.owner_email.trim()) {
+      toast.error('Owner email is required')
+      return
+    }
+
+    setIsCreating(true)
+    try {
+      // Create restaurant document
+      const result = await createRestaurant({
+        doc: {
+          doctype: 'Restaurant',
+          restaurant_name: newRestaurantData.restaurant_name.trim(),
+          owner_email: newRestaurantData.owner_email.trim(),
+          owner_phone: newRestaurantData.owner_phone.trim() || undefined,
+          is_active: 1
+        }
+      })
+
+      if (result?.message) {
+        const createdRestaurant = result.message
+        const restaurantName = createdRestaurant.restaurant_name || createdRestaurant.name
+        const restaurantDocName = createdRestaurant.name || createdRestaurant.restaurant_id
+        
+        // Create URL-friendly restaurant name
+        const urlFriendlyName = restaurantName.toLowerCase().replace(/\s+/g, '-')
+        
+        // Close modal
+        setShowCreateModal(false)
+        setNewRestaurantData({ restaurant_name: '', owner_email: '', owner_phone: '' })
+        
+        // Show success message
+        toast.success('Restaurant created successfully!')
+        
+        // Refresh restaurants list to include the newly created restaurant
+        if (refreshRestaurants) {
+          await refreshRestaurants()
+        }
+        
+        // Set the selected restaurant directly to ensure the page updates
+        setSelectedRestaurant(restaurantDocName)
     setShowRestaurantSelection(false)
-    setCurrentStep(0)
-    setCompletedSteps(new Set())
-    setStepData({})
+        
+        // Navigate to the new restaurant's setup wizard
+        // Use a small delay to ensure state updates are processed
+        setTimeout(() => {
+          navigate(`/setup/${encodeURIComponent(urlFriendlyName)}`, { replace: true })
+        }, 50)
+      } else {
+        throw new Error('Failed to create restaurant')
+      }
+    } catch (error: any) {
+      console.error('Error creating restaurant:', error)
+      toast.error('Failed to create restaurant', {
+        description: error?.message || 'An error occurred while creating the restaurant'
+      })
+    } finally {
+      setIsCreating(false)
+    }
   }
 
   const handleStepComplete = (data: any) => {
@@ -569,6 +680,7 @@ export default function SetupWizard() {
   const handleStepClick = (stepIndex: number) => {
     if (completedSteps.has(stepIndex) || stepIndex === currentStep) {
       setCurrentStep(stepIndex)
+      setShowProgressModal(false)
     }
   }
 
@@ -580,72 +692,68 @@ export default function SetupWizard() {
     active: index === currentStep,
   })) : []
 
+
   // Restaurant Selection Screen
   if (showRestaurantSelection && !restaurantsLoading) {
     return (
+      <>
       <div className="space-y-6">
+          <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Restaurant Setup Wizard</h2>
           <p className="text-muted-foreground">
             Select an existing restaurant to continue setup, or create a new one
           </p>
         </div>
+            <Button onClick={handleCreateNew}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create New Restaurant
+            </Button>
+              </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {/* Create New Restaurant Card */}
-          <Card 
-            className="border-2 border-dashed hover:border-primary cursor-pointer transition-all hover:shadow-lg"
-            onClick={handleCreateNew}
-          >
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <Plus className="h-8 w-8 text-primary" />
-              </div>
-              <CardTitle className="text-xl mb-2">Create New Restaurant</CardTitle>
-              <CardDescription className="text-center">
-                Start setting up a new restaurant from scratch
-              </CardDescription>
-            </CardContent>
-          </Card>
-
           {/* Existing Restaurants */}
           {restaurants.map((restaurant) => (
             <Card 
               key={restaurant.name}
-              className="border-2 hover:border-primary cursor-pointer transition-all hover:shadow-lg"
+              className="border-2 hover:border-primary cursor-pointer transition-all hover:shadow-lg flex flex-col h-full"
               onClick={() => handleRestaurantSelect(restaurant.name)}
             >
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Building2 className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">{restaurant.restaurant_name}</CardTitle>
-                      <CardDescription className="text-xs mt-1">
-                        ID: {restaurant.restaurant_id}
-                      </CardDescription>
-                    </div>
+              <CardHeader className="flex-shrink-0">
+                <div className="grid grid-cols-[auto_1fr_auto] items-start gap-2 w-full">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Building2 className="h-6 w-6 text-primary" />
                   </div>
-                  {restaurant.is_active ? (
-                    <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
-                      Active
-                    </span>
-                  ) : (
-                    <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
-                      Inactive
-                    </span>
-                  )}
+                  <div className="min-w-0 overflow-hidden pr-2">
+                    <CardTitle className="text-lg whitespace-nowrap overflow-hidden text-ellipsis" title={restaurant.restaurant_name}>
+                      {truncateText(restaurant.restaurant_name, 12)}
+                    </CardTitle>
+                    <CardDescription className="text-xs mt-1 truncate">
+                      ID: {restaurant.restaurant_id}
+                    </CardDescription>
+                  </div>
+                  <div className="flex-shrink-0">
+                    {restaurant.is_active ? (
+                      <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full whitespace-nowrap">
+                        Active
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full whitespace-nowrap">
+                        Inactive
+                      </span>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex-1 flex flex-col justify-between">
+                <div className="flex-1">
                 {restaurant.owner_email && (
-                  <p className="text-sm text-muted-foreground mb-3">
+                    <p className="text-sm text-muted-foreground mb-3 truncate">
                     Owner: {restaurant.owner_email}
                   </p>
                 )}
-                <Button variant="outline" className="w-full">
+                </div>
+                <Button variant="outline" className="w-full mt-auto">
                   Continue Setup
                 </Button>
               </CardContent>
@@ -668,6 +776,88 @@ export default function SetupWizard() {
           </Card>
         )}
       </div>
+
+        {/* Create New Restaurant Modal */}
+        <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Create New Restaurant</DialogTitle>
+              <DialogDescription>
+                Enter the basic information to create your restaurant
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="restaurant_name">
+                  Restaurant Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="restaurant_name"
+                  value={newRestaurantData.restaurant_name}
+                  onChange={(e) => setNewRestaurantData(prev => ({ ...prev, restaurant_name: e.target.value }))}
+                  disabled={isCreating}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Your restaurant's name as it will appear to customers (e.g., Pizza Palace)
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="owner_email">
+                  Owner Email <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="owner_email"
+                  type="email"
+                  value={newRestaurantData.owner_email}
+                  onChange={(e) => setNewRestaurantData(prev => ({ ...prev, owner_email: e.target.value }))}
+                  disabled={isCreating}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Email address of the restaurant owner for system access (e.g., owner@restaurant.com)
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="owner_phone">Owner Phone</Label>
+                <Input
+                  id="owner_phone"
+                  type="tel"
+                  value={newRestaurantData.owner_phone}
+                  onChange={(e) => setNewRestaurantData(prev => ({ ...prev, owner_phone: e.target.value }))}
+                  disabled={isCreating}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Phone number of the restaurant owner (e.g., +1 (555) 123-4567)
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowCreateModal(false)}
+                disabled={isCreating}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateRestaurant}
+                disabled={isCreating || !newRestaurantData.restaurant_name.trim() || !newRestaurantData.owner_email.trim()}
+              >
+                {isCreating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Restaurant
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
     )
   }
 
@@ -687,174 +877,46 @@ export default function SetupWizard() {
     )
   }
 
+  // Get restaurant display name
+  const displayRestaurantName = restaurantData?.restaurant_name || 
+    restaurants.find(r => r.name === selectedRestaurant)?.restaurant_name ||
+    restaurantNameFromUrl?.replace(/-/g, ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') ||
+    'Restaurant'
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Restaurant Setup Wizard</h2>
+          <h2 className="text-3xl font-bold tracking-tight">{displayRestaurantName} wizard</h2>
           <p className="text-muted-foreground">
             Follow these steps to set up your restaurant
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => {
-            setShowRestaurantSelection(true)
-            setSelectedRestaurant(null)
-          }}
-        >
-          <Building2 className="mr-2 h-4 w-4" />
-          Change Restaurant
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              navigate('/setup')
+            }}
+          >
+            <Building2 className="mr-2 h-4 w-4" />
+            Change Restaurant
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setShowProgressModal(true)}
+            className="bg-green-600 hover:bg-green-700 text-white border-green-600"
+          >
+            Check progress: {Math.round(progressPercentage)}%
+          </Button>
+        </div>
       </div>
-
-      <Card className="border border-border">
-        <CardHeader className="pb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-            <div>
-              <CardTitle className="text-xl font-semibold text-foreground">Setup Progress</CardTitle>
-              <CardDescription className="mt-1 text-sm text-muted-foreground">
-                Step {currentStep + 1} of {steps.length}
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <div className="text-2xl sm:text-3xl font-bold text-primary">{Math.round(progressPercentage)}%</div>
-                <div className="text-xs text-muted-foreground uppercase tracking-wide">Complete</div>
-              </div>
-            </div>
-          </div>
-          <Progress value={progressPercentage} className="h-2" />
-        </CardHeader>
-        <CardContent className="pt-4 pb-6 px-4 sm:px-6">
-          <Stepper 
-            steps={stepperSteps} 
-            currentStep={currentStep}
-            onStepClick={handleStepClick}
-          />
-        </CardContent>
-      </Card>
 
       {currentStepData && (
         <Card className="border-2">
           <CardHeader className="pb-4">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <CardTitle className="text-2xl mb-2">{currentStepData.title}</CardTitle>
-                <CardDescription className="text-base">{currentStepData.description}</CardDescription>
-              </div>
-              {currentStepData.required && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive border border-destructive/20">
-                  Required
-                </span>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {/* Staff Members - Show list of existing members */}
-            {currentStepData.id === 'users' && finalRestaurantId && (
-              <StaffMembersList 
-                restaurantId={finalRestaurantId}
-                onAdd={() => {
-                  setCompletedSteps(prev => new Set([...prev, currentStep]))
-                }}
-              />
-            )}
-
-            {/* Menu Categories - Show list */}
-            {currentStepData.id === 'categories' && finalRestaurantId && currentStepData.view_only && (
-              <RestaurantDataList 
-                doctype="Menu Category"
-                restaurantId={finalRestaurantId}
-                titleField="category_name"
-              />
-            )}
-
-            {/* Menu Products - Show list */}
-            {currentStepData.id === 'products' && finalRestaurantId && currentStepData.view_only && (
-              <RestaurantDataList 
-                doctype="Menu Product"
-                restaurantId={finalRestaurantId}
-                titleField="product_name"
-              />
-            )}
-
-            {/* Default - Use DynamicForm for other steps */}
-            {currentStepData && !['users', 'categories', 'products'].includes(currentStepData.id) && (
-              <div className="bg-muted/30 rounded-md p-6 border">
-                <DynamicForm
-                  onChange={setFormHasChanges}
-                  showSaveButton={false}
-                  doctype={currentStepData.doctype}
-                  hideFields={currentStepData.id === 'restaurant' ? ['restaurant_id', 'company'] : undefined}
-                  docname={(() => {
-                    const savedData = stepData[currentStepData.id]
-                    // For restaurant, use the selected restaurant name
-                    if (currentStepData.id === 'restaurant' && selectedRestaurant) {
-                      return selectedRestaurant
-                    }
-                    // For config, use restaurant as docname (autoname: field:restaurant)
-                    if (currentStepData.id === 'config' && finalRestaurantId) {
-                      return finalRestaurantId
-                    }
-                    return savedData?.name || savedData?.restaurant_id || undefined
-                  })()}
-                  mode={(() => {
-                    // If restaurant exists, always use edit mode
-                    if (currentStepData.id === 'restaurant' && selectedRestaurant && restaurantData) {
-                      return 'edit'
-                    }
-                    // If config exists, use edit mode
-                    if (currentStepData.id === 'config' && progress?.config) {
-                      return 'edit'
-                    }
-                    // For other steps, check if completed
-                    return completedSteps.has(currentStep) ? 'edit' : 'create'
-                  })()}
-                  initialData={(() => {
-                    // For Restaurant step - load existing data
-                    if (currentStepData.id === 'restaurant' && restaurantData) {
-                      const data = { ...restaurantData }
-                      delete data.name // Remove name, it's the docname
-                      return data
-                    }
-                    
-                    // For Restaurant Config - always set restaurant and load existing data
-                    if (currentStepData.id === 'config') {
-                      const restaurantValue = finalRestaurantId || restaurantName
-                      const configData = stepData['config'] || {}
-                      return {
-                        restaurant: restaurantValue,
-                        ...configData
-                      }
-                    }
-                    
-                    // For other steps that depend on restaurant
-                    if (currentStepData.depends_on === 'restaurant') {
-                      const restaurantValue = finalRestaurantId || restaurantName
-                      const savedData = stepData[currentStepData.id]
-                      return {
-                        restaurant: restaurantValue,
-                        ...(savedData ? { ...savedData, name: undefined } : {})
-                      }
-                    }
-                    
-                    // Load saved data for completed steps
-                    if (completedSteps.has(currentStep) && stepData[currentStepData.id]) {
-                      const saved = { ...stepData[currentStepData.id] }
-                      delete saved.name
-                      return saved
-                    }
-                    
-                    return {}
-                  })()}
-                  onSave={handleStepComplete}
-                  triggerSave={triggerSave}
-                />
-              </div>
-            )}
-
-            <div className="flex justify-between mt-6 pt-6 border-t">
+            {/* Navigation Buttons - Above Heading */}
+            <div className="flex justify-between mb-6 pb-4 border-b">
               <Button
                 variant="outline"
                 onClick={handlePrevious}
@@ -984,9 +1046,161 @@ export default function SetupWizard() {
                 )}
               </div>
             </div>
+
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <CardTitle className="text-2xl mb-2">{currentStepData.title}</CardTitle>
+                <CardDescription className="text-base">{currentStepData.description}</CardDescription>
+              </div>
+              {currentStepData.required && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive border border-destructive/20">
+                  Required
+                </span>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {/* Staff Members - Show list of existing members */}
+            {currentStepData.id === 'users' && finalRestaurantId && (
+              <StaffMembersList 
+                restaurantId={finalRestaurantId}
+                onAdd={() => {
+                  setCompletedSteps(prev => new Set([...prev, currentStep]))
+                }}
+              />
+            )}
+
+            {/* Menu Categories - Show list */}
+            {currentStepData.id === 'categories' && finalRestaurantId && currentStepData.view_only && (
+              <RestaurantDataList 
+                doctype="Menu Category"
+                restaurantId={finalRestaurantId}
+                titleField="category_name"
+              />
+            )}
+
+            {/* Menu Products - Show list */}
+            {currentStepData.id === 'products' && finalRestaurantId && currentStepData.view_only && (
+              <RestaurantDataList 
+                doctype="Menu Product"
+                restaurantId={finalRestaurantId}
+                titleField="product_name"
+              />
+            )}
+
+            {/* Default - Use DynamicForm for other steps */}
+            {currentStepData && !['users', 'categories', 'products'].includes(currentStepData.id) && (
+              <div className="bg-muted/30 rounded-md p-6 border">
+                <DynamicForm
+                  onChange={setFormHasChanges}
+                  showSaveButton={false}
+                  doctype={currentStepData.doctype}
+                  hideFields={currentStepData.id === 'restaurant' 
+                    ? ['restaurant_id', 'company', 'slug', 'subdomain'] 
+                    : currentStepData.id === 'config'
+                    ? ['restaurant_name', 'description', 'currency', 'primary_color']
+                    : undefined}
+                  docname={(() => {
+                    const savedData = stepData[currentStepData.id]
+                    // For restaurant, use the selected restaurant name
+                    if (currentStepData.id === 'restaurant' && selectedRestaurant) {
+                      return selectedRestaurant
+                    }
+                    // For config, use restaurant as docname (autoname: field:restaurant)
+                    if (currentStepData.id === 'config' && finalRestaurantId) {
+                      return finalRestaurantId
+                    }
+                    return savedData?.name || savedData?.restaurant_id || undefined
+                  })()}
+                  mode={(() => {
+                    // If restaurant exists, always use edit mode
+                    if (currentStepData.id === 'restaurant' && selectedRestaurant && restaurantData) {
+                      return 'edit'
+                    }
+                    // If config exists, use edit mode
+                    if (currentStepData.id === 'config' && progress?.config) {
+                      return 'edit'
+                    }
+                    // For other steps, check if completed
+                    return completedSteps.has(currentStep) ? 'edit' : 'create'
+                  })()}
+                  initialData={(() => {
+                    // For Restaurant step - load existing data
+                    if (currentStepData.id === 'restaurant' && restaurantData) {
+                      const data = { ...restaurantData }
+                      delete data.name // Remove name, it's the docname
+                      return data
+                    }
+                    
+                    // For Restaurant Config - always set restaurant and load existing data
+                    if (currentStepData.id === 'config') {
+                      const restaurantValue = finalRestaurantId || restaurantName
+                      const configData = stepData['config'] || {}
+                      return {
+                        restaurant: restaurantValue,
+                        ...configData
+                      }
+                    }
+                    
+                    // For other steps that depend on restaurant
+                    if (currentStepData.depends_on === 'restaurant') {
+                      const restaurantValue = finalRestaurantId || restaurantName
+                      const savedData = stepData[currentStepData.id]
+                      return {
+                        restaurant: restaurantValue,
+                        ...(savedData ? { ...savedData, name: undefined } : {})
+                      }
+                    }
+                    
+                    // Load saved data for completed steps
+                    if (completedSteps.has(currentStep) && stepData[currentStepData.id]) {
+                      const saved = { ...stepData[currentStepData.id] }
+                      delete saved.name
+                      return saved
+                    }
+                    
+                    return {}
+                  })()}
+                  onSave={handleStepComplete}
+                  triggerSave={triggerSave}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
+
+      {/* Progress Modal */}
+      <Dialog open={showProgressModal} onOpenChange={setShowProgressModal}>
+        <DialogContent className="sm:max-w-[800px]">
+          <Card className="border border-border">
+            <CardHeader className="pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                <div>
+                  <CardTitle className="text-xl font-semibold text-foreground">Setup Progress</CardTitle>
+                  <CardDescription className="mt-1 text-sm text-muted-foreground">
+                    Step {currentStep + 1} of {steps.length}
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <div className="text-2xl sm:text-3xl font-bold text-primary">{Math.round(progressPercentage)}%</div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wide">Complete</div>
+                  </div>
+                </div>
+              </div>
+              <Progress value={progressPercentage} className="h-2" />
+            </CardHeader>
+            <CardContent className="pt-4 pb-6 px-4 sm:px-6">
+              <Stepper 
+                steps={stepperSteps} 
+                currentStep={currentStep}
+                onStepClick={handleStepClick}
+              />
+            </CardContent>
+          </Card>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

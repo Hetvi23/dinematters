@@ -34,7 +34,7 @@ def get_restaurant_config(restaurant_id):
 			 "logo", "hero_video", "apple_touch_icon", "color_palette_violet", "color_palette_indigo",
 			 "color_palette_blue", "color_palette_green", "color_palette_yellow", "color_palette_orange",
 			 "color_palette_red", "currency", "enable_table_booking", "enable_banquet_booking",
-			 "enable_events", "enable_offers", "enable_coupons"],
+			 "enable_events", "enable_offers", "enable_coupons", "enable_experience_lounge"],
 			as_dict=True
 		)
 		
@@ -56,7 +56,8 @@ def get_restaurant_config(restaurant_id):
 				"enable_banquet_booking": 1,
 				"enable_events": 1,
 				"enable_offers": 1,
-				"enable_coupons": 1
+				"enable_coupons": 1,
+				"enable_experience_lounge": 1
 			}
 		
 		# Build color palette
@@ -116,7 +117,8 @@ def get_restaurant_config(restaurant_id):
 				"enableBanquetBooking": bool(config.get("enable_banquet_booking", 1)),
 				"enableEvents": bool(config.get("enable_events", 1)),
 				"enableOffers": bool(config.get("enable_offers", 1)),
-				"enableCoupons": bool(config.get("enable_coupons", 1))
+				"enableCoupons": bool(config.get("enable_coupons", 1)),
+				"enableExperienceLounge": bool(config.get("enable_experience_lounge", 1))
 			}
 		}
 		

@@ -35,7 +35,8 @@
   "column_break_settings",
   "enable_events",
   "enable_offers",
-  "enable_coupons"
+  "enable_coupons",
+  "enable_experience_lounge"
  ],
  "fields": [
   {
@@ -189,6 +190,12 @@
    "fieldname": "enable_coupons",
    "fieldtype": "Check",
    "label": "Enable Coupons"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_experience_lounge",
+   "fieldtype": "Check",
+   "label": "Enable Experience Lounge"
   }
  ],
  "index_web_pages_for_search": 1,

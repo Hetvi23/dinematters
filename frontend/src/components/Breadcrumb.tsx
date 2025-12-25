@@ -44,6 +44,28 @@ export default function Breadcrumb() {
       'Restaurant': 'Restaurants',
     }
 
+    // Special handling for Setup Wizard page - add restaurant name if available
+    if (segments[0] === 'setup' && segments.length > 1) {
+      breadcrumbs.push({
+        label: 'Setup Wizard',
+        href: '/setup'
+      })
+      
+      // Get restaurant name from URL (second segment)
+      const restaurantNameFromUrl = decodeLabel(segments[1])
+      // Convert URL-friendly name back to readable format (replace hyphens with spaces, capitalize)
+      const restaurantName = restaurantNameFromUrl
+        .replace(/-/g, ' ')
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ')
+      
+      breadcrumbs.push({
+        label: `${restaurantName} wizard`
+      })
+      return breadcrumbs
+    }
+
     // Check if this is a module route (doctype that's not in the standard routes)
     const isModuleRoute = segments.length === 1 && 
       !['dashboard', 'setup', 'modules', 'orders', 'products', 'categories'].includes(segments[0]) &&

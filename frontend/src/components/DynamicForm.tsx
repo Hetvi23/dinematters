@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ColorPaletteSelector } from '@/components/ui/color-palette-selector'
+import { DatePicker } from '@/components/ui/date-picker'
 import { useFrappeGetDoc, useFrappePostCall, useFrappeGetDocList } from '@/lib/frappe'
 import { toast } from 'sonner'
 import { Loader2, Check } from 'lucide-react'
@@ -402,6 +403,89 @@ export default function DynamicForm({
     }
   }
 
+  // Helper function to enhance description with example values
+  const getEnhancedDescription = (field: DocTypeField, doctype: string): string => {
+    if (!field.description) return ''
+    
+    const fieldname = field.fieldname.toLowerCase()
+    const fieldLabel = field.label.toLowerCase()
+    
+    // Restaurant doctype specific examples
+    if (doctype === 'Restaurant') {
+      const examples: Record<string, string> = {
+        'restaurant_name': ' (e.g., Pizza Palace)',
+        'subdomain': ' (e.g., pizza-palace-nyc)',
+        'slug': ' (e.g., pizza-palace)',
+        'owner_email': ' (e.g., owner@restaurant.com)',
+        'owner_phone': ' (e.g., +1 (555) 123-4567)',
+        'owner_name': ' (e.g., John Smith)',
+        'address': ' (e.g., 123 Main Street)',
+        'city': ' (e.g., New York)',
+        'state': ' (e.g., New York)',
+        'zip_code': ' (e.g., 10001)',
+        'tax_rate': ' (e.g., 18 for 18%)',
+        'default_delivery_fee': ' (e.g., 5.00)',
+        'timezone': ' (e.g., America/New_York)',
+        'tables': ' (e.g., 20)',
+        'description': ' (e.g., A cozy Italian restaurant serving authentic pizza...)'
+      }
+      return field.description + (examples[fieldname] || '')
+    }
+    
+    // Restaurant Config doctype specific examples
+    if (doctype === 'Restaurant Config') {
+      const examples: Record<string, string> = {
+        'restaurant_name': ' (e.g., Pizza Palace)',
+        'tagline': ' (e.g., Authentic Italian Cuisine)',
+        'subtitle': ' (e.g., Since 1995)',
+        'description': ' (e.g., Experience the finest Italian dining...)',
+        'primary_color': ' (e.g., #ea580c)',
+        'hero_video': ' (e.g., https://example.com/video.mp4)'
+      }
+      return field.description + (examples[fieldname] || '')
+    }
+    
+    // Generic examples based on field type and name
+    if (fieldname.includes('email') || fieldLabel.includes('email')) {
+      return field.description + ' (e.g., owner@restaurant.com)'
+    }
+    if (fieldname.includes('phone') || fieldLabel.includes('phone')) {
+      return field.description + ' (e.g., +1 (555) 123-4567)'
+    }
+    if (fieldname.includes('name') && !fieldname.includes('restaurant')) {
+      return field.description + ' (e.g., John Smith)'
+    }
+    if (fieldname.includes('address') || fieldLabel.includes('address')) {
+      return field.description + ' (e.g., 123 Main Street)'
+    }
+    if (fieldname.includes('city') || fieldLabel.includes('city')) {
+      return field.description + ' (e.g., New York)'
+    }
+    if (fieldname.includes('state') || fieldLabel.includes('state')) {
+      return field.description + ' (e.g., California)'
+    }
+    if (fieldname.includes('zip') || fieldname.includes('postal')) {
+      return field.description + ' (e.g., 10001)'
+    }
+    if (fieldname.includes('rate') || fieldname.includes('percent')) {
+      return field.description + ' (e.g., 18)'
+    }
+    if (fieldname.includes('fee') || fieldname.includes('price') || fieldname.includes('cost')) {
+      return field.description + ' (e.g., 10.00)'
+    }
+    if (fieldname.includes('url') || fieldname.includes('link')) {
+      return field.description + ' (e.g., https://example.com)'
+    }
+    if (fieldname.includes('timezone')) {
+      return field.description + ' (e.g., America/New_York)'
+    }
+    if (fieldname.includes('table')) {
+      return field.description + ' (e.g., 20)'
+    }
+    
+    return field.description
+  }
+
   const renderField = (field: DocTypeField) => {
     if (field.hidden) return null
     if (actualMode === 'view' && field.read_only) return null
@@ -445,6 +529,75 @@ export default function DynamicForm({
           // Hide all other color palette fields - we only use one field to store the selected color
           return null
         }
+        
+        // Special handling for hero_video - render as file upload instead of URL input
+        if (field.fieldname === 'hero_video') {
+          return (
+            <div key={field.fieldname} className="space-y-2">
+              <Label htmlFor={field.fieldname}>
+                {field.label.replace('URL', '')}
+                {field.required && <span className="text-destructive">*</span>}
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id={field.fieldname}
+                  type="file"
+                  accept="video/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+
+                    try {
+                      // Upload file to Frappe
+                      const formData = new FormData()
+                      formData.append('file', file)
+                      formData.append('is_private', '0')
+                      formData.append('folder', 'Home/Attachments')
+
+                      const csrfToken = (window as any).frappe?.csrf_token || (window as any).csrf_token
+
+                      const response = await fetch('/api/method/upload_file', {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                          'X-Frappe-CSRF-Token': csrfToken,
+                        },
+                      })
+
+                      if (!response.ok) {
+                        const error = await response.json()
+                        throw new Error(error.message?.message || error.message || 'Upload failed')
+                      }
+
+                      const result = await response.json()
+                      const fileUrl = result.message?.file_url || result.message?.name || ''
+                      handleFieldChange(field.fieldname, fileUrl)
+                      toast.success('Video uploaded successfully')
+                    } catch (error: any) {
+                      toast.error(error?.message || 'Failed to upload video')
+                    } finally {
+                      // Reset input
+                      e.target.value = ''
+                    }
+                  }}
+                  readOnly={isReadOnly}
+                  required={field.required}
+                  disabled={isReadOnly}
+                  className="cursor-pointer"
+                />
+                {value && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Uploaded: {value.split('/').pop()}</span>
+                  </div>
+                )}
+              </div>
+              {field.description && (
+                <p className="text-xs text-muted-foreground">Choose a video file from your local system</p>
+              )}
+            </div>
+          )
+        }
+        
         return (
           <div key={field.fieldname} className="space-y-2">
             <Label htmlFor={field.fieldname}>
@@ -457,10 +610,9 @@ export default function DynamicForm({
               onChange={(e) => handleFieldChange(field.fieldname, e.target.value)}
               readOnly={isReadOnly}
               required={field.required}
-              placeholder={field.description}
             />
             {field.description && (
-              <p className="text-xs text-muted-foreground">{field.description}</p>
+              <p className="text-xs text-muted-foreground">{getEnhancedDescription(field, doctype)}</p>
             )}
           </div>
         )
@@ -479,11 +631,10 @@ export default function DynamicForm({
               onChange={(e) => handleFieldChange(field.fieldname, e.target.value)}
               readOnly={isReadOnly}
               required={field.required}
-              placeholder={field.description}
               rows={4}
             />
             {field.description && (
-              <p className="text-xs text-muted-foreground">{field.description}</p>
+              <p className="text-xs text-muted-foreground">{getEnhancedDescription(field, doctype)}</p>
             )}
           </div>
         )
@@ -554,27 +705,26 @@ export default function DynamicForm({
               onChange={(e) => handleFieldChange(field.fieldname, parseFloat(e.target.value) || 0)}
               readOnly={isReadOnly}
               required={field.required}
-              placeholder={field.description}
             />
+            {field.description && (
+              <p className="text-xs text-muted-foreground">{getEnhancedDescription(field, doctype)}</p>
+            )}
           </div>
         )
 
       case 'Date':
         return (
-          <div key={field.fieldname} className="space-y-2">
-            <Label htmlFor={field.fieldname}>
-              {field.label}
-              {field.required && <span className="text-destructive">*</span>}
-            </Label>
-            <Input
-              id={field.fieldname}
-              type="date"
-              value={value}
-              onChange={(e) => handleFieldChange(field.fieldname, e.target.value)}
-              readOnly={isReadOnly}
-              required={field.required}
-            />
-          </div>
+          <DatePicker
+            key={field.fieldname}
+            id={field.fieldname}
+            value={value || ''}
+            onChange={(dateValue) => handleFieldChange(field.fieldname, dateValue)}
+            placeholder="Select a date"
+            required={field.required}
+            readOnly={isReadOnly}
+            label={field.label}
+            description={field.description ? getEnhancedDescription(field, doctype) : undefined}
+          />
         )
 
       case 'Time':
@@ -768,8 +918,10 @@ export default function DynamicForm({
               onChange={(e) => handleFieldChange(field.fieldname, e.target.value)}
               readOnly={isReadOnly}
               required={field.required}
-              placeholder={field.description}
             />
+            {field.description && (
+              <p className="text-xs text-muted-foreground">{getEnhancedDescription(field, doctype)}</p>
+            )}
           </div>
         )
     }
@@ -813,7 +965,13 @@ export default function DynamicForm({
   }
 
   // Group fields by sections (simplified - in real implementation, parse section breaks)
-  const visibleFields = (meta.fields || []).filter(f => !f.hidden && !hideFields.includes(f.fieldname))
+  // Filter out hidden fields, Column Breaks, Section Breaks, and fields in hideFields
+  const visibleFields = (meta.fields || []).filter(f => 
+    !f.hidden && 
+    !hideFields.includes(f.fieldname) &&
+    f.fieldtype !== 'Column Break' &&
+    f.fieldtype !== 'Section Break'
+  )
 
   // Calculate required fields validation
   const requiredFields = visibleFields.filter(f => f.required)

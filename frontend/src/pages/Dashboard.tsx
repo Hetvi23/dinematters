@@ -332,7 +332,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between sm:flex-col sm:items-end sm:text-right sm:ml-4 gap-2">
                       <p className="font-medium text-foreground">₹{order.total || 0}</p>
                       <div className="flex flex-col sm:block items-end sm:items-start gap-1">
-                        <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-muted-foreground">
                         {new Date(order.creation).toLocaleDateString()}
                       </p>
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${getStatusColor(order.status || 'Pending')}`}>
