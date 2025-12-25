@@ -146,17 +146,17 @@ export default function Breadcrumb() {
           return (
             <li key={index} className="flex items-center gap-1.5">
               {index > 0 && (
-                <ChevronRight className="h-3.5 w-3.5 text-[#605e5c] flex-shrink-0" />
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
               )}
               {isLast ? (
-                <span className="text-[#323130] font-medium truncate max-w-[200px]">
+                <span className="text-foreground font-medium truncate max-w-[200px]">
                   {crumb.label}
                 </span>
               ) : (
                 <Link
                   to={crumb.href || '#'}
                   className={cn(
-                    "text-[#605e5c] hover:text-[#323130] transition-colors truncate max-w-[200px]",
+                    "text-muted-foreground hover:text-foreground transition-colors truncate max-w-[200px]",
                     "hover:underline"
                   )}
                 >

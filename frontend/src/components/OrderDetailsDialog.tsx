@@ -31,19 +31,19 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'delivered':
-        return 'bg-green-100 text-green-800'
+        return 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784]'
       case 'cancelled':
-        return 'bg-red-100 text-red-800'
+        return 'bg-[#fde7e9] dark:bg-[#b71c1c] text-[#d13438] dark:text-[#ef5350]'
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800'
+        return 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44]'
       case 'confirmed':
-        return 'bg-blue-100 text-blue-800'
+        return 'bg-orange-50 dark:bg-primary/20 text-primary dark:text-primary/80'
       case 'preparing':
-        return 'bg-purple-100 text-purple-800'
+        return 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8]'
       case 'ready':
-        return 'bg-indigo-100 text-indigo-800'
+        return 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-300'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-muted text-muted-foreground'
     }
   }
 
@@ -87,19 +87,19 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                       const hasCustomizations = customizations && Object.keys(customizations).length > 0
 
                       return (
-                        <div key={index} className="border-b pb-3 last:border-0 last:pb-0">
+                        <div key={index} className="border-b border-border pb-3 last:border-0 last:pb-0">
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
-                              <p className="font-medium">{item.product || 'N/A'}</p>
+                              <p className="font-medium text-foreground">{item.product || 'N/A'}</p>
                               <p className="text-xs text-muted-foreground">
                                 Qty: {item.quantity || 1} × ₹{item.unit_price || 0}
                               </p>
                             </div>
-                            <p className="font-semibold">₹{item.total_price || item.unit_price || 0}</p>
+                            <p className="font-semibold text-foreground">₹{item.total_price || item.unit_price || 0}</p>
                           </div>
                           
                           {hasCustomizations && (
-                            <div className="mt-2 pl-2 border-l-2 border-gray-200">
+                            <div className="mt-2 pl-2 border-l-2 border-border">
                               <div className="space-y-0.5">
                                 {Object.entries(customizations).map(([questionId, optionIds]: [string, any]) => {
                                   const options = Array.isArray(optionIds) ? optionIds : [optionIds]
@@ -133,7 +133,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                 {order.discount && order.discount > 0 && (
                   <div className="flex justify-between text-sm">
                     <p className="text-muted-foreground">Discount</p>
-                    <p className="font-medium text-green-600">-₹{order.discount}</p>
+                    <p className="font-medium text-[#107c10] dark:text-[#81c784]">-₹{order.discount}</p>
                   </div>
                 )}
                 {order.tax && order.tax > 0 && (
@@ -149,13 +149,13 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                   </div>
                 )}
                 {(order.coupon || coupon) && (
-                  <div className="flex justify-between items-center text-sm bg-green-50 p-2 rounded">
+                  <div className="flex justify-between items-center text-sm bg-[#dff6dd] dark:bg-[#1b5e20] p-2 rounded-md border border-[#92c5f7] dark:border-[#4caf50]">
                     <div>
                       <p className="text-xs text-muted-foreground">Coupon</p>
-                      <p className="font-semibold text-green-700">{coupon?.code || order.coupon || 'N/A'}</p>
+                      <p className="font-semibold text-[#107c10] dark:text-[#81c784]">{coupon?.code || order.coupon || 'N/A'}</p>
                     </div>
                     {coupon && (
-                      <p className="font-semibold text-green-600">
+                      <p className="font-semibold text-[#107c10] dark:text-[#81c784]">
                         {coupon.discount_type === 'percent' 
                           ? `-${coupon.discount_value}%` 
                           : `-₹${coupon.discount_value}`}
@@ -163,9 +163,9 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                     )}
                   </div>
                 )}
-                <div className="flex justify-between border-t pt-2 mt-2">
-                  <p className="font-semibold">Total</p>
-                  <p className="font-bold text-lg">₹{order.total || 0}</p>
+                <div className="flex justify-between border-t border-border pt-2 mt-2">
+                  <p className="font-semibold text-foreground">Total</p>
+                  <p className="font-bold text-lg text-foreground">₹{order.total || 0}</p>
                 </div>
               </CardContent>
             </Card>

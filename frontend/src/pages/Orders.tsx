@@ -183,8 +183,8 @@ export default function Orders() {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-semibold text-[#323130] tracking-tight">Orders</h2>
-          <p className="text-[#605e5c] text-sm mt-1">
+          <h2 className="text-xl sm:text-2xl font-semibold text-foreground tracking-tight">Orders</h2>
+          <p className="text-muted-foreground text-sm mt-1">
             Manage and track all restaurant orders
           </p>
         </div>
@@ -227,7 +227,7 @@ export default function Orders() {
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {/* Search */}
               <div className="relative md:col-span-2">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-[#605e5c]" />
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search order number..."
                   value={searchQuery}
@@ -314,17 +314,17 @@ export default function Orders() {
       <Card>
         <CardContent className="pt-6">
           {isLoading ? (
-            <div className="text-center py-8 text-[#605e5c]">Loading orders...</div>
+            <div className="text-center py-8 text-muted-foreground">Loading orders...</div>
           ) : filteredOrders && filteredOrders.length > 0 ? (
             <>
               {/* Kanban View - Desktop Only */}
               {viewType === 'kanban' && (
                 <div className="hidden md:block">
-                  <OrdersKanban 
-                    orders={filteredOrders} 
-                    onCheckOrder={handleCheckOrder}
-                    onOrderUpdate={() => mutate()}
-                  />
+              <OrdersKanban 
+                orders={filteredOrders} 
+                onCheckOrder={handleCheckOrder}
+                onOrderUpdate={() => mutate()}
+              />
                 </div>
               )}
               
@@ -334,11 +334,11 @@ export default function Orders() {
                   {/* Mobile Card View */}
                   <div className="md:hidden space-y-3">
                   {filteredOrders.map((order: any) => (
-                    <div key={order.name} className="p-4 border border-[#edebe9] rounded-md bg-white hover:border-[#c8c6c4] transition-colors">
+                    <div key={order.name} className="p-4 border border-border rounded-md bg-card hover:border-border/80 transition-colors">
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-[#323130] truncate">{order.order_number || order.name}</h3>
-                          <p className="text-sm text-[#605e5c] mt-1">
+                          <h3 className="font-semibold text-foreground truncate">{order.order_number || order.name}</h3>
+                          <p className="text-sm text-muted-foreground mt-1">
                             {order.creation ? new Date(order.creation).toLocaleString('en-IN', {
                               day: '2-digit',
                               month: 'short',
@@ -354,13 +354,13 @@ export default function Orders() {
                         >
                           <SelectTrigger className={cn(
                             "h-7 w-[110px] text-xs border-0 shadow-none",
-                            order.status === 'delivered' ? 'bg-[#dff6dd] text-[#107c10] hover:bg-[#c8e6c9]' :
-                            order.status === 'cancelled' ? 'bg-[#fde7e9] text-[#d13438] hover:bg-[#fcc5c9]' :
-                            order.status === 'pending' ? 'bg-[#fff4ce] text-[#ca5010] hover:bg-[#ffe69d]' :
-                            order.status === 'confirmed' ? 'bg-orange-50 text-[#ea580c] hover:bg-orange-100' :
-                            order.status === 'preparing' ? 'bg-[#e8d5ff] text-[#8764b8] hover:bg-[#d4b9e8]' :
-                            order.status === 'ready' ? 'bg-[#cce5ff] text-[#004578] hover:bg-[#99ccff]' :
-                            'bg-[#f3f2f1] text-[#605e5c] hover:bg-[#edebe9]'
+                            order.status === 'delivered' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
+                            order.status === 'cancelled' ? 'bg-[#fde7e9] dark:bg-[#b71c1c] text-[#d13438] dark:text-[#ef5350] hover:bg-[#fcc5c9] dark:hover:bg-[#c62828]' :
+                            order.status === 'pending' ? 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44] hover:bg-[#ffe69d] dark:hover:bg-[#ca5010]/30' :
+                            order.status === 'confirmed' ? 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#ea580c] dark:text-[#ff8c42] hover:bg-orange-100 dark:hover:bg-[#ea580c]/30' :
+                            order.status === 'preparing' ? 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] hover:bg-[#d4b9e8] dark:hover:bg-[#6a1b9a]' :
+                            order.status === 'ready' ? 'bg-[#cce5ff] dark:bg-[#0d47a1] text-[#004578] dark:text-[#64b5f6] hover:bg-[#99ccff] dark:hover:bg-[#1565c0]' :
+                            'bg-muted text-muted-foreground hover:bg-accent'
                           )}>
                             <SelectValue>
                               <span className="capitalize">{order.status || 'pending'}</span>
@@ -378,16 +378,16 @@ export default function Orders() {
                       </div>
                       <div className="flex items-center gap-3 mb-3 flex-wrap">
                         {order.table_number && (
-                          <span className="inline-flex items-center rounded px-2 py-1 text-xs font-medium bg-[#e8d5ff] text-[#8764b8] border border-[#d4b9e8]">
+                          <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a]">
                             Table {order.table_number}
                           </span>
                         )}
                         {order.coupon && (
-                          <span className="inline-flex items-center rounded px-2 py-1 text-xs font-medium bg-[#dff6dd] text-[#107c10] border border-[#92c5f7]">
+                          <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] border border-[#92c5f7] dark:border-[#4caf50]">
                             {order.coupon}
                           </span>
                         )}
-                        <span className="text-lg font-semibold text-[#323130] ml-auto">₹{order.total || 0}</span>
+                        <span className="text-lg font-semibold text-foreground ml-auto">₹{order.total || 0}</span>
                       </div>
                       <Button
                         variant="outline"
@@ -404,36 +404,36 @@ export default function Orders() {
 
                 {/* Desktop Table View */}
                 <div className="hidden md:block overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Order Number</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Table</TableHead>
-                        <TableHead>Coupon</TableHead>
-                        <TableHead>Total</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Food Order</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredOrders.map((order: any) => (
-                        <TableRow key={order.name}>
-                          <TableCell className="font-medium">{order.order_number || order.name}</TableCell>
-                          <TableCell>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order Number</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Table</TableHead>
+                    <TableHead>Coupon</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Food Order</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredOrders.map((order: any) => (
+                    <TableRow key={order.name}>
+                      <TableCell className="font-medium">{order.order_number || order.name}</TableCell>
+                      <TableCell>
                             <Select
                               value={order.status || 'pending'}
                               onValueChange={(newStatus) => handleStatusChange(order.name, newStatus)}
                             >
                               <SelectTrigger className={cn(
                                 "h-7 w-[120px] text-xs border-0 shadow-none",
-                                order.status === 'delivered' ? 'bg-[#dff6dd] text-[#107c10] hover:bg-[#c8e6c9]' :
-                                order.status === 'cancelled' ? 'bg-[#fde7e9] text-[#d13438] hover:bg-[#fcc5c9]' :
-                                order.status === 'pending' ? 'bg-[#fff4ce] text-[#ca5010] hover:bg-[#ffe69d]' :
-                                order.status === 'confirmed' ? 'bg-orange-50 text-[#ea580c] hover:bg-orange-100' :
-                                order.status === 'preparing' ? 'bg-[#e8d5ff] text-[#8764b8] hover:bg-[#d4b9e8]' :
-                                order.status === 'ready' ? 'bg-[#cce5ff] text-[#004578] hover:bg-[#99ccff]' :
-                                'bg-[#f3f2f1] text-[#605e5c] hover:bg-[#edebe9]'
+                                order.status === 'delivered' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
+                                order.status === 'cancelled' ? 'bg-[#fde7e9] dark:bg-[#b71c1c] text-[#d13438] dark:text-[#ef5350] hover:bg-[#fcc5c9] dark:hover:bg-[#c62828]' :
+                                order.status === 'pending' ? 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44] hover:bg-[#ffe69d] dark:hover:bg-[#ca5010]/30' :
+                                order.status === 'confirmed' ? 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#ea580c] dark:text-[#ff8c42] hover:bg-orange-100 dark:hover:bg-[#ea580c]/30' :
+                                order.status === 'preparing' ? 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] hover:bg-[#d4b9e8] dark:hover:bg-[#6a1b9a]' :
+                                order.status === 'ready' ? 'bg-[#cce5ff] dark:bg-[#0d47a1] text-[#004578] dark:text-[#64b5f6] hover:bg-[#99ccff] dark:hover:bg-[#1565c0]' :
+                                'bg-muted text-muted-foreground hover:bg-accent'
                               )}>
                                 <SelectValue>
                                   <span className="capitalize">{order.status || 'pending'}</span>
@@ -448,58 +448,58 @@ export default function Orders() {
                                 <SelectItem value="cancelled">Cancelled</SelectItem>
                               </SelectContent>
                             </Select>
-                          </TableCell>
-                          <TableCell>
-                            {order.table_number ? (
-                              <span className="inline-flex items-center rounded px-2 py-1 text-xs font-medium bg-[#e8d5ff] text-[#8764b8] border border-[#d4b9e8]">
-                                Table {order.table_number}
-                              </span>
-                            ) : (
-                              <span className="text-[#605e5c]">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {order.coupon ? (
-                              <span className="inline-flex items-center rounded px-2 py-1 text-xs font-medium bg-[#dff6dd] text-[#107c10] border border-[#92c5f7]">
-                                {order.coupon}
-                              </span>
-                            ) : (
-                              <span className="text-[#605e5c]">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="font-medium text-[#323130]">₹{order.total || 0}</TableCell>
-                          <TableCell className="text-[#605e5c]">
-                            {order.creation ? new Date(order.creation).toLocaleString('en-IN', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            }) : 'N/A'}
-                          </TableCell>
-                          <TableCell>
-                            <Button
+                      </TableCell>
+                      <TableCell>
+                        {order.table_number ? (
+                              <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a]">
+                            Table {order.table_number}
+                          </span>
+                        ) : (
+                              <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {order.coupon ? (
+                              <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] border border-[#92c5f7] dark:border-[#4caf50]">
+                            {order.coupon}
+                          </span>
+                        ) : (
+                              <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                          <TableCell className="font-medium text-foreground">₹{order.total || 0}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                        {order.creation ? new Date(order.creation).toLocaleString('en-IN', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }) : 'N/A'}
+                      </TableCell>
+                      <TableCell>
+                        <Button
                               variant="outline"
-                              size="sm"
-                              onClick={() => handleCheckOrder(order.name)}
-                            >
+                          size="sm"
+                          onClick={() => handleCheckOrder(order.name)}
+                        >
                               <Eye className="h-4 w-4" />
                               <span className="hidden sm:inline ml-1">View</span>
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
                 </div>
                 </>
               )}
             </>
           ) : (
-            <div className="text-center py-12 text-[#605e5c]">
+            <div className="text-center py-12 text-muted-foreground">
               <p className="text-sm">No orders found</p>
               {hasActiveFilters && (
-                <p className="text-xs mt-2 text-[#a19f9d]">Try adjusting your filters</p>
+                <p className="text-xs mt-2 text-muted-foreground/70">Try adjusting your filters</p>
               )}
             </div>
           )}

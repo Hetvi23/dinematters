@@ -10,8 +10,10 @@ import DynamicForm from '@/components/DynamicForm'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { useFrappePostCall } from '@/lib/frappe'
+import { useConfirm } from '@/hooks/useConfirm'
 
 export default function ModuleList() {
+  const { confirm, ConfirmDialogComponent } = useConfirm()
   const { doctype } = useParams<{ doctype: string }>()
   const { permissions } = usePermissions(doctype || '')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -30,7 +32,15 @@ export default function ModuleList() {
   const { call: deleteDoc } = useFrappePostCall('frappe.client.delete')
 
   const handleDelete = async (docname: string) => {
-    if (!confirm(`Are you sure you want to delete this ${doctype}?`)) return
+    const confirmed = await confirm({
+      title: 'Delete Record',
+      description: `Are you sure you want to delete this ${doctype}? This action cannot be undone.`,
+      variant: 'destructive',
+      confirmText: 'Delete',
+      cancelText: 'Cancel'
+    })
+
+    if (!confirmed) return
 
     try {
       await deleteDoc({

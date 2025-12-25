@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button'
 import { ArrowLeft, Edit, Trash2, QrCode, Download, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
+import { useConfirm } from '@/hooks/useConfirm'
 
 export default function ModuleDetail() {
+  const { confirm, ConfirmDialogComponent } = useConfirm()
   const { doctype, docname } = useParams<{ doctype: string; docname: string }>()
   const navigate = useNavigate()
   const { permissions } = usePermissions(doctype || '')
@@ -36,7 +38,15 @@ export default function ModuleDetail() {
   }, [doctype, docname, doc?.tables])
 
   const handleDelete = async () => {
-    if (!confirm(`Are you sure you want to delete this ${doctype}?`)) return
+    const confirmed = await confirm({
+      title: 'Delete Record',
+      description: `Are you sure you want to delete this ${doctype}? This action cannot be undone.`,
+      variant: 'destructive',
+      confirmText: 'Delete',
+      cancelText: 'Cancel'
+    })
+
+    if (!confirmed) return
 
     try {
       await deleteDoc({
@@ -172,6 +182,7 @@ export default function ModuleDetail() {
         }}
         onCancel={() => setMode('view')}
       />
+      {ConfirmDialogComponent}
     </div>
   )
 }

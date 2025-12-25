@@ -37,8 +37,8 @@ export default function Modules() {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-[#605e5c]" />
-          <p className="text-sm text-[#605e5c]">Loading modules...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Loading modules...</p>
         </div>
       </div>
     )
@@ -53,51 +53,51 @@ export default function Modules() {
   }> = {
     'Restaurant Setup': { 
       icon: Building2, 
-      color: 'text-[#ea580c]', 
-      bgColor: 'bg-orange-50',
-      borderColor: 'border-orange-200'
+      color: 'text-[#ea580c] dark:text-[#ff8c42]', 
+      bgColor: 'bg-orange-50 dark:bg-[#ea580c]/20',
+      borderColor: 'border-orange-200 dark:border-[#ea580c]/40'
     },
     'Menu Management': { 
       icon: UtensilsCrossed, 
-      color: 'text-[#107c10]', 
-      bgColor: 'bg-[#dff6dd]',
-      borderColor: 'border-[#92c5f7]'
+      color: 'text-[#107c10] dark:text-[#81c784]', 
+      bgColor: 'bg-[#dff6dd] dark:bg-[#1b5e20]',
+      borderColor: 'border-[#92c5f7] dark:border-[#4caf50]'
     },
     'Orders': { 
       icon: ShoppingCart, 
-      color: 'text-[#004578]', 
-      bgColor: 'bg-[#cce5ff]',
-      borderColor: 'border-[#99ccff]'
+      color: 'text-[#004578] dark:text-[#64b5f6]', 
+      bgColor: 'bg-[#cce5ff] dark:bg-[#0d47a1]',
+      borderColor: 'border-[#99ccff] dark:border-[#1565c0]'
     },
     'Bookings': { 
       icon: Calendar, 
-      color: 'text-[#8764b8]', 
-      bgColor: 'bg-[#e8d5ff]',
-      borderColor: 'border-[#d4b9e8]'
+      color: 'text-[#8764b8] dark:text-[#ba68c8]', 
+      bgColor: 'bg-[#e8d5ff] dark:bg-[#4a148c]',
+      borderColor: 'border-[#d4b9e8] dark:border-[#6a1b9a]'
     },
     'Marketing & Promotions': { 
       icon: TrendingUp, 
-      color: 'text-[#d13438]', 
-      bgColor: 'bg-[#fde7e9]',
-      borderColor: 'border-[#f4c2c4]'
+      color: 'text-[#d13438] dark:text-[#ef5350]', 
+      bgColor: 'bg-[#fde7e9] dark:bg-[#b71c1c]',
+      borderColor: 'border-[#f4c2c4] dark:border-[#d32f2f]'
     },
     'Legacy': { 
       icon: Grid3x3, 
-      color: 'text-[#605e5c]', 
-      bgColor: 'bg-[#f3f2f1]',
-      borderColor: 'border-[#edebe9]'
+      color: 'text-muted-foreground', 
+      bgColor: 'bg-muted',
+      borderColor: 'border-border'
     },
     'Tools': { 
       icon: Settings, 
-      color: 'text-[#ca5010]', 
-      bgColor: 'bg-[#fff4ce]',
-      borderColor: 'border-[#ffe69d]'
+      color: 'text-[#ca5010] dark:text-[#ffaa44]', 
+      bgColor: 'bg-[#fff4ce] dark:bg-[#ca5010]/20',
+      borderColor: 'border-[#ffe69d] dark:border-[#ca5010]/40'
     },
     'Other': { 
       icon: Package, 
-      color: 'text-[#605e5c]', 
-      bgColor: 'bg-[#f3f2f1]',
-      borderColor: 'border-[#edebe9]'
+      color: 'text-muted-foreground', 
+      bgColor: 'bg-muted',
+      borderColor: 'border-border'
     },
   }
 
@@ -106,14 +106,14 @@ export default function Modules() {
       {/* Header Section */}
       <div className="space-y-2">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-md bg-orange-50">
-            <Grid3x3 className="h-5 w-5 text-[#ea580c]" />
+          <div className="p-2.5 rounded-md bg-orange-50 dark:bg-[#ea580c]/20">
+            <Grid3x3 className="h-5 w-5 text-[#ea580c] dark:text-[#ff8c42]" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-semibold text-[#323130] tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">
             All Modules
           </h1>
         </div>
-        <p className="text-sm text-[#605e5c] pl-11">
+        <p className="text-sm text-muted-foreground pl-11">
           Access and manage all dinematters modules. Permissions are automatically enforced based on your role.
         </p>
       </div>
@@ -129,13 +129,13 @@ export default function Modules() {
         return (
           <div key={category} className="space-y-4">
             {/* Category Header */}
-            <div className="flex items-center gap-3 pb-3 border-b border-[#edebe9]">
+            <div className="flex items-center gap-3 pb-3 border-b border-border">
               <div className={cn("p-2 rounded-md", config.bgColor, config.borderColor, "border")}>
                 <CategoryIcon className={cn("h-4 w-4", config.color)} />
               </div>
               <div className="flex items-center gap-3 flex-1">
-                <h2 className="text-lg font-semibold text-[#323130]">{category}</h2>
-                <span className="text-xs text-[#605e5c] font-medium bg-[#f3f2f1] px-2 py-0.5 rounded-md">
+                <h2 className="text-lg font-semibold text-foreground">{category}</h2>
+                <span className="text-xs text-muted-foreground font-medium bg-muted px-2 py-0.5 rounded-md">
                   {doctypeArray.length} {doctypeArray.length === 1 ? 'module' : 'modules'}
                 </span>
               </div>
@@ -159,15 +159,15 @@ export default function Modules() {
       
       {/* Empty State */}
       {!hasCategories && (
-        <Card className="border border-[#edebe9]">
+        <Card className="border border-border">
           <CardContent className="py-16 sm:py-20 text-center">
             <div className="flex flex-col items-center gap-4 max-w-md mx-auto">
-              <div className="p-4 rounded-full bg-[#f3f2f1]">
-                <Grid3x3 className="h-8 w-8 text-[#605e5c]" />
+              <div className="p-4 rounded-full bg-muted">
+                <Grid3x3 className="h-8 w-8 text-muted-foreground" />
               </div>
               <div className="space-y-2">
-                <h3 className="text-lg font-semibold text-[#323130]">No modules available</h3>
-                <p className="text-sm text-[#605e5c]">
+                <h3 className="text-lg font-semibold text-foreground">No modules available</h3>
+                <p className="text-sm text-muted-foreground">
                   Please check your permissions or contact your administrator to get access to modules.
                 </p>
               </div>
@@ -218,10 +218,10 @@ function ModuleCard({
       )}
     >
       <Card className={cn(
-        "h-full transition-all duration-200 border border-[#edebe9] bg-white",
-        "hover:shadow-md hover:border-[#c8c6c4]",
+        "h-full transition-all duration-200 border border-border bg-card",
+        "hover:shadow-md hover:border-border/80",
         hasAccess 
-          ? "cursor-pointer hover:bg-[#faf9f8]" 
+          ? "cursor-pointer hover:bg-muted" 
           : "opacity-50 border-dashed"
       )}>
         <CardContent className="p-3">
@@ -229,11 +229,11 @@ function ModuleCard({
             {/* Icon */}
             <div className={cn(
               "p-1.5 rounded-md flex-shrink-0",
-              hasAccess ? categoryBgColor : "bg-[#f3f2f1]"
+              hasAccess ? categoryBgColor : "bg-muted"
             )}>
               <ModuleIcon className={cn(
                 "h-3.5 w-3.5",
-                hasAccess ? categoryColor : "text-[#a19f9d]"
+                hasAccess ? categoryColor : "text-muted-foreground"
               )} />
             </div>
 
@@ -241,14 +241,14 @@ function ModuleCard({
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2">
                 <h3 className={cn(
-                  "text-sm font-semibold text-[#323130] leading-snug",
-                  "group-hover:text-[#201f1e] transition-colors",
+                  "text-sm font-semibold text-foreground leading-snug",
+                  "group-hover:text-foreground transition-colors",
                   "line-clamp-1"
                 )}>
                   {displayLabel}
                 </h3>
                 {!hasAccess && (
-                  <Lock className="h-3.5 w-3.5 text-[#a19f9d] flex-shrink-0" />
+                  <Lock className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                 )}
                 {hasAccess && (
                   <ChevronRight className={cn(
@@ -258,7 +258,7 @@ function ModuleCard({
                   )} />
                 )}
               </div>
-              <p className="text-xs text-[#605e5c] font-normal truncate mt-0.5">
+              <p className="text-xs text-muted-foreground font-normal truncate mt-0.5">
                 {doctype}
               </p>
             </div>
@@ -268,7 +268,10 @@ function ModuleCard({
           {hasAccess && (
             <div className={cn(
               "mt-2.5 h-0.5 rounded-full transition-all duration-200",
-              categoryColor.replace('text-', 'bg-'),
+              // Extract the first color class and convert to bg
+              categoryColor.includes('text-') 
+                ? categoryColor.split(' ')[0].replace('text-', 'bg-')
+                : 'bg-primary',
               "w-0 group-hover:w-full"
             )} />
           )}

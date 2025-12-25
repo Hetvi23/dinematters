@@ -1,9 +1,10 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, Menu, X, Lock, LockOpen, ChevronDown, TrendingUp, TrendingDown, DollarSign, Clock, AlertCircle, Activity } from 'lucide-react'
+import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, Menu, X, Lock, LockOpen, ChevronDown, TrendingUp, TrendingDown, DollarSign, Clock, AlertCircle, Activity, Moon, Sun } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetCall } from '@/lib/frappe'
 import { useState, useEffect, useMemo } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useTheme } from '@/contexts/ThemeContext'
 import Breadcrumb from './Breadcrumb'
 
 interface LayoutProps {
@@ -29,6 +30,7 @@ interface Restaurant {
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
+  const { theme, toggleTheme } = useTheme()
   const [sidebarOpen, setSidebarOpen] = useState(false) // Mobile sidebar
   const [sidebarExpanded, setSidebarExpanded] = useState(true) // Desktop sidebar expanded/collapsed
   const [sidebarHovered, setSidebarHovered] = useState(false) // Hover state for temporary expansion
@@ -179,11 +181,11 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#faf9f8]">
+    <div className="min-h-screen bg-background">
       {/* Sidebar - Toggleable with Hover */}
       <aside 
         className={cn(
-          "fixed inset-y-0 left-0 z-50 bg-[#faf9f8] border-r border-[#edebe9] transform transition-all duration-200 ease-in-out shadow-sm",
+          "fixed inset-y-0 left-0 z-50 bg-sidebar border-r border-sidebar-border transform transition-all duration-200 ease-in-out shadow-sm",
           // Mobile: slide in/out
           sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
           // Desktop: width based on expanded state or hover
@@ -201,7 +203,7 @@ export default function Layout({ children }: LayoutProps) {
         <div className="flex flex-col h-full">
           {/* Logo with Toggle Button - Unified with Top Navbar */}
           <div className={cn(
-            "flex items-center bg-white transition-all border-r border-[#edebe9]",
+            "flex items-center bg-card border-r border-sidebar-border transition-all",
             showExpanded ? "px-4 justify-between py-2.5 h-[3.5rem]" : "px-2 justify-center h-[3.5rem]"
           )}>
             {showExpanded ? (
@@ -220,17 +222,17 @@ export default function Layout({ children }: LayoutProps) {
                         }
                       }}
                     >
-                      <SelectTrigger className="h-auto py-1.5 px-2 border-0 bg-transparent hover:bg-[#f3f2f1] shadow-none focus:ring-0 focus:ring-offset-0 w-full justify-between data-[state=open]:bg-[#f3f2f1] [&>svg:last-child]:hidden">
+                      <SelectTrigger className="h-auto py-1.5 px-2 border-0 bg-transparent hover:bg-sidebar-accent shadow-none focus:ring-0 focus:ring-offset-0 w-full justify-between data-[state=open]:bg-sidebar-accent [&>svg:last-child]:hidden">
                         <div className="flex items-center min-w-0 flex-1 max-w-[calc(100%-2rem)]">
                           <div className="min-w-0 flex-1 overflow-hidden">
-                            <SelectValue className="text-sm font-semibold text-[#323130] block">
+                            <SelectValue className="text-sm font-semibold text-sidebar-foreground block">
                               <span className="inline-block truncate max-w-full whitespace-nowrap overflow-hidden text-ellipsis">
                                 {currentRestaurant?.restaurant_name || restaurants[0]?.restaurant_name || 'Select Restaurant'}
                               </span>
                             </SelectValue>
                           </div>
                         </div>
-                        <ChevronDown className="h-4 w-4 text-[#605e5c] flex-shrink-0 ml-2 opacity-70" />
+                        <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2 opacity-70" />
                       </SelectTrigger>
                       <SelectContent 
                         className="min-w-[240px] z-[60]"
@@ -242,11 +244,11 @@ export default function Layout({ children }: LayoutProps) {
                         {restaurants.map((restaurant) => (
                           <SelectItem key={restaurant.name} value={restaurant.name}>
                             <div className="flex items-center gap-2 w-full">
-                              <Store className="h-4 w-4 text-[#605e5c] flex-shrink-0" />
+                              <Store className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                               <div className="flex flex-col min-w-0 flex-1">
-                                <span className="text-sm font-medium text-[#323130] truncate">{restaurant.restaurant_name}</span>
+                                <span className="text-sm font-medium text-foreground truncate">{restaurant.restaurant_name}</span>
                                 {!restaurant.is_active && (
-                                  <span className="text-xs text-[#a19f9d]">Inactive</span>
+                                  <span className="text-xs text-muted-foreground">Inactive</span>
                                 )}
                               </div>
                             </div>
@@ -256,8 +258,8 @@ export default function Layout({ children }: LayoutProps) {
                     </Select>
                   ) : (
                     <div className="flex items-center gap-2 py-1.5 px-2">
-                      <Store className="h-4 w-4 text-[#a19f9d] flex-shrink-0" />
-                      <span className="text-sm text-[#a19f9d]">No restaurants</span>
+                      <Store className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span className="text-sm text-muted-foreground">No restaurants</span>
                     </div>
                   )}
                 </div>
@@ -267,11 +269,11 @@ export default function Layout({ children }: LayoutProps) {
                     onClick={handleToggle}
                     className={cn(
                       "hidden lg:flex items-center justify-center p-1.5 rounded-md transition-all duration-300",
-                      "hover:bg-[#edebe9] active:scale-90",
+                      "hover:bg-sidebar-accent active:scale-90",
                       "relative overflow-visible",
                       sidebarExpanded 
-                        ? "text-[#ea580c] hover:text-[#c2410c] hover:bg-orange-50" 
-                        : "text-[#605e5c] hover:text-[#323130]"
+                        ? "text-primary hover:text-primary/80" 
+                        : "text-muted-foreground hover:text-sidebar-foreground"
                     )}
                     title={sidebarExpanded ? "Unlock sidebar (allow auto-collapse)" : "Lock sidebar (keep expanded)"}
                   >
@@ -289,27 +291,27 @@ export default function Layout({ children }: LayoutProps) {
                   {/* Close Button - Mobile Only */}
                   <button
                     onClick={() => setSidebarOpen(false)}
-                    className="lg:hidden p-1.5 rounded-md hover:bg-[#edebe9] transition-colors"
+                    className="lg:hidden p-1.5 rounded-md hover:bg-sidebar-accent transition-colors"
                   >
-                    <X className="h-4 w-4 text-[#605e5c]" />
+                    <X className="h-4 w-4 text-muted-foreground" />
                   </button>
                 </div>
               </>
             ) : (
               <>
                 <Link to="/dashboard" className="flex items-center justify-center hover:opacity-80 transition-opacity flex-1">
-                  <Store className="h-5 w-5 text-[#ea580c]" />
+                  <Store className="h-5 w-5 text-primary" />
                 </Link>
                 {/* Lock/Unlock Button when collapsed - Desktop Only */}
                 <button
                   onClick={handleToggle}
                   className={cn(
                     "hidden lg:flex items-center justify-center p-1.5 rounded transition-all duration-300",
-                    "hover:bg-[#edebe9] active:scale-90",
+                    "hover:bg-sidebar-accent active:scale-90",
                     "relative overflow-visible",
                     sidebarExpanded 
-                      ? "text-[#ea580c] hover:text-[#c2410c] hover:bg-orange-50" 
-                      : "text-[#605e5c] hover:text-[#323130]"
+                      ? "text-primary hover:text-primary/80" 
+                      : "text-muted-foreground hover:text-sidebar-foreground"
                   )}
                   title={sidebarExpanded ? "Unlock sidebar" : "Lock sidebar"}
                 >
@@ -345,25 +347,25 @@ export default function Layout({ children }: LayoutProps) {
                   className={cn(
                     "relative flex items-center rounded-md text-sm font-normal transition-all group",
                     showExpanded ? "gap-3 px-3 py-2" : "justify-center px-2 py-2",
-                    "hover:bg-[#edebe9] active:bg-[#e1dfdd]",
+                    "hover:bg-sidebar-accent active:bg-sidebar-accent/80",
                     isActive
-                      ? "bg-orange-50 text-[#ea580c] font-medium"
-                      : "text-[#323130] hover:text-[#201f1e]"
+                      ? "bg-primary/10 text-primary font-medium dark:bg-primary/20"
+                      : "text-sidebar-foreground hover:text-sidebar-foreground"
                   )}
                   title={!showExpanded ? item.name : undefined}
                 >
                   {isActive && (
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#ea580c] rounded-r" />
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r" />
                   )}
                   <Icon className={cn(
                     "h-4 w-4 flex-shrink-0",
-                    isActive ? "text-[#ea580c]" : "text-[#605e5c]"
+                    isActive ? "text-primary" : "text-muted-foreground"
                   )} />
                   {showExpanded && (
                     <>
                       <span className="flex-1">{item.name}</span>
                       {showBadge && (
-                        <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-[#d13438] text-white text-xs flex items-center justify-center font-semibold">
+                        <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
                           {pendingOrders > 9 ? '9+' : pendingOrders}
                         </span>
                       )}
@@ -371,7 +373,7 @@ export default function Layout({ children }: LayoutProps) {
                   )}
                   {/* Tooltip for collapsed state */}
                   {!showExpanded && (
-                    <span className="absolute left-full ml-2 px-2 py-1 rounded-md bg-[#323130] text-white text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 shadow-lg">
+                    <span className="absolute left-full ml-2 px-2 py-1 rounded-md bg-foreground text-background text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 shadow-lg">
                       {item.name}
                       {showBadge && ` (${pendingOrders} pending)`}
                     </span>
@@ -381,14 +383,75 @@ export default function Layout({ children }: LayoutProps) {
             })}
           </nav>
           
-          {/* Footer with Tagline */}
-          {showExpanded && (
-            <div className="px-4 py-3 border-t border-[#edebe9] bg-white">
-              <p className="text-xs italic text-[#a19f9d] text-center font-light">
-                By Dinematters
-              </p>
-            </div>
-          )}
+          {/* Footer with Theme Toggle and Tagline */}
+          <div className="px-4 py-3 border-t border-sidebar-border bg-card">
+            {showExpanded ? (
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs italic text-muted-foreground font-light flex-1">
+                  By Dinematters
+                </p>
+                {/* Animated Theme Switch - Expanded */}
+                <button
+                  onClick={toggleTheme}
+                  className={cn(
+                    "relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ease-in-out",
+                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card",
+                    "hover:scale-105 active:scale-95",
+                    theme === 'dark' 
+                      ? "bg-primary shadow-md shadow-primary/30" 
+                      : "bg-muted-foreground/30 hover:bg-muted-foreground/40"
+                  )}
+                  title={theme === 'light' ? "Switch to dark mode" : "Switch to light mode"}
+                  role="switch"
+                  aria-checked={theme === 'dark'}
+                >
+                  <span
+                    className={cn(
+                      "absolute flex items-center justify-center h-5 w-5 transform rounded-full bg-white shadow-md transition-all duration-300 ease-in-out",
+                      theme === 'dark' ? "translate-x-6" : "translate-x-1"
+                    )}
+                  >
+                    {theme === 'dark' ? (
+                      <Moon className="h-3 w-3 text-primary transition-all duration-300" />
+                    ) : (
+                      <Sun className="h-3 w-3 text-muted-foreground transition-all duration-300" />
+                    )}
+                  </span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                {/* Animated Theme Switch - Collapsed */}
+                <button
+                  onClick={toggleTheme}
+                  className={cn(
+                    "relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ease-in-out",
+                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-sidebar",
+                    "hover:scale-105 active:scale-95",
+                    theme === 'dark' 
+                      ? "bg-primary shadow-md shadow-primary/30" 
+                      : "bg-muted-foreground/30 hover:bg-muted-foreground/40"
+                  )}
+                  title={theme === 'light' ? "Switch to dark mode" : "Switch to light mode"}
+                  role="switch"
+                  aria-checked={theme === 'dark'}
+                >
+                  <span
+                    className={cn(
+                      "absolute flex items-center justify-center h-5 w-5 transform rounded-full bg-white shadow-md transition-all duration-300 ease-in-out",
+                      theme === 'dark' ? "translate-x-6" : "translate-x-1"
+                    )}
+                  >
+                    {theme === 'dark' ? (
+                      <Moon className="h-3 w-3 text-primary transition-all duration-300" />
+                    ) : (
+                      <Sun className="h-3 w-3 text-muted-foreground transition-all duration-300" />
+                    )}
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </aside>
 
@@ -406,93 +469,113 @@ export default function Layout({ children }: LayoutProps) {
         showExpanded ? "lg:pl-64" : "lg:pl-16"
       )}>
         {/* Top Header - Analytics Magic Panel - Unified with Sidebar */}
-        <header className="sticky top-0 z-30 bg-white border-b border-[#edebe9] shadow-sm">
+        <header className="sticky top-0 z-30 bg-card border-b border-border shadow-sm">
           <div className="flex items-center h-[3.5rem]">
             {/* Left: Mobile Menu Only */}
             <div className="flex items-center flex-shrink-0 lg:hidden pl-4">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="p-2 -ml-2 rounded-md hover:bg-[#edebe9] transition-colors"
+                className="p-2 -ml-2 rounded-md hover:bg-accent transition-colors"
               >
-                <Menu className="h-5 w-5 text-[#605e5c]" />
+                <Menu className="h-5 w-5 text-muted-foreground" />
               </button>
             </div>
 
             {/* Analytics Panel - Full Width from Start */}
             <div className="hidden lg:flex items-center gap-4 flex-1 pl-6 pr-6 flex-nowrap overflow-x-auto h-full">
               {/* Today's Revenue */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-[#faf9f8] transition-colors group whitespace-nowrap">
-                <DollarSign className="h-3.5 w-3.5 text-[#ea580c] flex-shrink-0" />
-                <span className="text-xs text-[#605e5c]">Today:</span>
-                <span className="text-sm font-semibold text-[#323130]">
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-muted transition-colors group whitespace-nowrap">
+                <DollarSign className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                <span className="text-xs text-muted-foreground">Today:</span>
+                <span className="text-sm font-semibold text-foreground">
                   ₹{analytics.todayRevenue.toFixed(0)}
                 </span>
                 {analytics.revenueChange !== 0 && (
                   <div className={cn(
-                    "flex items-center gap-0.5 text-[10px] font-medium px-1 py-0.5 rounded-md ml-1",
+                    "flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-md ml-1",
                     analytics.revenueChange > 0 
-                      ? "text-[#107c10] bg-[#dff6dd]" 
-                      : "text-[#d13438] bg-[#fde7e9]"
+                      ? "text-[#107c10] bg-[#dff6dd] dark:text-[#81c784] dark:bg-[#1b5e20]" 
+                      : "text-[#d13438] bg-[#fde7e9] dark:text-white dark:bg-[#b71c1c]"
                   )}>
                     {analytics.revenueChange > 0 ? (
-                      <TrendingUp className="h-2.5 w-2.5" />
+                      <TrendingUp className={cn(
+                        "h-2.5 w-2.5",
+                        analytics.revenueChange > 0 
+                          ? "text-[#107c10] dark:text-[#81c784]" 
+                          : "text-[#d13438] dark:text-white"
+                      )} />
                     ) : (
-                      <TrendingDown className="h-2.5 w-2.5" />
+                      <TrendingDown className={cn(
+                        "h-2.5 w-2.5",
+                        analytics.revenueChange > 0 
+                          ? "text-[#107c10] dark:text-[#81c784]" 
+                          : "text-[#d13438] dark:text-white"
+                      )} />
                     )}
-                    <span>{Math.abs(analytics.revenueChange).toFixed(0)}%</span>
+                    <span className="whitespace-nowrap">{Math.abs(analytics.revenueChange).toFixed(0)}%</span>
                   </div>
                 )}
               </div>
 
               {/* Today's Orders */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-[#faf9f8] transition-colors group whitespace-nowrap">
-                <ShoppingCart className="h-3.5 w-3.5 text-[#ea580c] flex-shrink-0" />
-                <span className="text-xs text-[#605e5c]">Orders:</span>
-                <span className="text-sm font-semibold text-[#323130]">
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-muted transition-colors group whitespace-nowrap">
+                <ShoppingCart className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                <span className="text-xs text-muted-foreground">Orders:</span>
+                <span className="text-sm font-semibold text-foreground">
                   {analytics.todayOrders}
                 </span>
                 {analytics.ordersChange !== 0 && (
                   <div className={cn(
-                    "flex items-center gap-0.5 text-[10px] font-medium px-1 py-0.5 rounded-md ml-1",
+                    "flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-md ml-1",
                     analytics.ordersChange > 0 
-                      ? "text-[#107c10] bg-[#dff6dd]" 
-                      : "text-[#d13438] bg-[#fde7e9]"
+                      ? "text-[#107c10] bg-[#dff6dd] dark:text-[#81c784] dark:bg-[#1b5e20]" 
+                      : "text-[#d13438] bg-[#fde7e9] dark:text-white dark:bg-[#b71c1c]"
                   )}>
                     {analytics.ordersChange > 0 ? (
-                      <TrendingUp className="h-2.5 w-2.5" />
+                      <TrendingUp className={cn(
+                        "h-2.5 w-2.5",
+                        analytics.ordersChange > 0 
+                          ? "text-[#107c10] dark:text-[#81c784]" 
+                          : "text-[#d13438] dark:text-white"
+                      )} />
                     ) : (
-                      <TrendingDown className="h-2.5 w-2.5" />
+                      <TrendingDown className={cn(
+                        "h-2.5 w-2.5",
+                        analytics.ordersChange > 0 
+                          ? "text-[#107c10] dark:text-[#81c784]" 
+                          : "text-[#d13438] dark:text-white"
+                      )} />
                     )}
-                    <span>{Math.abs(analytics.ordersChange).toFixed(0)}%</span>
+                    <span className="whitespace-nowrap">{Math.abs(analytics.ordersChange).toFixed(0)}%</span>
                   </div>
                 )}
               </div>
 
               {/* Pending Orders Alert */}
               {analytics.pendingOrders > 0 && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#fff4ce] border border-[#ffe69d] hover:bg-[#fff4ce]/80 transition-colors whitespace-nowrap">
-                  <AlertCircle className="h-3.5 w-3.5 text-[#ca5010] flex-shrink-0" />
-                  <span className="text-xs text-[#ca5010] font-medium">Pending:</span>
-                  <span className="text-sm font-semibold text-[#ca5010]">
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#fff4ce] dark:bg-[#ca5010]/20 border border-[#ffe69d] dark:border-[#ca5010]/40 hover:bg-[#fff4ce]/80 dark:hover:bg-[#ca5010]/30 transition-colors whitespace-nowrap">
+                  <AlertCircle className="h-3.5 w-3.5 text-[#ca5010] dark:text-[#ffaa44] flex-shrink-0" />
+                  <span className="text-xs text-[#ca5010] dark:text-[#ffaa44] font-medium">Pending:</span>
+                  <span className="text-sm font-semibold text-[#ca5010] dark:text-[#ffaa44]">
                     {analytics.pendingOrders}
                   </span>
                 </div>
               )}
 
               {/* Average Order Value */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-[#faf9f8] transition-colors group whitespace-nowrap">
-                <Activity className="h-3.5 w-3.5 text-[#605e5c] flex-shrink-0" />
-                <span className="text-xs text-[#605e5c]">Avg:</span>
-                <span className="text-sm font-semibold text-[#323130]">
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-muted transition-colors group whitespace-nowrap">
+                <Activity className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                <span className="text-xs text-muted-foreground">Avg:</span>
+                <span className="text-sm font-semibold text-foreground">
                   ₹{analytics.avgOrderValue.toFixed(0)}
                 </span>
               </div>
 
               {/* Total Revenue */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-[#faf9f8] transition-colors group whitespace-nowrap">
-                <TrendingUp className="h-3.5 w-3.5 text-[#605e5c] flex-shrink-0" />
-                <span className="text-xs text-[#605e5c]">Total:</span>
-                <span className="text-sm font-semibold text-[#323130]">
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-muted transition-colors group whitespace-nowrap">
+                <TrendingUp className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                <span className="text-xs text-muted-foreground">Total:</span>
+                <span className="text-sm font-semibold text-foreground">
                   ₹{analytics.totalRevenue.toFixed(0)}
                 </span>
               </div>
@@ -502,26 +585,26 @@ export default function Layout({ children }: LayoutProps) {
             <div className="lg:hidden flex-1 overflow-x-auto px-2">
               <div className="flex items-center gap-2">
                 {/* Today's Revenue - Mobile */}
-                <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#faf9f8] whitespace-nowrap">
-                  <DollarSign className="h-3 w-3 text-[#ea580c] flex-shrink-0" />
-                  <span className="text-xs font-semibold text-[#323130]">
+                <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-muted whitespace-nowrap">
+                  <DollarSign className="h-3 w-3 text-primary flex-shrink-0" />
+                  <span className="text-xs font-semibold text-foreground">
                     ₹{analytics.todayRevenue.toFixed(0)}
                   </span>
                 </div>
 
                 {/* Today's Orders - Mobile */}
-                <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#faf9f8] whitespace-nowrap">
-                  <ShoppingCart className="h-3 w-3 text-[#ea580c] flex-shrink-0" />
-                  <span className="text-xs font-semibold text-[#323130]">
+                <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-muted whitespace-nowrap">
+                  <ShoppingCart className="h-3 w-3 text-primary flex-shrink-0" />
+                  <span className="text-xs font-semibold text-foreground">
                     {analytics.todayOrders}
                   </span>
                 </div>
 
                 {/* Pending Orders - Mobile */}
                 {analytics.pendingOrders > 0 && (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#fff4ce] border border-[#ffe69d] whitespace-nowrap">
-                    <AlertCircle className="h-3 w-3 text-[#ca5010] flex-shrink-0" />
-                    <span className="text-xs font-semibold text-[#ca5010]">
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#fff4ce] dark:bg-[#ca5010]/20 border border-[#ffe69d] dark:border-[#ca5010]/40 whitespace-nowrap">
+                    <AlertCircle className="h-3 w-3 text-[#ca5010] dark:text-[#ffaa44] flex-shrink-0" />
+                    <span className="text-xs font-semibold text-[#ca5010] dark:text-[#ffaa44]">
                       {analytics.pendingOrders}
                     </span>
                   </div>
@@ -532,7 +615,7 @@ export default function Layout({ children }: LayoutProps) {
         </header>
 
         {/* Page Content */}
-        <main className="p-3 sm:p-4 md:p-6 bg-[#faf9f8] min-h-[calc(100vh-4.5rem)] overflow-x-hidden">
+        <main className="p-3 sm:p-4 md:p-6 bg-background min-h-[calc(100vh-4.5rem)] overflow-x-hidden">
           <div className="max-w-full">
             <Breadcrumb />
             {children}

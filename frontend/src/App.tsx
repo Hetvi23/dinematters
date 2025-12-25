@@ -1,6 +1,7 @@
 import { FrappeProvider } from 'frappe-react-sdk'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from './components/ui/sonner'
+import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import SetupWizard from './pages/SetupWizard'
@@ -18,14 +19,11 @@ import CategoryDetail from './pages/CategoryDetail'
 import CategoryEdit from './pages/CategoryEdit'
 import CategoryNew from './pages/CategoryNew'
 
-function App() {
+function AppContent() {
+	const { theme } = useTheme()
+	
 	return (
-		<FrappeProvider
-			swrConfig={{
-				errorRetryCount: 2
-			}}
-			socketPort={import.meta.env.VITE_SOCKET_PORT}
-			siteName={window.frappe?.boot?.sitename ?? import.meta.env.VITE_SITE_NAME}>
+		<>
 			<BrowserRouter basename="/dinematters">
 				<Layout>
 					<Routes>
@@ -49,7 +47,22 @@ function App() {
 					</Routes>
 				</Layout>
 			</BrowserRouter>
-			<Toaster richColors theme='light' />
+			<Toaster richColors theme={theme} />
+		</>
+	)
+}
+
+function App() {
+	return (
+		<FrappeProvider
+			swrConfig={{
+				errorRetryCount: 2
+			}}
+			socketPort={import.meta.env.VITE_SOCKET_PORT}
+			siteName={window.frappe?.boot?.sitename ?? import.meta.env.VITE_SITE_NAME}>
+			<ThemeProvider>
+				<AppContent />
+			</ThemeProvider>
 		</FrappeProvider>
 	)
 }

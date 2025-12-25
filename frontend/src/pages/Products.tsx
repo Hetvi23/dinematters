@@ -5,8 +5,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button'
 import { Eye, Pencil, Trash2, Plus } from 'lucide-react'
 import { toast } from 'sonner'
+import { useConfirm } from '@/hooks/useConfirm'
 
 export default function Products() {
+  const { confirm, ConfirmDialogComponent } = useConfirm()
   const { data: products, isLoading, mutate } = useFrappeGetDocList('Menu Product', {
     fields: ['name', 'product_name', 'price', 'original_price', 'is_active'],
     limit: 100,
@@ -16,7 +18,15 @@ export default function Products() {
   const { deleteDoc } = useFrappeDeleteDoc()
 
   const handleDelete = async (productId: string, productName: string) => {
-    if (!confirm(`Are you sure you want to delete "${productName}"?`)) {
+    const confirmed = await confirm({
+      title: 'Delete Product',
+      description: `Are you sure you want to delete "${productName}"? This action cannot be undone.`,
+      variant: 'destructive',
+      confirmText: 'Delete',
+      cancelText: 'Cancel'
+    })
+
+    if (!confirmed) {
       return
     }
 
@@ -34,8 +44,8 @@ export default function Products() {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-semibold text-[#323130] tracking-tight">Products</h2>
-          <p className="text-[#605e5c] text-sm mt-1">
+          <h2 className="text-xl sm:text-2xl font-semibold text-foreground tracking-tight">Products</h2>
+          <p className="text-muted-foreground text-sm mt-1">
             View and manage menu products (filtered by your restaurant permissions)
           </p>
         </div>
@@ -56,30 +66,30 @@ export default function Products() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-8 text-[#605e5c]">Loading products...</div>
+            <div className="text-center py-8 text-muted-foreground">Loading products...</div>
           ) : products && products.length > 0 ? (
             <>
               {/* Mobile Card View */}
               <div className="md:hidden space-y-3">
                 {products.map((product: any) => (
-                  <div key={product.name} className="p-4 border border-[#edebe9] rounded-md bg-white hover:border-[#c8c6c4] transition-colors">
+                  <div key={product.name} className="p-4 border border-border rounded-md bg-card hover:border-border/80 transition-colors">
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-[#323130] truncate">{product.product_name || product.name}</h3>
+                        <h3 className="font-semibold text-foreground truncate">{product.product_name || product.name}</h3>
                         <div className="flex items-center gap-3 mt-2">
-                          <span className="text-lg font-semibold text-[#323130]">₹{product.price || 0}</span>
+                          <span className="text-lg font-semibold text-foreground">₹{product.price || 0}</span>
                           {product.original_price && (
-                            <span className="text-sm text-[#605e5c] line-through">₹{product.original_price}</span>
+                            <span className="text-sm text-muted-foreground line-through">₹{product.original_price}</span>
                           )}
                         </div>
                       </div>
-                      <span className={`inline-flex items-center rounded px-2 py-1 text-xs font-medium border flex-shrink-0 ${
-                        product.is_active ? 'bg-[#dff6dd] text-[#107c10] border-[#92c5f7]' : 'bg-[#f3f2f1] text-[#605e5c] border-[#edebe9]'
+                      <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium border flex-shrink-0 ${
+                        product.is_active ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] border-[#92c5f7] dark:border-[#4caf50]' : 'bg-muted text-muted-foreground border-border'
                       }`}>
                         {product.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </div>
-                    <div className="flex gap-2 pt-3 border-t border-[#edebe9]">
+                    <div className="flex gap-2 pt-3 border-t border-border">
                       <Link to={`/products/${product.name}`} className="flex-1">
                         <Button variant="outline" size="sm" className="w-full">
                           <Eye className="h-4 w-4 mr-2" />
@@ -126,8 +136,8 @@ export default function Products() {
                           {product.original_price ? `₹${product.original_price}` : '-'}
                         </TableCell>
                         <TableCell>
-                          <span className={`inline-flex items-center rounded px-2 py-1 text-xs font-medium border ${
-                            product.is_active ? 'bg-[#dff6dd] text-[#107c10] border-[#92c5f7]' : 'bg-[#f3f2f1] text-[#605e5c] border-[#edebe9]'
+                          <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium border ${
+                            product.is_active ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] border-[#92c5f7] dark:border-[#4caf50]' : 'bg-muted text-muted-foreground border-border'
                           }`}>
                             {product.is_active ? 'Active' : 'Inactive'}
                           </span>
@@ -166,6 +176,7 @@ export default function Products() {
           )}
         </CardContent>
       </Card>
+      {ConfirmDialogComponent}
     </div>
   )
 }

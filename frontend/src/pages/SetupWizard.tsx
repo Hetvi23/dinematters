@@ -708,19 +708,19 @@ export default function SetupWizard() {
         </Button>
       </div>
 
-      <Card className="border border-[#edebe9]">
+      <Card className="border border-border">
         <CardHeader className="pb-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
             <div>
-              <CardTitle className="text-xl font-semibold text-[#323130]">Setup Progress</CardTitle>
-              <CardDescription className="mt-1 text-sm text-[#605e5c]">
+              <CardTitle className="text-xl font-semibold text-foreground">Setup Progress</CardTitle>
+              <CardDescription className="mt-1 text-sm text-muted-foreground">
                 Step {currentStep + 1} of {steps.length}
               </CardDescription>
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <div className="text-2xl sm:text-3xl font-bold text-[#ea580c]">{Math.round(progressPercentage)}%</div>
-                <div className="text-xs text-[#605e5c] uppercase tracking-wide">Complete</div>
+                <div className="text-2xl sm:text-3xl font-bold text-primary">{Math.round(progressPercentage)}%</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">Complete</div>
               </div>
             </div>
           </div>

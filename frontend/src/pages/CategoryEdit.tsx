@@ -101,7 +101,7 @@ export default function CategoryEdit() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="category_name">
-                Category Name <span className="text-red-500">*</span>
+                Category Name <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="category_name"

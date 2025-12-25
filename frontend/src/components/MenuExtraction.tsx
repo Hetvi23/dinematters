@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, CheckCircle, XCircle, Clock, Play, Check } from 'lucide-react'
 import DynamicForm from './DynamicForm'
 import EditableExtractedDishesTable from './EditableExtractedDishesTable'
+import { useConfirm } from '@/hooks/useConfirm'
 
 interface MenuExtractionProps {
   restaurantId: string
@@ -17,6 +18,7 @@ interface MenuExtractionProps {
 }
 
 export default function MenuExtraction({ restaurantId, onExtractionComplete, onNavigateToReview }: MenuExtractionProps) {
+  const { confirm, ConfirmDialogComponent } = useConfirm()
   // Get selected document from localStorage or use latest
   const [selectedDocName, setSelectedDocName] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
@@ -101,7 +103,15 @@ export default function MenuExtraction({ restaurantId, onExtractionComplete, onN
       return
     }
 
-    if (!confirm(`This will extract menu data from ${extractionDoc.menu_images.length} image(s). Continue?`)) {
+    const confirmed = await confirm({
+      title: 'Extract Menu Data',
+      description: `This will extract menu data from ${extractionDoc.menu_images.length} image(s). Continue?`,
+      variant: 'info',
+      confirmText: 'Continue',
+      cancelText: 'Cancel'
+    })
+
+    if (!confirmed) {
       return
     }
 
@@ -150,7 +160,15 @@ export default function MenuExtraction({ restaurantId, onExtractionComplete, onN
       return
     }
 
-    if (!confirm('This will create/update menu categories and products in the database. Continue?')) {
+    const confirmed = await confirm({
+      title: 'Approve Extraction',
+      description: 'This will create/update menu categories and products in the database. Continue?',
+      variant: 'warning',
+      confirmText: 'Approve',
+      cancelText: 'Cancel'
+    })
+
+    if (!confirmed) {
       return
     }
 
@@ -422,6 +440,7 @@ export default function MenuExtraction({ restaurantId, onExtractionComplete, onN
           </CardContent>
         </Card>
       )}
+      {ConfirmDialogComponent}
     </div>
   )
 }

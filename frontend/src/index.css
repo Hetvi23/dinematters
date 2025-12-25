@@ -43,38 +43,40 @@
 }
 
 .dark {
-  /* Microsoft Suite Dark Mode */
+  /* Dark Mode with Orange Theme */
   --background: #1a1a1a;
   --foreground: #ffffff;
   --card: #2d2d2d;
   --card-foreground: #ffffff;
   --popover: #2d2d2d;
   --popover-foreground: #ffffff;
-  --primary: #4fc3f7;
-  --primary-foreground: #1a1a1a;
+  /* Orange Theme Color - Adjusted for dark mode */
+  --primary: #ea580c;
+  --primary-foreground: #ffffff;
   --secondary: #2d2d2d;
   --secondary-foreground: #ffffff;
-  --muted: #2d2d2d;
+  --muted: #252525;
   --muted-foreground: #a19f9d;
   --accent: #3d3d3d;
   --accent-foreground: #ffffff;
   --destructive: #f44336;
   --border: #3d3d3d;
   --input: #3d3d3d;
-  --ring: #4fc3f7;
-  --chart-1: #4fc3f7;
+  --ring: #ea580c;
+  --chart-1: #ea580c;
   --chart-2: #81c784;
   --chart-3: #ffb74d;
   --chart-4: #ba68c8;
   --chart-5: #ef5350;
+  /* Sidebar - Dark Mode with Orange Theme */
   --sidebar: #252525;
   --sidebar-foreground: #ffffff;
-  --sidebar-primary: #4fc3f7;
-  --sidebar-primary-foreground: #1a1a1a;
+  --sidebar-primary: #ea580c;
+  --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #3d3d3d;
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #3d3d3d;
-  --sidebar-ring: #4fc3f7;
+  --sidebar-ring: #ea580c;
 }
 
 @theme inline {

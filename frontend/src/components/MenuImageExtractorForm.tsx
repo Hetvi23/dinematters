@@ -8,6 +8,7 @@ import { Loader2, CheckCircle, XCircle, Clock, Play, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import DynamicForm from './DynamicForm'
 import EditableExtractedDishesTable from './EditableExtractedDishesTable'
+import { useConfirm } from '@/hooks/useConfirm'
 
 interface MenuImageExtractorFormProps {
   docname?: string
@@ -20,6 +21,7 @@ export default function MenuImageExtractorForm({
   restaurantId,
   onComplete 
 }: MenuImageExtractorFormProps) {
+  const { confirm, ConfirmDialogComponent } = useConfirm()
   const [extractionDocName, setExtractionDocName] = useState<string | undefined>(docname)
   
   // Get extraction document
@@ -65,7 +67,15 @@ export default function MenuImageExtractorForm({
       return
     }
 
-    if (!confirm(`This will extract menu data from ${extractionDoc.menu_images.length} image(s). Continue?`)) {
+    const confirmed = await confirm({
+      title: 'Extract Menu Data',
+      description: `This will extract menu data from ${extractionDoc.menu_images.length} image(s). Continue?`,
+      variant: 'info',
+      confirmText: 'Continue',
+      cancelText: 'Cancel'
+    })
+
+    if (!confirmed) {
       return
     }
 
@@ -95,7 +105,15 @@ export default function MenuImageExtractorForm({
       return
     }
 
-    if (!confirm('This will create/update menu categories and products in the database. Continue?')) {
+    const confirmed = await confirm({
+      title: 'Approve Extraction',
+      description: 'This will create/update menu categories and products in the database. Continue?',
+      variant: 'warning',
+      confirmText: 'Approve',
+      cancelText: 'Cancel'
+    })
+
+    if (!confirmed) {
       return
     }
 
@@ -288,6 +306,7 @@ export default function MenuImageExtractorForm({
           </CardContent>
         </Card>
       )}
+      {ConfirmDialogComponent}
     </div>
   )
 }

@@ -41,10 +41,10 @@ export function Stepper({ steps, currentStep, onStepClick, className }: StepperP
                   className={cn(
                     "flex items-center justify-center w-7 h-7 rounded-md border-2 transition-all shrink-0",
                     isCompleted
-                      ? "bg-[#ea580c] border-[#ea580c] text-white shadow-sm"
+                      ? "bg-primary border-primary text-primary-foreground shadow-sm"
                       : isCurrent
-                      ? "border-[#ea580c] text-[#ea580c] bg-orange-50 shadow-md"
-                      : "border-[#edebe9] text-[#605e5c] bg-white",
+                      ? "border-primary text-primary bg-primary/10 dark:bg-primary/20 shadow-md"
+                      : "border-border text-muted-foreground bg-background",
                     isClickable && "cursor-pointer hover:scale-105",
                     !isClickable && "cursor-not-allowed"
                   )}
@@ -59,7 +59,7 @@ export function Stepper({ steps, currentStep, onStepClick, className }: StepperP
                   <p
                     className={cn(
                       "text-[9px] font-medium leading-tight line-clamp-2",
-                      isCurrent ? "text-[#323130] font-semibold" : "text-[#605e5c]"
+                      isCurrent ? "text-foreground font-semibold" : "text-muted-foreground"
                     )}
                     title={step.description || step.title}
                   >
@@ -71,7 +71,7 @@ export function Stepper({ steps, currentStep, onStepClick, className }: StepperP
                 <div
                   className={cn(
                     "h-0.5 w-2 mt-3.5 transition-colors rounded-full flex-shrink-0",
-                    isCompleted ? "bg-[#ea580c]" : "bg-[#edebe9]"
+                    isCompleted ? "bg-primary" : "bg-border"
                   )}
                 />
               )}
@@ -96,11 +96,11 @@ export function Stepper({ steps, currentStep, onStepClick, className }: StepperP
               className={cn(
                 "w-full flex items-center gap-3 p-3 rounded-md border transition-all text-left",
                 isCompleted
-                  ? "bg-orange-50 border-[#ea580c]"
+                  ? "bg-primary/10 dark:bg-primary/20 border-primary"
                   : isCurrent
-                  ? "bg-orange-50 border-[#ea580c] border-2"
-                  : "bg-white border-[#edebe9]",
-                isClickable && "cursor-pointer hover:bg-[#faf9f8]",
+                  ? "bg-primary/10 dark:bg-primary/20 border-primary border-2"
+                  : "bg-card border-border",
+                isClickable && "cursor-pointer hover:bg-muted",
                 !isClickable && "cursor-not-allowed opacity-60"
               )}
             >
@@ -108,10 +108,10 @@ export function Stepper({ steps, currentStep, onStepClick, className }: StepperP
                 className={cn(
                   "flex items-center justify-center w-8 h-8 rounded-md border-2 flex-shrink-0",
                   isCompleted
-                    ? "bg-[#ea580c] border-[#ea580c] text-white"
+                    ? "bg-primary border-primary text-primary-foreground"
                     : isCurrent
-                    ? "border-[#ea580c] text-[#ea580c] bg-white"
-                    : "border-[#edebe9] text-[#605e5c] bg-white"
+                    ? "border-primary text-primary bg-background"
+                    : "border-border text-muted-foreground bg-background"
                 )}
               >
                 {isCompleted ? (
@@ -124,13 +124,13 @@ export function Stepper({ steps, currentStep, onStepClick, className }: StepperP
                 <p
                   className={cn(
                     "text-sm font-medium leading-tight",
-                    isCurrent ? "text-[#323130] font-semibold" : "text-[#605e5c]"
+                    isCurrent ? "text-foreground font-semibold" : "text-muted-foreground"
                   )}
                 >
                   {step.title}
                 </p>
                 {step.description && (
-                  <p className="text-xs text-[#605e5c] mt-0.5 line-clamp-1">
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
                     {step.description}
                   </p>
                 )}

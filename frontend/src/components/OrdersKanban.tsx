@@ -8,6 +8,7 @@ import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { useFrappePostCall } from '@/lib/frappe'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useConfirm } from '@/hooks/useConfirm'
 
 interface Order {
   name: string
@@ -36,10 +37,10 @@ interface OrdersKanbanProps {
 }
 
 const STATUSES = [
-  { value: 'pending', label: 'Pending', color: 'bg-[#fff4ce] text-[#ca5010] border-[#ffe69d]' },
-  { value: 'confirmed', label: 'Confirmed', color: 'bg-orange-50 text-[#ea580c] border-orange-200' },
-  { value: 'preparing', label: 'Preparing', color: 'bg-[#e8d5ff] text-[#8764b8] border-[#d4b9e8]' },
-  { value: 'delivered', label: 'Delivered', color: 'bg-[#dff6dd] text-[#107c10] border-[#92c5f7]' },
+  { value: 'pending', label: 'Pending', color: 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44] border-[#ffe69d] dark:border-[#ca5010]/40' },
+  { value: 'confirmed', label: 'Confirmed', color: 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#ea580c] dark:text-[#ff8c42] border-orange-200 dark:border-[#ea580c]/40' },
+  { value: 'preparing', label: 'Preparing', color: 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border-[#d4b9e8] dark:border-[#6a1b9a]' },
+  { value: 'delivered', label: 'Delivered', color: 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] border-[#92c5f7] dark:border-[#4caf50]' },
 ]
 
 // Draggable Order Card Component
@@ -52,6 +53,7 @@ function DraggableOrderCard({
   onCheckOrder: (orderId: string) => void
   onCancelOrder?: (orderId: string) => void
 }) {
+  const { confirm, ConfirmDialogComponent } = useConfirm()
   const { attributes, listeners, setNodeRef, isDragging, transform } = useDraggable({
     id: order.name,
     data: {
@@ -76,7 +78,7 @@ function DraggableOrderCard({
       {...listeners}
       {...attributes}
       className={cn(
-        "cursor-grab active:cursor-grabbing hover:shadow-md transition-all duration-200 bg-white border border-[#edebe9] py-0",
+        "cursor-grab active:cursor-grabbing hover:shadow-md transition-all duration-200 bg-card border border-border py-0",
         isDragging && "opacity-50 scale-95 shadow-xl"
       )}
     >
@@ -84,12 +86,12 @@ function DraggableOrderCard({
         {/* Header: Order ID and Table */}
         <div className="flex items-center justify-between mb-2.5">
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
-            <span className="text-xs font-semibold text-[#323130] uppercase truncate">
+            <span className="text-xs font-semibold text-foreground uppercase truncate">
               {order.order_number || order.name}
             </span>
           </div>
           {order.table_number != null && (
-            <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-[#e8d5ff] text-[#8764b8] border border-[#d4b9e8] flex-shrink-0">
+            <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a] flex-shrink-0">
               Table {order.table_number}
             </span>
           )}
@@ -97,16 +99,16 @@ function DraggableOrderCard({
         
         {/* Customer Info - Single Row */}
         {(order.customer_name || order.customer_phone) && (
-          <div className="flex items-center gap-2 mb-2.5 text-xs text-[#605e5c]">
+          <div className="flex items-center gap-2 mb-2.5 text-xs text-muted-foreground">
             {order.customer_name && (
               <div className="flex items-center gap-1 min-w-0 flex-1">
-                <User className="h-3 w-3 text-[#a19f9d] flex-shrink-0" />
+                <User className="h-3 w-3 text-muted-foreground/70 flex-shrink-0" />
                 <span className="truncate">{order.customer_name}</span>
               </div>
             )}
             {order.customer_phone && (
               <div className="flex items-center gap-1 flex-shrink-0">
-                <Phone className="h-3 w-3 text-[#a19f9d]" />
+                <Phone className="h-3 w-3 text-muted-foreground/70" />
                 <span className="truncate">{order.customer_phone}</span>
               </div>
             )}
@@ -114,10 +116,10 @@ function DraggableOrderCard({
         )}
         
         {/* Order Total - TO PAY */}
-        <div className="mb-2.5 pb-2.5 border-b border-[#edebe9]">
+        <div className="mb-2.5 pb-2.5 border-b border-border">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="text-xs text-[#605e5c] font-medium">TO PAY</span>
-            <span className="text-base font-bold text-[#323130]">
+            <span className="text-xs text-muted-foreground font-medium">TO PAY</span>
+            <span className="text-base font-bold text-foreground">
               ₹{order.total?.toFixed(0) || 0}
             </span>
           </div>
@@ -126,17 +128,17 @@ function DraggableOrderCard({
         {/* Payment & Coupon Info */}
         <div className="space-y-1 mb-2.5">
           {order.payment_method && (
-            <div className="flex items-center gap-1.5 text-xs text-[#605e5c]">
-              <CreditCard className="h-3 w-3 text-[#a19f9d] flex-shrink-0" />
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <CreditCard className="h-3 w-3 text-muted-foreground/70 flex-shrink-0" />
               <span className="capitalize truncate">{order.payment_method.replace('_', ' ')}</span>
               {order.payment_status && (
                 <span className={cn(
-                  "ml-1 px-1 py-0.5 rounded text-[10px] font-medium",
+                  "ml-1 px-1 py-0.5 rounded-md text-[10px] font-medium",
                   order.payment_status === 'completed' 
-                    ? "bg-[#dff6dd] text-[#107c10]"
+                    ? "bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784]"
                     : order.payment_status === 'failed'
-                    ? "bg-[#fde7e9] text-[#d13438]"
-                    : "bg-[#fff4ce] text-[#ca5010]"
+                    ? "bg-[#fde7e9] dark:bg-[#b71c1c] text-[#d13438] dark:text-[#ef5350]"
+                    : "bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44]"
                 )}>
                   {order.payment_status}
                 </span>
@@ -144,16 +146,16 @@ function DraggableOrderCard({
             </div>
           )}
           {order.coupon && (
-            <div className="flex items-center gap-1.5 text-xs text-[#605e5c]">
-              <Tag className="h-3 w-3 text-[#a19f9d] flex-shrink-0" />
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Tag className="h-3 w-3 text-muted-foreground/70 flex-shrink-0" />
               <span className="truncate">{order.coupon}</span>
             </div>
           )}
         </div>
         
         {/* Timestamp */}
-        <div className="flex items-center gap-1.5 text-xs text-[#605e5c] mb-2.5">
-          <Clock className="h-3 w-3 text-[#a19f9d] flex-shrink-0" />
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2.5">
+          <Clock className="h-3 w-3 text-muted-foreground/70 flex-shrink-0" />
           <span>
             {order.creation ? new Date(order.creation).toLocaleString('en-IN', {
               day: '2-digit',
@@ -165,22 +167,32 @@ function DraggableOrderCard({
         </div>
         
         {/* Footer Actions */}
-        <div className="flex items-center gap-2 pt-2 border-t border-[#edebe9]">
+        <div className="flex items-center gap-2 pt-2 border-t border-border">
           {showCancelButton && onCancelOrder && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation()
-                if (confirm('Are you sure you want to cancel this order?')) {
-                  onCancelOrder(order.name)
-                }
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              className="h-7 px-2 text-xs text-[#d13438] hover:text-[#a4262c] hover:bg-[#fde7e9] border-[#f4c2c4] flex-1"
-            >
-              Cancel
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async (e) => {
+                  e.stopPropagation()
+                  const confirmed = await confirm({
+                    title: 'Cancel Order',
+                    description: 'Are you sure you want to cancel this order? This action cannot be undone.',
+                    variant: 'destructive',
+                    confirmText: 'Cancel Order',
+                    cancelText: 'Keep Order'
+                  })
+                  if (confirmed) {
+                    onCancelOrder(order.name)
+                  }
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="h-7 px-2 text-xs text-destructive hover:text-destructive/80 hover:bg-destructive/10 border-destructive/20 flex-1"
+              >
+                Cancel
+              </Button>
+              {ConfirmDialogComponent}
+            </>
           )}
           <Button
             variant="ghost"
@@ -190,7 +202,7 @@ function DraggableOrderCard({
               onCheckOrder(order.name)
             }}
             onPointerDown={(e) => e.stopPropagation()}
-            className="h-7 px-2 text-xs text-[#323130] hover:text-[#201f1e] hover:bg-[#f3f2f1] flex-1"
+            className="h-7 px-2 text-xs text-foreground hover:text-foreground hover:bg-accent flex-1"
           >
             <Eye className="h-3.5 w-3.5 mr-1" />
             View
@@ -230,15 +242,15 @@ function DroppableStatusColumn({
       <div
         ref={setNodeRef}
         className={cn(
-          "space-y-1.5 rounded-md px-2 py-1 bg-[#faf9f8] flex-1 overflow-y-auto transition-all duration-200 border",
+          "space-y-1.5 rounded-md px-2 py-1 bg-muted flex-1 overflow-y-auto transition-all duration-200 border",
           isOver 
-            ? 'bg-orange-50 border-2 border-[#ea580c] border-dashed shadow-inner' 
-            : 'border-[#edebe9] hover:border-[#c8c6c4]'
+            ? 'bg-primary/10 dark:bg-primary/20 border-2 border-primary border-dashed shadow-inner' 
+            : 'border-border hover:border-border/80'
         )}
         style={{ maxHeight: 'calc(100vh - 320px)', minHeight: '300px' }}
       >
         {orders.length === 0 ? (
-          <div className="text-center text-[#605e5c] text-sm py-8">
+          <div className="text-center text-muted-foreground text-sm py-8">
             No orders
           </div>
         ) : (
@@ -404,17 +416,17 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
         }}
       >
         {activeOrder ? (
-          <Card className="cursor-grabbing shadow-2xl bg-white border-2 border-[#ea580c] w-80 rotate-1 scale-105 transition-transform duration-200">
+          <Card className="cursor-grabbing shadow-2xl bg-card border-2 border-primary w-80 rotate-1 scale-105 transition-transform duration-200">
             <CardContent className="px-3 py-3">
               {/* Header: Order ID and Table */}
               <div className="flex items-center justify-between mb-2.5">
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                  <span className="text-xs font-semibold text-[#323130] uppercase truncate">
+                  <span className="text-xs font-semibold text-foreground uppercase truncate">
                     {activeOrder.order_number || activeOrder.name}
                   </span>
                 </div>
                   {activeOrder.table_number != null && (
-                    <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-[#e8d5ff] text-[#8764b8] border border-[#d4b9e8] flex-shrink-0">
+                    <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a] flex-shrink-0">
                       Table {activeOrder.table_number}
                     </span>
                   )}
@@ -422,16 +434,16 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
               
               {/* Customer Info - Single Row */}
               {(activeOrder.customer_name || activeOrder.customer_phone) && (
-                <div className="flex items-center gap-2 mb-2.5 text-xs text-[#605e5c]">
+                <div className="flex items-center gap-2 mb-2.5 text-xs text-muted-foreground">
                   {activeOrder.customer_name && (
                     <div className="flex items-center gap-1 min-w-0 flex-1">
-                      <User className="h-3 w-3 text-[#a19f9d] flex-shrink-0" />
+                      <User className="h-3 w-3 text-muted-foreground/70 flex-shrink-0" />
                       <span className="truncate">{activeOrder.customer_name}</span>
                     </div>
                   )}
                   {activeOrder.customer_phone && (
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      <Phone className="h-3 w-3 text-[#a19f9d]" />
+                      <Phone className="h-3 w-3 text-muted-foreground/70" />
                       <span className="truncate">{activeOrder.customer_phone}</span>
                     </div>
                   )}
@@ -439,18 +451,18 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
               )}
               
               {/* Order Total - TO PAY */}
-              <div className="mb-2.5 pb-2.5 border-b border-[#edebe9]">
+              <div className="mb-2.5 pb-2.5 border-b border-border">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-xs text-[#605e5c] font-medium">TO PAY</span>
-                  <span className="text-base font-bold text-[#323130]">
+                  <span className="text-xs text-muted-foreground font-medium">TO PAY</span>
+                  <span className="text-base font-bold text-foreground">
                     ₹{activeOrder.total?.toFixed(0) || 0}
                   </span>
                 </div>
               </div>
               
               {/* Timestamp */}
-              <div className="flex items-center gap-1.5 text-xs text-[#605e5c]">
-                <Clock className="h-3 w-3 text-[#a19f9d] flex-shrink-0" />
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3 text-muted-foreground/70 flex-shrink-0" />
                 <span>
                   {activeOrder.creation ? new Date(activeOrder.creation).toLocaleString('en-IN', {
                     day: '2-digit',
