@@ -231,7 +231,7 @@
   },
   {
    "fieldname": "google_map_url",
-   "fieldtype": "Data",
+   "fieldtype": "Long Text",
    "label": "Google Map URL",
    "description": "Enter the Google Maps URL for your restaurant location"
   }
