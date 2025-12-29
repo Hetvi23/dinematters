@@ -716,15 +716,15 @@ export default function DynamicForm({
         return (
           <DatePicker
             key={field.fieldname}
-            id={field.fieldname}
+              id={field.fieldname}
             value={value || ''}
             onChange={(dateValue) => handleFieldChange(field.fieldname, dateValue)}
             placeholder="Select a date"
-            required={field.required}
+              required={field.required}
             readOnly={isReadOnly}
             label={field.label}
             description={field.description ? getEnhancedDescription(field, doctype) : undefined}
-          />
+            />
         )
 
       case 'Time':

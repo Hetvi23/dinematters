@@ -6,12 +6,10 @@ import RestaurantDataList from '@/components/RestaurantDataList'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Stepper, Step } from '@/components/ui/stepper'
-import { ArrowLeft, ArrowRight, Check, Plus, Building2, Loader2 } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 interface WizardStep {
@@ -42,37 +40,18 @@ const truncateText = (text: string, maxLength: number): string => {
 
 export default function SetupWizard() {
   const navigate = useNavigate()
-  const params = useParams<{ restaurantName?: string }>()
   
-  // Get restaurant name from URL params
-  const restaurantNameFromUrl = params.restaurantName ? decodeURIComponent(params.restaurantName) : null
-  
-  // Restaurant selection state - only use URL params, not localStorage
-  const [selectedRestaurant, setSelectedRestaurant] = useState<string | null>(null)
-  
-  const [showRestaurantSelection, setShowRestaurantSelection] = useState<boolean>(() => {
-    // If URL has restaurant name, don't show selection
-    if (restaurantNameFromUrl) {
-      return false
+  // Get selected restaurant from localStorage (set by Layout component)
+  const [selectedRestaurant, setSelectedRestaurant] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('dinematters-selected-restaurant')
+    } catch {
+      return null
     }
-    // If no restaurant name in URL, always show selection
-    return true
   })
-  
-  // Modal state for creating new restaurant
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [newRestaurantData, setNewRestaurantData] = useState({
-    restaurant_name: '',
-    owner_email: '',
-    owner_phone: ''
-  })
-  const [isCreating, setIsCreating] = useState(false)
-  
-  // API call for creating restaurant
-  const { call: createRestaurant } = useFrappePostCall('frappe.client.insert')
   
   // Get user's restaurants
-  const { data: restaurantsData, isLoading: restaurantsLoading, mutate: refreshRestaurants } = useFrappeGetCall<{ message: { restaurants: Restaurant[] } }>(
+  const { data: restaurantsData, isLoading: restaurantsLoading } = useFrappeGetCall<{ message: { restaurants: Restaurant[] } }>(
     'dinematters.dinematters.api.ui.get_user_restaurants',
     {},
     'user-restaurants'
@@ -80,29 +59,24 @@ export default function SetupWizard() {
   
   const restaurants = restaurantsData?.message?.restaurants || []
   
-  // Find restaurant by name from URL and set as selected
+  // Update selected restaurant from localStorage when restaurants are loaded
   useEffect(() => {
-    if (restaurantNameFromUrl && restaurants.length > 0) {
-      // Find restaurant by restaurant_name (case-insensitive, URL-friendly)
-      const restaurant = restaurants.find(r => 
-        r.restaurant_name.toLowerCase().replace(/\s+/g, '-') === restaurantNameFromUrl.toLowerCase() ||
-        r.restaurant_id.toLowerCase() === restaurantNameFromUrl.toLowerCase() ||
-        r.name === restaurantNameFromUrl
-      )
-      if (restaurant) {
-        setSelectedRestaurant(restaurant.name)
-        setShowRestaurantSelection(false)
-      } else {
-        // Restaurant not found, show selection screen
-        setSelectedRestaurant(null)
-        setShowRestaurantSelection(true)
+    if (restaurants.length > 0) {
+      try {
+        const saved = localStorage.getItem('dinematters-selected-restaurant')
+        if (saved && restaurants.find(r => r.name === saved || r.restaurant_id === saved)) {
+          setSelectedRestaurant(saved)
+        } else if (!selectedRestaurant) {
+          // Use first restaurant as default if none selected
+          const firstRestaurant = restaurants[0]
+          setSelectedRestaurant(firstRestaurant.name)
+          localStorage.setItem('dinematters-selected-restaurant', firstRestaurant.name)
+        }
+      } catch {
+        // Ignore errors
       }
-    } else if (!restaurantNameFromUrl) {
-      // No restaurant name in URL, show selection screen
-      setSelectedRestaurant(null)
-      setShowRestaurantSelection(true)
     }
-  }, [restaurantNameFromUrl, restaurants])
+  }, [restaurants, selectedRestaurant])
   
   // Get setup wizard steps
   const { data: stepsData } = useFrappeGetCall<{ message: { steps: WizardStep[] } }>(
@@ -134,12 +108,12 @@ export default function SetupWizard() {
   
   // Get restaurant data if editing existing
   const { data: restaurantData } = useFrappeGetDoc('Restaurant', selectedRestaurant || '', {
-    enabled: !!selectedRestaurant && showRestaurantSelection === false
+    enabled: !!selectedRestaurant
   })
   
   // Get Restaurant Config data if restaurant exists
   const { data: configData } = useFrappeGetDoc('Restaurant Config', restaurantId || '', {
-    enabled: !!restaurantId && showRestaurantSelection === false
+    enabled: !!restaurantId
   })
 
   const [currentStep, setCurrentStep] = useState<number>(() => {
@@ -206,14 +180,6 @@ export default function SetupWizard() {
     }
   }, [currentStep])
 
-  useEffect(() => {
-    if (isInitialMount.current) return
-    try {
-      localStorage.setItem('dinematters-setup-show-selection', showRestaurantSelection.toString())
-    } catch (e) {
-      console.error('Failed to save showSelection to localStorage:', e)
-    }
-  }, [showRestaurantSelection])
 
   // Initialize progress when restaurant is selected
   // Use a ref to track if we've already initialized to prevent loops
@@ -465,95 +431,6 @@ export default function SetupWizard() {
     setTriggerSave(0)
   }, [currentStep])
 
-  const handleRestaurantSelect = (restaurantId: string) => {
-    // Find restaurant to get its name
-    const restaurant = restaurants.find(r => r.name === restaurantId || r.restaurant_id === restaurantId)
-    if (restaurant) {
-      // Create URL-friendly restaurant name (lowercase, replace spaces with hyphens)
-      const urlFriendlyName = restaurant.restaurant_name.toLowerCase().replace(/\s+/g, '-')
-      // Navigate to URL with restaurant name
-      navigate(`/setup/${encodeURIComponent(urlFriendlyName)}`)
-    } else {
-      // Fallback: navigate to /setup if restaurant not found
-      navigate('/setup')
-    }
-  }
-
-  const handleCreateNew = () => {
-    // Open the create restaurant modal
-    setShowCreateModal(true)
-    setNewRestaurantData({
-      restaurant_name: '',
-      owner_email: '',
-      owner_phone: ''
-    })
-  }
-
-  const handleCreateRestaurant = async () => {
-    // Validate required fields
-    if (!newRestaurantData.restaurant_name.trim()) {
-      toast.error('Restaurant name is required')
-      return
-    }
-    if (!newRestaurantData.owner_email.trim()) {
-      toast.error('Owner email is required')
-      return
-    }
-
-    setIsCreating(true)
-    try {
-      // Create restaurant document
-      const result = await createRestaurant({
-        doc: {
-          doctype: 'Restaurant',
-          restaurant_name: newRestaurantData.restaurant_name.trim(),
-          owner_email: newRestaurantData.owner_email.trim(),
-          owner_phone: newRestaurantData.owner_phone.trim() || undefined,
-          is_active: 1
-        }
-      })
-
-      if (result?.message) {
-        const createdRestaurant = result.message
-        const restaurantName = createdRestaurant.restaurant_name || createdRestaurant.name
-        const restaurantDocName = createdRestaurant.name || createdRestaurant.restaurant_id
-        
-        // Create URL-friendly restaurant name
-        const urlFriendlyName = restaurantName.toLowerCase().replace(/\s+/g, '-')
-        
-        // Close modal
-        setShowCreateModal(false)
-        setNewRestaurantData({ restaurant_name: '', owner_email: '', owner_phone: '' })
-        
-        // Show success message
-        toast.success('Restaurant created successfully!')
-        
-        // Refresh restaurants list to include the newly created restaurant
-        if (refreshRestaurants) {
-          await refreshRestaurants()
-        }
-        
-        // Set the selected restaurant directly to ensure the page updates
-        setSelectedRestaurant(restaurantDocName)
-    setShowRestaurantSelection(false)
-        
-        // Navigate to the new restaurant's setup wizard
-        // Use a small delay to ensure state updates are processed
-        setTimeout(() => {
-          navigate(`/setup/${encodeURIComponent(urlFriendlyName)}`, { replace: true })
-        }, 50)
-      } else {
-        throw new Error('Failed to create restaurant')
-      }
-    } catch (error: any) {
-      console.error('Error creating restaurant:', error)
-      toast.error('Failed to create restaurant', {
-        description: error?.message || 'An error occurred while creating the restaurant'
-      })
-    } finally {
-      setIsCreating(false)
-    }
-  }
 
   const handleStepComplete = (data: any) => {
     // Validate that we got some data back (any document should have a 'name' field)
@@ -693,171 +570,20 @@ export default function SetupWizard() {
   })) : []
 
 
-  // Restaurant Selection Screen
-  if (showRestaurantSelection && !restaurantsLoading) {
+  // Show loading state if no restaurant is selected
+  if (!selectedRestaurant && !restaurantsLoading) {
     return (
-      <>
       <div className="space-y-6">
-          <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Restaurant Setup Wizard</h2>
-          <p className="text-muted-foreground">
-            Select an existing restaurant to continue setup, or create a new one
-          </p>
+          <p className="text-muted-foreground">Please select a restaurant from the dropdown above to continue.</p>
         </div>
-            <Button onClick={handleCreateNew}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create New Restaurant
-            </Button>
-              </div>
-
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {/* Existing Restaurants */}
-          {restaurants.map((restaurant) => (
-            <Card 
-              key={restaurant.name}
-              className="border-2 hover:border-primary cursor-pointer transition-all hover:shadow-lg flex flex-col h-full"
-              onClick={() => handleRestaurantSelect(restaurant.name)}
-            >
-              <CardHeader className="flex-shrink-0">
-                <div className="grid grid-cols-[auto_1fr_auto] items-start gap-2 w-full">
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <Building2 className="h-6 w-6 text-primary" />
-                  </div>
-                  <div className="min-w-0 overflow-hidden pr-2">
-                    <CardTitle className="text-lg whitespace-nowrap overflow-hidden text-ellipsis" title={restaurant.restaurant_name}>
-                      {truncateText(restaurant.restaurant_name, 12)}
-                    </CardTitle>
-                    <CardDescription className="text-xs mt-1 truncate">
-                      ID: {restaurant.restaurant_id}
-                    </CardDescription>
-                  </div>
-                  <div className="flex-shrink-0">
-                    {restaurant.is_active ? (
-                      <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full whitespace-nowrap">
-                        Active
-                      </span>
-                    ) : (
-                      <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full whitespace-nowrap">
-                        Inactive
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="flex-1 flex flex-col justify-between">
-                <div className="flex-1">
-                {restaurant.owner_email && (
-                    <p className="text-sm text-muted-foreground mb-3 truncate">
-                    Owner: {restaurant.owner_email}
-                  </p>
-                )}
-                </div>
-                <Button variant="outline" className="w-full mt-auto">
-                  Continue Setup
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {restaurants.length === 0 && (
-          <Card className="border-2">
-            <CardContent className="py-12 text-center">
-              <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground mb-4">
-                You don't have access to any restaurants yet.
-              </p>
-              <Button onClick={handleCreateNew}>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Your First Restaurant
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+        <Card>
+          <CardContent className="flex items-center justify-center py-8">
+            <div className="text-muted-foreground">No restaurant selected</div>
+          </CardContent>
+        </Card>
       </div>
-
-        {/* Create New Restaurant Modal */}
-        <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Create New Restaurant</DialogTitle>
-              <DialogDescription>
-                Enter the basic information to create your restaurant
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="restaurant_name">
-                  Restaurant Name <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="restaurant_name"
-                  value={newRestaurantData.restaurant_name}
-                  onChange={(e) => setNewRestaurantData(prev => ({ ...prev, restaurant_name: e.target.value }))}
-                  disabled={isCreating}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Your restaurant's name as it will appear to customers (e.g., Pizza Palace)
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="owner_email">
-                  Owner Email <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="owner_email"
-                  type="email"
-                  value={newRestaurantData.owner_email}
-                  onChange={(e) => setNewRestaurantData(prev => ({ ...prev, owner_email: e.target.value }))}
-                  disabled={isCreating}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Email address of the restaurant owner for system access (e.g., owner@restaurant.com)
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="owner_phone">Owner Phone</Label>
-                <Input
-                  id="owner_phone"
-                  type="tel"
-                  value={newRestaurantData.owner_phone}
-                  onChange={(e) => setNewRestaurantData(prev => ({ ...prev, owner_phone: e.target.value }))}
-                  disabled={isCreating}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Phone number of the restaurant owner (e.g., +1 (555) 123-4567)
-                </p>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowCreateModal(false)}
-                disabled={isCreating}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCreateRestaurant}
-                disabled={isCreating || !newRestaurantData.restaurant_name.trim() || !newRestaurantData.owner_email.trim()}
-              >
-                {isCreating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Restaurant
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </>
     )
   }
 
@@ -880,7 +606,6 @@ export default function SetupWizard() {
   // Get restaurant display name
   const displayRestaurantName = restaurantData?.restaurant_name || 
     restaurants.find(r => r.name === selectedRestaurant)?.restaurant_name ||
-    restaurantNameFromUrl?.replace(/-/g, ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') ||
     'Restaurant'
 
   return (
@@ -892,25 +617,14 @@ export default function SetupWizard() {
             Follow these steps to set up your restaurant
           </p>
         </div>
-        <div className="flex flex-col gap-2">
-          <Button
-            variant="outline"
-            onClick={() => {
-              navigate('/setup')
-            }}
-          >
-            <Building2 className="mr-2 h-4 w-4" />
-            Change Restaurant
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setShowProgressModal(true)}
-            className="bg-green-600 hover:bg-green-700 text-white border-green-600"
-          >
-            Check progress: {Math.round(progressPercentage)}%
-          </Button>
-        </div>
-      </div>
+        <Button
+          variant="outline"
+          onClick={() => setShowProgressModal(true)}
+          className="bg-green-600 hover:bg-green-700 text-white border-green-600"
+        >
+          Check progress: {Math.round(progressPercentage)}%
+        </Button>
+            </div>
 
       {currentStepData && (
         <Card className="border-2">
@@ -1096,7 +810,7 @@ export default function SetupWizard() {
                   showSaveButton={false}
                   doctype={currentStepData.doctype}
                   hideFields={currentStepData.id === 'restaurant' 
-                    ? ['restaurant_id', 'company', 'slug', 'subdomain'] 
+                    ? ['restaurant_id', 'company', 'subdomain'] 
                     : currentStepData.id === 'config'
                     ? ['restaurant_name', 'description', 'currency', 'primary_color']
                     : undefined}

@@ -1,11 +1,16 @@
-import { Link, useLocation } from 'react-router-dom'
-import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, Menu, X, Lock, LockOpen, ChevronDown, TrendingUp, TrendingDown, DollarSign, Clock, AlertCircle, Activity, Moon, Sun } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, Menu, X, Lock, LockOpen, ChevronDown, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useFrappeGetDocList, useFrappeGetCall } from '@/lib/frappe'
+import { useFrappeGetDocList, useFrappeGetCall, useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe'
 import { useState, useEffect, useMemo } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useTheme } from '@/contexts/ThemeContext'
 import Breadcrumb from './Breadcrumb'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { toast } from 'sonner'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -30,6 +35,7 @@ interface Restaurant {
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
+  const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
   const [sidebarOpen, setSidebarOpen] = useState(false) // Mobile sidebar
   const [sidebarExpanded, setSidebarExpanded] = useState(true) // Desktop sidebar expanded/collapsed
@@ -38,6 +44,18 @@ export default function Layout({ children }: LayoutProps) {
   const [selectOpen, setSelectOpen] = useState(false) // Track if restaurant select is open
   const [lockAnimating, setLockAnimating] = useState(false) // Track lock animation state
   const [selectedRestaurant, setSelectedRestaurant] = useState<string | null>(null)
+  
+  // Modal state for creating new restaurant
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [newRestaurantData, setNewRestaurantData] = useState({
+    restaurant_name: '',
+    owner_email: '',
+    owner_phone: ''
+  })
+  const [isCreating, setIsCreating] = useState(false)
+  
+  // API call for creating restaurant
+  const { call: createRestaurant } = useFrappePostCall('frappe.client.insert')
 
   // Fetch user's restaurants
   const { data: restaurantsData } = useFrappeGetCall<{ message: { restaurants: Restaurant[] } }>(
@@ -68,6 +86,17 @@ export default function Layout({ children }: LayoutProps) {
 
   // Handle restaurant change
   const handleRestaurantChange = (restaurantId: string) => {
+    if (restaurantId === '__create_new__') {
+      // Open create restaurant modal
+      setShowCreateModal(true)
+      setNewRestaurantData({
+        restaurant_name: '',
+        owner_email: '',
+        owner_phone: ''
+      })
+      return
+    }
+    
     setSelectedRestaurant(restaurantId)
     try {
       localStorage.setItem('dinematters-selected-restaurant', restaurantId)
@@ -78,8 +107,77 @@ export default function Layout({ children }: LayoutProps) {
     }
   }
 
+  // Handle create restaurant submission
+  const handleCreateRestaurant = async () => {
+    // Validate required fields
+    if (!newRestaurantData.restaurant_name.trim()) {
+      toast.error('Restaurant name is required')
+      return
+    }
+    if (!newRestaurantData.owner_email.trim()) {
+      toast.error('Owner email is required')
+      return
+    }
+
+    setIsCreating(true)
+    try {
+      // Create restaurant document
+      const result = await createRestaurant({
+        doc: {
+          doctype: 'Restaurant',
+          restaurant_name: newRestaurantData.restaurant_name.trim(),
+          owner_email: newRestaurantData.owner_email.trim(),
+          owner_phone: newRestaurantData.owner_phone.trim() || undefined,
+          is_active: 1
+        }
+      })
+
+      if (result?.message) {
+        const createdRestaurant = result.message
+        const restaurantName = createdRestaurant.restaurant_name || createdRestaurant.name
+        const restaurantDocName = createdRestaurant.name || createdRestaurant.restaurant_id
+        
+        // Create URL-friendly restaurant name
+        const urlFriendlyName = restaurantName.toLowerCase().replace(/\s+/g, '-')
+        
+        // Close modal
+        setShowCreateModal(false)
+        setNewRestaurantData({ restaurant_name: '', owner_email: '', owner_phone: '' })
+        
+        // Show success message
+        toast.success('Restaurant created successfully!')
+        
+        // Set the selected restaurant
+        setSelectedRestaurant(restaurantDocName)
+        localStorage.setItem('dinematters-selected-restaurant', restaurantDocName)
+        
+        // Navigate to the new restaurant's setup wizard
+        setTimeout(() => {
+          navigate(`/setup/${encodeURIComponent(urlFriendlyName)}`, { replace: true })
+          window.location.reload()
+        }, 100)
+      } else {
+        throw new Error('Failed to create restaurant')
+      }
+    } catch (error: any) {
+      console.error('Error creating restaurant:', error)
+      toast.error('Failed to create restaurant', {
+        description: error?.message || 'An error occurred while creating the restaurant'
+      })
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
   // Get current restaurant details
   const currentRestaurant = restaurants.find(r => r.name === selectedRestaurant || r.restaurant_id === selectedRestaurant)
+
+  // Fetch restaurant document to get slug
+  const { data: restaurantDoc } = useFrappeGetDoc('Restaurant', selectedRestaurant || '', {
+    enabled: !!selectedRestaurant
+  })
+
+  const restaurantSlug = restaurantDoc?.slug || ''
 
   // Fetch orders for analytics
   const { data: orders } = useFrappeGetDocList('Order', {
@@ -254,6 +352,13 @@ export default function Layout({ children }: LayoutProps) {
                             </div>
                           </SelectItem>
                         ))}
+                        <div className="border-t border-border my-1" />
+                        <SelectItem value="__create_new__" className="text-primary">
+                          <div className="flex items-center gap-2 w-full">
+                            <Plus className="h-4 w-4 text-primary flex-shrink-0" />
+                            <span className="text-sm font-medium">Create New Restaurant</span>
+                          </div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   ) : (
@@ -581,6 +686,24 @@ export default function Layout({ children }: LayoutProps) {
               </div>
             </div>
 
+            {/* Right Side: Watch Preview Button */}
+            {restaurantSlug && (
+              <div className="hidden lg:flex items-center pr-6 flex-shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    window.open(`https://demo.dinematters.com/${restaurantSlug}`, '_blank', 'noopener,noreferrer')
+                  }}
+                  className="gap-2"
+                >
+                  <Eye className="h-4 w-4" />
+                  Watch preview
+                  <ExternalLink className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+
             {/* Mobile Analytics Panel - Compact */}
             <div className="lg:hidden flex-1 overflow-x-auto px-2">
               <div className="flex items-center gap-2">
@@ -611,6 +734,23 @@ export default function Layout({ children }: LayoutProps) {
                 )}
               </div>
             </div>
+
+            {/* Right Side: Watch Preview Button - Mobile */}
+            {restaurantSlug && (
+              <div className="lg:hidden flex items-center pr-2 flex-shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    window.open(`https://demo.dinematters.com/${restaurantSlug}`, '_blank', 'noopener,noreferrer')
+                  }}
+                  className="gap-1.5 px-2"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  <span className="text-xs">Preview</span>
+                </Button>
+              </div>
+            )}
           </div>
         </header>
 
@@ -622,6 +762,87 @@ export default function Layout({ children }: LayoutProps) {
           </div>
         </main>
       </div>
+
+      {/* Create New Restaurant Modal */}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Create New Restaurant</DialogTitle>
+            <DialogDescription>
+              Enter the basic information to create your restaurant
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="restaurant_name">
+                Restaurant Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="restaurant_name"
+                value={newRestaurantData.restaurant_name}
+                onChange={(e) => setNewRestaurantData(prev => ({ ...prev, restaurant_name: e.target.value }))}
+                disabled={isCreating}
+              />
+              <p className="text-xs text-muted-foreground">
+                Your restaurant's name as it will appear to customers (e.g., Pizza Palace)
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="owner_email">
+                Owner Email <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="owner_email"
+                type="email"
+                value={newRestaurantData.owner_email}
+                onChange={(e) => setNewRestaurantData(prev => ({ ...prev, owner_email: e.target.value }))}
+                disabled={isCreating}
+              />
+              <p className="text-xs text-muted-foreground">
+                Email address of the restaurant owner for system access (e.g., owner@restaurant.com)
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="owner_phone">Owner Phone</Label>
+              <Input
+                id="owner_phone"
+                type="tel"
+                value={newRestaurantData.owner_phone}
+                onChange={(e) => setNewRestaurantData(prev => ({ ...prev, owner_phone: e.target.value }))}
+                disabled={isCreating}
+              />
+              <p className="text-xs text-muted-foreground">
+                Phone number of the restaurant owner (e.g., +1 (555) 123-4567)
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateModal(false)}
+              disabled={isCreating}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateRestaurant}
+              disabled={isCreating || !newRestaurantData.restaurant_name.trim() || !newRestaurantData.owner_email.trim()}
+            >
+              {isCreating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Restaurant
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

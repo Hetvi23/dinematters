@@ -81,7 +81,8 @@ def get_restaurant_context(restaurant_id):
 		"tax_rate": restaurant_doc.tax_rate,
 		"default_delivery_fee": restaurant_doc.default_delivery_fee,
 		"currency": restaurant_doc.currency,
-		"timezone": restaurant_doc.timezone
+		"timezone": restaurant_doc.timezone,
+		"google_map_url": restaurant_doc.google_map_url
 	}
 
 
