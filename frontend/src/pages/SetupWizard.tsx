@@ -11,6 +11,7 @@ import { Stepper, Step } from '@/components/ui/stepper'
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { useRestaurant } from '@/contexts/RestaurantContext'
 
 interface WizardStep {
   id: string
@@ -40,15 +41,7 @@ const truncateText = (text: string, maxLength: number): string => {
 
 export default function SetupWizard() {
   const navigate = useNavigate()
-  
-  // Get selected restaurant from localStorage (set by Layout component)
-  const [selectedRestaurant, setSelectedRestaurant] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem('dinematters-selected-restaurant')
-    } catch {
-      return null
-    }
-  })
+  const { selectedRestaurant, setSelectedRestaurant } = useRestaurant()
   
   // Get user's restaurants
   const { data: restaurantsData, isLoading: restaurantsLoading } = useFrappeGetCall<{ message: { restaurants: Restaurant[] } }>(
@@ -58,25 +51,6 @@ export default function SetupWizard() {
   )
   
   const restaurants = restaurantsData?.message?.restaurants || []
-  
-  // Update selected restaurant from localStorage when restaurants are loaded
-  useEffect(() => {
-    if (restaurants.length > 0) {
-      try {
-        const saved = localStorage.getItem('dinematters-selected-restaurant')
-        if (saved && restaurants.find(r => r.name === saved || r.restaurant_id === saved)) {
-          setSelectedRestaurant(saved)
-        } else if (!selectedRestaurant) {
-          // Use first restaurant as default if none selected
-          const firstRestaurant = restaurants[0]
-          setSelectedRestaurant(firstRestaurant.name)
-          localStorage.setItem('dinematters-selected-restaurant', firstRestaurant.name)
-        }
-      } catch {
-        // Ignore errors
-      }
-    }
-  }, [restaurants, selectedRestaurant])
   
   // Get setup wizard steps
   const { data: stepsData } = useFrappeGetCall<{ message: { steps: WizardStep[] } }>(
@@ -104,6 +78,7 @@ export default function SetupWizard() {
   const progress = progressData?.message || {}
 
   // Get restaurant name from step data if available (define early to avoid initialization errors)
+  // Always use selectedRestaurant from context as the primary source
   const restaurantId = selectedRestaurant || null
   
   // Get restaurant data if editing existing
@@ -402,10 +377,12 @@ export default function SetupWizard() {
   }, [formHasChanges, currentStep, currentStepData, completedSteps])
 
   // Get restaurant name from step data if available
-  const restaurantName = restaurantId || stepData['restaurant']?.name || stepData['restaurant']?.restaurant_id || selectedRestaurant
+  // Priority: selectedRestaurant from context > stepData > fallback
+  const restaurantName = selectedRestaurant || stepData['restaurant']?.name || stepData['restaurant']?.restaurant_id || restaurantId
   
   // Update restaurantId with step data if available (but keep the early definition above)
-  const finalRestaurantId = restaurantId || stepData['restaurant']?.name || stepData['restaurant']?.restaurant_id || selectedRestaurant
+  // Always prioritize selectedRestaurant from context
+  const finalRestaurantId = selectedRestaurant || stepData['restaurant']?.name || stepData['restaurant']?.restaurant_id || restaurantId
   const { data: restaurantUsers } = useFrappeGetDocList(
     'Restaurant User',
     {
@@ -462,7 +439,10 @@ export default function SetupWizard() {
       
       // If restaurant was created, set it as selected
       if (stepId === 'restaurant' && (data.name || data.restaurant_id)) {
-        setSelectedRestaurant(data.name || data.restaurant_id)
+        const restaurantId = data.name || data.restaurant_id
+        setSelectedRestaurant(restaurantId)
+        // Dispatch custom event to notify other components
+        window.dispatchEvent(new CustomEvent('restaurant-selected'))
       }
     }
     setCompletedSteps(prev => new Set([...prev, currentStep]))
@@ -603,9 +583,10 @@ export default function SetupWizard() {
     )
   }
 
-  // Get restaurant display name
+  // Get restaurant display name for showing in read-only fields
   const displayRestaurantName = restaurantData?.restaurant_name || 
     restaurants.find(r => r.name === selectedRestaurant)?.restaurant_name ||
+    selectedRestaurant ||
     'Restaurant'
 
   return (
@@ -806,6 +787,7 @@ export default function SetupWizard() {
             {currentStepData && !['users', 'categories', 'products'].includes(currentStepData.id) && (
               <div className="bg-muted/30 rounded-md p-6 border">
                 <DynamicForm
+                  key={`${currentStepData.id}-${selectedRestaurant || 'no-restaurant'}-${currentStep}`}
                   onChange={setFormHasChanges}
                   showSaveButton={false}
                   doctype={currentStepData.doctype}
@@ -814,6 +796,11 @@ export default function SetupWizard() {
                     : currentStepData.id === 'config'
                     ? ['restaurant_name', 'description', 'currency', 'primary_color']
                     : undefined}
+                  readOnlyFields={currentStepData.id === 'config' 
+                    ? ['restaurant'] 
+                    : currentStepData.depends_on === 'restaurant'
+                    ? ['restaurant']
+                    : undefined}
                   docname={(() => {
                     const savedData = stepData[currentStepData.id]
                     // For restaurant, use the selected restaurant name
@@ -821,8 +808,9 @@ export default function SetupWizard() {
                       return selectedRestaurant
                     }
                     // For config, use restaurant as docname (autoname: field:restaurant)
-                    if (currentStepData.id === 'config' && finalRestaurantId) {
-                      return finalRestaurantId
+                    // Always prioritize selectedRestaurant from context
+                    if (currentStepData.id === 'config') {
+                      return selectedRestaurant || finalRestaurantId || savedData?.restaurant || undefined
                     }
                     return savedData?.name || savedData?.restaurant_id || undefined
                   })()}
@@ -846,23 +834,29 @@ export default function SetupWizard() {
                       return data
                     }
                     
-                    // For Restaurant Config - always set restaurant and load existing data
+                    // For Restaurant Config - always set restaurant from selectedRestaurant and load existing data
                     if (currentStepData.id === 'config') {
-                      const restaurantValue = finalRestaurantId || restaurantName
+                      // Always use selectedRestaurant from context as the primary source
+                      const restaurantValue = selectedRestaurant || finalRestaurantId || restaurantName
                       const configData = stepData['config'] || {}
+                      // Remove restaurant from configData if it exists to ensure we use the selected one
+                      const { restaurant: _, ...restConfigData } = configData
                       return {
                         restaurant: restaurantValue,
-                        ...configData
+                        ...restConfigData
                       }
                     }
                     
                     // For other steps that depend on restaurant
                     if (currentStepData.depends_on === 'restaurant') {
-                      const restaurantValue = finalRestaurantId || restaurantName
+                      // Always use selectedRestaurant from context as the primary source
+                      const restaurantValue = selectedRestaurant || finalRestaurantId || restaurantName
                       const savedData = stepData[currentStepData.id]
+                      // Remove restaurant from savedData if it exists to ensure we use the selected one
+                      const { restaurant: _, ...restSavedData } = savedData || {}
                       return {
                         restaurant: restaurantValue,
-                        ...(savedData ? { ...savedData, name: undefined } : {})
+                        ...(restSavedData ? { ...restSavedData, name: undefined } : {})
                       }
                     }
                     

@@ -3,29 +3,36 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ShoppingCart, Package, FolderTree, TrendingUp, Store, Clock, CheckCircle, XCircle, AlertCircle, Link as LinkIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { useRestaurant } from '@/contexts/RestaurantContext'
 
 export default function Dashboard() {
-  // Fetch data with permissions (restaurant-based filtering is handled by permission_query_conditions)
+  const { selectedRestaurant } = useRestaurant()
+  
+  // Fetch data filtered by selected restaurant
   const { data: orders, isLoading: ordersLoading } = useFrappeGetDocList('Order', {
     fields: ['name', 'status', 'total', 'creation', 'restaurant', 'table_number'],
+    filters: selectedRestaurant ? { restaurant: selectedRestaurant } : undefined,
     limit: 50,
     orderBy: { field: 'creation', order: 'desc' }
-  })
+  }, selectedRestaurant ? `orders-dashboard-${selectedRestaurant}` : null)
 
   const { data: products, isLoading: productsLoading } = useFrappeGetDocList('Menu Product', {
     fields: ['name', 'product_name', 'price', 'is_active', 'restaurant'],
+    filters: selectedRestaurant ? { restaurant: selectedRestaurant } : undefined,
     limit: 100
-  })
+  }, selectedRestaurant ? `products-dashboard-${selectedRestaurant}` : null)
 
   const { data: categories, isLoading: categoriesLoading } = useFrappeGetDocList('Menu Category', {
     fields: ['name', 'category_name', 'restaurant'],
+    filters: selectedRestaurant ? { restaurant: selectedRestaurant } : undefined,
     limit: 100
-  })
+  }, selectedRestaurant ? `categories-dashboard-${selectedRestaurant}` : null)
 
   const { data: restaurants, isLoading: restaurantsLoading } = useFrappeGetDocList('Restaurant', {
     fields: ['name', 'restaurant_name', 'is_active', 'owner_email', 'city', 'state'],
+    filters: selectedRestaurant ? { name: selectedRestaurant } : undefined,
     limit: 100
-  })
+  }, selectedRestaurant ? `restaurants-dashboard-${selectedRestaurant}` : null)
 
   // Calculate stats
   const totalOrders = orders?.length || 0

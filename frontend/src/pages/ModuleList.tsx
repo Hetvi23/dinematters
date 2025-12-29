@@ -11,22 +11,41 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { toast } from 'sonner'
 import { useFrappePostCall } from '@/lib/frappe'
 import { useConfirm } from '@/hooks/useConfirm'
+import { useRestaurant } from '@/contexts/RestaurantContext'
 
 export default function ModuleList() {
   const { confirm, ConfirmDialogComponent } = useConfirm()
   const { doctype } = useParams<{ doctype: string }>()
+  const { selectedRestaurant } = useRestaurant()
   const { permissions } = usePermissions(doctype || '')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
 
+  // Restaurant-based doctypes that should be filtered by selected restaurant
+  const restaurantBasedDoctypes = [
+    'Menu Product', 'Menu Category', 'Order', 'Cart Entry',
+    'Coupon', 'Offer', 'Event', 'Game', 'Table Booking',
+    'Banquet Booking', 'Restaurant Config', 'Home Feature', 'Legacy Content'
+  ]
+
+  // Determine if this doctype should be filtered by restaurant
+  const shouldFilterByRestaurant = doctype && restaurantBasedDoctypes.includes(doctype)
+  
+  // Build filters
+  const filters = shouldFilterByRestaurant && selectedRestaurant
+    ? { restaurant: selectedRestaurant }
+    : undefined
+
   const { data: docs, isLoading } = useFrappeGetDocList(doctype || '', {
     fields: ['name', 'creation', 'modified'],
+    filters,
     limit: 100,
     orderBy: { field: 'modified', order: 'desc' }
   }, {
-    refresh: refreshKey
+    refresh: refreshKey,
+    key: selectedRestaurant ? `${doctype}-${selectedRestaurant}-${refreshKey}` : `${doctype}-${refreshKey}`
   })
 
   const { call: deleteDoc } = useFrappePostCall('frappe.client.delete')
@@ -171,6 +190,9 @@ export default function ModuleList() {
             <DynamicForm
               doctype={doctype}
               mode="create"
+              initialData={shouldFilterByRestaurant && selectedRestaurant
+                ? { restaurant: selectedRestaurant }
+                : {}}
               onSave={(data) => {
                 setShowCreateDialog(false)
                 setRefreshKey(prev => prev + 1)

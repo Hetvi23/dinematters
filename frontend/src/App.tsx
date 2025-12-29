@@ -2,6 +2,7 @@ import { FrappeProvider } from 'frappe-react-sdk'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from './components/ui/sonner'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
+import { RestaurantProvider } from './contexts/RestaurantContext'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import SetupWizard from './pages/SetupWizard'
@@ -62,7 +63,9 @@ function App() {
 			socketPort={import.meta.env.VITE_SOCKET_PORT}
 			siteName={window.frappe?.boot?.sitename ?? import.meta.env.VITE_SITE_NAME}>
 			<ThemeProvider>
-				<AppContent />
+				<RestaurantProvider>
+					<AppContent />
+				</RestaurantProvider>
 			</ThemeProvider>
 		</FrappeProvider>
 	)

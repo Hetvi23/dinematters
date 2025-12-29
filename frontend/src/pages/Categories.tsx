@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useState, useMemo } from 'react'
 import { useFrappeGetDocList, useFrappeDeleteDoc } from '@/lib/frappe'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -6,16 +7,113 @@ import { Button } from '@/components/ui/button'
 import { Eye, Pencil, Trash2, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/hooks/useConfirm'
+import { useRestaurant } from '@/contexts/RestaurantContext'
+import { ListFilters, FilterCondition } from '@/components/ListFilters'
 
 export default function Categories() {
   const { confirm, ConfirmDialogComponent } = useConfirm()
+  const { selectedRestaurant } = useRestaurant()
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filters, setFilters] = useState<FilterCondition[]>([])
+  
   const { data: categories, isLoading, mutate } = useFrappeGetDocList('Menu Category', {
-    fields: ['name', 'category_name', 'description', 'display_order'],
-    limit: 100,
+    fields: ['name', 'category_id', 'category_name', 'display_name', 'description', 'display_order', 'is_special'],
+    filters: selectedRestaurant ? { restaurant: selectedRestaurant } : undefined,
+    limit: 1000,
     orderBy: { field: 'display_order', order: 'asc' }
-  })
+  }, selectedRestaurant ? `categories-${selectedRestaurant}` : null)
 
   const { deleteDoc } = useFrappeDeleteDoc()
+
+  // Apply search and filters
+  const filteredCategories = useMemo(() => {
+    if (!categories) return []
+    
+    let filtered = [...categories]
+    
+    // Apply search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter((category: any) => {
+        return (
+          (category.category_name || '').toLowerCase().includes(query) ||
+          (category.display_name || '').toLowerCase().includes(query) ||
+          (category.name || '').toLowerCase().includes(query) ||
+          (category.category_id || '').toLowerCase().includes(query) ||
+          (category.description || '').toLowerCase().includes(query) ||
+          String(category.display_order || '').includes(query)
+        )
+      })
+    }
+    
+    // Apply filters
+    filters.forEach((filter) => {
+      // Skip empty filters, but allow false, 0, and empty string as valid values
+      if (filter.value === '' || filter.value === null || filter.value === undefined) {
+        // For 'is' and 'is not' operators, empty value is valid
+        if (filter.operator !== 'is' && filter.operator !== 'is not') {
+          return
+        }
+      }
+      
+      filtered = filtered.filter((category: any) => {
+        const fieldValue = category[filter.fieldname]
+        const filterValue = filter.value
+        
+        // Handle null/undefined field values
+        if (fieldValue === null || fieldValue === undefined) {
+          if (filter.operator === 'is') return true
+          if (filter.operator === 'is not') return false
+          if (filter.operator === '=' && (filterValue === null || filterValue === undefined || filterValue === '')) return true
+          if (filter.operator === '!=' && (filterValue !== null && filterValue !== undefined && filterValue !== '')) return true
+          return false
+        }
+        
+        switch (filter.operator) {
+          case '=':
+            // Handle boolean comparison
+            if (typeof fieldValue === 'boolean' || typeof filterValue === 'boolean') {
+              return Boolean(fieldValue) === Boolean(filterValue)
+            }
+            // Case-insensitive string comparison for text fields
+            return String(fieldValue).trim().toLowerCase() === String(filterValue).trim().toLowerCase()
+          case '!=':
+            // Handle boolean comparison
+            if (typeof fieldValue === 'boolean' || typeof filterValue === 'boolean') {
+              return Boolean(fieldValue) !== Boolean(filterValue)
+            }
+            // Case-insensitive string comparison for text fields
+            return String(fieldValue).trim().toLowerCase() !== String(filterValue).trim().toLowerCase()
+          case '>':
+            return Number(fieldValue) > Number(filterValue)
+          case '<':
+            return Number(fieldValue) < Number(filterValue)
+          case '>=':
+            return Number(fieldValue) >= Number(filterValue)
+          case '<=':
+            return Number(fieldValue) <= Number(filterValue)
+          case 'like':
+            return String(fieldValue || '').toLowerCase().includes(String(filterValue).toLowerCase())
+          case 'not like':
+            return !String(fieldValue || '').toLowerCase().includes(String(filterValue).toLowerCase())
+          case 'in':
+            const inValues = Array.isArray(filterValue) ? filterValue : [filterValue]
+            return inValues.some(v => String(fieldValue).trim().toLowerCase() === String(v).trim().toLowerCase())
+          case 'not in':
+            const notInValues = Array.isArray(filterValue) ? filterValue : [filterValue]
+            return !notInValues.some(v => String(fieldValue).trim().toLowerCase() === String(v).trim().toLowerCase())
+          case 'is':
+            return fieldValue === null || fieldValue === undefined || fieldValue === ''
+          case 'is not':
+            return fieldValue !== null && fieldValue !== undefined && fieldValue !== ''
+          default:
+            return true
+        }
+      })
+    })
+    
+    return filtered
+  }, [categories, searchQuery, filters])
 
   const handleDelete = async (categoryId: string, categoryName: string) => {
     const confirmed = await confirm({
@@ -59,23 +157,43 @@ export default function Categories() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Categories</CardTitle>
-          <CardDescription>
-            Categories are automatically filtered based on your restaurant access
-          </CardDescription>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle>All Categories</CardTitle>
+              <CardDescription>
+                Categories are automatically filtered based on your restaurant access
+                {filteredCategories.length !== categories?.length && (
+                  <span className="ml-2">
+                    (Showing {filteredCategories.length} of {categories?.length || 0})
+                  </span>
+                )}
+              </CardDescription>
+            </div>
+            <ListFilters
+              doctype="Menu Category"
+              filters={filters}
+              onFiltersChange={setFilters}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              searchPlaceholder="Search categories..."
+            />
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Loading categories...</div>
-          ) : categories && categories.length > 0 ? (
+          ) : filteredCategories && filteredCategories.length > 0 ? (
             <>
               {/* Mobile Card View */}
               <div className="md:hidden space-y-3">
-                {categories.map((category: any) => (
+                {filteredCategories.map((category: any, index: number) => (
                   <div key={category.name} className="p-4 border border-border rounded-md bg-card hover:border-border/80 transition-colors">
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-foreground truncate">{category.category_name || category.name}</h3>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs text-muted-foreground">#{index + 1}</span>
+                          <h3 className="font-semibold text-foreground truncate">{category.category_name || category.name}</h3>
+                        </div>
                         {category.description && (
                           <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{category.description}</p>
                         )}
@@ -115,6 +233,7 @@ export default function Categories() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-16">Sr. No.</TableHead>
                   <TableHead>Category Name</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Display Order</TableHead>
@@ -122,8 +241,9 @@ export default function Categories() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {categories.map((category: any) => (
+                {filteredCategories.map((category: any, index: number) => (
                   <TableRow key={category.name}>
+                    <TableCell className="text-muted-foreground">{index + 1}</TableCell>
                     <TableCell className="font-medium">{category.category_name || category.name}</TableCell>
                         <TableCell className="text-muted-foreground">
                       {category.description || '-'}

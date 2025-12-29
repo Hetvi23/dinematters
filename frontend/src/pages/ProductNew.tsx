@@ -8,9 +8,11 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft, Plus } from 'lucide-react'
 import { toast } from 'sonner'
+import { useRestaurant } from '@/contexts/RestaurantContext'
 
 export default function ProductNew() {
   const navigate = useNavigate()
+  const { selectedRestaurant } = useRestaurant()
   const { call, loading } = useFrappePostCall('frappe.client.insert')
 
   const [formData, setFormData] = useState({
@@ -29,10 +31,16 @@ export default function ProductNew() {
       return
     }
 
+    if (!selectedRestaurant) {
+      toast.error('Please select a restaurant first')
+      return
+    }
+
     try {
       await call({
         doc: {
           doctype: 'Menu Product',
+          restaurant: selectedRestaurant,
           product_name: formData.product_name,
           price: parseFloat(formData.price),
           original_price: formData.original_price ? parseFloat(formData.original_price) : null,

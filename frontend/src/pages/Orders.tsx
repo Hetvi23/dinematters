@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
+import { useRestaurant } from '@/contexts/RestaurantContext'
 
 type ViewType = 'kanban' | 'list'
 
@@ -69,11 +70,79 @@ export default function Orders() {
   const [dateTo, setDateTo] = useState('')
   const [showFilters, setShowFilters] = useState(false)
 
-  const { data: orders, isLoading, mutate } = useFrappeGetDocList('Order', {
-    fields: ['name', 'order_number', 'status', 'total', 'creation', 'restaurant', 'table_number', 'coupon', 'customer_name', 'customer_phone', 'payment_method', 'payment_status', 'subtotal', 'discount', 'tax', 'delivery_fee'],
-    limit: 100,
-    orderBy: { field: 'creation', order: 'desc' }
-  })
+  const { selectedRestaurant, restaurants } = useRestaurant()
+  
+  // Get the restaurant identifier to use for filtering
+  // selectedRestaurant is the docname, which should match the Order.restaurant field
+  const restaurantFilter = selectedRestaurant
+  
+  // Build filters - always filter by restaurant if one is selected
+  const filters = restaurantFilter ? { restaurant: restaurantFilter } : undefined
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('[Orders] Restaurant Filter:', {
+      selectedRestaurant,
+      restaurantFilter,
+      filters,
+      hasRestaurants: restaurants.length > 0
+    })
+  }, [selectedRestaurant, restaurantFilter, filters, restaurants.length])
+  
+  // Only fetch orders if a restaurant is selected
+  const { data: orders, isLoading, mutate } = useFrappeGetDocList(
+    'Order',
+    {
+      fields: ['name', 'order_number', 'status', 'total', 'creation', 'restaurant', 'table_number', 'coupon', 'customer_name', 'customer_phone', 'payment_method', 'payment_status', 'subtotal', 'discount', 'tax', 'delivery_fee'],
+      filters: filters,
+      limit: 100,
+      orderBy: { field: 'creation', order: 'desc' }
+    },
+    restaurantFilter ? `orders-${restaurantFilter}` : null // Use null to disable query when no restaurant selected
+  )
+  
+  // Debug: Log orders to verify filtering
+  useEffect(() => {
+    if (orders) {
+      const allRestaurants = [...new Set(orders.map((o: any) => o.restaurant))]
+      const matchingOrders = restaurantFilter 
+        ? orders.filter((o: any) => o.restaurant === restaurantFilter)
+        : []
+      
+      console.log('[Orders] Filter Results:', {
+        totalOrders: orders.length,
+        matchingOrders: matchingOrders.length,
+        restaurantFilter,
+        allRestaurantsInData: allRestaurants,
+        orders: orders.slice(0, 5).map((o: any) => ({ 
+          id: o.name, 
+          orderNumber: o.order_number,
+          restaurant: o.restaurant, 
+          matches: restaurantFilter ? o.restaurant === restaurantFilter : false 
+        }))
+      })
+      
+      // Warn if we see orders from other restaurants when a restaurant is selected
+      if (restaurantFilter && allRestaurants.length > 1) {
+        console.warn('[Orders] WARNING: Orders from multiple restaurants detected!', {
+          selectedRestaurant: restaurantFilter,
+          restaurantsInData: allRestaurants,
+          shouldOnlyShow: restaurantFilter
+        })
+      }
+    }
+  }, [orders, restaurantFilter])
+  
+  // Force refresh when selectedRestaurant changes
+  useEffect(() => {
+    if (restaurantFilter) {
+      // Small delay to ensure the filter is applied
+      const timer = setTimeout(() => {
+        mutate()
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [restaurantFilter, mutate])
 
   // Status update API call
   const { call: updateOrderStatus } = useFrappePostCall('dinematters.dinematters.api.order_status.update_status')
@@ -105,23 +174,92 @@ export default function Orders() {
     }
   }
 
-  // Get unique table numbers for filter
+  // Get unique table numbers for filter (use filteredOrders to only show tables from selected restaurant)
   const uniqueTables = useMemo(() => {
-    if (!orders) return []
+    if (!orders || !restaurantFilter) return []
+    // First filter by restaurant, then get unique tables
+    const restaurantOrders = orders.filter((order: any) => order.restaurant === restaurantFilter)
     const tables = new Set<number>()
-    orders.forEach((order: any) => {
+    restaurantOrders.forEach((order: any) => {
       if (order.table_number != null) {
         tables.add(order.table_number)
       }
     })
     return Array.from(tables).sort((a, b) => a - b)
-  }, [orders])
+  }, [orders, restaurantFilter])
 
-  // Apply filters
+  // Apply filters (including restaurant filter as fallback)
+  // CRITICAL: This filter MUST always be applied to prevent showing orders from other restaurants
   const filteredOrders = useMemo(() => {
-    if (!orders) return []
+    // Force console log to verify code is running
+    console.log('🔍 [Orders] Filter function EXECUTING:', {
+      hasOrders: !!orders,
+      ordersCount: orders?.length || 0,
+      restaurantFilter: restaurantFilter || 'NULL',
+      selectedRestaurant: selectedRestaurant || 'NULL',
+      timestamp: new Date().toISOString()
+    })
     
-    return orders.filter((order: any) => {
+    if (!orders) {
+      console.log('🔍 [Orders] No orders data, returning empty array')
+      return []
+    }
+    
+    // If no restaurant is selected, return empty array (don't show any orders)
+    if (!restaurantFilter) {
+      console.log('🔍 [Orders] ⚠️ No restaurant selected, returning empty array')
+      return []
+    }
+    
+    // FIRST: Filter by restaurant - CRITICAL: This ensures data isolation
+    // This MUST be the first filter applied to prevent showing orders from other restaurants
+    const restaurantFiltered = orders.filter((order: any) => {
+      const orderRestaurant = order.restaurant
+      
+      // Strict exact match - if restaurant doesn't match exactly, exclude the order
+      // Handle null/undefined cases
+      if (!orderRestaurant) {
+        console.log('🔍 [Orders] ❌ Order has no restaurant field:', {
+          orderId: order.name || order.order_number,
+          orderNumber: order.order_number
+        })
+        return false
+      }
+      
+      // Convert both to strings and trim for comparison
+      const orderRestaurantStr = String(orderRestaurant).trim()
+      const filterStr = String(restaurantFilter).trim()
+      const matches = orderRestaurantStr === filterStr
+      
+      if (!matches) {
+        console.log('🔍 [Orders] ❌ Restaurant MISMATCH - filtering out:', {
+          orderId: order.name || order.order_number,
+          orderNumber: order.order_number,
+          orderRestaurant: orderRestaurantStr,
+          restaurantFilter: filterStr,
+          matches: false
+        })
+      } else {
+        console.log('🔍 [Orders] ✅ Restaurant MATCH:', {
+          orderId: order.name || order.order_number,
+          orderRestaurant: orderRestaurantStr
+        })
+      }
+      
+      return matches
+    })
+    
+    console.log('🔍 [Orders] ✅ Restaurant filter RESULT:', {
+      totalOrdersFromAPI: orders.length,
+      filteredCount: restaurantFiltered.length,
+      restaurantFilter: restaurantFilter,
+      allRestaurantsInData: [...new Set(orders.map((o: any) => o.restaurant))],
+      filteredRestaurants: [...new Set(restaurantFiltered.map((o: any) => o.restaurant))]
+    })
+    
+    // SECOND: Apply other filters (search, status, table, date) to restaurant-filtered orders
+    return restaurantFiltered.filter((order: any) => {
+      
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase()
@@ -158,7 +296,7 @@ export default function Orders() {
       
       return true
     })
-  }, [orders, searchQuery, statusFilter, tableFilter, dateFrom, dateTo])
+  }, [orders, restaurantFilter, searchQuery, statusFilter, tableFilter, dateFrom, dateTo])
 
   const clearFilters = () => {
     setSearchQuery('')
@@ -290,9 +428,9 @@ export default function Orders() {
             <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="text-sm text-muted-foreground">
                 {hasActiveFilters ? (
-                  <>Showing {filteredOrders.length} of {orders?.length || 0} orders</>
+                  <>Showing {filteredOrders.length} of {filteredOrders.length} orders (filtered by restaurant: {restaurantFilter || 'none'})</>
                 ) : (
-                  <>Total: {orders?.length || 0} orders</>
+                  <>Total: {filteredOrders.length} orders (restaurant: {restaurantFilter || 'none'})</>
                 )}
               </div>
               <Button
@@ -314,7 +452,20 @@ export default function Orders() {
         <CardContent className="pt-6">
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Loading orders...</div>
-          ) : filteredOrders && filteredOrders.length > 0 ? (
+          ) : !restaurantFilter ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <p className="text-sm">Please select a restaurant from the dropdown above to view orders</p>
+            </div>
+          ) : !filteredOrders || filteredOrders.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <p className="text-sm">No orders found for restaurant: {restaurantFilter}</p>
+              {orders && orders.length > 0 && (
+                <p className="text-xs mt-2 text-destructive">
+                  Warning: {orders.length} orders in database, but none match selected restaurant
+                </p>
+              )}
+            </div>
+          ) : (
             <>
               {/* Kanban View - Desktop Only */}
               {viewType === 'kanban' && (
@@ -494,13 +645,6 @@ export default function Orders() {
                 </>
               )}
             </>
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              <p className="text-sm">No orders found</p>
-              {hasActiveFilters && (
-                <p className="text-xs mt-2 text-muted-foreground/70">Try adjusting your filters</p>
-              )}
-            </div>
           )}
         </CardContent>
       </Card>

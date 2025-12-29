@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useState, useMemo } from 'react'
 import { useFrappeGetDocList, useFrappeDeleteDoc } from '@/lib/frappe'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -6,16 +7,138 @@ import { Button } from '@/components/ui/button'
 import { Eye, Pencil, Trash2, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/hooks/useConfirm'
+import { useRestaurant } from '@/contexts/RestaurantContext'
+import { ListFilters, FilterCondition } from '@/components/ListFilters'
 
 export default function Products() {
   const { confirm, ConfirmDialogComponent } = useConfirm()
+  const { selectedRestaurant } = useRestaurant()
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filters, setFilters] = useState<FilterCondition[]>([])
+  
   const { data: products, isLoading, mutate } = useFrappeGetDocList('Menu Product', {
-    fields: ['name', 'product_name', 'price', 'original_price', 'is_active'],
-    limit: 100,
+    fields: ['name', 'product_name', 'price', 'original_price', 'is_active', 'category', 'category_name', 'main_category', 'product_type', 'description', 'calories', 'is_vegetarian'],
+    filters: selectedRestaurant ? { restaurant: selectedRestaurant } : undefined,
+    limit: 1000,
     orderBy: { field: 'product_name', order: 'asc' }
-  })
+  }, selectedRestaurant ? `products-${selectedRestaurant}` : null)
 
   const { deleteDoc } = useFrappeDeleteDoc()
+
+  // Apply search and filters
+  const filteredProducts = useMemo(() => {
+    if (!products) return []
+    
+    let filtered = [...products]
+    
+    // Apply search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter((product: any) => {
+        return (
+          (product.product_name || '').toLowerCase().includes(query) ||
+          (product.name || '').toLowerCase().includes(query) ||
+          String(product.price || '').includes(query) ||
+          String(product.original_price || '').includes(query)
+        )
+      })
+    }
+    
+    // Apply filters
+    filters.forEach((filter) => {
+      // Skip empty filters, but allow false, 0, and empty string as valid values
+      if (filter.value === '' || filter.value === null || filter.value === undefined) {
+        // For 'is' and 'is not' operators, empty value is valid
+        if (filter.operator !== 'is' && filter.operator !== 'is not') {
+          console.log('[Products Filter] Skipping empty filter:', filter)
+          return
+        }
+      }
+      
+      const beforeCount = filtered.length
+      filtered = filtered.filter((product: any) => {
+        const fieldValue = product[filter.fieldname]
+        const filterValue = filter.value
+        
+        // Debug logging for troubleshooting
+        console.log('[Products Filter] Checking:', {
+          fieldname: filter.fieldname,
+          operator: filter.operator,
+          fieldValue: fieldValue,
+          filterValue: filterValue,
+          productName: product.product_name || product.name,
+          fieldExists: filter.fieldname in product
+        })
+        
+        // Handle null/undefined field values
+        if (fieldValue === null || fieldValue === undefined) {
+          if (filter.operator === 'is') return true
+          if (filter.operator === 'is not') return false
+          if (filter.operator === '=' && (filterValue === null || filterValue === undefined || filterValue === '')) return true
+          if (filter.operator === '!=' && (filterValue !== null && filterValue !== undefined && filterValue !== '')) return true
+          return false
+        }
+        
+        switch (filter.operator) {
+          case '=':
+            // Handle boolean comparison
+            if (typeof fieldValue === 'boolean' || typeof filterValue === 'boolean') {
+              return Boolean(fieldValue) === Boolean(filterValue)
+            }
+            // Case-insensitive string comparison for text fields
+            return String(fieldValue).trim().toLowerCase() === String(filterValue).trim().toLowerCase()
+          case '!=':
+            // Handle boolean comparison
+            if (typeof fieldValue === 'boolean' || typeof filterValue === 'boolean') {
+              return Boolean(fieldValue) !== Boolean(filterValue)
+            }
+            // Case-insensitive string comparison for text fields
+            return String(fieldValue).trim().toLowerCase() !== String(filterValue).trim().toLowerCase()
+          case '>':
+            return Number(fieldValue) > Number(filterValue)
+          case '<':
+            return Number(fieldValue) < Number(filterValue)
+          case '>=':
+            return Number(fieldValue) >= Number(filterValue)
+          case '<=':
+            return Number(fieldValue) <= Number(filterValue)
+          case 'like':
+            return String(fieldValue || '').toLowerCase().includes(String(filterValue).toLowerCase())
+          case 'not like':
+            return !String(fieldValue || '').toLowerCase().includes(String(filterValue).toLowerCase())
+          case 'in':
+            const inValues = Array.isArray(filterValue) ? filterValue : [filterValue]
+            return inValues.some(v => String(fieldValue).trim().toLowerCase() === String(v).trim().toLowerCase())
+          case 'not in':
+            const notInValues = Array.isArray(filterValue) ? filterValue : [filterValue]
+            return !notInValues.some(v => String(fieldValue).trim().toLowerCase() === String(v).trim().toLowerCase())
+          case 'is':
+            return fieldValue === null || fieldValue === undefined || fieldValue === ''
+          case 'is not':
+            return fieldValue !== null && fieldValue !== undefined && fieldValue !== ''
+          default:
+            return true
+        }
+      })
+    })
+    
+    // Debug: Log filter results
+    if (filters.length > 0) {
+      console.log('[Products Filter Results]', {
+        totalProducts: products.length,
+        filteredCount: filtered.length,
+        activeFilters: filters.filter(f => f.value !== '' && f.value !== null && f.value !== undefined),
+        filters: filters.map(f => ({
+          fieldname: f.fieldname,
+          operator: f.operator,
+          value: f.value,
+          valueType: typeof f.value
+        }))
+      })
+    }
+    
+    return filtered
+  }, [products, searchQuery, filters])
 
   const handleDelete = async (productId: string, productName: string) => {
     const confirmed = await confirm({
@@ -59,23 +182,43 @@ export default function Products() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Products</CardTitle>
-          <CardDescription>
-            Products are automatically filtered based on your restaurant access
-          </CardDescription>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle>All Products</CardTitle>
+              <CardDescription>
+                Products are automatically filtered based on your restaurant access
+                {filteredProducts.length !== products?.length && (
+                  <span className="ml-2">
+                    (Showing {filteredProducts.length} of {products?.length || 0})
+                  </span>
+                )}
+              </CardDescription>
+            </div>
+            <ListFilters
+              doctype="Menu Product"
+              filters={filters}
+              onFiltersChange={setFilters}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              searchPlaceholder="Search products..."
+            />
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Loading products...</div>
-          ) : products && products.length > 0 ? (
+          ) : filteredProducts && filteredProducts.length > 0 ? (
             <>
               {/* Mobile Card View */}
               <div className="md:hidden space-y-3">
-                {products.map((product: any) => (
+                {filteredProducts.map((product: any, index: number) => (
                   <div key={product.name} className="p-4 border border-border rounded-md bg-card hover:border-border/80 transition-colors">
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-foreground truncate">{product.product_name || product.name}</h3>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs text-muted-foreground">#{index + 1}</span>
+                          <h3 className="font-semibold text-foreground truncate">{product.product_name || product.name}</h3>
+                        </div>
                         <div className="flex items-center gap-3 mt-2">
                           <span className="text-lg font-semibold text-foreground">₹{product.price || 0}</span>
                           {product.original_price && (
@@ -120,6 +263,7 @@ export default function Products() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-16">Sr. No.</TableHead>
                       <TableHead>Product Name</TableHead>
                       <TableHead>Price</TableHead>
                       <TableHead>Original Price</TableHead>
@@ -128,8 +272,9 @@ export default function Products() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {products.map((product: any) => (
+                    {filteredProducts.map((product: any, index: number) => (
                       <TableRow key={product.name}>
+                        <TableCell className="text-muted-foreground">{index + 1}</TableCell>
                         <TableCell className="font-medium">{product.product_name || product.name}</TableCell>
                         <TableCell>₹{product.price || 0}</TableCell>
                         <TableCell>

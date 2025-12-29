@@ -5,6 +5,7 @@ import { useFrappeGetDocList, useFrappeGetCall, useFrappeGetDoc, useFrappePostCa
 import { useState, useEffect, useMemo } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useRestaurant } from '@/contexts/RestaurantContext'
 import Breadcrumb from './Breadcrumb'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -37,13 +38,13 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
+  const { selectedRestaurant, setSelectedRestaurant, setRestaurantsData } = useRestaurant()
   const [sidebarOpen, setSidebarOpen] = useState(false) // Mobile sidebar
   const [sidebarExpanded, setSidebarExpanded] = useState(true) // Desktop sidebar expanded/collapsed
   const [sidebarHovered, setSidebarHovered] = useState(false) // Hover state for temporary expansion
   const [hoverDisabled, setHoverDisabled] = useState(false) // Temporarily disable hover after toggle
   const [selectOpen, setSelectOpen] = useState(false) // Track if restaurant select is open
   const [lockAnimating, setLockAnimating] = useState(false) // Track lock animation state
-  const [selectedRestaurant, setSelectedRestaurant] = useState<string | null>(null)
   
   // Modal state for creating new restaurant
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -66,23 +67,12 @@ export default function Layout({ children }: LayoutProps) {
 
   const restaurants = restaurantsData?.message?.restaurants || []
 
-  // Initialize selected restaurant from localStorage or use first restaurant
+  // Update context with restaurants data
   useEffect(() => {
-    if (restaurants.length > 0 && !selectedRestaurant) {
-      try {
-        const saved = localStorage.getItem('dinematters-selected-restaurant')
-        if (saved && restaurants.find(r => r.name === saved || r.restaurant_id === saved)) {
-          setSelectedRestaurant(saved)
-        } else {
-          // Use first restaurant as default
-          setSelectedRestaurant(restaurants[0].name)
-          localStorage.setItem('dinematters-selected-restaurant', restaurants[0].name)
-        }
-      } catch {
-        setSelectedRestaurant(restaurants[0].name)
-      }
+    if (restaurants.length > 0) {
+      setRestaurantsData(restaurants)
     }
-  }, [restaurants, selectedRestaurant])
+  }, [restaurants, setRestaurantsData])
 
   // Handle restaurant change
   const handleRestaurantChange = (restaurantId: string) => {
@@ -98,13 +88,10 @@ export default function Layout({ children }: LayoutProps) {
     }
     
     setSelectedRestaurant(restaurantId)
-    try {
-      localStorage.setItem('dinematters-selected-restaurant', restaurantId)
-      // Reload page to refresh data with new restaurant context
-      window.location.reload()
-    } catch {
-      // If localStorage fails, still update state
-    }
+    // Dispatch custom event to notify other components
+    window.dispatchEvent(new CustomEvent('restaurant-selected'))
+    // Reload page to refresh data with new restaurant context
+    window.location.reload()
   }
 
   // Handle create restaurant submission
@@ -149,7 +136,8 @@ export default function Layout({ children }: LayoutProps) {
         
         // Set the selected restaurant
         setSelectedRestaurant(restaurantDocName)
-        localStorage.setItem('dinematters-selected-restaurant', restaurantDocName)
+        // Dispatch custom event to notify other components
+        window.dispatchEvent(new CustomEvent('restaurant-selected'))
         
         // Navigate to the new restaurant's setup wizard
         setTimeout(() => {
@@ -179,12 +167,13 @@ export default function Layout({ children }: LayoutProps) {
 
   const restaurantSlug = restaurantDoc?.slug || ''
 
-  // Fetch orders for analytics
+  // Fetch orders for analytics - filter by selected restaurant
   const { data: orders } = useFrappeGetDocList('Order', {
     fields: ['name', 'status', 'total', 'creation'],
+    filters: selectedRestaurant ? { restaurant: selectedRestaurant } : undefined,
     limit: 200,
     orderBy: { field: 'creation', order: 'desc' }
-  })
+  }, selectedRestaurant ? `orders-analytics-${selectedRestaurant}` : null)
 
   // Calculate analytics metrics
   const analytics = useMemo(() => {

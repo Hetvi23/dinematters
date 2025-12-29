@@ -8,9 +8,11 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft, Plus } from 'lucide-react'
 import { toast } from 'sonner'
+import { useRestaurant } from '@/contexts/RestaurantContext'
 
 export default function CategoryNew() {
   const navigate = useNavigate()
+  const { selectedRestaurant } = useRestaurant()
   const { call, loading } = useFrappePostCall('frappe.client.insert')
 
   const [formData, setFormData] = useState({
@@ -27,10 +29,16 @@ export default function CategoryNew() {
       return
     }
 
+    if (!selectedRestaurant) {
+      toast.error('Please select a restaurant first')
+      return
+    }
+
     try {
       await call({
         doc: {
           doctype: 'Menu Category',
+          restaurant: selectedRestaurant,
           category_name: formData.category_name,
           description: formData.description,
           display_order: formData.display_order ? parseInt(formData.display_order) : null

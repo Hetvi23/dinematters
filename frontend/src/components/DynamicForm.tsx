@@ -27,6 +27,7 @@ interface DynamicFormProps {
   onFieldChange?: (fieldname: string, value: any) => void
   onChange?: (hasChanges: boolean) => void // Notify parent when form has changes
   hideFields?: string[] // Fields to hide from the form
+  readOnlyFields?: string[] // Fields to make read-only
   showSaveButton?: boolean // Control whether to show save button
   triggerSave?: number // Increment this to trigger save
 }
@@ -41,6 +42,7 @@ export default function DynamicForm({
   onFieldChange,
   onChange,
   hideFields = [],
+  readOnlyFields = [],
   showSaveButton = true,
   triggerSave
 }: DynamicFormProps) {
@@ -495,6 +497,11 @@ export default function DynamicForm({
     // Make certain fields read-only after creation (restaurant owner perspective)
     let isReadOnly = field.read_only || actualMode === 'view'
     
+    // Check if field is in readOnlyFields prop
+    if (readOnlyFields.includes(field.fieldname)) {
+      isReadOnly = true
+    }
+    
     // For Restaurant doctype, make IDs read-only after creation
     if (doctype === 'Restaurant' && mode === 'edit' && docname) {
       const lockedFields = ['restaurant_id', 'slug', 'subdomain']
@@ -640,6 +647,15 @@ export default function DynamicForm({
         )
 
       case 'Link':
+        // For read-only Link fields, render as a simple text input instead of dropdown
+        if (isReadOnly) {
+          return <LinkFieldReadOnly
+            key={field.fieldname}
+            field={field}
+            value={value}
+          />
+        }
+        
         return <LinkField
           key={field.fieldname}
           field={field}
@@ -1080,6 +1096,46 @@ export default function DynamicForm({
           </Button>
         )}
       </div>
+    </div>
+  )
+}
+
+// Link Field Read-Only Component - Shows linked record as read-only text
+function LinkFieldReadOnly({ 
+  field, 
+  value
+}: { 
+  field: DocTypeField
+  value: any
+}) {
+  const linkedDoctype = field.options || ''
+  const { data: linkedRecord } = useFrappeGetDoc(linkedDoctype, value || '', {
+    enabled: !!value && !!linkedDoctype
+  })
+  
+  const getDisplayValue = () => {
+    if (!linkedRecord) return value || ''
+    if (linkedDoctype === 'Restaurant' && linkedRecord.restaurant_name) {
+      return linkedRecord.restaurant_name
+    }
+    return linkedRecord.name || value || ''
+  }
+  
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={field.fieldname}>
+        {field.label}
+        {field.required && <span className="text-destructive">*</span>}
+      </Label>
+      <Input
+        id={field.fieldname}
+        value={getDisplayValue()}
+        readOnly={true}
+        className="bg-muted cursor-not-allowed"
+      />
+      {field.description && (
+        <p className="text-xs text-muted-foreground">{field.description}</p>
+      )}
     </div>
   )
 }
