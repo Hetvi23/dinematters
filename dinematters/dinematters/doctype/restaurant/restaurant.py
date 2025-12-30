@@ -29,10 +29,8 @@ class Restaurant(Document):
 		if not self.subdomain and self.restaurant_id:
 			self.subdomain = self.restaurant_id.lower().replace(" ", "-")
 		
-		# Check if tables field changed and generate QR codes
-		if self.has_value_changed("tables") and self.tables and self.tables > 0:
-			# Generate QR codes after save
-			self._generate_qr_codes = True
+		# Note: QR codes are no longer auto-generated on table update
+		# They must be explicitly generated via the generate_qr_codes_pdf method
 	
 	def generate_restaurant_id(self):
 		"""Generate unique restaurant_id from restaurant_name"""
@@ -74,10 +72,10 @@ class Restaurant(Document):
 				self.generate_table_qr_codes_pdf()
 	
 	def on_update(self):
-		"""Generate QR codes when tables field is updated"""
-		if hasattr(self, "_generate_qr_codes") and self._generate_qr_codes:
-			if self.tables and self.tables > 0:
-				self.generate_table_qr_codes_pdf()
+		"""Called after document is updated"""
+		# QR codes are no longer auto-generated here
+		# They must be explicitly generated via the generate_qr_codes_pdf method
+		pass
 	
 	def auto_assign_owner(self):
 		"""Auto-create User, Restaurant User and User Permission for owner"""
@@ -235,7 +233,7 @@ class Restaurant(Document):
 			qr_size = 3 * inch  # Larger QR code for single page
 			
 			# Get base URL, default to https://demo.dinematters.com/ if not set
-			base_url = self.base_url or "https://demo.dinematters.com/"
+			base_url = getattr(self, 'base_url', None) or "https://demo.dinematters.com/"
 			# Ensure base_url ends with /
 			if not base_url.endswith('/'):
 				base_url += '/'
@@ -290,19 +288,27 @@ class Restaurant(Document):
 			
 			# Delete existing QR codes PDF if it exists
 			file_name = f"{self.restaurant_id}_table_qr_codes.pdf"
-			existing_file = frappe.db.get_value("File", {
+			
+			# Find all existing files with this name for this restaurant
+			existing_files = frappe.get_all("File", {
 				"file_name": file_name,
 				"attached_to_doctype": "Restaurant",
 				"attached_to_name": self.name
-			}, "name")
+			}, ["name"])
 			
-			if existing_file:
+			# Delete all existing files
+			for file_doc in existing_files:
 				try:
-					frappe.delete_doc("File", existing_file, ignore_permissions=True)
-				except:
-					pass  # Ignore if file doesn't exist
+					frappe.delete_doc("File", file_doc.name, ignore_permissions=True, force=True)
+					frappe.db.commit()
+				except Exception as e:
+					frappe.log_error(f"Error deleting existing QR code file {file_doc.name}: {str(e)}", "QR Code File Deletion")
+					# Continue even if deletion fails
 			
 			# Save as attachment
+			import time
+			timestamp = int(time.time())
+			
 			file_doc = frappe.get_doc({
 				"doctype": "File",
 				"file_name": file_name,
@@ -319,14 +325,22 @@ class Restaurant(Document):
 			)
 			
 			# Store file URL in document for easy access (if field exists)
+			# Use the unique file URL to avoid caching issues
+			file_url = file_doc.file_url
+			# Add timestamp to URL to force browser refresh
+			if "?" in file_url:
+				file_url += f"&t={timestamp}"
+			else:
+				file_url += f"?t={timestamp}"
+			
 			try:
 				if frappe.db.has_column("Restaurant", "qr_codes_pdf_url"):
-					self.db_set("qr_codes_pdf_url", file_doc.file_url, update_modified=False)
+					self.db_set("qr_codes_pdf_url", file_url, update_modified=False)
 			except:
 				# Field doesn't exist yet, will be available after migration
 				pass
 			
-			return file_doc.file_url
+			return file_url
 			
 		except ImportError:
 			frappe.throw(_("Required libraries not installed. Please install: pip install qrcode[pil] reportlab"))

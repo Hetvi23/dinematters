@@ -42,6 +42,7 @@ export default function Breadcrumb() {
       'products': 'Products',
       'categories': 'Categories',
       'Restaurant': 'Restaurants',
+      'qr-codes': 'QR Codes',
     }
 
     // Special handling for Setup Wizard page - add restaurant name if available
@@ -68,7 +69,7 @@ export default function Breadcrumb() {
 
     // Check if this is a module route (doctype that's not in the standard routes)
     const isModuleRoute = segments.length === 1 && 
-      !['dashboard', 'setup', 'modules', 'orders', 'products', 'categories'].includes(segments[0]) &&
+      !['dashboard', 'setup', 'modules', 'orders', 'products', 'categories', 'qr-codes'].includes(segments[0]) &&
       !segments[0].includes('/')
 
     // If it's a module route, add "All Modules" before it

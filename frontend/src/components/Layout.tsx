@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, Menu, X, Lock, LockOpen, ChevronDown, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2 } from 'lucide-react'
+import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, Menu, X, Lock, LockOpen, ChevronDown, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetCall, useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe'
 import { useState, useEffect, useMemo } from 'react'
@@ -25,6 +25,7 @@ const navigation = [
   { name: 'Orders', href: '/orders', icon: ShoppingCart },
   { name: 'Products', href: '/products', icon: Package },
   { name: 'Categories', href: '/categories', icon: FolderTree },
+  { name: 'Manage QR Codes', href: '/qr-codes', icon: QrCode },
 ]
 
 interface Restaurant {
@@ -188,8 +189,8 @@ export default function Layout({ children }: LayoutProps) {
 
   // Fetch orders for analytics - filter by selected restaurant
   const { data: orders } = useFrappeGetDocList('Order', {
-    fields: ['name', 'status', 'total', 'creation'],
-    filters: selectedRestaurant ? { restaurant: selectedRestaurant } : undefined,
+    fields: ['name', 'status', 'total', 'creation', 'restaurant'],
+    filters: selectedRestaurant ? ({ restaurant: selectedRestaurant } as any) : undefined,
     limit: 200,
     orderBy: { field: 'creation', order: 'desc' }
   }, selectedRestaurant ? `orders-analytics-${selectedRestaurant}` : null)
@@ -500,7 +501,7 @@ export default function Layout({ children }: LayoutProps) {
           <div className="px-4 py-3 border-t border-sidebar-border bg-card">
             {showExpanded ? (
               <div className="flex items-center justify-between gap-3">
-                <p className="text-xs italic text-muted-foreground font-light flex-1">
+                <p className="text-base italic text-red-500 dark:text-red-400 font-light flex-1">
                   By Dinematters
                 </p>
                 {/* Animated Theme Switch - Expanded */}
