@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Eye, GripVertical, Clock, UtensilsCrossed, X, User, Phone, CreditCard, Tag } from 'lucide-react'
+import { Eye, Clock, User, Phone, CreditCard, Tag } from 'lucide-react'
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragMoveEvent, closestCorners, PointerSensor, TouchSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
@@ -9,6 +9,13 @@ import { useFrappePostCall } from '@/lib/frappe'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useConfirm } from '@/hooks/useConfirm'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface Order {
   name: string
@@ -34,6 +41,7 @@ interface OrdersKanbanProps {
   onCheckOrder: (orderId: string) => void
   onOrderUpdate?: () => void
   onCancelOrder?: (orderId: string) => void
+  restaurantTables?: number
 }
 
 const STATUSES = [
@@ -47,13 +55,18 @@ const STATUSES = [
 function DraggableOrderCard({ 
   order, 
   onCheckOrder, 
-  onCancelOrder 
+  onCancelOrder,
+  onTableNumberChange,
+  tableOptions = []
 }: { 
   order: Order
   onCheckOrder: (orderId: string) => void
   onCancelOrder?: (orderId: string) => void
+  onTableNumberChange?: (orderId: string, tableNumber: number) => void
+  tableOptions?: number[]
 }) {
   const { confirm, ConfirmDialogComponent } = useConfirm()
+  const safeTableOptions = Array.isArray(tableOptions) ? tableOptions : []
   const { attributes, listeners, setNodeRef, isDragging, transform } = useDraggable({
     id: order.name,
     data: {
@@ -90,9 +103,33 @@ function DraggableOrderCard({
               {order.order_number || order.name}
             </span>
           </div>
-          {order.table_number != null && (
+          {safeTableOptions.length > 0 && onTableNumberChange ? (
+            <Select
+              value={(order.table_number ?? 0).toString()}
+              onValueChange={(value) => {
+                const parsed = parseInt(value, 10)
+                const tableNum = Number.isNaN(parsed) ? 0 : parsed
+                onTableNumberChange(order.name, tableNum)
+              }}
+            >
+              <SelectTrigger
+                className="h-5 px-1.5 text-[10px] font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a] flex-shrink-0 w-auto min-w-[60px]"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {safeTableOptions.map((tableNum) => (
+                  <SelectItem key={tableNum} value={tableNum.toString()}>
+                    Table {tableNum}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
             <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a] flex-shrink-0">
-              Table {order.table_number}
+              Table {order.table_number ?? 0}
             </span>
           )}
         </div>
@@ -219,14 +256,19 @@ function DroppableStatusColumn({
   orders, 
   onCheckOrder,
   onCancelOrder,
-  activeId
+  activeId,
+  handleTableNumberChange,
+  tableOptions = []
 }: { 
   status: typeof STATUSES[0]
   orders: Order[]
   onCheckOrder: (orderId: string) => void
   onCancelOrder?: (orderId: string) => void
   activeId?: string | null
+  handleTableNumberChange: (orderId: string, tableNumber: number) => void
+  tableOptions?: number[]
 }) {
+  const safeTableOptions = Array.isArray(tableOptions) ? tableOptions : []
   const { setNodeRef, isOver } = useDroppable({
     id: status.value,
   })
@@ -266,6 +308,8 @@ function DroppableStatusColumn({
                 order={order}
                 onCheckOrder={onCheckOrder}
                 onCancelOrder={onCancelOrder}
+                onTableNumberChange={handleTableNumberChange}
+                tableOptions={safeTableOptions}
               />
             </div>
           ))
@@ -275,10 +319,23 @@ function DroppableStatusColumn({
   )
 }
 
-export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrder }: OrdersKanbanProps) {
+export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrder, restaurantTables }: OrdersKanbanProps) {
   const { call } = useFrappePostCall('dinematters.dinematters.api.order_status.update_status')
+  const { call: updateTableNumber } = useFrappePostCall('dinematters.dinematters.api.order_status.update_table_number')
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
+  
+  // Generate table options based on restaurant tables count (always include Table 0)
+  const tableOptions = useMemo(() => {
+    const maxTables = Number(restaurantTables ?? 0)
+    const options: number[] = [0]
+    if (maxTables > 0) {
+      for (let i = 1; i <= maxTables; i++) {
+        options.push(i)
+      }
+    }
+    return options
+  }, [restaurantTables])
   
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -311,21 +368,22 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
   }, [orders])
 
   const handleDragStart = (event: DragStartEvent) => {
-    const order = event.active.data.current?.order
+    const order = event.active.data.current?.order as Order | undefined
     if (order) {
       setActiveOrder(order)
       setActiveId(event.active.id as string)
     }
   }
 
-  const handleDragMove = (event: DragMoveEvent) => {
-    // Optional: Add any visual feedback during drag movement
+  const handleDragMove = (_event: DragMoveEvent) => {
+    // optional: add visual feedback
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
     setActiveOrder(null)
     setActiveId(null)
-    const { active, over } = event
 
     if (!over || active.id === over.id) {
       return
@@ -335,24 +393,16 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
     const newStatus = over.id as string
 
     try {
-      // Use our custom API endpoint to update status
       await call({
         order_id: orderId,
-        status: newStatus
+        status: newStatus,
       })
-      
-      // Show success message
-      toast.success(`Order moved to ${STATUSES.find(s => s.value === newStatus)?.label}`)
-      
-      // Trigger refresh to update the UI
-      if (onOrderUpdate) {
-        onOrderUpdate()
-      }
+
+      toast.success(`Order moved to ${STATUSES.find(s => s.value === newStatus)?.label || newStatus}`)
     } catch (error: any) {
       console.error('Failed to update order status:', error)
       toast.error(error?.message || 'Failed to update order status')
-      
-      // Still refresh to sync with actual database state
+    } finally {
       if (onOrderUpdate) {
         onOrderUpdate()
       }
@@ -381,6 +431,28 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
     }
   }
 
+  const handleTableNumberChange = async (orderId: string, tableNumber: number) => {
+    try {
+      await updateTableNumber({
+        order_id: orderId,
+        table_number: tableNumber
+      })
+      
+      toast.success(`Table updated to Table ${tableNumber}`)
+      
+      if (onOrderUpdate) {
+        onOrderUpdate()
+      }
+    } catch (error: any) {
+      console.error('Failed to update table number:', error)
+      toast.error(error?.message || 'Failed to update table number')
+      
+      if (onOrderUpdate) {
+        onOrderUpdate()
+      }
+    }
+  }
+
   return (
     <DndContext
       sensors={sensors}
@@ -401,6 +473,8 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
               onCheckOrder={onCheckOrder}
               onCancelOrder={onCancelOrder || handleCancelOrder}
               activeId={activeId}
+              handleTableNumberChange={handleTableNumberChange}
+              tableOptions={tableOptions}
             />
           )
         })}
@@ -425,11 +499,11 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
                     {activeOrder.order_number || activeOrder.name}
                   </span>
                 </div>
-                  {activeOrder.table_number != null && (
+                  {activeOrder.table_number != null ? (
                     <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a] flex-shrink-0">
                       Table {activeOrder.table_number}
                     </span>
-                  )}
+                  ) : null}
               </div>
               
               {/* Customer Info - Single Row */}

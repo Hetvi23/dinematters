@@ -137,6 +137,66 @@ def get_restaurant_info(restaurant_id):
 
 
 @frappe.whitelist(allow_guest=True)
+def get_restaurant_tables(restaurant_id):
+	"""
+	GET /api/method/dinematters.dinematters.api.restaurant.get_restaurant_tables
+	Get available tables for a restaurant
+	
+	Parameters:
+	- restaurant_id (required): The restaurant identifier
+	
+	Returns:
+	{
+		"success": true,
+		"data": {
+			"tables": [
+				{"value": 1, "label": "Table 1"},
+				{"value": 2, "label": "Table 2"},
+				...
+			]
+		}
+	}
+	"""
+	try:
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
+		# Get number of tables from restaurant
+		tables_count = frappe.db.get_value("Restaurant", restaurant, "tables")
+		
+		if not tables_count or tables_count <= 0:
+			return {
+				"success": True,
+				"data": {
+					"tables": []
+				}
+			}
+		
+		# Generate table options
+		tables = []
+		for i in range(1, int(tables_count) + 1):
+			tables.append({
+				"value": i,
+				"label": f"Table {i}"
+			})
+		
+		return {
+			"success": True,
+			"data": {
+				"tables": tables
+			}
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in get_restaurant_tables: {str(e)}")
+		return {
+			"success": False,
+			"error": {
+				"code": "TABLES_FETCH_ERROR",
+				"message": str(e)
+			}
+		}
+
+
+@frappe.whitelist(allow_guest=True)
 def list_restaurants(active_only=True):
 	"""
 	GET /api/method/dinematters.dinematters.api.restaurant.list_restaurants

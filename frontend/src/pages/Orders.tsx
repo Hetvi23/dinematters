@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useFrappeGetDocList, useFrappePostCall } from '@/lib/frappe'
+import { useFrappeGetDocList, useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -76,8 +76,26 @@ export default function Orders() {
   // selectedRestaurant is the docname, which should match the Order.restaurant field
   const restaurantFilter = selectedRestaurant
   
+  // Fetch restaurant data to get tables count
+  const { data: restaurantDoc } = useFrappeGetDoc('Restaurant', selectedRestaurant || '', {
+    enabled: !!selectedRestaurant,
+    fields: ['name', 'tables']
+  })
+  
+  // Generate table options based on restaurant tables count (always include Table 0)
+  const tableOptions = useMemo(() => {
+    const maxTables = Number(restaurantDoc?.tables ?? 0)
+    const options: number[] = [0]
+    if (maxTables > 0) {
+      for (let i = 1; i <= maxTables; i++) {
+        options.push(i)
+      }
+    }
+    return options
+  }, [restaurantDoc?.tables])
+  
   // Build filters - always filter by restaurant if one is selected
-  const filters = restaurantFilter ? { restaurant: restaurantFilter } : undefined
+  const filters = restaurantFilter ? { restaurant: restaurantFilter } : {}
   
   // Debug logging
   useEffect(() => {
@@ -85,16 +103,16 @@ export default function Orders() {
       selectedRestaurant,
       restaurantFilter,
       filters,
-      hasRestaurants: restaurants.length > 0
+      hasRestaurants: (restaurants?.length || 0) > 0
     })
-  }, [selectedRestaurant, restaurantFilter, filters, restaurants.length])
+  }, [selectedRestaurant, restaurantFilter, filters, restaurants])
   
   // Only fetch orders if a restaurant is selected
   const { data: orders, isLoading, mutate } = useFrappeGetDocList(
     'Order',
     {
       fields: ['name', 'order_number', 'status', 'total', 'creation', 'restaurant', 'table_number', 'coupon', 'customer_name', 'customer_phone', 'payment_method', 'payment_status', 'subtotal', 'discount', 'tax', 'delivery_fee'],
-      filters: filters,
+      filters: restaurantFilter ? { restaurant: restaurantFilter } as any : undefined,
       limit: 100,
       orderBy: { field: 'creation', order: 'desc' }
     },
@@ -103,7 +121,7 @@ export default function Orders() {
   
   // Debug: Log orders to verify filtering
   useEffect(() => {
-    if (orders) {
+    if (orders && Array.isArray(orders)) {
       const allRestaurants = [...new Set(orders.map((o: any) => o.restaurant))]
       const matchingOrders = restaurantFilter 
         ? orders.filter((o: any) => o.restaurant === restaurantFilter)
@@ -146,6 +164,7 @@ export default function Orders() {
 
   // Status update API call
   const { call: updateOrderStatus } = useFrappePostCall('dinematters.dinematters.api.order_status.update_status')
+  const { call: updateTableNumber } = useFrappePostCall('dinematters.dinematters.api.order_status.update_table_number')
 
   // Handle status change
   const handleStatusChange = async (orderId: string, newStatus: string) => {
@@ -174,11 +193,31 @@ export default function Orders() {
     }
   }
 
+  // Handle table number change
+  const handleTableNumberChange = async (orderId: string, tableNumber: number) => {
+    try {
+      await updateTableNumber({
+        order_id: orderId,
+        table_number: tableNumber
+      })
+      
+      toast.success(`Table updated to Table ${tableNumber}`)
+      
+      // Refresh orders list
+      mutate()
+    } catch (error: any) {
+      console.error('Failed to update table number:', error)
+      toast.error(error?.message || 'Failed to update table number')
+    }
+  }
+
   // Get unique table numbers for filter (use filteredOrders to only show tables from selected restaurant)
   const uniqueTables = useMemo(() => {
-    if (!orders || !restaurantFilter) return []
+    if (!orders || !Array.isArray(orders) || !restaurantFilter) return []
     // First filter by restaurant, then get unique tables
     const restaurantOrders = orders.filter((order: any) => order.restaurant === restaurantFilter)
+    if (!restaurantOrders || restaurantOrders.length === 0) return []
+    
     const tables = new Set<number>()
     restaurantOrders.forEach((order: any) => {
       if (order.table_number != null) {
@@ -200,8 +239,8 @@ export default function Orders() {
       timestamp: new Date().toISOString()
     })
     
-    if (!orders) {
-      console.log('🔍 [Orders] No orders data, returning empty array')
+    if (!orders || !Array.isArray(orders)) {
+      console.log('🔍 [Orders] No orders data or invalid data, returning empty array')
       return []
     }
     
@@ -296,7 +335,7 @@ export default function Orders() {
       
       return true
     })
-  }, [orders, restaurantFilter, searchQuery, statusFilter, tableFilter, dateFrom, dateTo])
+  }, [orders, restaurantFilter, searchQuery, statusFilter, tableFilter, dateFrom, dateTo]) || []
 
   const clearFilters = () => {
     setSearchQuery('')
@@ -311,11 +350,6 @@ export default function Orders() {
   const handleCheckOrder = (orderId: string) => {
     setSelectedOrderId(orderId)
     setIsDialogOpen(true)
-  }
-
-  const handleCloseDialog = () => {
-    setIsDialogOpen(false)
-    setSelectedOrderId(null)
   }
 
   return (
@@ -428,9 +462,9 @@ export default function Orders() {
             <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="text-sm text-muted-foreground">
                 {hasActiveFilters ? (
-                  <>Showing {filteredOrders.length} of {filteredOrders.length} orders (filtered by restaurant: {restaurantFilter || 'none'})</>
+                  <>Showing {filteredOrders?.length || 0} of {filteredOrders?.length || 0} orders (filtered by restaurant: {restaurantFilter || 'none'})</>
                 ) : (
-                  <>Total: {filteredOrders.length} orders (restaurant: {restaurantFilter || 'none'})</>
+                  <>Total: {filteredOrders?.length || 0} orders (restaurant: {restaurantFilter || 'none'})</>
                 )}
               </div>
               <Button
@@ -456,7 +490,7 @@ export default function Orders() {
             <div className="text-center py-12 text-muted-foreground">
               <p className="text-sm">Please select a restaurant from the dropdown above to view orders</p>
             </div>
-          ) : !filteredOrders || filteredOrders.length === 0 ? (
+          ) : !filteredOrders || filteredOrders?.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <p className="text-sm">No orders found for restaurant: {restaurantFilter}</p>
               {orders && orders.length > 0 && (
@@ -474,6 +508,7 @@ export default function Orders() {
                 orders={filteredOrders} 
                 onCheckOrder={handleCheckOrder}
                 onOrderUpdate={() => mutate()}
+                restaurantTables={restaurantDoc?.tables}
               />
                 </div>
               )}
@@ -483,7 +518,7 @@ export default function Orders() {
                 <>
                   {/* Mobile Card View */}
                   <div className="md:hidden space-y-3">
-                  {filteredOrders.map((order: any) => (
+                  {filteredOrders?.map((order: any) => (
                     <div key={order.name} className="p-4 border border-border rounded-md bg-card hover:border-border/80 transition-colors">
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div className="flex-1 min-w-0">
@@ -527,9 +562,29 @@ export default function Orders() {
                         </Select>
                       </div>
                       <div className="flex items-center gap-3 mb-3 flex-wrap">
-                        {order.table_number && (
+                        {tableOptions.length > 0 ? (
+                          <Select
+                            value={(order.table_number ?? 0).toString()}
+                            onValueChange={(value) => {
+                              const parsed = parseInt(value, 10)
+                              const tableNum = Number.isNaN(parsed) ? 0 : parsed
+                              handleTableNumberChange(order.name, tableNum)
+                            }}
+                          >
+                            <SelectTrigger className="h-7 px-2 text-xs font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a] w-auto min-w-[90px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {tableOptions.map((tableNum) => (
+                                <SelectItem key={tableNum} value={tableNum.toString()}>
+                                  Table {tableNum}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
                           <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a]">
-                            Table {order.table_number}
+                            Table {order.table_number ?? 0}
                           </span>
                         )}
                         {order.coupon && (
@@ -567,7 +622,7 @@ export default function Orders() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredOrders.map((order: any) => (
+                  {filteredOrders?.map((order: any) => (
                     <TableRow key={order.name}>
                       <TableCell className="font-medium">{order.order_number || order.name}</TableCell>
                       <TableCell>
@@ -600,12 +655,30 @@ export default function Orders() {
                             </Select>
                       </TableCell>
                       <TableCell>
-                        {order.table_number ? (
-                              <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a]">
-                            Table {order.table_number}
-                          </span>
+                        {tableOptions.length > 0 ? (
+                          <Select
+                            value={(order.table_number ?? 0).toString()}
+                            onValueChange={(value) => {
+                              const parsed = parseInt(value, 10)
+                              const tableNum = Number.isNaN(parsed) ? 0 : parsed
+                              handleTableNumberChange(order.name, tableNum)
+                            }}
+                          >
+                            <SelectTrigger className="h-7 px-2 text-xs font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a] w-auto min-w-[100px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {tableOptions.map((tableNum) => (
+                                <SelectItem key={tableNum} value={tableNum.toString()}>
+                                  Table {tableNum}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         ) : (
-                              <span className="text-muted-foreground">-</span>
+                          <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a]">
+                            Table {order.table_number ?? 0}
+                          </span>
                         )}
                       </TableCell>
                       <TableCell>

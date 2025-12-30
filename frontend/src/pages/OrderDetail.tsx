@@ -1,14 +1,54 @@
 import { useParams, Link } from 'react-router-dom'
-import { useFrappeGetDoc } from '@/lib/frappe'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 export default function OrderDetail() {
   const { orderId } = useParams<{ orderId: string }>()
   const { data: order, isLoading } = useFrappeGetDoc('Order', orderId || '', {
     fields: ['*']
   })
+  
+  // Get restaurant data to fetch table options
+  const { data: restaurantDoc } = useFrappeGetDoc('Restaurant', order?.restaurant || '', {
+    enabled: !!order?.restaurant,
+    fields: ['name', 'tables']
+  })
+  
+  // Table update API call
+  const { call: updateTableNumber } = useFrappePostCall('dinematters.dinematters.api.order_status.update_table_number')
+  
+  // Generate table options based on restaurant tables count
+  const tableOptions = [0, ...(restaurantDoc?.tables ? Array.from({length: restaurantDoc.tables}, (_, i) => i + 1) : [])]
+  
+  // Handle table number change
+  const handleTableNumberChange = async (newTableNumber: number) => {
+    if (!order?.name) return
+    
+    try {
+      await updateTableNumber({
+        order_id: order.name,
+        table_number: newTableNumber
+      })
+      
+      toast.success(`Table updated to Table ${newTableNumber}`)
+      
+      // Reload the order data to show the updated table number
+      window.location.reload()
+    } catch (error: any) {
+      console.error('Failed to update table number:', error)
+      toast.error(error?.message || 'Failed to update table number')
+    }
+  }
 
   if (isLoading) {
     return (
@@ -73,14 +113,37 @@ export default function OrderDetail() {
               <p className="text-sm text-muted-foreground">Restaurant</p>
               <p className="font-medium">{order.restaurant || 'N/A'}</p>
             </div>
-            {order.table_number && (
+            {tableOptions.length > 0 ? (
+              <div>
+                <p className="text-sm text-muted-foreground">Table Number</p>
+                <Select
+                  value={(order.table_number ?? 0).toString()}
+                  onValueChange={(value) => {
+                    const parsed = parseInt(value, 10)
+                    const tableNum = Number.isNaN(parsed) ? 0 : parsed
+                    handleTableNumberChange(tableNum)
+                  }}
+                >
+                  <SelectTrigger className="w-full max-w-[150px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tableOptions.map((tableNum) => (
+                      <SelectItem key={tableNum} value={tableNum.toString()}>
+                        Table {tableNum}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : order.table_number ? (
               <div>
                 <p className="text-sm text-muted-foreground">Table Number</p>
                 <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800">
                   Table {order.table_number}
                 </span>
               </div>
-            )}
+            ) : null}
             <div>
               <p className="text-sm text-muted-foreground">Created</p>
               <p>{order.creation ? new Date(order.creation).toLocaleString() : 'N/A'}</p>
