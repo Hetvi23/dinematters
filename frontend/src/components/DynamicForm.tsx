@@ -30,6 +30,7 @@ interface DynamicFormProps {
   readOnlyFields?: string[] // Fields to make read-only
   showSaveButton?: boolean // Control whether to show save button
   triggerSave?: number // Increment this to trigger save
+  skipLoadingState?: boolean // Skip showing loading spinner (useful when parent handles loading via page reload)
 }
 
 export default function DynamicForm({ 
@@ -44,7 +45,8 @@ export default function DynamicForm({
   hideFields = [],
   readOnlyFields = [],
   showSaveButton = true,
-  triggerSave
+  triggerSave,
+  skipLoadingState = false
 }: DynamicFormProps) {
   // Debug: Log component render
   console.log(`[DynamicForm] ${doctype} - Component render:`, {
@@ -1093,7 +1095,8 @@ export default function DynamicForm({
     }
   }
 
-  if (isLoading || metaLoading) {
+  // Skip loading state if skipLoadingState is true (parent handles loading via page reload)
+  if (!skipLoadingState && (isLoading || metaLoading)) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-8">
@@ -1120,7 +1123,8 @@ export default function DynamicForm({
     )
   }
 
-  if (!meta) {
+  // Skip loading state if skipLoadingState is true (parent handles loading via page reload)
+  if (!skipLoadingState && !meta) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-8">
@@ -1132,7 +1136,7 @@ export default function DynamicForm({
 
   // Group fields by sections (simplified - in real implementation, parse section breaks)
   // Filter out hidden fields, Column Breaks, Section Breaks, and fields in hideFields
-  const visibleFields = (meta.fields || []).filter(f => 
+  const visibleFields = (meta?.fields || []).filter(f => 
     !f.hidden && 
     !hideFields.includes(f.fieldname) &&
     f.fieldtype !== 'Column Break' &&
@@ -1199,7 +1203,7 @@ export default function DynamicForm({
           {visibleFields.length === 0 ? (
             <div className="col-span-2 text-center text-muted-foreground py-8">
               <p>No fields available for this form.</p>
-              <p className="text-xs mt-2">Total fields: {meta.fields?.length || 0}, Hidden: {meta.fields?.filter(f => f.hidden).length || 0}</p>
+              <p className="text-xs mt-2">Total fields: {meta?.fields?.length || 0}, Hidden: {meta?.fields?.filter(f => f.hidden).length || 0}</p>
             </div>
           ) : (
             visibleFields.map(field => {

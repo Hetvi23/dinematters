@@ -670,24 +670,11 @@ export default function SetupWizard() {
     setFormHasChanges(false)
     setTriggerSave(0) // Reset trigger
     
-    // Auto-advance to next step if not last
-    if (currentStep < steps.length - 1) {
-      const nextStep = currentStep + 1
-      const nextStepSlug = getStepIdFromIndex(nextStep)
-      setTimeout(() => {
-        if (nextStepSlug) {
-          navigate(`/setup/${nextStepSlug}`, { replace: true })
-          // Reload page to ensure fresh data
-          setTimeout(() => {
-            window.location.reload()
-          }, 100)
-        } else {
-          setCurrentStep(nextStep)
-        }
-      }, 500)
-    } else {
-      navigate('/dashboard')
-    }
+    // Show success message - stay on current step after saving
+    toast.success('Changes saved successfully')
+    
+    // Do NOT auto-advance to next step - user stays on current step
+    // User can manually navigate using Next/Previous/Skip buttons
   }
 
   const handleNext = () => {
@@ -1058,6 +1045,7 @@ export default function SetupWizard() {
                   key={`${currentStepData.id}-${selectedRestaurant || 'no-restaurant'}-${currentStep}-${urlStepId || ''}`}
                   onChange={setFormHasChanges}
                   showSaveButton={false}
+                  skipLoadingState={true}
                   doctype={currentStepData.doctype}
                   hideFields={currentStepData.id === 'restaurant' 
                     ? ['restaurant_id', 'company', 'subdomain'] 
