@@ -155,10 +155,49 @@ export default function DynamicForm({
       if (!formDataInitialized && mode === 'create') {
         setFormDataInitialized(false) // Force re-initialization
       }
+      // Update formData with initialData values for read-only fields (they shouldn't have user changes)
+      if (formDataInitialized && readOnlyFields.length > 0) {
+        setFormData(prev => {
+          const updated = { ...prev }
+          let hasChanges = false
+          readOnlyFields.forEach(fieldname => {
+            if (initialData[fieldname] !== undefined && initialData[fieldname] !== null) {
+              updated[fieldname] = initialData[fieldname]
+              hasChanges = true
+            }
+          })
+          if (hasChanges) {
+            // Also update originalDataRef to keep change detection accurate
+            originalDataRef.current = { ...originalDataRef.current, ...updated }
+          }
+          return hasChanges ? updated : prev
+        })
+      }
+      // Also update formData for any initialData keys that are missing or empty in formData
+      if (formDataInitialized && mode === 'create') {
+        setFormData(prev => {
+          const updated = { ...prev }
+          let hasChanges = false
+          Object.keys(initialData).forEach(key => {
+            // Update if field is missing, undefined, null, or empty string in formData
+            if (!(key in prev) || prev[key] === undefined || prev[key] === null || prev[key] === '') {
+              if (initialData[key] !== undefined && initialData[key] !== null && initialData[key] !== '') {
+                updated[key] = initialData[key]
+                hasChanges = true
+              }
+            }
+          })
+          if (hasChanges) {
+            // Also update originalDataRef to keep change detection accurate
+            originalDataRef.current = { ...originalDataRef.current, ...updated }
+          }
+          return hasChanges ? updated : prev
+        })
+      }
     } else {
       initialDataRef.current = {}
     }
-  }, [JSON.stringify(initialData)])
+  }, [JSON.stringify(initialData), formDataInitialized, mode, readOnlyFields])
 
   // Trigger save when parent requests it
   useEffect(() => {
