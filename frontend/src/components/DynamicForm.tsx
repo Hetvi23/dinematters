@@ -142,6 +142,7 @@ export default function DynamicForm({
       return // Don't overwrite user data
     }
 
+    // When docname changes from undefined to a value, or docData becomes available, initialize
     if (docData && mode !== 'create' && !formDataInitialized) {
       console.log(`[DynamicForm] ${doctype} - Loading docData into formData:`, {
         hasDocData: !!docData,
@@ -243,7 +244,7 @@ export default function DynamicForm({
       })
       setFormDataInitialized(true)
     }
-  }, [docData, meta, mode, formDataInitialized])
+  }, [docData, meta, mode, formDataInitialized, docname])
 
   // Reset initialization flag when mode or docname changes (but not when initialData changes)
   useEffect(() => {

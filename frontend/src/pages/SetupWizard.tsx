@@ -6,10 +6,10 @@ import RestaurantDataList from '@/components/RestaurantDataList'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Stepper, Step } from '@/components/ui/stepper'
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 
@@ -33,14 +33,50 @@ interface Restaurant {
   modified: string
 }
 
-// Helper function to truncate text to a specific number of characters
-const truncateText = (text: string, maxLength: number): string => {
-  if (!text || text.length <= maxLength) return text
-  return text.substring(0, maxLength) + '...'
+// Helper function to convert step ID to URL-friendly slug
+const stepIdToSlug = (stepId: string): string => {
+  // Map step IDs to URL-friendly slugs
+  const slugMap: Record<string, string> = {
+    'restaurant': 'CreateRestaurant',
+    'config': 'RestaurantConfiguration',
+    'users': 'StaffMembers',
+    'categories': 'MenuCategories',
+    'products': 'MenuProducts',
+    'offers': 'CreateOffers',
+    'coupons': 'CreateCoupons',
+    'events': 'CreateEvents',
+    'games': 'AddGames',
+    'home_features': 'HomeFeatures',
+    'table_booking': 'TableBookingSetup',
+    'banquet_booking': 'BanquetBookingSetup',
+  }
+  return slugMap[stepId] || stepId
+}
+
+// Helper function to convert URL slug back to step ID
+const slugToStepId = (slug: string): string => {
+  // Reverse mapping
+  const idMap: Record<string, string> = {
+    'CreateRestaurant': 'restaurant',
+    'RestaurantConfiguration': 'config',
+    'StaffMembers': 'users',
+    'MenuCategories': 'categories',
+    'MenuProducts': 'products',
+    'CreateOffers': 'offers',
+    'CreateCoupons': 'coupons',
+    'CreateEvents': 'events',
+    'AddGames': 'games',
+    'HomeFeatures': 'home_features',
+    'TableBookingSetup': 'table_booking',
+    'BanquetBookingSetup': 'banquet_booking',
+  }
+  return idMap[slug] || slug
 }
 
 export default function SetupWizard() {
   const navigate = useNavigate()
+  const { stepId: urlStepId } = useParams<{ stepId?: string }>()
+  const location = useLocation()
   const { selectedRestaurant, setSelectedRestaurant } = useRestaurant()
   
   // Get user's restaurants
@@ -68,6 +104,20 @@ export default function SetupWizard() {
     return []
   })()
 
+  // Helper function to get step index from step ID
+  const getStepIndexFromId = (stepId: string | undefined): number => {
+    if (!stepId || steps.length === 0) return 0
+    const id = slugToStepId(stepId)
+    const index = steps.findIndex(step => step.id === id)
+    return index >= 0 ? index : 0
+  }
+
+  // Helper function to get step ID from index
+  const getStepIdFromIndex = (index: number): string => {
+    if (index < 0 || index >= steps.length) return ''
+    return stepIdToSlug(steps[index].id)
+  }
+
   // Get setup progress for selected restaurant
   const { data: progressData } = useFrappeGetCall<{ message: Record<string, boolean> }>(
     'dinematters.dinematters.api.ui.get_restaurant_setup_progress',
@@ -91,7 +141,14 @@ export default function SetupWizard() {
     enabled: !!restaurantId
   })
 
+  // Initialize currentStep from URL or localStorage
   const [currentStep, setCurrentStep] = useState<number>(() => {
+    // First priority: URL parameter
+    if (urlStepId && steps.length > 0) {
+      const stepIndex = getStepIndexFromId(urlStepId)
+      if (stepIndex >= 0) return stepIndex
+    }
+    // Fallback: localStorage
     try {
       const saved = localStorage.getItem('dinematters-setup-step')
       return saved ? parseInt(saved, 10) : 0
@@ -99,6 +156,47 @@ export default function SetupWizard() {
       return 0
     }
   })
+
+  // Track if we're updating from URL to prevent circular updates
+  const isUpdatingFromUrl = useRef(false)
+  
+  // Sync URL with currentStep when steps are loaded or URL changes
+  useEffect(() => {
+    if (steps.length === 0) return
+    
+    // If URL has a stepId, use it to set currentStep
+    if (urlStepId) {
+      const stepIndex = getStepIndexFromId(urlStepId)
+      if (stepIndex >= 0 && stepIndex !== currentStep) {
+        isUpdatingFromUrl.current = true
+        setCurrentStep(stepIndex)
+      }
+    } else if (location.pathname === '/setup') {
+      // If no stepId in URL but we're on /setup, redirect to first step
+      const stepSlug = getStepIdFromIndex(currentStep)
+      if (stepSlug) {
+        navigate(`/setup/${stepSlug}`, { replace: true })
+      }
+    }
+  }, [urlStepId, steps.length, currentStep, navigate, location.pathname])
+
+  // Update URL when currentStep changes (but not from URL sync)
+  useEffect(() => {
+    if (isUpdatingFromUrl.current) {
+      isUpdatingFromUrl.current = false
+      return
+    }
+    
+    if (steps.length > 0 && currentStep >= 0 && currentStep < steps.length) {
+      const stepSlug = getStepIdFromIndex(currentStep)
+      if (stepSlug) {
+        const expectedPath = `/setup/${stepSlug}`
+        if (location.pathname !== expectedPath) {
+          navigate(expectedPath, { replace: true })
+        }
+      }
+    }
+  }, [currentStep, steps.length, navigate, location.pathname])
   // Initialize completedSteps from localStorage if available
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(() => {
     try {
@@ -236,26 +334,44 @@ export default function SetupWizard() {
       
       setStepData(prev => ({ ...prev, ...newStepData }))
 
-      // Check if we have a persisted step from localStorage
-      try {
-        const savedStep = localStorage.getItem('dinematters-setup-step')
-        const persistedStep = savedStep ? parseInt(savedStep, 10) : null
-        
-        if (persistedStep !== null && persistedStep >= 0 && persistedStep < steps.length) {
-          // Use persisted step if valid
-          setCurrentStep(persistedStep)
-        } else {
-          // No valid persisted step, find first incomplete required step
+      // Only set step from localStorage if URL doesn't have a stepId
+      // URL takes priority over localStorage
+      if (!urlStepId) {
+        try {
+          const savedStep = localStorage.getItem('dinematters-setup-step')
+          const persistedStep = savedStep ? parseInt(savedStep, 10) : null
+          
+          if (persistedStep !== null && persistedStep >= 0 && persistedStep < steps.length) {
+            // Use persisted step if valid, but update URL
+            const stepSlug = getStepIdFromIndex(persistedStep)
+            if (stepSlug) {
+              navigate(`/setup/${stepSlug}`, { replace: true })
+            } else {
+              setCurrentStep(persistedStep)
+            }
+          } else {
+            // No valid persisted step, find first incomplete required step
+            const firstIncomplete = steps.findIndex((step, index) => !completed.has(index) && step.required)
+            if (firstIncomplete !== -1) {
+              const stepSlug = getStepIdFromIndex(firstIncomplete)
+              if (stepSlug) {
+                navigate(`/setup/${stepSlug}`, { replace: true })
+              } else {
+                setCurrentStep(firstIncomplete)
+              }
+            }
+          }
+        } catch (e) {
+          // Fallback to finding first incomplete step
           const firstIncomplete = steps.findIndex((step, index) => !completed.has(index) && step.required)
           if (firstIncomplete !== -1) {
-            setCurrentStep(firstIncomplete)
+            const stepSlug = getStepIdFromIndex(firstIncomplete)
+            if (stepSlug) {
+              navigate(`/setup/${stepSlug}`, { replace: true })
+            } else {
+              setCurrentStep(firstIncomplete)
+            }
           }
-        }
-      } catch (e) {
-        // Fallback to finding first incomplete step
-        const firstIncomplete = steps.findIndex((step, index) => !completed.has(index) && step.required)
-        if (firstIncomplete !== -1) {
-          setCurrentStep(firstIncomplete)
         }
       }
     }
@@ -264,12 +380,13 @@ export default function SetupWizard() {
     if (!selectedRestaurant) {
       progressInitialized.current = null
     }
-  }, [selectedRestaurant, progress, steps, restaurantData, configData])
+  }, [selectedRestaurant, progress, steps, restaurantData, configData, urlStepId, navigate])
   
   // Load step documents when restaurant and progress are available
   const { call: getDocList } = useFrappePostCall('frappe.client.get_list')
   const { call: getDoc } = useFrappePostCall('frappe.client.get')
   
+  // Load all step documents when restaurant and progress are available
   useEffect(() => {
     if (!selectedRestaurant || !progress || steps.length === 0) return
 
@@ -328,6 +445,108 @@ export default function SetupWizard() {
 
     loadStepData()
   }, [selectedRestaurant, progress, steps, getDocList, getDoc])
+
+  // Load data for current step when URL changes or step changes
+  // This ensures data is fetched immediately when navigating via URL
+  const currentStepDataRef = useRef<{ stepId: string | null, urlStepId: string | null }>({ stepId: null, urlStepId: null })
+  const [loadingStepData, setLoadingStepData] = useState<Record<string, boolean>>({})
+  
+  useEffect(() => {
+    if (!selectedRestaurant || !progress || steps.length === 0 || currentStep < 0 || currentStep >= steps.length) return
+
+    const currentStepInfo = steps[currentStep]
+    if (!currentStepInfo) return
+
+    const stepId = currentStepInfo.id
+    
+    // Always reload when URL changes, even if stepId is the same
+    // This ensures we get fresh data from backend when navigating via URL
+    const shouldReload = currentStepDataRef.current.stepId !== stepId || 
+                         currentStepDataRef.current.urlStepId !== urlStepId
+    
+    if (!shouldReload) {
+      return
+    }
+    
+    currentStepDataRef.current = { stepId, urlStepId: urlStepId || null }
+
+    const stepDocTypeMap: Record<string, string> = {
+      'config': 'Restaurant Config',
+      'offers': 'Offer',
+      'coupons': 'Coupon',
+      'events': 'Event',
+      'games': 'Game',
+      'home_features': 'Home Feature',
+      'table_booking': 'Table Booking',
+      'banquet_booking': 'Banquet Booking',
+    }
+
+    const doctype = stepDocTypeMap[stepId]
+
+    // Load data if this step has a doctype and progress indicates it exists
+    // Always reload when URL changes to ensure fresh data
+    if (doctype && progress[stepId]) {
+      // Mark as loading
+      setLoadingStepData(prev => ({ ...prev, [stepId]: true }))
+      
+      const loadCurrentStepData = async () => {
+        try {
+          console.log(`[SetupWizard] Loading data for step ${stepId} (${doctype}) from URL: ${urlStepId}`)
+          
+          // Get the first document for this restaurant
+          const result: any = await getDocList({
+            doctype,
+            filters: JSON.stringify({ restaurant: selectedRestaurant }),
+            fields: JSON.stringify(['name']),
+            limit_page_length: 1,
+            order_by: 'modified desc'
+          })
+          
+          if (result?.message && Array.isArray(result.message) && result.message.length > 0) {
+            // Get full document details
+            const docName = result.message[0].name
+            const fullDoc: any = await getDoc({
+              doctype,
+              name: docName
+            })
+            
+            if (fullDoc?.message) {
+              console.log(`[SetupWizard] Loaded data for step ${stepId}:`, fullDoc.message)
+              setStepData(prev => ({ ...prev, [stepId]: fullDoc.message }))
+            } else if (result.message[0]) {
+              // Fallback to the list result
+              setStepData(prev => ({ ...prev, [stepId]: result.message[0] }))
+            }
+          } else {
+            // No document found, clear stepData for this step
+            console.log(`[SetupWizard] No document found for step ${stepId}, clearing stepData`)
+            setStepData(prev => {
+              const updated = { ...prev }
+              delete updated[stepId]
+              return updated
+            })
+          }
+        } catch (error) {
+          console.error(`Error loading ${doctype} for step ${stepId}:`, error)
+        } finally {
+          setLoadingStepData(prev => ({ ...prev, [stepId]: false }))
+        }
+      }
+
+      loadCurrentStepData()
+    } else if (!progress[stepId]) {
+      // If step is not completed, ensure stepData is cleared
+      setStepData(prev => {
+        if (prev[stepId]) {
+          const updated = { ...prev }
+          delete updated[stepId]
+          return updated
+        }
+        return prev
+      })
+      setLoadingStepData(prev => ({ ...prev, [stepId]: false }))
+    }
+  }, [currentStep, urlStepId, selectedRestaurant, progress, steps, getDocList, getDoc])
 
   const currentStepData = steps.length > 0 && currentStep >= 0 && currentStep < steps.length ? steps[currentStep] : null
   
@@ -402,11 +621,11 @@ export default function SetupWizard() {
     }
   }, [finalRestaurantId, restaurantUsers, steps, completedSteps])
   
-  // Reset form state when step changes
+  // Reset form state when step changes (including URL changes)
   useEffect(() => {
     setFormHasChanges(false)
     setTriggerSave(0)
-  }, [currentStep])
+  }, [currentStep, urlStepId])
 
 
   const handleStepComplete = (data: any) => {
@@ -453,8 +672,18 @@ export default function SetupWizard() {
     
     // Auto-advance to next step if not last
     if (currentStep < steps.length - 1) {
+      const nextStep = currentStep + 1
+      const nextStepSlug = getStepIdFromIndex(nextStep)
       setTimeout(() => {
-        setCurrentStep(prev => prev + 1)
+        if (nextStepSlug) {
+          navigate(`/setup/${nextStepSlug}`, { replace: true })
+          // Reload page to ensure fresh data
+          setTimeout(() => {
+            window.location.reload()
+          }, 100)
+        } else {
+          setCurrentStep(nextStep)
+        }
       }, 500)
     } else {
       navigate('/dashboard')
@@ -466,7 +695,17 @@ export default function SetupWizard() {
     // This allows users to navigate forward without being stuck
     if (currentStep < steps.length - 1) {
       setFormHasChanges(false) // Reset changes flag when moving forward
-      setCurrentStep(prev => prev + 1)
+      const nextStep = currentStep + 1
+      const nextStepSlug = getStepIdFromIndex(nextStep)
+      if (nextStepSlug) {
+        navigate(`/setup/${nextStepSlug}`, { replace: true })
+        // Reload page to ensure fresh data
+        setTimeout(() => {
+          window.location.reload()
+        }, 100)
+      } else {
+        setCurrentStep(nextStep)
+      }
     }
   }
 
@@ -486,7 +725,17 @@ export default function SetupWizard() {
         }
         return updated
       })
-      setCurrentStep(prev => prev + 1)
+      const nextStep = currentStep + 1
+      const nextStepSlug = getStepIdFromIndex(nextStep)
+      if (nextStepSlug) {
+        navigate(`/setup/${nextStepSlug}`, { replace: true })
+        // Reload page to ensure fresh data
+        setTimeout(() => {
+          window.location.reload()
+        }, 100)
+      } else {
+        setCurrentStep(nextStep)
+      }
     } else if (currentStep === steps.length - 1) {
       // On last step, mark as completed and finish
       setFormHasChanges(false)
@@ -530,13 +779,32 @@ export default function SetupWizard() {
 
   const handlePrevious = () => {
     if (currentStep > 0) {
-      setCurrentStep(prev => prev - 1)
+      const prevStep = currentStep - 1
+      const prevStepSlug = getStepIdFromIndex(prevStep)
+      if (prevStepSlug) {
+        navigate(`/setup/${prevStepSlug}`, { replace: true })
+        // Reload page to ensure fresh data
+        setTimeout(() => {
+          window.location.reload()
+        }, 100)
+      } else {
+        setCurrentStep(prevStep)
+      }
     }
   }
 
   const handleStepClick = (stepIndex: number) => {
     if (completedSteps.has(stepIndex) || stepIndex === currentStep) {
-      setCurrentStep(stepIndex)
+      const stepSlug = getStepIdFromIndex(stepIndex)
+      if (stepSlug) {
+        navigate(`/setup/${stepSlug}`, { replace: true })
+        // Reload page to ensure fresh data
+        setTimeout(() => {
+          window.location.reload()
+        }, 100)
+      } else {
+        setCurrentStep(stepIndex)
+      }
       setShowProgressModal(false)
     }
   }
@@ -787,7 +1055,7 @@ export default function SetupWizard() {
             {currentStepData && !['users', 'categories', 'products'].includes(currentStepData.id) && (
               <div className="bg-muted/30 rounded-md p-6 border">
                 <DynamicForm
-                  key={`${currentStepData.id}-${selectedRestaurant || 'no-restaurant'}-${currentStep}`}
+                  key={`${currentStepData.id}-${selectedRestaurant || 'no-restaurant'}-${currentStep}-${urlStepId || ''}`}
                   onChange={setFormHasChanges}
                   showSaveButton={false}
                   doctype={currentStepData.doctype}
@@ -808,19 +1076,45 @@ export default function SetupWizard() {
                       return selectedRestaurant
                     }
                     // For config, use restaurant as docname (autoname: field:restaurant)
-                    // Always prioritize selectedRestaurant from context
+                    // Use progress to determine if config exists, then use restaurant name directly
                     if (currentStepData.id === 'config') {
-                      const docname = selectedRestaurant || finalRestaurantId || savedData?.restaurant || undefined
-                      console.log('[SetupWizard] Config step docname:', {
-                        selectedRestaurant,
-                        finalRestaurantId,
-                        savedData: savedData?.restaurant,
-                        docname,
-                        progress: progress?.config
-                      })
-                      return docname
+                      // If progress indicates config exists, use restaurant name as docname
+                      // This ensures DynamicForm can fetch immediately without waiting for stepData
+                      if (progress?.config && selectedRestaurant) {
+                        const docname = selectedRestaurant || finalRestaurantId || undefined
+                        console.log('[SetupWizard] Config step docname (from progress):', {
+                          selectedRestaurant,
+                          finalRestaurantId,
+                          docname,
+                          progress: progress?.config,
+                          hasStepData: !!savedData
+                        })
+                        return docname
+                      }
+                      // If no progress yet, return undefined (create mode)
+                      return undefined
                     }
-                    return savedData?.name || savedData?.restaurant_id || undefined
+                    // For other steps, check progress first, then use stepData
+                    const progressKey = currentStepData.id
+                    if (progress?.[progressKey] && selectedRestaurant) {
+                      // If progress indicates step is completed, try to get docname
+                      // First try from stepData (if already loaded)
+                      if (savedData?.name) {
+                        console.log(`[SetupWizard] Step ${currentStepData.id} docname (from stepData):`, savedData.name)
+                        return savedData.name
+                      }
+                      // If stepData not loaded yet, trigger loading and return undefined
+                      // The loading effect will update stepData, which will update docname
+                      // DynamicForm will then fetch data when docname becomes available
+                      if (!loadingStepData[currentStepData.id] && !savedData) {
+                        // Trigger loading by checking if we need to load
+                        console.log(`[SetupWizard] Step ${currentStepData.id} - progress exists, will load stepData`)
+                      }
+                      // Return undefined while loading - DynamicForm will wait
+                      return undefined
+                    }
+                    // No progress, return undefined (create mode)
+                    return undefined
                   })()}
                   mode={(() => {
                     // If restaurant exists, always use edit mode
@@ -849,28 +1143,39 @@ export default function SetupWizard() {
                       return data
                     }
                     
+                    // Get saved step data if available
+                    const savedStepData = stepData[currentStepData.id]
+                    
                     // For Restaurant Config - always pass restaurant from context
-                    // Other fields will come from backend in edit mode
+                    // Merge with saved step data if available
                     if (currentStepData.id === 'config') {
                       const restaurantValue = selectedRestaurant || finalRestaurantId || restaurantName
-                      return {
-                        restaurant: restaurantValue
+                      const baseData = { restaurant: restaurantValue }
+                      // Merge with saved data, but prioritize restaurant from context
+                      if (savedStepData) {
+                        return { ...savedStepData, restaurant: restaurantValue }
                       }
+                      return baseData
                     }
                     
                     // For other steps that depend on restaurant
-                    // Always pass restaurant from context, other fields from backend
+                    // Always pass restaurant from context, merge with saved data if available
                     if (currentStepData.depends_on === 'restaurant') {
                       const restaurantValue = selectedRestaurant || finalRestaurantId || restaurantName
-                      return {
-                        restaurant: restaurantValue
+                      const baseData = { restaurant: restaurantValue }
+                      // Merge with saved data, but prioritize restaurant from context
+                      if (savedStepData) {
+                        return { ...savedStepData, restaurant: restaurantValue }
                       }
+                      return baseData
                     }
                     
-                    // For other completed steps, let backend data take precedence
-                    if (completedSteps.has(currentStep) && stepData[currentStepData.id]) {
-                      // Don't pass initialData - DynamicForm will fetch via docname
-                      return {}
+                    // For other completed steps, pass saved data if available
+                    if (savedStepData) {
+                      // Remove name field as it's used as docname
+                      const data = { ...savedStepData }
+                      delete data.name
+                      return data
                     }
                     
                     return {}
@@ -918,4 +1223,6 @@ export default function SetupWizard() {
     </div>
   )
 }
+
+
 

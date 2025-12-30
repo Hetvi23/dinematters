@@ -19,6 +19,7 @@ import ProductNew from './pages/ProductNew'
 import CategoryDetail from './pages/CategoryDetail'
 import CategoryEdit from './pages/CategoryEdit'
 import CategoryNew from './pages/CategoryNew'
+import QRCodes from './pages/QRCodes'
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -31,7 +32,7 @@ function AppContent() {
 						<Route path="/" element={<Navigate to="/dashboard" replace />} />
 						<Route path="/dashboard" element={<Dashboard />} />
 						<Route path="/setup" element={<SetupWizard />} />
-						<Route path="/setup/:restaurantName" element={<SetupWizard />} />
+						<Route path="/setup/:stepId" element={<SetupWizard />} />
 						<Route path="/modules" element={<Modules />} />
 						<Route path="/:doctype" element={<ModuleList />} />
 						<Route path="/:doctype/:docname" element={<ModuleDetail />} />
@@ -46,6 +47,7 @@ function AppContent() {
 						<Route path="/categories/new" element={<CategoryNew />} />
 						<Route path="/categories/:categoryId/edit" element={<CategoryEdit />} />
 						<Route path="/categories/:categoryId" element={<CategoryDetail />} />
+						<Route path="/qr-codes" element={<QRCodes />} />
 					</Routes>
 				</Layout>
 			</BrowserRouter>
