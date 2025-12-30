@@ -810,7 +810,15 @@ export default function SetupWizard() {
                     // For config, use restaurant as docname (autoname: field:restaurant)
                     // Always prioritize selectedRestaurant from context
                     if (currentStepData.id === 'config') {
-                      return selectedRestaurant || finalRestaurantId || savedData?.restaurant || undefined
+                      const docname = selectedRestaurant || finalRestaurantId || savedData?.restaurant || undefined
+                      console.log('[SetupWizard] Config step docname:', {
+                        selectedRestaurant,
+                        finalRestaurantId,
+                        savedData: savedData?.restaurant,
+                        docname,
+                        progress: progress?.config
+                      })
+                      return docname
                     }
                     return savedData?.name || savedData?.restaurant_id || undefined
                   })()}
@@ -820,8 +828,15 @@ export default function SetupWizard() {
                       return 'edit'
                     }
                     // If config exists, use edit mode
-                    if (currentStepData.id === 'config' && progress?.config) {
-                      return 'edit'
+                    if (currentStepData.id === 'config') {
+                      const isEdit = !!(progress?.config && selectedRestaurant)
+                      console.log('[SetupWizard] Config step mode:', {
+                        'progress?.config': progress?.config,
+                        selectedRestaurant,
+                        isEdit,
+                        mode: isEdit ? 'edit' : 'create'
+                      })
+                      return isEdit ? 'edit' : 'create'
                     }
                     // For other steps, check if completed
                     return completedSteps.has(currentStep) ? 'edit' : 'create'
@@ -834,37 +849,28 @@ export default function SetupWizard() {
                       return data
                     }
                     
-                    // For Restaurant Config - always set restaurant from selectedRestaurant and load existing data
+                    // For Restaurant Config - always pass restaurant from context
+                    // Other fields will come from backend in edit mode
                     if (currentStepData.id === 'config') {
-                      // Always use selectedRestaurant from context as the primary source
                       const restaurantValue = selectedRestaurant || finalRestaurantId || restaurantName
-                      const configData = stepData['config'] || {}
-                      // Remove restaurant from configData if it exists to ensure we use the selected one
-                      const { restaurant: _, ...restConfigData } = configData
                       return {
-                        restaurant: restaurantValue,
-                        ...restConfigData
+                        restaurant: restaurantValue
                       }
                     }
                     
                     // For other steps that depend on restaurant
+                    // Always pass restaurant from context, other fields from backend
                     if (currentStepData.depends_on === 'restaurant') {
-                      // Always use selectedRestaurant from context as the primary source
                       const restaurantValue = selectedRestaurant || finalRestaurantId || restaurantName
-                      const savedData = stepData[currentStepData.id]
-                      // Remove restaurant from savedData if it exists to ensure we use the selected one
-                      const { restaurant: _, ...restSavedData } = savedData || {}
                       return {
-                        restaurant: restaurantValue,
-                        ...(restSavedData ? { ...restSavedData, name: undefined } : {})
+                        restaurant: restaurantValue
                       }
                     }
                     
-                    // Load saved data for completed steps
+                    // For other completed steps, let backend data take precedence
                     if (completedSteps.has(currentStep) && stepData[currentStepData.id]) {
-                      const saved = { ...stepData[currentStepData.id] }
-                      delete saved.name
-                      return saved
+                      // Don't pass initialData - DynamicForm will fetch via docname
+                      return {}
                     }
                     
                     return {}

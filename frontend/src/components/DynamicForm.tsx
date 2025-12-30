@@ -46,11 +46,58 @@ export default function DynamicForm({
   showSaveButton = true,
   triggerSave
 }: DynamicFormProps) {
+  // Debug: Log component render
+  console.log(`[DynamicForm] ${doctype} - Component render:`, {
+    doctype,
+    docname,
+    mode,
+    initialData,
+    readOnlyFields
+  })
+  
   const { meta, isLoading: metaLoading, error: metaError } = useDocTypeMeta(doctype)
   const { permissions, isLoading: permLoading } = usePermissions(doctype)
-  const { data: docData, isLoading: docLoading } = useFrappeGetDoc(doctype, docname || '', {
-    enabled: !!docname && mode !== 'create'
+  
+  const hookEnabled = !!docname && mode !== 'create'
+  const { data: docData, isLoading: docLoading, error: docError } = useFrappeGetDoc(doctype, docname || '', {
+    enabled: hookEnabled,
+    fields: ['*'] // Request all fields to ensure we get tagline, subtitle, etc.
   })
+
+  // Debug: Log hook state immediately
+  console.log(`[DynamicForm] ${doctype} - Hook state (immediate):`, {
+    doctype,
+    docname,
+    mode,
+    hookEnabled,
+    docLoading,
+    hasDocData: !!docData,
+    docError,
+    docDataKeys: docData ? Object.keys(docData) : [],
+    docDataSample: docData ? {
+      restaurant: docData.restaurant,
+      tagline: docData.tagline,
+      subtitle: docData.subtitle,
+      default_theme: docData.default_theme,
+      primary_color: docData.primary_color
+    } : null,
+    fullDocData: docData
+  })
+
+  // Debug: Log hook state in effect
+  useEffect(() => {
+    console.log(`[DynamicForm] ${doctype} - Hook state (effect):`, {
+      doctype,
+      docname,
+      mode,
+      hookEnabled,
+      docLoading,
+      hasDocData: !!docData,
+      docError,
+      docDataKeys: docData ? Object.keys(docData) : [],
+      docData: docData
+    })
+  }, [doctype, docname, mode, hookEnabled, docLoading, docData, docError])
 
   // Debug logging
   useEffect(() => {
@@ -91,11 +138,22 @@ export default function DynamicForm({
   useEffect(() => {
     // Only initialize if we haven't initialized yet AND user hasn't entered data
     if (formDataInitialized && hasUserDataRef.current) {
+      console.log(`[DynamicForm] ${doctype} - Skipping init: formDataInitialized=${formDataInitialized}, hasUserData=${hasUserDataRef.current}`)
       return // Don't overwrite user data
     }
 
     if (docData && mode !== 'create' && !formDataInitialized) {
-      // Load existing document data
+      console.log(`[DynamicForm] ${doctype} - Loading docData into formData:`, {
+        hasDocData: !!docData,
+        docDataKeys: Object.keys(docData),
+        tagline: docData.tagline,
+        subtitle: docData.subtitle,
+        default_theme: docData.default_theme,
+        primary_color: docData.primary_color,
+        formDataInitialized
+      })
+      
+      // Load existing document data from backend - this is the source of truth for most fields
       const cleanDocData = { ...docData }
       // Remove metadata fields that shouldn't be compared
       delete cleanDocData.name
@@ -103,8 +161,56 @@ export default function DynamicForm({
       delete cleanDocData.modified
       delete cleanDocData.modified_by
       delete cleanDocData.owner
-      setFormData(cleanDocData)
-      originalDataRef.current = { ...cleanDocData } // Store original data for comparison
+      
+      // For edit mode, backend data (docData) is the source of truth for most fields
+      // Start with ALL backend data (tagline, theme, colors, etc.)
+      // Also initialize all fields from meta with their defaults if they're not in docData
+      const mergedData = { ...cleanDocData }
+      
+      // If meta is available, ensure all fields are initialized (even if NULL in backend)
+      // This handles cases where the API only returns non-NULL fields
+      if (meta && meta.fields) {
+        meta.fields.forEach(field => {
+          // Only set if field is not already in mergedData (to preserve backend values)
+          // and field is not hidden
+          if (!field.hidden && !(field.fieldname in mergedData)) {
+            // Use default value if available, otherwise undefined
+            if (field.default !== undefined && field.default !== null) {
+              mergedData[field.fieldname] = field.default
+            }
+          }
+        })
+      }
+      
+      // Override read-only fields with initialData values (e.g., restaurant from context)
+      // This ensures restaurant field ALWAYS comes from context (top-left dropdown), not backend
+      // Use initialData prop directly to ensure we have the latest value
+      readOnlyFields.forEach(fieldname => {
+        if (initialData[fieldname] !== undefined && initialData[fieldname] !== null && initialData[fieldname] !== '') {
+          mergedData[fieldname] = initialData[fieldname]
+        } else if (initialDataRef.current[fieldname] !== undefined && initialDataRef.current[fieldname] !== null && initialDataRef.current[fieldname] !== '') {
+          mergedData[fieldname] = initialDataRef.current[fieldname]
+        }
+      })
+      
+      // Also ensure restaurant field is always set from initialData if provided (even if not in readOnlyFields yet)
+      if (initialData.restaurant !== undefined && initialData.restaurant !== null && initialData.restaurant !== '') {
+        mergedData.restaurant = initialData.restaurant
+      } else if (initialDataRef.current.restaurant !== undefined && initialDataRef.current.restaurant !== null && initialDataRef.current.restaurant !== '') {
+        mergedData.restaurant = initialDataRef.current.restaurant
+      }
+      
+      console.log(`[DynamicForm] ${doctype} - Setting formData with mergedData:`, {
+        mergedDataKeys: Object.keys(mergedData),
+        tagline: mergedData.tagline,
+        subtitle: mergedData.subtitle,
+        default_theme: mergedData.default_theme,
+        primary_color: mergedData.primary_color,
+        restaurant: mergedData.restaurant
+      })
+      
+      setFormData(mergedData)
+      originalDataRef.current = { ...mergedData } // Store original data for comparison
       setFormDataInitialized(true)
       hasUserDataRef.current = false // Reset - user hasn't made changes yet
     } else if (meta && !formDataInitialized && mode === 'create') {
@@ -137,7 +243,7 @@ export default function DynamicForm({
       })
       setFormDataInitialized(true)
     }
-  }, [docData, meta, mode, formDataInitialized, initialDataRef.current])
+  }, [docData, meta, mode, formDataInitialized])
 
   // Reset initialization flag when mode or docname changes (but not when initialData changes)
   useEffect(() => {
@@ -155,13 +261,15 @@ export default function DynamicForm({
       if (!formDataInitialized && mode === 'create') {
         setFormDataInitialized(false) // Force re-initialization
       }
-      // Update formData with initialData values for read-only fields (they shouldn't have user changes)
+      // Update formData with initialData values for read-only fields in both create and edit mode
+      // This ensures restaurant field from context always takes precedence
       if (formDataInitialized && readOnlyFields.length > 0) {
         setFormData(prev => {
           const updated = { ...prev }
           let hasChanges = false
           readOnlyFields.forEach(fieldname => {
-            if (initialData[fieldname] !== undefined && initialData[fieldname] !== null) {
+            if (initialData[fieldname] !== undefined && initialData[fieldname] !== null && initialData[fieldname] !== '') {
+              // Always update read-only fields from initialData (like restaurant from context)
               updated[fieldname] = initialData[fieldname]
               hasChanges = true
             }
@@ -173,12 +281,14 @@ export default function DynamicForm({
           return hasChanges ? updated : prev
         })
       }
-      // Also update formData for any initialData keys that are missing or empty in formData
+      // Also update formData for any initialData keys that are missing or empty in formData (create mode only)
       if (formDataInitialized && mode === 'create') {
         setFormData(prev => {
           const updated = { ...prev }
           let hasChanges = false
           Object.keys(initialData).forEach(key => {
+            // Skip read-only fields - they're handled above
+            if (readOnlyFields.includes(key)) return
             // Update if field is missing, undefined, null, or empty string in formData
             if (!(key in prev) || prev[key] === undefined || prev[key] === null || prev[key] === '') {
               if (initialData[key] !== undefined && initialData[key] !== null && initialData[key] !== '') {
