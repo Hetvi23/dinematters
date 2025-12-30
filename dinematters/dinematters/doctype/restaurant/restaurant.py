@@ -234,10 +234,16 @@ class Restaurant(Document):
 			margin = 0.5 * inch
 			qr_size = 3 * inch  # Larger QR code for single page
 			
+			# Get base URL, default to https://demo.dinematters.com/ if not set
+			base_url = self.base_url or "https://demo.dinematters.com/"
+			# Ensure base_url ends with /
+			if not base_url.endswith('/'):
+				base_url += '/'
+			
 			# Generate QR code for each table (one per page)
 			for table_num in range(1, self.tables + 1):
-				# Create QR code data: restaurant-id/table-number
-				qr_data = f"{self.restaurant_id}/{table_num}"
+				# Create QR code data: base_url/restaurant/table
+				qr_data = f"{base_url}{self.restaurant_id}/{table_num}"
 				
 				# Generate QR code
 				qr = qrcode.QRCode(

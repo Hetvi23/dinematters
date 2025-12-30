@@ -51,12 +51,14 @@ export default function Layout({ children }: LayoutProps) {
   const [newRestaurantData, setNewRestaurantData] = useState({
     restaurant_name: '',
     owner_email: '',
-    owner_phone: ''
+    owner_phone: '',
+    tables: ''
   })
   const [isCreating, setIsCreating] = useState(false)
   
   // API call for creating restaurant
   const { call: createRestaurant } = useFrappePostCall('frappe.client.insert')
+  const { call: generateQrCodes } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.generate_qr_codes_pdf')
 
   // Fetch user's restaurants
   const { data: restaurantsData } = useFrappeGetCall<{ message: { restaurants: Restaurant[] } }>(
@@ -82,7 +84,8 @@ export default function Layout({ children }: LayoutProps) {
       setNewRestaurantData({
         restaurant_name: '',
         owner_email: '',
-        owner_phone: ''
+        owner_phone: '',
+        tables: ''
       })
       return
     }
@@ -108,6 +111,9 @@ export default function Layout({ children }: LayoutProps) {
 
     setIsCreating(true)
     try {
+      // Parse tables as integer, default to 0 if empty
+      const tablesCount = newRestaurantData.tables ? parseInt(newRestaurantData.tables, 10) : 0
+      
       // Create restaurant document
       const result = await createRestaurant({
         doc: {
@@ -115,6 +121,7 @@ export default function Layout({ children }: LayoutProps) {
           restaurant_name: newRestaurantData.restaurant_name.trim(),
           owner_email: newRestaurantData.owner_email.trim(),
           owner_phone: newRestaurantData.owner_phone.trim() || undefined,
+          tables: tablesCount || 0,
           is_active: 1
         }
       })
@@ -124,15 +131,27 @@ export default function Layout({ children }: LayoutProps) {
         const restaurantName = createdRestaurant.restaurant_name || createdRestaurant.name
         const restaurantDocName = createdRestaurant.name || createdRestaurant.restaurant_id
         
+        // Generate QR codes if tables are specified
+        if (tablesCount > 0) {
+          try {
+            await generateQrCodes({ restaurant: restaurantDocName })
+            toast.success('Restaurant created and QR codes generated successfully!')
+          } catch (qrError: any) {
+            console.error('Error generating QR codes:', qrError)
+            toast.success('Restaurant created successfully!', {
+              description: 'Note: QR codes could not be generated. You can generate them later from the restaurant page.'
+            })
+          }
+        } else {
+          toast.success('Restaurant created successfully!')
+        }
+        
         // Create URL-friendly restaurant name
         const urlFriendlyName = restaurantName.toLowerCase().replace(/\s+/g, '-')
         
         // Close modal
         setShowCreateModal(false)
-        setNewRestaurantData({ restaurant_name: '', owner_email: '', owner_phone: '' })
-        
-        // Show success message
-        toast.success('Restaurant created successfully!')
+        setNewRestaurantData({ restaurant_name: '', owner_email: '', owner_phone: '', tables: '' })
         
         // Set the selected restaurant
         setSelectedRestaurant(restaurantDocName)
@@ -802,6 +821,21 @@ export default function Layout({ children }: LayoutProps) {
               />
               <p className="text-xs text-muted-foreground">
                 Phone number of the restaurant owner (e.g., +1 (555) 123-4567)
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tables">Number of Tables</Label>
+              <Input
+                id="tables"
+                type="number"
+                min="0"
+                value={newRestaurantData.tables}
+                onChange={(e) => setNewRestaurantData(prev => ({ ...prev, tables: e.target.value }))}
+                disabled={isCreating}
+                placeholder="0"
+              />
+              <p className="text-xs text-muted-foreground">
+                Number of tables in your restaurant. QR codes will be automatically generated if specified.
               </p>
             </div>
           </div>

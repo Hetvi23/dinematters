@@ -32,6 +32,7 @@
   "column_break_settings",
   "timezone",
   "currency",
+  "base_url",
   "tables",
   "qr_codes_pdf_url",
   "section_break_branding",
@@ -190,6 +191,13 @@
    "label": "Currency",
    "options": "Currency",
    "default": "USD"
+  },
+  {
+   "default": "https://demo.dinematters.com/",
+   "fieldname": "base_url",
+   "fieldtype": "Data",
+   "label": "Base URL",
+   "description": "Base URL for QR codes. QR codes will be generated as base_url/restaurant/table"
   },
   {
    "default": "0",

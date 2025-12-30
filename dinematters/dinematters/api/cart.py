@@ -516,28 +516,36 @@ def parse_qr_code(qr_data):
 				}
 			}
 		
-		# Parse QR code format: restaurant-id/table-number
+		# Parse QR code format: base_url/restaurant-id/table-number or restaurant-id/table-number (backward compatibility)
 		if "/" not in qr_data:
 			return {
 				"success": False,
 				"error": {
 					"code": "INVALID_QR_FORMAT",
-					"message": "Invalid QR code format. Expected: restaurant-id/table-number"
+					"message": "Invalid QR code format. Expected: base_url/restaurant-id/table-number or restaurant-id/table-number"
 				}
 			}
 		
 		parts = qr_data.split("/")
-		if len(parts) != 2:
+		
+		# Handle new format: base_url/restaurant-id/table-number (e.g., https://demo.dinematters.com/restaurant-id/1)
+		# Or old format: restaurant-id/table-number (backward compatibility)
+		if len(parts) >= 3:
+			# New format with base URL: extract restaurant_id and table_number from last two parts
+			restaurant_id = parts[-2]  # Second to last part
+			table_number = cint(parts[-1])  # Last part
+		elif len(parts) == 2:
+			# Old format: restaurant-id/table-number (backward compatibility)
+			restaurant_id = parts[0]
+			table_number = cint(parts[1])
+		else:
 			return {
 				"success": False,
 				"error": {
 					"code": "INVALID_QR_FORMAT",
-					"message": "Invalid QR code format. Expected: restaurant-id/table-number"
+					"message": "Invalid QR code format. Expected: base_url/restaurant-id/table-number or restaurant-id/table-number"
 				}
 			}
-		
-		restaurant_id = parts[0]
-		table_number = cint(parts[1])
 		
 		# Validate restaurant exists
 		if not frappe.db.exists("Restaurant", {"restaurant_id": restaurant_id}):

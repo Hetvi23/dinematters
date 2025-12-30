@@ -1,12 +1,41 @@
-import { useFrappeGetDocList } from '@/lib/frappe'
+import { useFrappeGetDocList, useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ShoppingCart, Package, FolderTree, TrendingUp, Store, Clock, CheckCircle, XCircle, AlertCircle, Link as LinkIcon } from 'lucide-react'
+import { ShoppingCart, Package, FolderTree, TrendingUp, Store, Clock, CheckCircle, XCircle, AlertCircle, Link as LinkIcon, QrCode } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { useRestaurant } from '@/contexts/RestaurantContext'
+import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 
 export default function Dashboard() {
   const { selectedRestaurant } = useRestaurant()
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
+  const { call: getQrCodeUrl } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.get_qr_codes_pdf_url')
+  const { call: generateQrCodes } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.generate_qr_codes_pdf')
+  
+  // Fetch restaurant document to check if it has tables
+  const { data: restaurantDoc } = useFrappeGetDoc('Restaurant', selectedRestaurant || '', {
+    enabled: !!selectedRestaurant,
+    fields: ['name', 'tables']
+  })
+  
+  // Load QR code URL for selected restaurant
+  useEffect(() => {
+    if (selectedRestaurant && restaurantDoc?.tables && restaurantDoc.tables > 0) {
+      getQrCodeUrl({ restaurant: selectedRestaurant })
+        .then((response: any) => {
+          if (response?.message) {
+            setQrCodeUrl(response.message)
+          }
+        })
+        .catch(() => {
+          // QR codes not generated yet
+          setQrCodeUrl(null)
+        })
+    } else {
+      setQrCodeUrl(null)
+    }
+  }, [selectedRestaurant, restaurantDoc?.tables, getQrCodeUrl])
   
   // Fetch data filtered by selected restaurant
   const { data: orders, isLoading: ordersLoading } = useFrappeGetDocList('Order', {
@@ -92,6 +121,39 @@ export default function Dashboard() {
     }
   }
 
+  const handleGenerateQrCodes = async () => {
+    if (!selectedRestaurant) {
+      toast.error('Please select a restaurant first')
+      return
+    }
+    try {
+      const response: any = await generateQrCodes({ restaurant: selectedRestaurant })
+      if (response?.message) {
+        setQrCodeUrl(response.message)
+        toast.success('QR codes PDF generated successfully')
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to generate QR codes')
+    }
+  }
+
+  const handleViewQrCodes = () => {
+    if (qrCodeUrl) {
+      window.open(qrCodeUrl, '_blank')
+    }
+  }
+
+  const handleDownloadQrCodes = () => {
+    if (qrCodeUrl) {
+      const link = document.createElement('a')
+      link.href = qrCodeUrl
+      link.download = `${selectedRestaurant}_table_qr_codes.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -102,16 +164,40 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {selectedRestaurant && restaurantDoc?.tables && restaurantDoc.tables > 0 && (
+            <>
+              {qrCodeUrl ? (
+                <>
+                  <Button variant="outline" size="sm" onClick={handleViewQrCodes} className="flex-1 sm:flex-initial">
+                    <QrCode className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">View QR Codes</span>
+                    <span className="sm:hidden">QR Codes</span>
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleDownloadQrCodes} className="flex-1 sm:flex-initial">
+                    <QrCode className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">Download QR Codes</span>
+                    <span className="sm:hidden">Download</span>
+                  </Button>
+                </>
+              ) : (
+                <Button variant="outline" size="sm" onClick={handleGenerateQrCodes} className="flex-1 sm:flex-initial">
+                  <QrCode className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Generate QR Codes</span>
+                  <span className="sm:hidden">Generate QR</span>
+                </Button>
+              )}
+            </>
+          )}
           <Button variant="outline" size="sm" asChild className="flex-1 sm:flex-initial">
             <Link to="/setup">
-              <LinkIcon className="h-4 w-4" />
+              <LinkIcon className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Setup Wizard</span>
               <span className="sm:hidden">Setup</span>
             </Link>
           </Button>
           <Button variant="outline" size="sm" asChild className="flex-1 sm:flex-initial">
             <Link to="/modules">
-              <Package className="h-4 w-4" />
+              <Package className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">All Modules</span>
               <span className="sm:hidden">Modules</span>
             </Link>
