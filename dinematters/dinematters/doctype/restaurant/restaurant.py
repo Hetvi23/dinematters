@@ -29,6 +29,25 @@ class Restaurant(Document):
 		if not self.subdomain and self.restaurant_id:
 			self.subdomain = self.restaurant_id.lower().replace(" ", "-")
 		
+		# Process currency field: convert symbol to currency code if needed
+		if self.currency:
+			# Check if currency is a symbol (not a 3-letter code)
+			# Symbols are typically 1-3 characters and not all uppercase letters
+			if not (len(self.currency) == 3 and self.currency.isupper() and self.currency.isalpha()):
+				# This might be a symbol, try to find matching currency
+				currency_code = frappe.db.get_value(
+					"Currency",
+					{"symbol": self.currency},
+					"name"
+				)
+				
+				if currency_code:
+					self.currency = currency_code
+				else:
+					# If not found by symbol, check if it's already a valid currency code
+					if not frappe.db.exists("Currency", self.currency):
+						frappe.throw(f"Invalid currency: {self.currency}. Please provide a valid currency code or symbol.")
+		
 		# Note: QR codes are no longer auto-generated on table update
 		# They must be explicitly generated via the generate_qr_codes_pdf method
 	

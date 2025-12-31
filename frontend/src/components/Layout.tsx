@@ -21,7 +21,6 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
   { name: 'Setup Wizard', href: '/setup', icon: Sparkles },
   { name: 'All Modules', href: '/modules', icon: Grid3x3 },
-  { name: 'Restaurants', href: '/Restaurant', icon: Store },
   { name: 'Orders', href: '/orders', icon: ShoppingCart },
   { name: 'Products', href: '/products', icon: Package },
   { name: 'Categories', href: '/categories', icon: FolderTree },

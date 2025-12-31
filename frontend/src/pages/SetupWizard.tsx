@@ -1053,7 +1053,9 @@ export default function SetupWizard() {
                     ? ['restaurant_name', 'description', 'currency', 'primary_color']
                     : undefined}
                   readOnlyFields={currentStepData.id === 'config' 
-                    ? ['restaurant'] 
+                    ? ['restaurant', 'base_url'] 
+                    : currentStepData.id === 'restaurant'
+                    ? ['base_url']
                     : currentStepData.depends_on === 'restaurant'
                     ? ['restaurant']
                     : undefined}
