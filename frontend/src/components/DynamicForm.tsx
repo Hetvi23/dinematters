@@ -16,6 +16,8 @@ import { Loader2, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import MenuImagesTable from './MenuImagesTable'
 import ExtractedDishesTable from './ExtractedDishesTable'
+import ProductMediaTable from './ProductMediaTable'
+import CustomizationQuestionsTable from './CustomizationQuestionsTable'
 
 interface DynamicFormProps {
   doctype: string
@@ -1051,6 +1053,38 @@ export default function DynamicForm({
             </div>
           )
         }
+        // Handle Product Media table
+        if (field.fieldname === 'product_media' && field.options === 'Product Media') {
+          return (
+            <div key={field.fieldname} className="space-y-2">
+              <ProductMediaTable
+                value={Array.isArray(value) ? value : []}
+                onChange={(items) => handleFieldChange(field.fieldname, items)}
+                required={field.required}
+                disabled={isReadOnly}
+              />
+              {field.description && (
+                <p className="text-xs text-muted-foreground">{field.description}</p>
+              )}
+            </div>
+          )
+        }
+        // Handle Customization Questions table
+        if (field.fieldname === 'customization_questions' && field.options === 'Customization Question') {
+          return (
+            <div key={field.fieldname} className="space-y-2">
+              <CustomizationQuestionsTable
+                value={Array.isArray(value) ? value : []}
+                onChange={(questions) => handleFieldChange(field.fieldname, questions)}
+                required={field.required}
+                disabled={isReadOnly}
+              />
+              {field.description && (
+                <p className="text-xs text-muted-foreground">{field.description}</p>
+              )}
+            </div>
+          )
+        }
         // Handle Extracted Dishes table - display read-only
         if (field.fieldname === 'extracted_dishes' && field.options === 'Extracted Dish') {
           const dishes = Array.isArray(value) ? value : []
@@ -1134,19 +1168,55 @@ export default function DynamicForm({
     )
   }
 
-  // Group fields by sections (simplified - in real implementation, parse section breaks)
-  // Filter out hidden fields, Column Breaks, Section Breaks, and fields in hideFields
-  const visibleFields = (meta?.fields || []).filter(f => 
-    !f.hidden && 
-    !hideFields.includes(f.fieldname) &&
-    f.fieldtype !== 'Column Break' &&
-    f.fieldtype !== 'Section Break'
-  )
+  // Group fields by sections - parse section breaks to create sections
+  const sections: Array<{ label?: string, fields: DocTypeField[] }> = []
+  let currentSection: { label?: string, fields: DocTypeField[] } = { fields: [] }
+  
+  if (meta?.fields) {
+    for (const field of meta.fields) {
+      if (field.hidden || hideFields.includes(field.fieldname)) {
+        continue
+      }
+      
+      if (field.fieldtype === 'Section Break') {
+        // Save current section if it has fields
+        if (currentSection.fields.length > 0) {
+          sections.push(currentSection)
+        }
+        // Start new section
+        currentSection = {
+          label: field.label,
+          fields: []
+        }
+      } else if (field.fieldtype !== 'Column Break') {
+        // Add field to current section
+        currentSection.fields.push(field)
+      }
+    }
+    // Add last section
+    if (currentSection.fields.length > 0) {
+      sections.push(currentSection)
+    }
+  }
+  
+  // If no sections were created, create a default section with all visible fields
+  if (sections.length === 0 && meta?.fields) {
+    const visibleFields = meta.fields.filter(f => 
+      !f.hidden && 
+      !hideFields.includes(f.fieldname) &&
+      f.fieldtype !== 'Column Break' &&
+      f.fieldtype !== 'Section Break'
+    )
+    if (visibleFields.length > 0) {
+      sections.push({ fields: visibleFields })
+    }
+  }
 
-  // Calculate required fields validation
-  const requiredFields = visibleFields.filter(f => f.required)
+  // Calculate required fields validation - get all fields from all sections
+  const allVisibleFields = sections.flatMap(s => s.fields)
+  const requiredFields = allVisibleFields.filter((f: DocTypeField) => f.required)
   const requiredFieldsCount = requiredFields.length
-  const filledRequiredFields = requiredFields.filter(f => {
+  const filledRequiredFields = requiredFields.filter((f: DocTypeField) => {
     const value = formData[f.fieldname]
     return value !== undefined && value !== null && value !== ''
   }).length
@@ -1198,23 +1268,38 @@ export default function DynamicForm({
         </div>
       )}
 
-      {/* Form Fields - Structured Grid */}
-      <div className="grid gap-6 md:grid-cols-2">
-          {visibleFields.length === 0 ? (
-            <div className="col-span-2 text-center text-muted-foreground py-8">
-              <p>No fields available for this form.</p>
-              <p className="text-xs mt-2">Total fields: {meta?.fields?.length || 0}, Hidden: {meta?.fields?.filter(f => f.hidden).length || 0}</p>
-            </div>
-          ) : (
-            visibleFields.map(field => {
-              const rendered = renderField(field)
-              if (!rendered) {
-                console.warn(`[DynamicForm] Field ${field.fieldname} (${field.fieldtype}) was not rendered`)
-              }
-              return rendered
-            })
-          )}
+      {/* Form Fields - Grouped by Sections */}
+      {sections.length === 0 ? (
+        <div className="text-center text-muted-foreground py-8">
+          <p>No fields available for this form.</p>
+              <p className="text-xs mt-2">Total fields: {meta?.fields?.length || 0}, Hidden: {meta?.fields?.filter((f: DocTypeField) => f.hidden).length || 0}</p>
         </div>
+      ) : (
+        sections.map((section, sectionIndex) => (
+          <div key={sectionIndex} className="space-y-4">
+            {section.label && (
+              <div className="border-b pb-2">
+                <h3 className="text-lg font-semibold">{section.label}</h3>
+              </div>
+            )}
+            <div className={cn(
+              "grid gap-6",
+              // For table fields (like customization_questions, product_media), use full width
+              section.fields.some(f => f.fieldtype === 'Table') 
+                ? "grid-cols-1" 
+                : "md:grid-cols-2"
+            )}>
+              {section.fields.map(field => {
+                const rendered = renderField(field)
+                if (!rendered) {
+                  console.warn(`[DynamicForm] Field ${field.fieldname} (${field.fieldtype}) was not rendered`)
+                }
+                return rendered
+              })}
+            </div>
+          </div>
+        ))
+      )}
 
       {/* Action Buttons */}
       <div className="flex justify-end gap-3 pt-6 border-t">
@@ -1229,7 +1314,7 @@ export default function DynamicForm({
             disabled={
               saving || 
               !allRequiredFieldsFilled ||
-              visibleFields.length === 0
+              sections.flatMap(s => s.fields).length === 0
             }
             size="lg"
             className="min-w-[120px]"

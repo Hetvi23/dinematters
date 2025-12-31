@@ -1,8 +1,8 @@
 import { useParams, Link } from 'react-router-dom'
 import { useFrappeGetDoc } from '@/lib/frappe'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
+import DynamicForm from '@/components/DynamicForm'
 
 export default function CategoryDetail() {
   const { categoryId } = useParams<{ categoryId: string }>()
@@ -45,27 +45,13 @@ export default function CategoryDetail() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Category Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <p className="text-sm text-muted-foreground">Category Name</p>
-            <p className="font-medium text-lg">{category.category_name || category.name}</p>
-          </div>
-          {category.description && (
-            <div>
-              <p className="text-sm text-muted-foreground">Description</p>
-              <p>{category.description}</p>
-            </div>
-          )}
-          <div>
-            <p className="text-sm text-muted-foreground">Display Order</p>
-            <p className="font-medium">{category.display_order || 'Not set'}</p>
-          </div>
-        </CardContent>
-      </Card>
+      <DynamicForm
+        doctype="Menu Category"
+        docname={categoryId}
+        mode="view"
+        hideFields={['company', 'subdomain']}
+        readOnlyFields={['restaurant']}
+      />
     </div>
   )
 }

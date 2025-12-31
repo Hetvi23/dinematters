@@ -139,7 +139,7 @@ export default function OrderDetail() {
             ) : order.table_number ? (
               <div>
                 <p className="text-sm text-muted-foreground">Table Number</p>
-                <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800">
+                <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border border-gray-700 dark:border-gray-300">
                   Table {order.table_number}
                 </span>
               </div>

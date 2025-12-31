@@ -113,7 +113,7 @@ function DraggableOrderCard({
               }}
             >
               <SelectTrigger
-                className="h-5 px-1.5 text-[10px] font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a] flex-shrink-0 w-auto min-w-[60px]"
+                className="h-5 px-1.5 text-[10px] font-medium bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border border-gray-700 dark:border-gray-300 flex-shrink-0 w-auto min-w-[60px]"
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
               >
@@ -128,7 +128,7 @@ function DraggableOrderCard({
               </SelectContent>
             </Select>
           ) : (
-            <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a] flex-shrink-0">
+            <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border border-gray-700 dark:border-gray-300 flex-shrink-0">
               Table {order.table_number ?? 0}
             </span>
           )}
@@ -500,7 +500,7 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
                   </span>
                 </div>
                   {activeOrder.table_number != null ? (
-                    <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a] flex-shrink-0">
+                    <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border border-gray-700 dark:border-gray-300 flex-shrink-0">
                       Table {activeOrder.table_number}
                     </span>
                   ) : null}

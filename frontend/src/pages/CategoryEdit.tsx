@@ -1,13 +1,9 @@
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
-import { useFrappeGetDoc, useFrappeUpdateDoc } from '@/lib/frappe'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useFrappeGetDoc } from '@/lib/frappe'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
+import DynamicForm from '@/components/DynamicForm'
 
 export default function CategoryEdit() {
   const { categoryId } = useParams<{ categoryId: string }>()
@@ -15,46 +11,6 @@ export default function CategoryEdit() {
   const { data: category, isLoading } = useFrappeGetDoc('Menu Category', categoryId || '', {
     fields: ['*']
   })
-  const { updateDoc, loading: updating } = useFrappeUpdateDoc()
-
-  const [formData, setFormData] = useState({
-    category_name: '',
-    description: '',
-    display_order: ''
-  })
-
-  useEffect(() => {
-    if (category) {
-      setFormData({
-        category_name: category.category_name || '',
-        description: category.description || '',
-        display_order: category.display_order || ''
-      })
-    }
-  }, [category])
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!formData.category_name) {
-      toast.error('Please fill in all required fields')
-      return
-    }
-
-    try {
-      await updateDoc('Menu Category', categoryId || '', {
-        category_name: formData.category_name,
-        description: formData.description,
-        display_order: formData.display_order ? parseInt(formData.display_order.toString()) : null
-      })
-      
-      toast.success('Category updated successfully')
-      navigate('/categories')
-    } catch (error: any) {
-      console.error('Failed to update category:', error)
-      toast.error(error?.message || 'Failed to update category')
-    }
-  }
 
   if (isLoading) {
     return (
@@ -77,6 +33,15 @@ export default function CategoryEdit() {
     )
   }
 
+  const handleSave = (data: any) => {
+    toast.success('Category updated successfully')
+    navigate('/categories')
+  }
+
+  const handleCancel = () => {
+    navigate('/categories')
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -92,65 +57,15 @@ export default function CategoryEdit() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Category Details</CardTitle>
-            <CardDescription>Update the category information below</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="category_name">
-                Category Name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="category_name"
-                value={formData.category_name}
-                onChange={(e) => setFormData({ ...formData, category_name: e.target.value })}
-                placeholder="Enter category name"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Enter category description"
-                rows={4}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="display_order">Display Order</Label>
-              <Input
-                id="display_order"
-                type="number"
-                min="0"
-                value={formData.display_order}
-                onChange={(e) => setFormData({ ...formData, display_order: e.target.value })}
-                placeholder="0"
-              />
-              <p className="text-xs text-muted-foreground">
-                Categories with lower numbers appear first
-              </p>
-            </div>
-
-            <div className="flex gap-2 pt-4">
-              <Button type="submit" disabled={updating}>
-                <Save className="h-4 w-4 mr-2" />
-                {updating ? 'Saving...' : 'Save Changes'}
-              </Button>
-              <Button type="button" variant="outline" onClick={() => navigate('/categories')}>
-                Cancel
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </form>
+      <DynamicForm
+        doctype="Menu Category"
+        docname={categoryId}
+        mode="edit"
+        onSave={handleSave}
+        onCancel={handleCancel}
+        hideFields={['company', 'subdomain']}
+        readOnlyFields={['restaurant']}
+      />
     </div>
   )
 }
-

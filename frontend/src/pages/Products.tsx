@@ -4,28 +4,71 @@ import { useFrappeGetDocList, useFrappeDeleteDoc } from '@/lib/frappe'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { Eye, Pencil, Trash2, Plus } from 'lucide-react'
+import { Eye, Pencil, Trash2, Plus, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/hooks/useConfirm'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { ListFilters, FilterCondition } from '@/components/ListFilters'
+import { cn } from '@/lib/utils'
+
+type SortField = 'product_name' | 'price' | 'original_price' | 'category_name' | 'calories' | 'display_order' | 'is_active' | 'is_vegetarian' | 'product_type' | 'main_category'
+type SortOrder = 'asc' | 'desc' | null
 
 export default function Products() {
   const { confirm, ConfirmDialogComponent } = useConfirm()
   const { selectedRestaurant } = useRestaurant()
   const [searchQuery, setSearchQuery] = useState('')
   const [filters, setFilters] = useState<FilterCondition[]>([])
+  const [sortField, setSortField] = useState<SortField>('product_name')
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
   
   const { data: products, isLoading, mutate } = useFrappeGetDocList('Menu Product', {
-    fields: ['name', 'product_name', 'price', 'original_price', 'is_active', 'category', 'category_name', 'main_category', 'product_type', 'description', 'calories', 'is_vegetarian'],
+    fields: ['name', 'product_name', 'price', 'original_price', 'is_active', 'category', 'category_name', 'main_category', 'product_type', 'description', 'calories', 'is_vegetarian', 'display_order', 'estimated_time', 'serving_size'],
     filters: selectedRestaurant ? { restaurant: selectedRestaurant } : undefined,
     limit: 1000,
-    orderBy: { field: 'product_name', order: 'asc' }
+    orderBy: { field: sortField, order: sortOrder || 'asc' }
   }, selectedRestaurant ? `products-${selectedRestaurant}` : null)
 
   const { deleteDoc } = useFrappeDeleteDoc()
 
-  // Apply search and filters
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Toggle sort order
+      if (sortOrder === 'asc') {
+        setSortOrder('desc')
+      } else if (sortOrder === 'desc') {
+        setSortOrder(null)
+        setSortField('product_name')
+      } else {
+        setSortOrder('asc')
+      }
+    } else {
+      setSortField(field)
+      setSortOrder('asc')
+    }
+  }
+
+  const SortableHeader = ({ field, children }: { field: SortField, children: React.ReactNode }) => {
+    const isActive = sortField === field
+    return (
+      <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort(field)}>
+        <div className="flex items-center gap-2">
+          {children}
+          {isActive ? (
+            sortOrder === 'asc' ? (
+              <ArrowUp className="h-4 w-4" />
+            ) : (
+              <ArrowDown className="h-4 w-4" />
+            )
+          ) : (
+            <ArrowUpDown className="h-4 w-4 opacity-50" />
+          )}
+        </div>
+      </TableHead>
+    )
+  }
+
+  // Apply search, filters, and sorting
   const filteredProducts = useMemo(() => {
     if (!products) return []
     
@@ -38,8 +81,12 @@ export default function Products() {
         return (
           (product.product_name || '').toLowerCase().includes(query) ||
           (product.name || '').toLowerCase().includes(query) ||
+          (product.category_name || '').toLowerCase().includes(query) ||
+          (product.product_type || '').toLowerCase().includes(query) ||
+          (product.main_category || '').toLowerCase().includes(query) ||
           String(product.price || '').includes(query) ||
-          String(product.original_price || '').includes(query)
+          String(product.original_price || '').includes(query) ||
+          String(product.calories || '').includes(query)
         )
       })
     }
@@ -122,6 +169,42 @@ export default function Products() {
       })
     })
     
+    // Apply client-side sorting (in case server-side sorting doesn't work as expected)
+    if (sortField && sortOrder) {
+      filtered.sort((a: any, b: any) => {
+        let aValue = a[sortField]
+        let bValue = b[sortField]
+        
+        // Handle null/undefined values
+        if (aValue === null || aValue === undefined) aValue = ''
+        if (bValue === null || bValue === undefined) bValue = ''
+        
+        // Handle boolean values
+        if (typeof aValue === 'boolean') {
+          aValue = aValue ? 1 : 0
+          bValue = bValue ? 1 : 0
+        }
+        
+        // Handle numeric values
+        if (sortField === 'price' || sortField === 'original_price' || sortField === 'calories' || sortField === 'display_order') {
+          aValue = Number(aValue) || 0
+          bValue = Number(bValue) || 0
+        }
+        
+        // Handle string values
+        if (typeof aValue === 'string') {
+          aValue = aValue.toLowerCase()
+          bValue = bValue.toLowerCase()
+        }
+        
+        let comparison = 0
+        if (aValue < bValue) comparison = -1
+        if (aValue > bValue) comparison = 1
+        
+        return sortOrder === 'asc' ? comparison : -comparison
+      })
+    }
+    
     // Debug: Log filter results
     if (filters.length > 0) {
       console.log('[Products Filter Results]', {
@@ -138,7 +221,7 @@ export default function Products() {
     }
     
     return filtered
-  }, [products, searchQuery, filters])
+  }, [products, searchQuery, filters, sortField, sortOrder])
 
   const handleDelete = async (productId: string, productName: string) => {
     const confirmed = await confirm({
@@ -259,43 +342,59 @@ export default function Products() {
               </div>
 
               {/* Desktop Table View */}
-              <div className="hidden md:block overflow-x-auto">
+              <div className="hidden md:block">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-16">Sr. No.</TableHead>
-                      <TableHead>Product Name</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead>Original Price</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead className="w-12">#</TableHead>
+                      <SortableHeader field="product_name">Product Name</SortableHeader>
+                      <SortableHeader field="category_name">Category</SortableHeader>
+                      <SortableHeader field="price">Price</SortableHeader>
+                      <SortableHeader field="original_price">Original</SortableHeader>
+                      <SortableHeader field="is_vegetarian">Type</SortableHeader>
+                      <SortableHeader field="is_active">Status</SortableHeader>
+                      <TableHead className="w-28">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredProducts.map((product: any, index: number) => (
                       <TableRow key={product.name}>
-                        <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{index + 1}</TableCell>
                         <TableCell className="font-medium">{product.product_name || product.name}</TableCell>
-                        <TableCell>₹{product.price || 0}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {product.category_name || '-'}
+                        </TableCell>
+                        <TableCell className="font-semibold">₹{product.price || 0}</TableCell>
+                        <TableCell className="text-sm">
                           {product.original_price ? `₹${product.original_price}` : '-'}
                         </TableCell>
                         <TableCell>
-                          <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium border ${
-                            product.is_active ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] border-[#92c5f7] dark:border-[#4caf50]' : 'bg-muted text-muted-foreground border-border'
+                          {product.is_vegetarian ? (
+                            <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-green-100 text-green-800">
+                              Veg
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-red-100 text-red-800">
+                              Non-Veg
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${
+                            product.is_active ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784]' : 'bg-muted text-muted-foreground'
                           }`}>
                             {product.is_active ? 'Active' : 'Inactive'}
                           </span>
                         </TableCell>
                         <TableCell>
-                          <div className="flex gap-2">
+                          <div className="flex gap-1">
                             <Link to={`/products/${product.name}`}>
-                              <Button variant="ghost" size="sm" title="View">
+                              <Button variant="ghost" size="sm" title="View" className="h-8 w-8 p-0">
                                 <Eye className="h-4 w-4" />
                               </Button>
                             </Link>
                             <Link to={`/products/${product.name}/edit`}>
-                              <Button variant="ghost" size="sm" title="Edit">
+                              <Button variant="ghost" size="sm" title="Edit" className="h-8 w-8 p-0">
                                 <Pencil className="h-4 w-4" />
                               </Button>
                             </Link>
@@ -304,7 +403,7 @@ export default function Products() {
                               size="sm" 
                               title="Delete"
                               onClick={() => handleDelete(product.name, product.product_name || product.name)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -325,6 +424,7 @@ export default function Products() {
     </div>
   )
 }
+
 
 
 
