@@ -661,25 +661,15 @@ export default function Orders() {
                               onValueChange={(newStatus) => handleStatusChange(order.name, newStatus)}
                             >
                               <SelectTrigger className={cn(
-<<<<<<< Updated upstream
-                                "h-7 w-[120px] text-xs border-0 shadow-none font-semibold",
-                                order.status === 'delivered' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#0d5d0d] dark:text-[#a5d6a7] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
-                                order.status === 'cancelled' ? 'bg-[#fde7e9] dark:bg-[#b71c1c] text-[#b91c1c] dark:text-[#ffcdd2] hover:bg-[#fcc5c9] dark:hover:bg-[#c62828]' :
-                                order.status === 'pending' ? 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#b45309] dark:text-[#ffd89b] hover:bg-[#ffe69d] dark:hover:bg-[#ca5010]/30' :
-                                order.status === 'confirmed' ? 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#c2410c] dark:text-[#ffb88c] hover:bg-orange-100 dark:hover:bg-[#ea580c]/30' :
-                                order.status === 'preparing' ? 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#6b21a8] dark:text-[#ce93d8] hover:bg-[#d4b9e8] dark:hover:bg-[#6a1b9a]' :
-                                order.status === 'ready' ? 'bg-[#cce5ff] dark:bg-[#0d47a1] text-[#003d7a] dark:text-[#90caf9] hover:bg-[#99ccff] dark:hover:bg-[#1565c0]' :
-=======
                                 "h-7 w-[120px] text-xs border-0 shadow-none",
                                 order.status === 'delivered' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
+                                order.status === 'billed' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
                                 order.status === 'cancelled' ? 'bg-[#fde7e9] dark:bg-[#b71c1c] text-[#d13438] dark:text-[#ef5350] hover:bg-[#fcc5c9] dark:hover:bg-[#c62828]' :
                                 order.status === 'pending' ? 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44] hover:bg-[#ffe69d] dark:hover:bg-[#ca5010]/30' :
                                 order.status === 'confirmed' ? 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#ea580c] dark:text-[#ff8c42] hover:bg-orange-100 dark:hover:bg-[#ea580c]/30' :
                                 order.status === 'preparing' ? 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] hover:bg-[#d4b9e8] dark:hover:bg-[#6a1b9a]' :
                                 order.status === 'ready' ? 'bg-[#cce5ff] dark:bg-[#0d47a1] text-[#004578] dark:text-[#64b5f6] hover:bg-[#99ccff] dark:hover:bg-[#1565c0]' :
                                 (order.status === 'In Billing' || order.status === 'in_billing') ? 'bg-[#fff3e0] dark:bg-[#e65100]/20 text-[#e65100] dark:text-[#ff9800] hover:bg-[#ffe0b2] dark:hover:bg-[#e65100]/30' :
-                                order.status === 'billed' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
->>>>>>> Stashed changes
                                 'bg-muted text-muted-foreground hover:bg-accent'
                               )}>
                                 <SelectValue>

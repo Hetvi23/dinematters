@@ -47,18 +47,11 @@ interface OrdersKanbanProps {
 }
 
 const STATUSES = [
-<<<<<<< Updated upstream
-  { value: 'pending', label: 'Pending', color: 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#b45309] dark:text-[#ffd89b] border-[#ffe69d] dark:border-[#ca5010]/40 font-semibold' },
-  { value: 'confirmed', label: 'Confirmed', color: 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#c2410c] dark:text-[#ffb88c] border-orange-200 dark:border-[#ea580c]/40 font-semibold' },
-  { value: 'preparing', label: 'Preparing', color: 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#6b21a8] dark:text-[#ce93d8] border-[#d4b9e8] dark:border-[#6a1b9a] font-semibold' },
-  { value: 'delivered', label: 'Delivered', color: 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#0d5d0d] dark:text-[#a5d6a7] border-[#92c5f7] dark:border-[#4caf50] font-semibold' },
-=======
   { value: 'pending', label: 'Pending', color: 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44] border-[#ffe69d] dark:border-[#ca5010]/40' },
   { value: 'confirmed', label: 'Confirmed', color: 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#ea580c] dark:text-[#ff8c42] border-orange-200 dark:border-[#ea580c]/40' },
   { value: 'preparing', label: 'Preparing', color: 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border-[#d4b9e8] dark:border-[#6a1b9a]' },
   { value: 'delivered', label: 'Delivered', color: 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] border-[#92c5f7] dark:border-[#4caf50]' },
   { value: 'In Billing', label: 'In Billing', color: 'bg-[#fff3e0] dark:bg-[#e65100]/20 text-[#e65100] dark:text-[#ff9800] border-[#ffe0b2] dark:border-[#e65100]/40' },
->>>>>>> Stashed changes
 ]
 
 // Draggable Order Card Component
@@ -362,12 +355,8 @@ function DroppableStatusColumn({
   )
 }
 
-<<<<<<< Updated upstream
-export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrder, restaurantTables }: OrdersKanbanProps) {
-  const { formatAmountNoDecimals } = useCurrency()
-=======
 export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrder, onBilledOrder, restaurantTables }: OrdersKanbanProps) {
->>>>>>> Stashed changes
+  const { formatAmountNoDecimals } = useCurrency()
   const { call } = useFrappePostCall('dinematters.dinematters.api.order_status.update_status')
   const { call: updateTableNumber } = useFrappePostCall('dinematters.dinematters.api.order_status.update_table_number')
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)

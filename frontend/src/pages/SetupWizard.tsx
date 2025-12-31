@@ -141,23 +141,7 @@ export default function SetupWizard() {
     enabled: !!restaurantId
   })
 
-<<<<<<< Updated upstream
   // Initialize currentStep from URL or localStorage
-=======
-  const [refreshNonce, setRefreshNonce] = useState(0)
-
-  const refetchFromBackend = async () => {
-    const tasks: Promise<unknown>[] = []
-    if (refreshProgress) tasks.push((refreshProgress as any)())
-    if (refreshRestaurant) tasks.push((refreshRestaurant as any)())
-    if (refreshConfig) tasks.push((refreshConfig as any)())
-    if (tasks.length) {
-      await Promise.allSettled(tasks)
-    }
-    setRefreshNonce((n) => n + 1)
-  }
-
->>>>>>> Stashed changes
   const [currentStep, setCurrentStep] = useState<number>(() => {
     // First priority: URL parameter
     if (urlStepId && steps.length > 0) {
@@ -396,10 +380,7 @@ export default function SetupWizard() {
     if (!selectedRestaurant) {
       progressInitialized.current = null
     }
-<<<<<<< Updated upstream
   }, [selectedRestaurant, progress, steps, restaurantData, configData, urlStepId, navigate])
-=======
-  }, [selectedRestaurant, progress, steps, restaurantData, configData])
 
   useEffect(() => {
     if (restaurantData) {
@@ -412,7 +393,6 @@ export default function SetupWizard() {
       setStepData(prev => ({ ...prev, config: configData }))
     }
   }, [configData])
->>>>>>> Stashed changes
   
   // Load step documents when restaurant and progress are available
   const { call: getDocList } = useFrappePostCall('frappe.client.get_list')
@@ -476,7 +456,7 @@ export default function SetupWizard() {
     }
 
     loadStepData()
-  }, [selectedRestaurant, progress, steps, getDocList, getDoc, refreshNonce])
+  }, [selectedRestaurant, progress, steps, getDocList, getDoc])
 
   // Load data for current step when URL changes or step changes
   // This ensures data is fetched immediately when navigating via URL
@@ -714,7 +694,6 @@ export default function SetupWizard() {
     // This allows users to navigate forward without being stuck
     if (currentStep < steps.length - 1) {
       setFormHasChanges(false) // Reset changes flag when moving forward
-<<<<<<< Updated upstream
       const nextStep = currentStep + 1
       const nextStepSlug = getStepIdFromIndex(nextStep)
       if (nextStepSlug) {
@@ -726,10 +705,6 @@ export default function SetupWizard() {
       } else {
         setCurrentStep(nextStep)
       }
-=======
-      await refetchFromBackend()
-      setCurrentStep(currentStep + 1)
->>>>>>> Stashed changes
     }
   }
 
@@ -803,7 +778,6 @@ export default function SetupWizard() {
 
   const handlePrevious = async () => {
     if (currentStep > 0) {
-<<<<<<< Updated upstream
       const prevStep = currentStep - 1
       const prevStepSlug = getStepIdFromIndex(prevStep)
       if (prevStepSlug) {
@@ -815,16 +789,11 @@ export default function SetupWizard() {
       } else {
         setCurrentStep(prevStep)
       }
-=======
-      await refetchFromBackend()
-      setCurrentStep(currentStep - 1)
->>>>>>> Stashed changes
     }
   }
 
   const handleStepClick = async (stepIndex: number) => {
     if (completedSteps.has(stepIndex) || stepIndex === currentStep) {
-<<<<<<< Updated upstream
       const stepSlug = getStepIdFromIndex(stepIndex)
       if (stepSlug) {
         navigate(`/setup/${stepSlug}`, { replace: true })
@@ -835,10 +804,6 @@ export default function SetupWizard() {
       } else {
         setCurrentStep(stepIndex)
       }
-=======
-      await refetchFromBackend()
-      setCurrentStep(stepIndex)
->>>>>>> Stashed changes
       setShowProgressModal(false)
     }
   }
@@ -1089,17 +1054,10 @@ export default function SetupWizard() {
             {currentStepData && !['users', 'categories', 'products'].includes(currentStepData.id) && (
               <div className="bg-muted/30 rounded-md p-6 border">
                 <DynamicForm
-<<<<<<< Updated upstream
                   key={`${currentStepData.id}-${selectedRestaurant || 'no-restaurant'}-${currentStep}-${urlStepId || ''}`}
                   onChange={setFormHasChanges}
                   showSaveButton={false}
                   skipLoadingState={true}
-=======
-                  key={`${currentStepData.id}-${selectedRestaurant || 'no-restaurant'}-${currentStep}-${refreshNonce}`}
-                  onChange={setFormHasChanges}
-                  showSaveButton={false}
-                  refreshNonce={refreshNonce}
->>>>>>> Stashed changes
                   doctype={currentStepData.doctype}
                   hideFields={currentStepData.id === 'restaurant' 
                     ? ['restaurant_id', 'company', 'subdomain'] 
