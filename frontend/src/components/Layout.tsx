@@ -1,5 +1,9 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+<<<<<<< Updated upstream
 import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, Menu, X, Lock, LockOpen, ChevronDown, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode } from 'lucide-react'
+=======
+import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, Menu, X, Lock, LockOpen, ChevronDown, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, Clock } from 'lucide-react'
+>>>>>>> Stashed changes
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetCall, useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe'
 import { useState, useEffect, useMemo } from 'react'
@@ -22,7 +26,13 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
   { name: 'Setup Wizard', href: '/setup', icon: Sparkles },
   { name: 'All Modules', href: '/modules', icon: Grid3x3 },
+<<<<<<< Updated upstream
   { name: 'Orders', href: '/orders', icon: ShoppingCart },
+=======
+  { name: 'Restaurants', href: '/Restaurant', icon: Store },
+  { name: 'Real Time Orders', href: '/orders', icon: ShoppingCart },
+  { name: 'Past and Billed Orders', href: '/past-orders', icon: Clock },
+>>>>>>> Stashed changes
   { name: 'Products', href: '/products', icon: Package },
   { name: 'Categories', href: '/categories', icon: FolderTree },
   { name: 'Manage QR Codes', href: '/qr-codes', icon: QrCode },

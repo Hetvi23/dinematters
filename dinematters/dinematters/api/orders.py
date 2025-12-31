@@ -372,7 +372,7 @@ def update_order_status(order_id, status):
 			}
 		
 		# Validate status
-		valid_statuses = ["pending", "confirmed", "preparing", "ready", "delivered", "cancelled"]
+		valid_statuses = ["pending", "confirmed", "preparing", "ready", "In Billing", "delivered", "billed", "cancelled"]
 		if status not in valid_statuses:
 			return {
 				"success": False,

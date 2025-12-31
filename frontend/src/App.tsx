@@ -10,6 +10,7 @@ import Modules from './pages/Modules'
 import ModuleList from './pages/ModuleList'
 import ModuleDetail from './pages/ModuleDetail'
 import Orders from './pages/Orders'
+import PastOrders from './pages/PastOrders'
 import Products from './pages/Products'
 import Categories from './pages/Categories'
 import OrderDetail from './pages/OrderDetail'
@@ -36,9 +37,10 @@ function AppContent() {
 						<Route path="/modules" element={<Modules />} />
 						<Route path="/:doctype" element={<ModuleList />} />
 						<Route path="/:doctype/:docname" element={<ModuleDetail />} />
-						{/* Legacy routes for backward compatibility */}
-						<Route path="/orders" element={<Orders />} />
-						<Route path="/orders/:orderId" element={<OrderDetail />} />
+					{/* Legacy routes for backward compatibility */}
+					<Route path="/orders" element={<Orders />} />
+					<Route path="/orders/:orderId" element={<OrderDetail />} />
+					<Route path="/past-orders" element={<PastOrders />} />
 						<Route path="/products" element={<Products />} />
 						<Route path="/products/new" element={<ProductNew />} />
 						<Route path="/products/:productId/edit" element={<ProductEdit />} />

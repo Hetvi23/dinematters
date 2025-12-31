@@ -83,15 +83,15 @@ export default function Dashboard() {
   }) || []
   const todayRevenue = todayOrders.reduce((sum: number, order: any) => sum + (order.total || 0), 0)
 
-  // Order status breakdown
-  const orderStatusCounts = orders?.reduce((acc: Record<string, number>, order: any) => {
+  // Order status breakdown (only today's orders)
+  const orderStatusCounts = todayOrders?.reduce((acc: Record<string, number>, order: any) => {
     const status = order.status || 'Pending'
     acc[status] = (acc[status] || 0) + 1
     return acc
   }, {}) || {}
 
-  // Recent orders (last 10)
-  const recentOrders = orders?.slice(0, 10) || []
+  // Recent orders (last 10 from today's orders)
+  const recentOrders = todayOrders?.slice(0, 10) || []
 
   const getStatusIcon = (status: string) => {
     switch (status?.toLowerCase()) {

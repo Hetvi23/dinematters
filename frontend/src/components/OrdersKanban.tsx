@@ -42,14 +42,23 @@ interface OrdersKanbanProps {
   onCheckOrder: (orderId: string) => void
   onOrderUpdate?: () => void
   onCancelOrder?: (orderId: string) => void
+  onBilledOrder?: (orderId: string) => void
   restaurantTables?: number
 }
 
 const STATUSES = [
+<<<<<<< Updated upstream
   { value: 'pending', label: 'Pending', color: 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#b45309] dark:text-[#ffd89b] border-[#ffe69d] dark:border-[#ca5010]/40 font-semibold' },
   { value: 'confirmed', label: 'Confirmed', color: 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#c2410c] dark:text-[#ffb88c] border-orange-200 dark:border-[#ea580c]/40 font-semibold' },
   { value: 'preparing', label: 'Preparing', color: 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#6b21a8] dark:text-[#ce93d8] border-[#d4b9e8] dark:border-[#6a1b9a] font-semibold' },
   { value: 'delivered', label: 'Delivered', color: 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#0d5d0d] dark:text-[#a5d6a7] border-[#92c5f7] dark:border-[#4caf50] font-semibold' },
+=======
+  { value: 'pending', label: 'Pending', color: 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44] border-[#ffe69d] dark:border-[#ca5010]/40' },
+  { value: 'confirmed', label: 'Confirmed', color: 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#ea580c] dark:text-[#ff8c42] border-orange-200 dark:border-[#ea580c]/40' },
+  { value: 'preparing', label: 'Preparing', color: 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border-[#d4b9e8] dark:border-[#6a1b9a]' },
+  { value: 'delivered', label: 'Delivered', color: 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] border-[#92c5f7] dark:border-[#4caf50]' },
+  { value: 'In Billing', label: 'In Billing', color: 'bg-[#fff3e0] dark:bg-[#e65100]/20 text-[#e65100] dark:text-[#ff9800] border-[#ffe0b2] dark:border-[#e65100]/40' },
+>>>>>>> Stashed changes
 ]
 
 // Draggable Order Card Component
@@ -57,12 +66,14 @@ function DraggableOrderCard({
   order, 
   onCheckOrder, 
   onCancelOrder,
+  onBilledOrder,
   onTableNumberChange,
   tableOptions = []
 }: { 
   order: Order
   onCheckOrder: (orderId: string) => void
   onCancelOrder?: (orderId: string) => void
+  onBilledOrder?: (orderId: string) => void
   onTableNumberChange?: (orderId: string, tableNumber: number) => void
   tableOptions?: number[]
 }) {
@@ -83,8 +94,14 @@ function DraggableOrderCard({
     transition: 'transform 200ms ease',
   }
 
-  // Don't show cancel button for cancelled or delivered orders
-  const showCancelButton = order.status !== 'cancelled' && order.status !== 'delivered'
+  // Normalize status for comparison
+  const normalizedStatus = order.status === 'in_billing' ? 'In Billing' : order.status
+  
+  // Don't show cancel button for cancelled, delivered, billed, or In Billing orders
+  const showCancelButton = normalizedStatus !== 'cancelled' && normalizedStatus !== 'delivered' && normalizedStatus !== 'billed' && normalizedStatus !== 'In Billing'
+  
+  // Show billed button only for orders in In Billing status
+  const showBilledButton = normalizedStatus === 'In Billing'
 
   return (
     <Card
@@ -208,30 +225,50 @@ function DraggableOrderCard({
         {/* Footer Actions */}
         <div className="flex items-center gap-2 pt-2 border-t border-border">
           {showCancelButton && onCancelOrder && (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async (e) => {
-                  e.stopPropagation()
-                  const confirmed = await confirm({
-                    title: 'Cancel Order',
-                    description: 'Are you sure you want to cancel this order? This action cannot be undone.',
-                    variant: 'destructive',
-                    confirmText: 'Cancel Order',
-                    cancelText: 'Keep Order'
-                  })
-                  if (confirmed) {
-                    onCancelOrder(order.name)
-                  }
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-                className="h-7 px-2 text-xs text-destructive hover:text-destructive/80 hover:bg-destructive/10 border-destructive/20 flex-1"
-              >
-                Cancel
-              </Button>
-              {ConfirmDialogComponent}
-            </>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async (e) => {
+                e.stopPropagation()
+                const confirmed = await confirm({
+                  title: 'Cancel Order',
+                  description: 'Are you sure you want to cancel this order? This action cannot be undone.',
+                  variant: 'destructive',
+                  confirmText: 'Cancel Order',
+                  cancelText: 'Keep Order'
+                })
+                if (confirmed) {
+                  onCancelOrder(order.name)
+                }
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="h-7 px-2 text-xs text-destructive hover:text-destructive/80 hover:bg-destructive/10 border-destructive/20 flex-1"
+            >
+              Cancel
+            </Button>
+          )}
+          {showBilledButton && onBilledOrder && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async (e) => {
+                e.stopPropagation()
+                const confirmed = await confirm({
+                  title: 'Mark as Billed',
+                  description: 'Are you sure you want to mark this order as billed?',
+                  variant: 'default',
+                  confirmText: 'Mark as Billed',
+                  cancelText: 'Cancel'
+                })
+                if (confirmed) {
+                  onBilledOrder(order.name)
+                }
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="h-7 px-2 text-xs text-[#107c10] dark:text-[#81c784] hover:text-[#107c10]/80 dark:hover:text-[#81c784]/80 hover:bg-[#dff6dd]/50 dark:hover:bg-[#1b5e20]/30 border-[#107c10]/20 dark:border-[#81c784]/20 flex-1"
+            >
+              Billed
+            </Button>
           )}
           <Button
             variant="ghost"
@@ -246,6 +283,7 @@ function DraggableOrderCard({
             <Eye className="h-3.5 w-3.5 mr-1" />
             View
           </Button>
+          {ConfirmDialogComponent}
         </div>
       </CardContent>
     </Card>
@@ -258,6 +296,7 @@ function DroppableStatusColumn({
   orders, 
   onCheckOrder,
   onCancelOrder,
+  onBilledOrder,
   activeId,
   handleTableNumberChange,
   tableOptions = []
@@ -266,6 +305,7 @@ function DroppableStatusColumn({
   orders: Order[]
   onCheckOrder: (orderId: string) => void
   onCancelOrder?: (orderId: string) => void
+  onBilledOrder?: (orderId: string) => void
   activeId?: string | null
   handleTableNumberChange: (orderId: string, tableNumber: number) => void
   tableOptions?: number[]
@@ -310,6 +350,7 @@ function DroppableStatusColumn({
                 order={order}
                 onCheckOrder={onCheckOrder}
                 onCancelOrder={onCancelOrder}
+                onBilledOrder={onBilledOrder}
                 onTableNumberChange={handleTableNumberChange}
                 tableOptions={safeTableOptions}
               />
@@ -321,8 +362,12 @@ function DroppableStatusColumn({
   )
 }
 
+<<<<<<< Updated upstream
 export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrder, restaurantTables }: OrdersKanbanProps) {
   const { formatAmountNoDecimals } = useCurrency()
+=======
+export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrder, onBilledOrder, restaurantTables }: OrdersKanbanProps) {
+>>>>>>> Stashed changes
   const { call } = useFrappePostCall('dinematters.dinematters.api.order_status.update_status')
   const { call: updateTableNumber } = useFrappePostCall('dinematters.dinematters.api.order_status.update_table_number')
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
@@ -355,13 +400,21 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
     useSensor(KeyboardSensor)
   )
 
+  // Normalize status value (handle legacy "in_billing" format)
+  const normalizeStatus = (status: string): string => {
+    if (status === 'in_billing') {
+      return 'In Billing'
+    }
+    return status
+  }
+
   const ordersByStatus = useMemo(() => {
     const grouped: Record<string, Order[]> = {}
     STATUSES.forEach(status => {
       grouped[status.value] = []
     })
     orders.forEach(order => {
-      const status = order.status || 'pending'
+      const status = normalizeStatus(order.status || 'pending')
       if (!grouped[status]) {
         grouped[status] = []
       }
@@ -393,7 +446,7 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
     }
 
     const orderId = active.id as string
-    const newStatus = over.id as string
+    const newStatus = normalizeStatus(over.id as string)
 
     try {
       await call({
@@ -427,6 +480,28 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
     } catch (error: any) {
       console.error('Failed to cancel order:', error)
       toast.error(error?.message || 'Failed to cancel order')
+      
+      if (onOrderUpdate) {
+        onOrderUpdate()
+      }
+    }
+  }
+
+  const handleBilledOrder = async (orderId: string) => {
+    try {
+      await call({
+        order_id: orderId,
+        status: 'billed'
+      })
+      
+      toast.success('Order marked as billed successfully')
+      
+      if (onOrderUpdate) {
+        onOrderUpdate()
+      }
+    } catch (error: any) {
+      console.error('Failed to mark order as billed:', error)
+      toast.error(error?.message || 'Failed to mark order as billed')
       
       if (onOrderUpdate) {
         onOrderUpdate()
@@ -475,6 +550,7 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
               orders={statusOrders}
               onCheckOrder={onCheckOrder}
               onCancelOrder={onCancelOrder || handleCancelOrder}
+              onBilledOrder={onBilledOrder || handleBilledOrder}
               activeId={activeId}
               handleTableNumberChange={handleTableNumberChange}
               tableOptions={tableOptions}

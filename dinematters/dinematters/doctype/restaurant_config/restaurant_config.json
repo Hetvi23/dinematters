@@ -36,7 +36,13 @@
   "enable_events",
   "enable_offers",
   "enable_coupons",
-  "enable_experience_lounge"
+  "enable_experience_lounge",
+  "section_break_social_media",
+  "google_review_link",
+  "instagram_profile_link",
+  "column_break_social_media",
+  "facebook_profile_link",
+  "whatsapp_phone_number"
  ],
  "fields": [
   {
@@ -196,6 +202,43 @@
    "fieldname": "enable_experience_lounge",
    "fieldtype": "Check",
    "label": "Enable Experience Lounge"
+  },
+  {
+   "fieldname": "section_break_social_media",
+   "fieldtype": "Section Break",
+   "label": "Social Media & Contact"
+  },
+  {
+   "fieldname": "google_review_link",
+   "fieldtype": "Data",
+   "label": "Google Review Link",
+   "options": "URL",
+   "description": "Link to redirect to Google review page"
+  },
+  {
+   "fieldname": "instagram_profile_link",
+   "fieldtype": "Data",
+   "label": "Instagram Profile Link",
+   "options": "URL",
+   "description": "Link to Instagram profile"
+  },
+  {
+   "fieldname": "column_break_social_media",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "facebook_profile_link",
+   "fieldtype": "Data",
+   "label": "Facebook Profile Link",
+   "options": "URL",
+   "description": "Link to Facebook profile"
+  },
+  {
+   "fieldname": "whatsapp_phone_number",
+   "fieldtype": "Data",
+   "label": "WhatsApp Phone Number",
+   "options": "Phone",
+   "description": "Phone number for WhatsApp contact"
   }
  ],
  "index_web_pages_for_search": 1,

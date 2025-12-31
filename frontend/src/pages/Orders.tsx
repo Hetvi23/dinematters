@@ -168,12 +168,23 @@ export default function Orders() {
   const { call: updateOrderStatus } = useFrappePostCall('dinematters.dinematters.api.order_status.update_status')
   const { call: updateTableNumber } = useFrappePostCall('dinematters.dinematters.api.order_status.update_table_number')
 
+  // Normalize status value (handle legacy "in_billing" format)
+  const normalizeStatus = (status: string): string => {
+    if (status === 'in_billing') {
+      return 'In Billing'
+    }
+    return status
+  }
+
   // Handle status change
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
+      // Normalize the status before sending to API
+      const normalizedStatus = normalizeStatus(newStatus)
+      
       await updateOrderStatus({
         order_id: orderId,
-        status: newStatus
+        status: normalizedStatus
       })
       
       const statusLabels: Record<string, string> = {
@@ -181,11 +192,14 @@ export default function Orders() {
         'confirmed': 'Confirmed',
         'preparing': 'Preparing',
         'ready': 'Ready',
+        'In Billing': 'In Billing',
+        'in_billing': 'In Billing', // Handle legacy format
         'delivered': 'Delivered',
+        'billed': 'Billed',
         'cancelled': 'Cancelled'
       }
       
-      toast.success(`Order status updated to ${statusLabels[newStatus] || newStatus}`)
+      toast.success(`Order status updated to ${statusLabels[normalizedStatus] || normalizedStatus}`)
       
       // Refresh orders list
       mutate()
@@ -298,8 +312,21 @@ export default function Orders() {
       filteredRestaurants: [...new Set(restaurantFiltered.map((o: any) => o.restaurant))]
     })
     
-    // SECOND: Apply other filters (search, status, table, date) to restaurant-filtered orders
-    return restaurantFiltered.filter((order: any) => {
+    // Filter by today's date - Real Time Orders should only show today's orders
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    
+    const todayFiltered = restaurantFiltered.filter((order: any) => {
+      if (!order.creation) return false
+      const orderDate = new Date(order.creation)
+      orderDate.setHours(0, 0, 0, 0)
+      return orderDate >= today && orderDate < tomorrow
+    })
+    
+    // SECOND: Apply other filters (search, status, table, date) to today's restaurant-filtered orders
+    return todayFiltered.filter((order: any) => {
       
       // Search filter
       if (searchQuery) {
@@ -422,6 +449,7 @@ export default function Orders() {
                   <SelectItem value="confirmed">Confirmed</SelectItem>
                   <SelectItem value="preparing">Preparing</SelectItem>
                   <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="billed">Billed</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
@@ -629,10 +657,11 @@ export default function Orders() {
                       <TableCell className="font-medium">{order.order_number || order.name}</TableCell>
                       <TableCell>
                             <Select
-                              value={order.status || 'pending'}
+                              value={normalizeStatus(order.status || 'pending')}
                               onValueChange={(newStatus) => handleStatusChange(order.name, newStatus)}
                             >
                               <SelectTrigger className={cn(
+<<<<<<< Updated upstream
                                 "h-7 w-[120px] text-xs border-0 shadow-none font-semibold",
                                 order.status === 'delivered' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#0d5d0d] dark:text-[#a5d6a7] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
                                 order.status === 'cancelled' ? 'bg-[#fde7e9] dark:bg-[#b71c1c] text-[#b91c1c] dark:text-[#ffcdd2] hover:bg-[#fcc5c9] dark:hover:bg-[#c62828]' :
@@ -640,6 +669,17 @@ export default function Orders() {
                                 order.status === 'confirmed' ? 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#c2410c] dark:text-[#ffb88c] hover:bg-orange-100 dark:hover:bg-[#ea580c]/30' :
                                 order.status === 'preparing' ? 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#6b21a8] dark:text-[#ce93d8] hover:bg-[#d4b9e8] dark:hover:bg-[#6a1b9a]' :
                                 order.status === 'ready' ? 'bg-[#cce5ff] dark:bg-[#0d47a1] text-[#003d7a] dark:text-[#90caf9] hover:bg-[#99ccff] dark:hover:bg-[#1565c0]' :
+=======
+                                "h-7 w-[120px] text-xs border-0 shadow-none",
+                                order.status === 'delivered' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
+                                order.status === 'cancelled' ? 'bg-[#fde7e9] dark:bg-[#b71c1c] text-[#d13438] dark:text-[#ef5350] hover:bg-[#fcc5c9] dark:hover:bg-[#c62828]' :
+                                order.status === 'pending' ? 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44] hover:bg-[#ffe69d] dark:hover:bg-[#ca5010]/30' :
+                                order.status === 'confirmed' ? 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#ea580c] dark:text-[#ff8c42] hover:bg-orange-100 dark:hover:bg-[#ea580c]/30' :
+                                order.status === 'preparing' ? 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] hover:bg-[#d4b9e8] dark:hover:bg-[#6a1b9a]' :
+                                order.status === 'ready' ? 'bg-[#cce5ff] dark:bg-[#0d47a1] text-[#004578] dark:text-[#64b5f6] hover:bg-[#99ccff] dark:hover:bg-[#1565c0]' :
+                                (order.status === 'In Billing' || order.status === 'in_billing') ? 'bg-[#fff3e0] dark:bg-[#e65100]/20 text-[#e65100] dark:text-[#ff9800] hover:bg-[#ffe0b2] dark:hover:bg-[#e65100]/30' :
+                                order.status === 'billed' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
+>>>>>>> Stashed changes
                                 'bg-muted text-muted-foreground hover:bg-accent'
                               )}>
                                 <SelectValue>
@@ -651,7 +691,9 @@ export default function Orders() {
                                 <SelectItem value="confirmed">Confirmed</SelectItem>
                                 <SelectItem value="preparing">Preparing</SelectItem>
                                 <SelectItem value="ready">Ready</SelectItem>
+                                <SelectItem value="In Billing">In Billing</SelectItem>
                                 <SelectItem value="delivered">Delivered</SelectItem>
+                                <SelectItem value="billed">Billed</SelectItem>
                                 <SelectItem value="cancelled">Cancelled</SelectItem>
                               </SelectContent>
                             </Select>

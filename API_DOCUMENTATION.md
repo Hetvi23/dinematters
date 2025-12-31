@@ -639,12 +639,31 @@ curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.con
         "enableBanquetBooking": true,
         "enableEvents": true,
         "enableOffers": true,
-        "enableCoupons": true
+        "enableCoupons": true,
+        "enableExperienceLounge": true
+      },
+      "socialMedia": {
+        "googleReviewLink": "https://g.page/r/.../review",
+        "instagramProfileLink": "https://www.instagram.com/restaurant_name/",
+        "facebookProfileLink": "https://www.facebook.com/restaurant_name/",
+        "whatsappPhoneNumber": "+1234567890"
       }
     }
   }
 }
 ```
+
+**Response Fields Description**:
+
+- `restaurant`: Basic restaurant information (name, tagline, subtitle, description)
+- `branding`: Visual branding elements (colors, logo, theme, video)
+- `pricing`: Currency settings
+- `settings`: Feature toggles for various restaurant functionalities
+- `socialMedia`: Social media and contact links
+  - `googleReviewLink` (string): URL to redirect to Google review page
+  - `instagramProfileLink` (string): Link to Instagram profile
+  - `facebookProfileLink` (string): Link to Facebook profile
+  - `whatsappPhoneNumber` (string): Phone number for WhatsApp contact (format: +1234567890)
 
 **Test Results**:
 - ✅ **Status**: Working perfectly

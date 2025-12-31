@@ -32,7 +32,11 @@ interface DynamicFormProps {
   readOnlyFields?: string[] // Fields to make read-only
   showSaveButton?: boolean // Control whether to show save button
   triggerSave?: number // Increment this to trigger save
+<<<<<<< Updated upstream
   skipLoadingState?: boolean // Skip showing loading spinner (useful when parent handles loading via page reload)
+=======
+  refreshNonce?: number
+>>>>>>> Stashed changes
 }
 
 export default function DynamicForm({ 
@@ -48,7 +52,11 @@ export default function DynamicForm({
   readOnlyFields = [],
   showSaveButton = true,
   triggerSave,
+<<<<<<< Updated upstream
   skipLoadingState = false
+=======
+  refreshNonce
+>>>>>>> Stashed changes
 }: DynamicFormProps) {
   // Debug: Log component render
   console.log(`[DynamicForm] ${doctype} - Component render:`, {
@@ -63,10 +71,16 @@ export default function DynamicForm({
   const { permissions, isLoading: permLoading } = usePermissions(doctype)
   
   const hookEnabled = !!docname && mode !== 'create'
-  const { data: docData, isLoading: docLoading, error: docError } = useFrappeGetDoc(doctype, docname || '', {
+  const { data: docData, isLoading: docLoading, error: docError, mutate: refreshDoc } = useFrappeGetDoc(doctype, docname || '', {
     enabled: hookEnabled,
     fields: ['*'] // Request all fields to ensure we get tagline, subtitle, etc.
   })
+
+  useEffect(() => {
+    if (hookEnabled && refreshDoc && refreshNonce !== undefined) {
+      void (refreshDoc as any)()
+    }
+  }, [hookEnabled, refreshDoc, refreshNonce])
 
   // Debug: Log hook state immediately
   console.log(`[DynamicForm] ${doctype} - Hook state (immediate):`, {
@@ -129,6 +143,8 @@ export default function DynamicForm({
   const initialDataRef = useRef(initialData || {})
   const hasUserDataRef = useRef(false)
   const originalDataRef = useRef<Record<string, any>>({}) // Track original data for change detection
+  const lastHydratedNonceRef = useRef<number | undefined>(undefined)
+  const lastHydratedModifiedRef = useRef<string | undefined>(undefined)
 
   // Update ref when initialData changes
   useEffect(() => {
@@ -140,14 +156,25 @@ export default function DynamicForm({
   }, [JSON.stringify(initialData)])
 
   useEffect(() => {
-    // Only initialize if we haven't initialized yet AND user hasn't entered data
-    if (formDataInitialized && hasUserDataRef.current) {
-      console.log(`[DynamicForm] ${doctype} - Skipping init: formDataInitialized=${formDataInitialized}, hasUserData=${hasUserDataRef.current}`)
-      return // Don't overwrite user data
+    // Never overwrite user edits
+    if (hasUserDataRef.current) {
+      console.log(`[DynamicForm] ${doctype} - Skipping hydrate: hasUserData=${hasUserDataRef.current}`)
+      return
     }
 
+<<<<<<< Updated upstream
     // When docname changes from undefined to a value, or docData becomes available, initialize
     if (docData && mode !== 'create' && !formDataInitialized) {
+=======
+    const docModified = (docData as any)?.modified as string | undefined
+    const shouldHydrateFromBackend = !!docData && mode !== 'create' && (
+      !formDataInitialized ||
+      (refreshNonce !== undefined && refreshNonce !== lastHydratedNonceRef.current) ||
+      (docModified && docModified !== lastHydratedModifiedRef.current)
+    )
+
+    if (shouldHydrateFromBackend) {
+>>>>>>> Stashed changes
       console.log(`[DynamicForm] ${doctype} - Loading docData into formData:`, {
         hasDocData: !!docData,
         docDataKeys: Object.keys(docData),
@@ -218,6 +245,8 @@ export default function DynamicForm({
       originalDataRef.current = { ...mergedData } // Store original data for comparison
       setFormDataInitialized(true)
       hasUserDataRef.current = false // Reset - user hasn't made changes yet
+      lastHydratedNonceRef.current = refreshNonce
+      lastHydratedModifiedRef.current = docModified
     } else if (meta && !formDataInitialized && mode === 'create') {
       // Initialize form with defaults and initial data only once
       // Start with initialData (pre-filled data), then add defaults
@@ -248,7 +277,11 @@ export default function DynamicForm({
       })
       setFormDataInitialized(true)
     }
+<<<<<<< Updated upstream
   }, [docData, meta, mode, formDataInitialized, docname])
+=======
+  }, [docData, meta, mode, formDataInitialized, refreshNonce, JSON.stringify(initialData), readOnlyFields?.join(",")])
+>>>>>>> Stashed changes
 
   // Reset initialization flag when mode or docname changes (but not when initialData changes)
   useEffect(() => {

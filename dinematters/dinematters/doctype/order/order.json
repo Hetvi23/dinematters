@@ -175,7 +175,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "pending\nconfirmed\npreparing\nready\ndelivered\ncancelled",
+   "options": "pending\nconfirmed\npreparing\nready\nIn Billing\ndelivered\nbilled\ncancelled",
    "reqd": 1
   },
   {
