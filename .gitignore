@@ -5,6 +5,10 @@
 tags
 node_modules
 __pycache__
+
+# Build artifacts - ignore hash-based asset files
+dinematters/public/dinematters/assets/index-*.css
+dinematters/public/dinematters/assets/index-*.js
 # Build artifacts - ignore hash-based asset files
 dinematters/public/dinematters/assets/index-*.css
 dinematters/public/dinematters/assets/index-*.js
