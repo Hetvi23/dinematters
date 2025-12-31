@@ -10,6 +10,7 @@ import frappe
 from frappe import _
 from frappe.utils import get_url
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api, get_restaurant_context
+from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 import json
 
 
@@ -86,6 +87,9 @@ def get_restaurant_config(restaurant_id):
 		if apple_touch_icon and apple_touch_icon.startswith("/files/"):
 			apple_touch_icon = get_url(apple_touch_icon)
 		
+		# Get currency info with symbol
+		currency_info = get_restaurant_currency_info(restaurant)
+		
 		response_data = {
 			"restaurant": {
 				"name": config.get("restaurant_name", ""),
@@ -110,7 +114,9 @@ def get_restaurant_config(restaurant_id):
 				}
 			},
 			"pricing": {
-				"currency": config.get("currency", "USD")
+				"currency": currency_info.get("currency", "USD"),
+				"symbol": currency_info.get("symbol", "$"),
+				"symbolOnRight": currency_info.get("symbolOnRight", False)
 			},
 			"settings": {
 				"enableTableBooking": bool(config.get("enable_table_booking", 1)),

@@ -1054,10 +1054,10 @@ export default function SetupWizard() {
                     : undefined}
                   readOnlyFields={currentStepData.id === 'config' 
                     ? ['restaurant', 'base_url'] 
-                    : currentStepData.id === 'restaurant'
-                    ? ['base_url']
                     : currentStepData.depends_on === 'restaurant'
                     ? ['restaurant']
+                    : currentStepData.doctype === 'Restaurant'
+                    ? ['base_url']
                     : undefined}
                   docname={(() => {
                     const savedData = stepData[currentStepData.id]

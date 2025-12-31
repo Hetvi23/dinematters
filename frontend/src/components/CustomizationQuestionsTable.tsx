@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Trash2, Plus, Edit2, X, Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useCurrency } from '@/hooks/useCurrency'
 
 interface CustomizationOption {
   name?: string
@@ -440,7 +441,7 @@ export default function CustomizationQuestionsTable({
                                           className="text-xs"
                                         />
                                       ) : (
-                                        <span className="text-sm">₹{option.price ?? 0}</span>
+                                        <span className="text-sm">{formatAmountNoDecimals(option.price)}</span>
                                       )}
                                     </TableCell>
                                     <TableCell>

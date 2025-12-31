@@ -10,6 +10,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, now_datetime, get_datetime_str, add_to_date
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api, validate_product_belongs_to_restaurant
+from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 import json
 import random
 import string
@@ -273,6 +274,9 @@ def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None):
 		total = frappe.db.count("Order", filters=filters)
 		total_pages = (total + limit - 1) // limit if limit > 0 else 1
 		
+		# Get currency info for restaurant
+		currency_info = get_restaurant_currency_info(restaurant)
+		
 		return {
 			"success": True,
 			"data": {
@@ -282,7 +286,10 @@ def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None):
 					"limit": limit,
 					"total": total,
 					"totalPages": total_pages
-				}
+				},
+				"currency": currency_info.get("currency", "USD"),
+				"currencySymbol": currency_info.get("symbol", "$"),
+				"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
 			}
 		}
 	except Exception as e:
@@ -428,6 +435,9 @@ def format_order(order_doc):
 	if order_doc.cooking_requests:
 		cooking_requests = json.loads(order_doc.cooking_requests)
 	
+	# Get currency info for restaurant
+	currency_info = get_restaurant_currency_info(order_doc.restaurant)
+	
 	order_data = {
 		"id": order_doc.order_id,
 		"orderNumber": order_doc.order_number,
@@ -440,7 +450,10 @@ def format_order(order_doc):
 		"cookingRequests": cooking_requests,
 		"status": order_doc.status,
 		"createdAt": get_datetime_str(order_doc.creation),
-		"estimatedDelivery": get_datetime_str(order_doc.estimated_delivery) if order_doc.estimated_delivery else None
+		"estimatedDelivery": get_datetime_str(order_doc.estimated_delivery) if order_doc.estimated_delivery else None,
+		"currency": currency_info.get("currency", "USD"),
+		"currencySymbol": currency_info.get("symbol", "$"),
+		"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
 	}
 	
 	# Add table_number if available

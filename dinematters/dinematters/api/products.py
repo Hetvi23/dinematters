@@ -10,6 +10,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
+from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 import json
 
 
@@ -92,6 +93,9 @@ def get_products(restaurant_id, category=None, type=None, vegetarian=None, searc
 		# Calculate pagination
 		total_pages = (total + limit - 1) // limit if limit > 0 else 1
 		
+		# Get currency info for restaurant
+		currency_info = get_restaurant_currency_info(restaurant)
+		
 		return {
 			"success": True,
 			"data": {
@@ -101,7 +105,10 @@ def get_products(restaurant_id, category=None, type=None, vegetarian=None, searc
 					"limit": limit,
 					"total": total,
 					"totalPages": total_pages
-				}
+				},
+				"currency": currency_info.get("currency", "USD"),
+				"currencySymbol": currency_info.get("symbol", "$"),
+				"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
 			}
 		}
 	except Exception as e:
@@ -158,10 +165,16 @@ def get_product(restaurant_id, product_id):
 		
 		formatted_product = format_product(product_doc)
 		
+		# Get currency info for restaurant
+		currency_info = get_restaurant_currency_info(restaurant)
+		
 		return {
 			"success": True,
 			"data": {
-				"product": formatted_product
+				"product": formatted_product,
+				"currency": currency_info.get("currency", "USD"),
+				"currencySymbol": currency_info.get("symbol", "$"),
+				"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
 			}
 		}
 	except Exception as e:

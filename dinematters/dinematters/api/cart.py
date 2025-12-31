@@ -10,6 +10,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, now_datetime, get_datetime_str
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api, validate_product_belongs_to_restaurant
+from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 import json
 import random
 import string
@@ -224,13 +225,19 @@ def get_cart(restaurant_id, session_id=None):
 		subtotal = sum(item["totalPrice"] for item in items)
 		total_items = len(items)
 		
+		# Get currency info for restaurant
+		currency_info = get_restaurant_currency_info(restaurant)
+		
 		summary = {
 			"totalItems": total_items,
 			"subtotal": subtotal,
 			"discount": 0,
 			"tax": 0,
 			"deliveryFee": 0,
-			"total": subtotal
+			"total": subtotal,
+			"currency": currency_info.get("currency", "USD"),
+			"currencySymbol": currency_info.get("symbol", "$"),
+			"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
 		}
 		
 		return {
@@ -450,13 +457,19 @@ def get_cart_summary(user, session_id, restaurant):
 	delivery_fee = 0
 	total = subtotal - discount + tax + delivery_fee
 	
+	# Get currency info for restaurant
+	currency_info = get_restaurant_currency_info(restaurant)
+	
 	return {
 		"totalItems": total_items,
 		"subtotal": subtotal,
 		"discount": discount,
 		"tax": tax,
 		"deliveryFee": delivery_fee,
-		"total": total
+		"total": total,
+		"currency": currency_info.get("currency", "USD"),
+		"currencySymbol": currency_info.get("symbol", "$"),
+		"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
 	}
 
 

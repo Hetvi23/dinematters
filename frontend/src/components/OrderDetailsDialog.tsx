@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useCurrency } from '@/hooks/useCurrency'
 
 interface OrderDetailsDialogProps {
   orderId: string | null
@@ -15,6 +16,7 @@ interface OrderDetailsDialogProps {
 }
 
 export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetailsDialogProps) {
+  const { formatAmount, formatAmountNoDecimals } = useCurrency()
   const { data: order, isLoading } = useFrappeGetDoc('Order', orderId || '', {
     fields: ['*'],
     enabled: open && !!orderId
@@ -92,10 +94,10 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                             <div className="flex-1">
                               <p className="font-medium text-foreground">{item.product || 'N/A'}</p>
                               <p className="text-xs text-muted-foreground">
-                                Qty: {item.quantity || 1} × ₹{item.unit_price || 0}
+                                Qty: {item.quantity || 1} × {formatAmount(item.unit_price)}
                               </p>
                             </div>
-                            <p className="font-semibold text-foreground">₹{item.total_price || item.unit_price || 0}</p>
+                            <p className="font-semibold text-foreground">{formatAmount(item.total_price || item.unit_price)}</p>
                           </div>
                           
                           {hasCustomizations && (
@@ -128,24 +130,24 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
               <CardContent className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <p className="text-muted-foreground">Subtotal</p>
-                  <p className="font-medium">₹{order.subtotal || 0}</p>
+                  <p className="font-medium">{formatAmount(order.subtotal)}</p>
                 </div>
                 {order.discount && order.discount > 0 && (
                   <div className="flex justify-between text-sm">
                     <p className="text-muted-foreground">Discount</p>
-                    <p className="font-medium text-[#107c10] dark:text-[#81c784]">-₹{order.discount}</p>
+                    <p className="font-medium text-[#107c10] dark:text-[#81c784]">-{formatAmount(order.discount)}</p>
                   </div>
                 )}
                 {order.tax && order.tax > 0 && (
                   <div className="flex justify-between text-sm">
                     <p className="text-muted-foreground">Tax</p>
-                    <p className="font-medium">₹{order.tax}</p>
+                    <p className="font-medium">{formatAmount(order.tax)}</p>
                   </div>
                 )}
                 {order.delivery_fee && order.delivery_fee > 0 && (
                   <div className="flex justify-between text-sm">
                     <p className="text-muted-foreground">Delivery Fee</p>
-                    <p className="font-medium">₹{order.delivery_fee}</p>
+                    <p className="font-medium">{formatAmount(order.delivery_fee)}</p>
                   </div>
                 )}
                 {(order.coupon || coupon) && (
@@ -158,14 +160,14 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                       <p className="font-semibold text-[#107c10] dark:text-[#81c784]">
                         {coupon.discount_type === 'percent' 
                           ? `-${coupon.discount_value}%` 
-                          : `-₹${coupon.discount_value}`}
+                          : `-${formatAmount(coupon.discount_value)}`}
                       </p>
                     )}
                   </div>
                 )}
                 <div className="flex justify-between border-t border-border pt-2 mt-2">
                   <p className="font-semibold text-foreground">Total</p>
-                  <p className="font-bold text-lg text-foreground">₹{order.total || 0}</p>
+                  <p className="font-bold text-lg text-foreground">{formatAmountNoDecimals(order.total)}</p>
                 </div>
               </CardContent>
             </Card>

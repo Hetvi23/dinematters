@@ -18,10 +18,12 @@ import {
 } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { useRestaurant } from '@/contexts/RestaurantContext'
+import { useCurrency } from '@/hooks/useCurrency'
 
 type ViewType = 'kanban' | 'list'
 
 export default function Orders() {
+  const { formatAmountNoDecimals } = useCurrency()
   // Load view preference from localStorage, default to 'list' on mobile, 'kanban' on desktop
   const [viewType, setViewType] = useState<ViewType>(() => {
     // Check if mobile (screen width < 768px)
@@ -538,17 +540,17 @@ export default function Orders() {
                           onValueChange={(newStatus) => handleStatusChange(order.name, newStatus)}
                         >
                           <SelectTrigger className={cn(
-                            "h-7 w-[110px] text-xs border-0 shadow-none",
-                            order.status === 'delivered' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
-                            order.status === 'cancelled' ? 'bg-[#fde7e9] dark:bg-[#b71c1c] text-[#d13438] dark:text-[#ef5350] hover:bg-[#fcc5c9] dark:hover:bg-[#c62828]' :
-                            order.status === 'pending' ? 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44] hover:bg-[#ffe69d] dark:hover:bg-[#ca5010]/30' :
-                            order.status === 'confirmed' ? 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#ea580c] dark:text-[#ff8c42] hover:bg-orange-100 dark:hover:bg-[#ea580c]/30' :
-                            order.status === 'preparing' ? 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] hover:bg-[#d4b9e8] dark:hover:bg-[#6a1b9a]' :
-                            order.status === 'ready' ? 'bg-[#cce5ff] dark:bg-[#0d47a1] text-[#004578] dark:text-[#64b5f6] hover:bg-[#99ccff] dark:hover:bg-[#1565c0]' :
+                            "h-7 w-[110px] text-xs border-0 shadow-none font-semibold",
+                            order.status === 'delivered' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#0d5d0d] dark:text-[#a5d6a7] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
+                            order.status === 'cancelled' ? 'bg-[#fde7e9] dark:bg-[#b71c1c] text-[#b91c1c] dark:text-[#ffcdd2] hover:bg-[#fcc5c9] dark:hover:bg-[#c62828]' :
+                            order.status === 'pending' ? 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#b45309] dark:text-[#ffd89b] hover:bg-[#ffe69d] dark:hover:bg-[#ca5010]/30' :
+                            order.status === 'confirmed' ? 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#c2410c] dark:text-[#ffb88c] hover:bg-orange-100 dark:hover:bg-[#ea580c]/30' :
+                            order.status === 'preparing' ? 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#6b21a8] dark:text-[#ce93d8] hover:bg-[#d4b9e8] dark:hover:bg-[#6a1b9a]' :
+                            order.status === 'ready' ? 'bg-[#cce5ff] dark:bg-[#0d47a1] text-[#003d7a] dark:text-[#90caf9] hover:bg-[#99ccff] dark:hover:bg-[#1565c0]' :
                             'bg-muted text-muted-foreground hover:bg-accent'
                           )}>
                             <SelectValue>
-                              <span className="capitalize">{order.status || 'pending'}</span>
+                              <span className="capitalize font-semibold">{order.status || 'pending'}</span>
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
@@ -592,7 +594,7 @@ export default function Orders() {
                             {order.coupon}
                           </span>
                         )}
-                        <span className="text-lg font-semibold text-foreground ml-auto">₹{order.total || 0}</span>
+                        <span className="text-lg font-semibold text-foreground ml-auto">{formatAmountNoDecimals(order.total)}</span>
                       </div>
                       <Button
                         variant="outline"
@@ -631,17 +633,17 @@ export default function Orders() {
                               onValueChange={(newStatus) => handleStatusChange(order.name, newStatus)}
                             >
                               <SelectTrigger className={cn(
-                                "h-7 w-[120px] text-xs border-0 shadow-none",
-                                order.status === 'delivered' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
-                                order.status === 'cancelled' ? 'bg-[#fde7e9] dark:bg-[#b71c1c] text-[#d13438] dark:text-[#ef5350] hover:bg-[#fcc5c9] dark:hover:bg-[#c62828]' :
-                                order.status === 'pending' ? 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44] hover:bg-[#ffe69d] dark:hover:bg-[#ca5010]/30' :
-                                order.status === 'confirmed' ? 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#ea580c] dark:text-[#ff8c42] hover:bg-orange-100 dark:hover:bg-[#ea580c]/30' :
-                                order.status === 'preparing' ? 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] hover:bg-[#d4b9e8] dark:hover:bg-[#6a1b9a]' :
-                                order.status === 'ready' ? 'bg-[#cce5ff] dark:bg-[#0d47a1] text-[#004578] dark:text-[#64b5f6] hover:bg-[#99ccff] dark:hover:bg-[#1565c0]' :
+                                "h-7 w-[120px] text-xs border-0 shadow-none font-semibold",
+                                order.status === 'delivered' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#0d5d0d] dark:text-[#a5d6a7] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
+                                order.status === 'cancelled' ? 'bg-[#fde7e9] dark:bg-[#b71c1c] text-[#b91c1c] dark:text-[#ffcdd2] hover:bg-[#fcc5c9] dark:hover:bg-[#c62828]' :
+                                order.status === 'pending' ? 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#b45309] dark:text-[#ffd89b] hover:bg-[#ffe69d] dark:hover:bg-[#ca5010]/30' :
+                                order.status === 'confirmed' ? 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#c2410c] dark:text-[#ffb88c] hover:bg-orange-100 dark:hover:bg-[#ea580c]/30' :
+                                order.status === 'preparing' ? 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#6b21a8] dark:text-[#ce93d8] hover:bg-[#d4b9e8] dark:hover:bg-[#6a1b9a]' :
+                                order.status === 'ready' ? 'bg-[#cce5ff] dark:bg-[#0d47a1] text-[#003d7a] dark:text-[#90caf9] hover:bg-[#99ccff] dark:hover:bg-[#1565c0]' :
                                 'bg-muted text-muted-foreground hover:bg-accent'
                               )}>
                                 <SelectValue>
-                                  <span className="capitalize">{order.status || 'pending'}</span>
+                                  <span className="capitalize font-semibold">{order.status || 'pending'}</span>
                                 </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
@@ -690,7 +692,7 @@ export default function Orders() {
                               <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                          <TableCell className="font-medium text-foreground">₹{order.total || 0}</TableCell>
+                          <TableCell className="font-medium text-foreground">{formatAmountNoDecimals(order.total)}</TableCell>
                           <TableCell className="text-muted-foreground">
                         {order.creation ? new Date(order.creation).toLocaleString('en-IN', {
                           day: '2-digit',

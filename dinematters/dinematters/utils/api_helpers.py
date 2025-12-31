@@ -8,6 +8,7 @@ API helper functions for restaurant validation and context
 import frappe
 from frappe import _
 from dinematters.dinematters.utils.permissions import validate_restaurant_access, get_user_restaurant_ids
+from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 
 
 def get_restaurant_from_id(restaurant_id):
@@ -69,6 +70,9 @@ def get_restaurant_context(restaurant_id):
 	
 	restaurant_doc = frappe.get_doc("Restaurant", restaurant)
 	
+	# Get currency info with symbol
+	currency_info = get_restaurant_currency_info(restaurant)
+	
 	return {
 		"id": restaurant_doc.restaurant_id,
 		"name": restaurant_doc.restaurant_name,
@@ -80,7 +84,9 @@ def get_restaurant_context(restaurant_id):
 		"country": restaurant_doc.country,
 		"tax_rate": restaurant_doc.tax_rate,
 		"default_delivery_fee": restaurant_doc.default_delivery_fee,
-		"currency": restaurant_doc.currency,
+		"currency": currency_info.get("currency", restaurant_doc.currency or "USD"),
+		"currencySymbol": currency_info.get("symbol", "$"),
+		"currencySymbolOnRight": currency_info.get("symbolOnRight", False),
 		"timezone": restaurant_doc.timezone,
 		"google_map_url": restaurant_doc.google_map_url
 	}

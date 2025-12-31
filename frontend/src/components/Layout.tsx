@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useRestaurant } from '@/contexts/RestaurantContext'
+import { useCurrency } from '@/hooks/useCurrency'
 import Breadcrumb from './Breadcrumb'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -39,6 +40,7 @@ export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
   const { selectedRestaurant, setSelectedRestaurant, setRestaurantsData } = useRestaurant()
+  const { formatAmountNoDecimals } = useCurrency()
   const [sidebarOpen, setSidebarOpen] = useState(false) // Mobile sidebar
   const [sidebarExpanded, setSidebarExpanded] = useState(true) // Desktop sidebar expanded/collapsed
   const [sidebarHovered, setSidebarHovered] = useState(false) // Hover state for temporary expansion
@@ -601,7 +603,7 @@ export default function Layout({ children }: LayoutProps) {
                 <DollarSign className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                 <span className="text-xs text-muted-foreground">Today:</span>
                 <span className="text-sm font-semibold text-foreground">
-                  ₹{analytics.todayRevenue.toFixed(0)}
+                  {formatAmountNoDecimals(analytics.todayRevenue)}
                 </span>
                 {analytics.revenueChange !== 0 && (
                   <div className={cn(
@@ -680,7 +682,7 @@ export default function Layout({ children }: LayoutProps) {
                 <Activity className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                 <span className="text-xs text-muted-foreground">Avg:</span>
                 <span className="text-sm font-semibold text-foreground">
-                  ₹{analytics.avgOrderValue.toFixed(0)}
+                  {formatAmountNoDecimals(analytics.avgOrderValue)}
                 </span>
               </div>
 
@@ -689,7 +691,7 @@ export default function Layout({ children }: LayoutProps) {
                 <TrendingUp className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                 <span className="text-xs text-muted-foreground">Total:</span>
                 <span className="text-sm font-semibold text-foreground">
-                  ₹{analytics.totalRevenue.toFixed(0)}
+                  {formatAmountNoDecimals(analytics.totalRevenue)}
                 </span>
               </div>
             </div>
@@ -719,7 +721,7 @@ export default function Layout({ children }: LayoutProps) {
                 <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-muted whitespace-nowrap">
                   <DollarSign className="h-3 w-3 text-primary flex-shrink-0" />
                   <span className="text-xs font-semibold text-foreground">
-                    ₹{analytics.todayRevenue.toFixed(0)}
+                    {formatAmountNoDecimals(analytics.todayRevenue)}
                   </span>
                 </div>
 

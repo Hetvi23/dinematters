@@ -9,10 +9,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRestaurant } from '@/contexts/RestaurantContext'
+import { useCurrency } from '@/hooks/useCurrency'
 
 export default function ProductNew() {
   const navigate = useNavigate()
   const { selectedRestaurant } = useRestaurant()
+  const { symbol } = useCurrency()
   const { call, loading } = useFrappePostCall('frappe.client.insert')
 
   const [formData, setFormData] = useState({
@@ -95,7 +97,7 @@ export default function ProductNew() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="price">
-                  Price (₹) <span className="text-red-500">*</span>
+                  Price ({symbol}) <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="price"
@@ -110,7 +112,7 @@ export default function ProductNew() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="original_price">Original Price (₹)</Label>
+                <Label htmlFor="original_price">Original Price ({symbol})</Label>
                 <Input
                   id="original_price"
                   type="number"

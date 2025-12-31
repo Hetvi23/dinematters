@@ -9,6 +9,7 @@ import { useFrappePostCall } from '@/lib/frappe'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useConfirm } from '@/hooks/useConfirm'
+import { useCurrency } from '@/hooks/useCurrency'
 import {
   Select,
   SelectContent,
@@ -45,10 +46,10 @@ interface OrdersKanbanProps {
 }
 
 const STATUSES = [
-  { value: 'pending', label: 'Pending', color: 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44] border-[#ffe69d] dark:border-[#ca5010]/40' },
-  { value: 'confirmed', label: 'Confirmed', color: 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#ea580c] dark:text-[#ff8c42] border-orange-200 dark:border-[#ea580c]/40' },
-  { value: 'preparing', label: 'Preparing', color: 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border-[#d4b9e8] dark:border-[#6a1b9a]' },
-  { value: 'delivered', label: 'Delivered', color: 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] border-[#92c5f7] dark:border-[#4caf50]' },
+  { value: 'pending', label: 'Pending', color: 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#b45309] dark:text-[#ffd89b] border-[#ffe69d] dark:border-[#ca5010]/40 font-semibold' },
+  { value: 'confirmed', label: 'Confirmed', color: 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#c2410c] dark:text-[#ffb88c] border-orange-200 dark:border-[#ea580c]/40 font-semibold' },
+  { value: 'preparing', label: 'Preparing', color: 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#6b21a8] dark:text-[#ce93d8] border-[#d4b9e8] dark:border-[#6a1b9a] font-semibold' },
+  { value: 'delivered', label: 'Delivered', color: 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#0d5d0d] dark:text-[#a5d6a7] border-[#92c5f7] dark:border-[#4caf50] font-semibold' },
 ]
 
 // Draggable Order Card Component
@@ -66,6 +67,7 @@ function DraggableOrderCard({
   tableOptions?: number[]
 }) {
   const { confirm, ConfirmDialogComponent } = useConfirm()
+  const { formatAmountNoDecimals } = useCurrency()
   const safeTableOptions = Array.isArray(tableOptions) ? tableOptions : []
   const { attributes, listeners, setNodeRef, isDragging, transform } = useDraggable({
     id: order.name,
@@ -157,7 +159,7 @@ function DraggableOrderCard({
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-xs text-muted-foreground font-medium">TO PAY</span>
             <span className="text-base font-bold text-foreground">
-              ₹{order.total?.toFixed(0) || 0}
+              {formatAmountNoDecimals(order.total)}
             </span>
           </div>
         </div>
@@ -170,12 +172,12 @@ function DraggableOrderCard({
               <span className="capitalize truncate">{order.payment_method.replace('_', ' ')}</span>
               {order.payment_status && (
                 <span className={cn(
-                  "ml-1 px-1 py-0.5 rounded-md text-[10px] font-medium",
+                  "ml-1 px-1 py-0.5 rounded-md text-[10px] font-semibold",
                   order.payment_status === 'completed' 
-                    ? "bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784]"
+                    ? "bg-[#dff6dd] dark:bg-[#1b5e20] text-[#0d5d0d] dark:text-[#a5d6a7]"
                     : order.payment_status === 'failed'
-                    ? "bg-[#fde7e9] dark:bg-[#b71c1c] text-[#d13438] dark:text-[#ef5350]"
-                    : "bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44]"
+                    ? "bg-[#fde7e9] dark:bg-[#b71c1c] text-[#b91c1c] dark:text-[#ffcdd2]"
+                    : "bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#b45309] dark:text-[#ffd89b]"
                 )}>
                   {order.payment_status}
                 </span>
@@ -275,8 +277,8 @@ function DroppableStatusColumn({
 
   return (
     <div className="flex-shrink-0 flex-1 min-w-0 flex flex-col">
-      <div className={`rounded-md px-3 py-2 ${status.color} mb-3 inline-flex items-center justify-center`}>
-        <h3 className="font-semibold text-xs uppercase tracking-wide">
+      <div className={`rounded-md px-3 py-2 ${status.color} mb-3 inline-flex items-center justify-center border`}>
+        <h3 className="font-bold text-xs uppercase tracking-wide">
           {status.label} ({orders.length})
         </h3>
       </div>
@@ -320,6 +322,7 @@ function DroppableStatusColumn({
 }
 
 export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrder, restaurantTables }: OrdersKanbanProps) {
+  const { formatAmountNoDecimals } = useCurrency()
   const { call } = useFrappePostCall('dinematters.dinematters.api.order_status.update_status')
   const { call: updateTableNumber } = useFrappePostCall('dinematters.dinematters.api.order_status.update_table_number')
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
@@ -529,7 +532,7 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-xs text-muted-foreground font-medium">TO PAY</span>
                   <span className="text-base font-bold text-foreground">
-                    ₹{activeOrder.total?.toFixed(0) || 0}
+                    {formatAmountNoDecimals(activeOrder.total)}
                   </span>
                 </div>
               </div>

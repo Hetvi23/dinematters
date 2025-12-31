@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useDocTypeMeta, DocTypeField } from '@/lib/doctype'
 import { usePermissions } from '@/lib/permissions'
 import { Button } from '@/components/ui/button'
@@ -472,7 +472,6 @@ export default function DynamicForm({
           const field = meta?.fields.find(f => f.fieldname === key)
           if (value !== undefined && value !== null) {
             if (value !== '' || field?.required) {
-              // CurrencyField already sends symbol, so value is already the symbol
               docData[key] = value
             }
           }
@@ -490,7 +489,6 @@ export default function DynamicForm({
           const oldValue = docData?.[key]
           // Only update if value changed
           if (newValue !== oldValue && newValue !== undefined && newValue !== null) {
-            // CurrencyField already sends symbol, so newValue is already the symbol
             updates[key] = newValue
           }
         })
@@ -658,17 +656,17 @@ export default function DynamicForm({
       isReadOnly = true
     }
     
-    // Make base_url read-only everywhere (system field, not user-editable)
-    if (field.fieldname === 'base_url') {
-      isReadOnly = true
-    }
-    
-    // For Restaurant doctype, make IDs read-only after creation
+    // For Restaurant doctype, make IDs and base_url read-only after creation
     if (doctype === 'Restaurant' && mode === 'edit' && docname) {
-      const lockedFields = ['restaurant_id', 'slug', 'subdomain']
+      const lockedFields = ['restaurant_id', 'slug', 'subdomain', 'base_url']
       if (lockedFields.includes(field.fieldname)) {
         isReadOnly = true
       }
+    }
+    
+    // Always make base_url read-only regardless of doctype or mode
+    if (field.fieldname === 'base_url') {
+      isReadOnly = true
     }
 
     switch (field.fieldtype) {
@@ -808,17 +806,6 @@ export default function DynamicForm({
         )
 
       case 'Link':
-        // Special handling for Currency Link fields
-        if (field.options === 'Currency') {
-          return <CurrencyField
-            key={field.fieldname}
-            field={field}
-            value={value}
-            onChange={(val) => handleFieldChange(field.fieldname, val)}
-            isReadOnly={isReadOnly}
-          />
-        }
-        
         // For read-only Link fields, render as a simple text input instead of dropdown
         if (isReadOnly) {
           return <LinkFieldReadOnly
@@ -1493,112 +1480,6 @@ function LinkField({
             })
           ) : (
             <SelectItem value="" disabled>No options available</SelectItem>
-          )}
-        </SelectContent>
-      </Select>
-      {field.description && (
-        <p className="text-xs text-muted-foreground">{field.description}</p>
-      )}
-    </div>
-  )
-}
-
-// Currency Field Component - Shows currency code with symbol and sends only symbol to backend
-function CurrencyField({ 
-  field, 
-  value, 
-  onChange, 
-  isReadOnly 
-}: { 
-  field: DocTypeField
-  value: any
-  onChange: (value: string) => void
-  isReadOnly: boolean
-}) {
-  // Fetch currencies with their symbols
-  const { data: currencies, isLoading } = useFrappeGetDocList(
-    'Currency',
-    {
-      fields: ['name', 'currency_name', 'symbol'],
-      limit: 1000,
-      orderBy: { field: 'currency_name', order: 'asc' }
-    },
-    'currency-list'
-  )
-  
-  // When currency is selected, send only the symbol to backend
-  const handleCurrencyChange = (currencyCode: string) => {
-    const currency = currencies?.find((c: any) => c.name === currencyCode)
-    if (currency) {
-      // Send only the symbol to backend
-      onChange(currency.symbol || currency.name)
-    } else {
-      onChange(currencyCode)
-    }
-  }
-  
-  // Find currency by symbol (for loading existing values)
-  const currencyBySymbol = useMemo(() => {
-    if (!value || !currencies) return null
-    // First try to find by symbol
-    let found = currencies.find((c: any) => c.symbol === value)
-    // If not found, try by name
-    if (!found) {
-      found = currencies.find((c: any) => c.name === value)
-    }
-    return found
-  }, [value, currencies])
-  
-  const displayValue = currencyBySymbol ? currencyBySymbol.name : value
-  
-  if (isLoading) {
-    return (
-      <div key={field.fieldname} className="space-y-2">
-        <Label htmlFor={field.fieldname}>
-          {field.label}
-          {field.required && <span className="text-destructive">*</span>}
-        </Label>
-        <div className="flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-sm text-muted-foreground">Loading currencies...</span>
-        </div>
-      </div>
-    )
-  }
-  
-  return (
-    <div key={field.fieldname} className="space-y-2">
-      <Label htmlFor={field.fieldname}>
-        {field.label}
-        {field.required && <span className="text-destructive">*</span>}
-      </Label>
-      <Select
-        value={displayValue || ''}
-        onValueChange={handleCurrencyChange}
-        disabled={isReadOnly}
-      >
-        <SelectTrigger id={field.fieldname}>
-          <SelectValue placeholder={`Select ${field.label}`}>
-            {currencyBySymbol 
-              ? `${currencyBySymbol.currency_name || currencyBySymbol.name} - ${currencyBySymbol.symbol || currencyBySymbol.name}`
-              : value
-              ? `${value} - ${value}`
-              : `Select ${field.label}`
-            }
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {currencies && currencies.length > 0 ? (
-            currencies.map((currency: any) => {
-              const display = `${currency.currency_name || currency.name} - ${currency.symbol || currency.name}`
-              return (
-                <SelectItem key={currency.name} value={currency.name}>
-                  {display}
-                </SelectItem>
-              )
-            })
-          ) : (
-            <SelectItem value="" disabled>No currencies available</SelectItem>
           )}
         </SelectContent>
       </Select>

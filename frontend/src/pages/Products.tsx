@@ -10,11 +10,13 @@ import { useConfirm } from '@/hooks/useConfirm'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { ListFilters, FilterCondition } from '@/components/ListFilters'
 import { cn } from '@/lib/utils'
+import { useCurrency } from '@/hooks/useCurrency'
 
 type SortField = 'product_name' | 'price' | 'original_price' | 'category_name' | 'calories' | 'display_order' | 'is_active' | 'is_vegetarian' | 'product_type' | 'main_category'
 type SortOrder = 'asc' | 'desc' | null
 
 export default function Products() {
+  const { formatAmountNoDecimals } = useCurrency()
   const { confirm, ConfirmDialogComponent } = useConfirm()
   const { selectedRestaurant } = useRestaurant()
   const [searchQuery, setSearchQuery] = useState('')
@@ -303,9 +305,9 @@ export default function Products() {
                           <h3 className="font-semibold text-foreground truncate">{product.product_name || product.name}</h3>
                         </div>
                         <div className="flex items-center gap-3 mt-2">
-                          <span className="text-lg font-semibold text-foreground">₹{product.price || 0}</span>
+                          <span className="text-lg font-semibold text-foreground">{formatAmountNoDecimals(product.price)}</span>
                           {product.original_price && (
-                            <span className="text-sm text-muted-foreground line-through">₹{product.original_price}</span>
+                            <span className="text-sm text-muted-foreground line-through">{formatAmountNoDecimals(product.original_price)}</span>
                           )}
                         </div>
                       </div>
@@ -364,9 +366,9 @@ export default function Products() {
                         <TableCell className="text-sm text-muted-foreground">
                           {product.category_name || '-'}
                         </TableCell>
-                        <TableCell className="font-semibold">₹{product.price || 0}</TableCell>
+                        <TableCell className="font-semibold">{formatAmountNoDecimals(product.price)}</TableCell>
                         <TableCell className="text-sm">
-                          {product.original_price ? `₹${product.original_price}` : '-'}
+                          {product.original_price ? formatAmountNoDecimals(product.original_price) : '-'}
                         </TableCell>
                         <TableCell>
                           {product.is_vegetarian ? (

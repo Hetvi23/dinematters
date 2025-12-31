@@ -11,8 +11,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useCurrency } from '@/hooks/useCurrency'
 
 export default function OrderDetail() {
+  const { formatAmount, formatAmountNoDecimals } = useCurrency()
   const { orderId } = useParams<{ orderId: string }>()
   const { data: order, isLoading } = useFrappeGetDoc('Order', orderId || '', {
     fields: ['*']
@@ -158,29 +160,29 @@ export default function OrderDetail() {
           <CardContent className="space-y-4">
             <div className="flex justify-between">
               <p className="text-muted-foreground">Subtotal</p>
-              <p className="font-medium">₹{order.subtotal || 0}</p>
+              <p className="font-medium">{formatAmount(order.subtotal)}</p>
             </div>
             {order.discount && order.discount > 0 && (
               <div className="flex justify-between">
                 <p className="text-muted-foreground">Discount</p>
-                <p className="font-medium text-green-600">-₹{order.discount}</p>
+                <p className="font-medium text-green-600">-{formatAmount(order.discount)}</p>
               </div>
             )}
             {order.tax && order.tax > 0 && (
               <div className="flex justify-between">
                 <p className="text-muted-foreground">Tax</p>
-                <p className="font-medium">₹{order.tax}</p>
+                <p className="font-medium">{formatAmount(order.tax)}</p>
               </div>
             )}
             {order.delivery_fee && order.delivery_fee > 0 && (
               <div className="flex justify-between">
                 <p className="text-muted-foreground">Delivery Fee</p>
-                <p className="font-medium">₹{order.delivery_fee}</p>
+                <p className="font-medium">{formatAmount(order.delivery_fee)}</p>
               </div>
             )}
             <div className="flex justify-between border-t pt-4">
               <p className="font-semibold">Total</p>
-              <p className="font-bold text-lg">₹{order.total || 0}</p>
+              <p className="font-bold text-lg">{formatAmountNoDecimals(order.total)}</p>
             </div>
           </CardContent>
         </Card>
@@ -202,11 +204,11 @@ export default function OrderDetail() {
                     </p>
                     {item.unit_price && (
                       <p className="text-sm text-muted-foreground">
-                        Unit Price: ₹{item.unit_price}
+                        Unit Price: {formatAmount(item.unit_price)}
                       </p>
                     )}
                   </div>
-                  <p className="font-medium">₹{item.total_price || item.unit_price || 0}</p>
+                  <p className="font-medium">{formatAmount(item.total_price || item.unit_price)}</p>
                 </div>
               ))}
             </div>

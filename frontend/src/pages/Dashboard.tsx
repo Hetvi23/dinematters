@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
+import { useCurrency } from '@/hooks/useCurrency'
 
 export default function Dashboard() {
   const { selectedRestaurant } = useRestaurant()
+  const { formatAmount, formatAmountNoDecimals } = useCurrency()
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
   const { call: getQrCodeUrl } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.get_qr_codes_pdf_url')
   const { call: generateQrCodes } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.generate_qr_codes_pdf')
@@ -232,7 +234,7 @@ export default function Dashboard() {
               {ordersLoading ? '...' : todayOrders.length}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Revenue: ₹{todayRevenue.toFixed(2)}
+              Revenue: {formatAmount(todayRevenue)}
             </p>
           </CardContent>
         </Card>
@@ -259,7 +261,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-semibold text-foreground">
-              {ordersLoading ? '...' : `₹${totalRevenue.toFixed(2)}`}
+              {ordersLoading ? '...' : formatAmount(totalRevenue)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Total revenue from orders
@@ -330,9 +332,6 @@ export default function Dashboard() {
                 <CardTitle>Restaurants</CardTitle>
                 <CardDescription>Your restaurant locations</CardDescription>
               </div>
-              <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
-                <Link to="/Restaurant">View All</Link>
-              </Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -341,10 +340,9 @@ export default function Dashboard() {
             ) : restaurants && restaurants.length > 0 ? (
               <div className="space-y-3">
                 {restaurants.slice(0, 5).map((restaurant: any) => (
-                  <Link
+                  <div
                     key={restaurant.name}
-                    to={`/Restaurant/${restaurant.name}`}
-                    className="flex items-center justify-between p-3 rounded-md border border-border hover:bg-muted hover:border-border/80 transition-colors"
+                    className="flex items-center justify-between p-3 rounded-md border border-border"
                   >
                     <div className="flex-1">
                       <p className="font-medium text-foreground">{restaurant.restaurant_name || restaurant.name}</p>
@@ -365,7 +363,7 @@ export default function Dashboard() {
                         </span>
                       )}
                     </div>
-                  </Link>
+                  </div>
                 ))}
                 {restaurants.length > 5 && (
                   <p className="text-sm text-center text-muted-foreground pt-2">
@@ -423,7 +421,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div className="flex items-center justify-between sm:flex-col sm:items-end sm:text-right sm:ml-4 gap-2">
-                      <p className="font-medium text-foreground">₹{order.total || 0}</p>
+                      <p className="font-medium text-foreground">{formatAmountNoDecimals(order.total)}</p>
                       <div className="flex flex-col sm:block items-end sm:items-start gap-1">
                       <p className="text-sm text-muted-foreground">
                         {new Date(order.creation).toLocaleDateString()}
