@@ -201,7 +201,9 @@ def format_product(product_doc):
 		"description": product_doc.description or "",
 		"isVegetarian": bool(product_doc.is_vegetarian),
 		"calories": cint(product_doc.calories) or 0,
-		"servingSize": product_doc.serving_size or "1"
+		"servingSize": product_doc.serving_size or "1",
+		"displayOrder": cint(product_doc.display_order) or 0,
+		"isActive": bool(product_doc.is_active) if hasattr(product_doc, 'is_active') else True
 	}
 	
 	# Optional fields
