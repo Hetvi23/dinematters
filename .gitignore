@@ -12,3 +12,13 @@ dinematters/public/dinematters/assets/index-*.js
 # Build artifacts - ignore hash-based asset files
 dinematters/public/dinematters/assets/index-*.css
 dinematters/public/dinematters/assets/index-*.js
+
+# FastAPI Proxy - Environment and virtual environment
+fastapi_proxy/.env
+fastapi_proxy/venv/
+fastapi_proxy/.venv/
+fastapi_proxy/__pycache__/
+fastapi_proxy/**/__pycache__/
+*.env
+venv/
+.venv/
