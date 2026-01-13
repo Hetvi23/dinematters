@@ -20,17 +20,34 @@ from slowapi.errors import RateLimitExceeded
 import logging
 import time
 
-from .config import settings
-from .middleware.logging import setup_logging
-from .middleware.error_handler import error_handler_middleware
-from .routes import (
-	ui_routes,
-	order_routes,
-	document_routes,
-	restaurant_routes,
-	frappe_routes,
-	resource_routes
-)
+try:
+	from .config import settings
+	from .middleware.logging import setup_logging
+	from .middleware.error_handler import error_handler_middleware
+	from .routes import (
+		ui_routes,
+		order_routes,
+		document_routes,
+		restaurant_routes,
+		frappe_routes,
+		resource_routes
+	)
+except ImportError:
+	# Allow running as script for development
+	import sys
+	import os
+	sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+	from config import settings
+	from middleware.logging import setup_logging
+	from middleware.error_handler import error_handler_middleware
+	from routes import (
+		ui_routes,
+		order_routes,
+		document_routes,
+		restaurant_routes,
+		frappe_routes,
+		resource_routes
+	)
 
 # Setup logging
 setup_logging()
@@ -141,7 +158,7 @@ if __name__ == "__main__":
 	logger.info(f"ERPNext Backend: {settings.erpnext_base_url}")
 	
 	uvicorn.run(
-		"main:app",
+		app,  # Use app directly instead of string
 		host=settings.fastapi_host,
 		port=settings.fastapi_port,
 		reload=settings.fastapi_debug,
