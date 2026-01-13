@@ -4,7 +4,14 @@ import logging
 import sys
 from pythonjsonlogger import jsonlogger
 
-from ..config import settings
+try:
+	from ..config import settings
+except ImportError:
+	# Allow running as script
+	import os
+	import sys
+	sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+	from config import settings
 
 
 def setup_logging():
