@@ -229,8 +229,9 @@ has_permission = {
 
 # Request Events
 # ----------------
-# before_request = ["dinematters.utils.before_request"]
-# after_request = ["dinematters.utils.after_request"]
+# CORS Configuration for Frontend Access
+before_request = ["dinematters.dinematters.utils.cors_helpers.handle_cors_preflight"]
+after_request = ["dinematters.dinematters.utils.cors_helpers.add_cors_headers"]
 
 # Job Events
 # ----------
