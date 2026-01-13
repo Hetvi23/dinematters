@@ -20,34 +20,27 @@ from slowapi.errors import RateLimitExceeded
 import logging
 import time
 
-try:
-	from .config import settings
-	from .middleware.logging import setup_logging
-	from .middleware.error_handler import error_handler_middleware
-	from .routes import (
-		ui_routes,
-		order_routes,
-		document_routes,
-		restaurant_routes,
-		frappe_routes,
-		resource_routes
-	)
-except ImportError:
-	# Allow running as script for development
-	import sys
-	import os
-	sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-	from config import settings
-	from middleware.logging import setup_logging
-	from middleware.error_handler import error_handler_middleware
-	from routes import (
-		ui_routes,
-		order_routes,
-		document_routes,
-		restaurant_routes,
-		frappe_routes,
-		resource_routes
-	)
+# Handle imports - work as both module and script
+import sys
+import os
+
+# Add current directory to path for absolute imports
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+if _current_dir not in sys.path:
+	sys.path.insert(0, _current_dir)
+
+# Use absolute imports
+from config import settings
+from middleware.logging import setup_logging
+from middleware.error_handler import error_handler_middleware
+from routes import (
+	ui_routes,
+	order_routes,
+	document_routes,
+	restaurant_routes,
+	frappe_routes,
+	resource_routes
+)
 
 # Setup logging
 setup_logging()

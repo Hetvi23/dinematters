@@ -4,14 +4,17 @@ import logging
 import sys
 from pythonjsonlogger import jsonlogger
 
-try:
-	from ..config import settings
-except ImportError:
-	# Allow running as script
-	import os
-	import sys
-	sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-	from config import settings
+# Handle imports - work as both module and script
+import sys
+import os
+
+# Add parent directory to path for absolute imports
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+_parent_dir = os.path.dirname(_current_dir)
+if _parent_dir not in sys.path:
+	sys.path.insert(0, _parent_dir)
+
+from config import settings
 
 
 def setup_logging():
