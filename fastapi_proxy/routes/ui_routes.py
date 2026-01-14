@@ -48,8 +48,10 @@ class GetRestaurantSetupProgressRequest(BaseModel):
 
 
 # Route Implementations
+# Note: ERPNext uses dot notation in method paths
+# We need to match: dinematters.dinematters.api.ui.get_doctype_meta
 
-@router.post("/get_doctype_meta")
+@router.post("/dinematters.dinematters.api.ui.get_doctype_meta")
 async def get_doctype_meta(
 	request: GetDoctypeMetaRequest,
 	current_user: TokenData = Depends(get_current_user)
@@ -82,7 +84,39 @@ async def get_doctype_meta(
 		)
 
 
-@router.post("/get_user_permissions")
+@router.post("/dinematters.dinematters.api.ui.get_user_permissions")
+async def get_doctype_meta(
+	request: GetDoctypeMetaRequest,
+	current_user: TokenData = Depends(get_current_user)
+):
+	"""
+	Get DocType metadata
+	
+	Mirrors: dinematters.dinematters.api.ui.get_doctype_meta
+	Type: READ
+	Cache: Yes (60s)
+	"""
+	client = get_erpnext_client()
+	
+	try:
+		# Forward request to ERPNext - unchanged
+		response = await client.call_method(
+			"dinematters.dinematters.api.ui.get_doctype_meta",
+			data=request.dict(),
+			http_method="POST"
+		)
+		
+		# Return response - unchanged
+		return response
+		
+	except Exception as e:
+		logger.error(f"Error in get_doctype_meta: {str(e)}")
+		raise HTTPException(
+			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			detail=str(e)
+		)
+
+
 async def get_user_permissions(
 	request: GetUserPermissionsRequest,
 	current_user: TokenData = Depends(get_current_user)
@@ -112,7 +146,7 @@ async def get_user_permissions(
 		)
 
 
-@router.post("/get_all_doctypes")
+@router.post("/dinematters.dinematters.api.ui.get_all_doctypes")
 async def get_all_doctypes(
 	current_user: TokenData = Depends(get_current_user)
 ):
@@ -141,7 +175,7 @@ async def get_all_doctypes(
 		)
 
 
-@router.post("/get_user_restaurants")
+@router.post("/dinematters.dinematters.api.ui.get_user_restaurants")
 async def get_user_restaurants(
 	current_user: TokenData = Depends(get_current_user)
 ):
@@ -170,7 +204,7 @@ async def get_user_restaurants(
 		)
 
 
-@router.post("/get_restaurant_setup_progress")
+@router.post("/dinematters.dinematters.api.ui.get_restaurant_setup_progress")
 async def get_restaurant_setup_progress(
 	request: GetRestaurantSetupProgressRequest,
 	current_user: TokenData = Depends(get_current_user)
@@ -200,7 +234,7 @@ async def get_restaurant_setup_progress(
 		)
 
 
-@router.post("/get_setup_wizard_steps")
+@router.post("/dinematters.dinematters.api.ui.get_setup_wizard_steps")
 async def get_setup_wizard_steps(
 	current_user: TokenData = Depends(get_current_user)
 ):

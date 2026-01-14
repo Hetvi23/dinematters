@@ -122,11 +122,13 @@ async def health_check():
 
 
 # Include routers
-app.include_router(ui_routes.router, prefix="/api/method/dinematters.dinematters.api.ui", tags=["UI APIs"])
-app.include_router(order_routes.router, prefix="/api/method/dinematters.dinematters.api.order_status", tags=["Order Management"])
-app.include_router(document_routes.router, prefix="/api/method/dinematters.dinematters.api.documents", tags=["Document Management"])
-app.include_router(restaurant_routes.router, prefix="/api/method/dinematters.dinematters.doctype.restaurant.restaurant", tags=["Restaurant"])
-app.include_router(frappe_routes.router, prefix="/api/method/frappe.client", tags=["Frappe Client"])
+# ERPNext uses dot notation: /api/method/dinematters.dinematters.api.ui.get_setup_wizard_steps
+# FastAPI routes need to handle this - we'll use path parameters to capture the method name
+app.include_router(ui_routes.router, prefix="/api/method", tags=["UI APIs"])
+app.include_router(order_routes.router, prefix="/api/method", tags=["Order Management"])
+app.include_router(document_routes.router, prefix="/api/method", tags=["Document Management"])
+app.include_router(restaurant_routes.router, prefix="/api/method", tags=["Restaurant"])
+app.include_router(frappe_routes.router, prefix="/api/method", tags=["Frappe Client"])
 app.include_router(resource_routes.router, prefix="/api/resource", tags=["Resource API"])
 
 
