@@ -1,0 +1,32 @@
+# FastAPI Proxy Requirements
+
+# Core
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+gunicorn==21.2.0
+python-dotenv==1.0.0
+
+# HTTP Client
+httpx==0.26.0
+
+# Authentication & Security
+pyjwt[crypto]==2.8.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# Rate Limiting
+slowapi==0.1.9
+
+# Caching
+redis==5.0.1
+hiredis==2.3.2
+
+# Data Validation
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# CORS is built into FastAPI - no separate package needed
+
+# Logging
+python-json-logger==2.0.7
+
