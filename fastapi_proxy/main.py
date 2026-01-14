@@ -123,13 +123,28 @@ async def health_check():
 
 # Include routers
 # ERPNext uses dot notation: /api/method/dinematters.dinematters.api.ui.get_setup_wizard_steps
-# FastAPI routes need to handle this - we'll use path parameters to capture the method name
+# Routes are defined with full method paths, prefix is just /api/method
 app.include_router(ui_routes.router, prefix="/api/method", tags=["UI APIs"])
 app.include_router(order_routes.router, prefix="/api/method", tags=["Order Management"])
 app.include_router(document_routes.router, prefix="/api/method", tags=["Document Management"])
 app.include_router(restaurant_routes.router, prefix="/api/method", tags=["Restaurant"])
 app.include_router(frappe_routes.router, prefix="/api/method", tags=["Frappe Client"])
 app.include_router(resource_routes.router, prefix="/api/resource", tags=["Resource API"])
+
+
+# Debug: Catch-all route to see what paths are being requested
+# This must be AFTER all other routes to catch unmatched paths
+@app.api_route("/api/method/{path:path}", methods=["GET", "POST", "PUT", "DELETE"], include_in_schema=False)
+async def catch_all_method(path: str, request: Request):
+	"""Catch-all for /api/method/* to debug routing"""
+	logger.warning(f"Catch-all route hit: /api/method/{path}")
+	return {
+		"debug": True,
+		"path": path,
+		"full_path": f"/api/method/{path}",
+		"method": request.method,
+		"message": "Route not found - this is a catch-all debug route"
+	}
 
 
 # Root endpoint
