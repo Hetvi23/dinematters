@@ -205,8 +205,7 @@ async def get_restaurant_setup_progress(
 
 @router.post("/dinematters.dinematters.api.ui.get_setup_wizard_steps")
 async def get_setup_wizard_steps(
-	# Temporarily disable auth for testing
-	# current_user: TokenData = Depends(get_current_user)
+	current_user: TokenData = Depends(get_current_user)
 ):
 	"""
 	Get setup wizard steps configuration
