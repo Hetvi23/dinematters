@@ -134,17 +134,21 @@ app.include_router(resource_routes.router, prefix="/api/resource", tags=["Resour
 
 # Debug: Catch-all route to see what paths are being requested
 # This must be AFTER all other routes to catch unmatched paths
+# Using {path:path} to capture the full method name including dots
 @app.api_route("/api/method/{path:path}", methods=["GET", "POST", "PUT", "DELETE"], include_in_schema=False)
 async def catch_all_method(path: str, request: Request):
-	"""Catch-all for /api/method/* to debug routing"""
+	"""Catch-all for /api/method/* to debug routing - shows what path was received"""
 	logger.warning(f"Catch-all route hit: /api/method/{path}")
-	return {
-		"debug": True,
-		"path": path,
-		"full_path": f"/api/method/{path}",
-		"method": request.method,
-		"message": "Route not found - this is a catch-all debug route"
-	}
+	return JSONResponse(
+		status_code=404,
+		content={
+			"debug": True,
+			"path": path,
+			"full_path": f"/api/method/{path}",
+			"method": request.method,
+			"message": "Route not found - this is a catch-all debug route. Check if route is registered."
+		}
+	)
 
 
 # Root endpoint

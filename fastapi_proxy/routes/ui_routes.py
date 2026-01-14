@@ -49,9 +49,10 @@ class GetRestaurantSetupProgressRequest(BaseModel):
 
 # Route Implementations
 # Note: ERPNext uses dot notation in method paths
-# We need to match: dinematters.dinematters.api.ui.get_doctype_meta
+# FastAPI doesn't match dots well, so we use a catch-all and dispatch by method name
+# The router prefix is /api/method, so routes are relative to that
 
-@router.post("/dinematters.dinematters.api.ui.get_doctype_meta")
+@router.post("/dinematters.dinematters.api.ui.get_doctype_meta", include_in_schema=True)
 async def get_doctype_meta(
 	request: GetDoctypeMetaRequest,
 	current_user: TokenData = Depends(get_current_user)
