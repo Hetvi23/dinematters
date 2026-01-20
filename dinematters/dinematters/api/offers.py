@@ -22,28 +22,34 @@ def get_offers(restaurant_id, featured=None, category=None, active_only=True):
 		# Validate restaurant
 		restaurant = validate_restaurant_for_api(restaurant_id)
 		
-		# Build filters
-		filters = {"restaurant": restaurant}
-		
-		if active_only:
-			filters["is_active"] = 1
-			# Check validity dates if set
-			today_date = today()
-			# Only filter if dates are set
-			date_filters = []
+		# Build filters (Frappe get_all: dict for simple eq, or list-of-lists for conditions)
+		today_date = today()
+		date_filters = []
+		if active_only and frappe.db.exists("Offer", {"restaurant": restaurant}):
 			if frappe.db.exists("Offer", {"restaurant": restaurant, "valid_from": ["is", "set"]}):
 				date_filters.append(["valid_from", "<=", today_date])
 			if frappe.db.exists("Offer", {"restaurant": restaurant, "valid_to": ["is", "set"]}):
 				date_filters.append(["valid_to", ">=", today_date])
-			if date_filters:
-				filters.extend(date_filters)
-		
-		if featured is not None:
-			filters["featured"] = 1 if featured else 0
-		
-		if category:
-			filters["category"] = category
-		
+
+		if date_filters:
+			# Use list-of-lists so we can add date conditions (dict has no .extend())
+			filters = [["restaurant", "=", restaurant]]
+			if active_only:
+				filters.append(["is_active", "=", 1])
+			filters.extend(date_filters)
+			if featured is not None:
+				filters.append(["featured", "=", 1 if featured else 0])
+			if category:
+				filters.append(["category", "=", category])
+		else:
+			filters = {"restaurant": restaurant}
+			if active_only:
+				filters["is_active"] = 1
+			if featured is not None:
+				filters["featured"] = 1 if featured else 0
+			if category:
+				filters["category"] = category
+
 		# Get offers
 		offers = frappe.get_all(
 			"Offer",
