@@ -77,7 +77,7 @@ export default function SetupWizard() {
   const navigate = useNavigate()
   const { stepId: urlStepId } = useParams<{ stepId?: string }>()
   const location = useLocation()
-  const { selectedRestaurant, setSelectedRestaurant } = useRestaurant()
+  const { selectedRestaurant, setSelectedRestaurant, restaurantConfig } = useRestaurant()
   
   // Get user's restaurants
   const { data: restaurantsData, isLoading: restaurantsLoading } = useFrappeGetCall<{ message: { restaurants: Restaurant[] } }>(
@@ -457,6 +457,38 @@ export default function SetupWizard() {
 
     loadStepData()
   }, [selectedRestaurant, progress, steps, getDocList, getDoc])
+
+  // Keep track of Restaurant Config docname explicitly so we can force edit mode when config exists
+  const [configDocName, setConfigDocName] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    if (!selectedRestaurant) {
+      setConfigDocName(undefined)
+      return
+    }
+    let mounted = true
+    const fetchConfigDoc = async () => {
+      try {
+        const result: any = await getDocList({
+          doctype: 'Restaurant Config',
+          filters: JSON.stringify({ restaurant: selectedRestaurant }),
+          fields: JSON.stringify(['name']),
+          limit_page_length: 1,
+          order_by: 'modified desc'
+        })
+        if (!mounted) return
+        if (result?.message && Array.isArray(result.message) && result.message.length > 0) {
+          setConfigDocName(result.message[0].name)
+        } else {
+          setConfigDocName(undefined)
+        }
+      } catch (e) {
+        if (!mounted) return
+        setConfigDocName(undefined)
+      }
+    }
+    void fetchConfigDoc()
+    return () => { mounted = false }
+  }, [selectedRestaurant, getDocList])
 
   // Load data for current step when URL changes or step changes
   // This ensures data is fetched immediately when navigating via URL
@@ -1053,6 +1085,79 @@ export default function SetupWizard() {
             {/* Default - Use DynamicForm for other steps */}
             {currentStepData && !['users', 'categories', 'products'].includes(currentStepData.id) && (
               <div className="bg-muted/30 rounded-md p-6 border">
+                {/* Admin Preview: show hero video and feature cards immediately for config step */}
+                {currentStepData.id === 'config' && restaurantConfig && (
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div />
+                      <div className="space-x-2">
+                        <a
+                          className="inline-flex items-center px-3 py-1.5 rounded bg-primary text-white text-sm"
+                          href={`/app/home-feature?filters=${encodeURIComponent(JSON.stringify([["Home Feature","restaurant","=", selectedRestaurant || finalRestaurantId]]))}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Edit Features
+                        </a>
+                      </div>
+                    </div>
+                    {/* Hero video preview */}
+                    {restaurantConfig?.branding?.heroVideo ? (
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium mb-2">Hero Preview</label>
+                        <div className="rounded overflow-hidden border">
+                          <video
+                            src={restaurantConfig.branding.heroVideo}
+                            controls
+                            muted
+                            loop
+                            className="w-full h-auto max-h-64 object-cover bg-black"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mb-4 text-sm text-muted-foreground">No hero video uploaded yet.</div>
+                    )}
+
+                    {/* Feature cards preview */}
+                    {Array.isArray(restaurantConfig?.homeFeatures) && restaurantConfig.homeFeatures.length > 0 ? (
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Feature Cards Preview</label>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {restaurantConfig.homeFeatures.map((f: any) => (
+                            <div key={f.id} className="p-2 bg-card rounded-md shadow-sm text-center relative">
+                              {f.imageSrc ? (
+                                <img
+                                  src={f.imageSrc}
+                                  alt={f.imageAlt || f.title}
+                                  className="h-28 w-full object-cover rounded-md mb-2"
+                                />
+                              ) : (
+                                <div className="h-28 w-full bg-muted rounded-md mb-2 flex items-center justify-center text-xs text-muted-foreground">No image</div>
+                              )}
+                              {/* Edit button for this feature */}
+                              {f.name && (
+                                <a
+                                  href={`/app/home-feature/${encodeURIComponent(f.name)}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="absolute top-2 right-2 bg-white/90 text-xs px-2 py-1 rounded shadow"
+                                >
+                                  Edit
+                                </a>
+                              )}
+                              <div className="font-semibold text-sm">{f.title}</div>
+                              {f.subtitle && <div className="text-xs text-muted-foreground">{f.subtitle}</div>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">No feature cards configured yet.</div>
+                    )}
+                  </div>
+                )}
+
                 <DynamicForm
                   key={`${currentStepData.id}-${selectedRestaurant || 'no-restaurant'}-${currentStep}-${urlStepId || ''}`}
                   onChange={setFormHasChanges}
@@ -1077,23 +1182,14 @@ export default function SetupWizard() {
                     if (currentStepData.id === 'restaurant' && selectedRestaurant) {
                       return selectedRestaurant
                     }
-                    // For config, use restaurant as docname (autoname: field:restaurant)
-                    // Use progress to determine if config exists, then use restaurant name directly
+                    // For config, prefer explicit config docname if found; else fallback to progress + restaurant
                     if (currentStepData.id === 'config') {
-                      // If progress indicates config exists, use restaurant name as docname
-                      // This ensures DynamicForm can fetch immediately without waiting for stepData
-                      if (progress?.config && selectedRestaurant) {
-                        const docname = selectedRestaurant || finalRestaurantId || undefined
-                        console.log('[SetupWizard] Config step docname (from progress):', {
-                          selectedRestaurant,
-                          finalRestaurantId,
-                          docname,
-                          progress: progress?.config,
-                          hasStepData: !!savedData
-                        })
-                        return docname
+                      if (configDocName) {
+                        return configDocName
                       }
-                      // If no progress yet, return undefined (create mode)
+                      if (progress?.config && selectedRestaurant) {
+                        return selectedRestaurant
+                      }
                       return undefined
                     }
                     // For other steps, check progress first, then use stepData
@@ -1106,13 +1202,9 @@ export default function SetupWizard() {
                         return savedData.name
                       }
                       // If stepData not loaded yet, trigger loading and return undefined
-                      // The loading effect will update stepData, which will update docname
-                      // DynamicForm will then fetch data when docname becomes available
                       if (!loadingStepData[currentStepData.id] && !savedData) {
-                        // Trigger loading by checking if we need to load
                         console.log(`[SetupWizard] Step ${currentStepData.id} - progress exists, will load stepData`)
                       }
-                      // Return undefined while loading - DynamicForm will wait
                       return undefined
                     }
                     // No progress, return undefined (create mode)
@@ -1123,12 +1215,13 @@ export default function SetupWizard() {
                     if (currentStepData.id === 'restaurant' && selectedRestaurant && restaurantData) {
                       return 'edit'
                     }
-                    // If config exists, use edit mode
+                    // If config exists, use edit mode (prefer explicit configDocName)
                     if (currentStepData.id === 'config') {
-                      const isEdit = !!(progress?.config && selectedRestaurant)
+                      const isEdit = !!(configDocName || (progress?.config && selectedRestaurant))
                       console.log('[SetupWizard] Config step mode:', {
                         'progress?.config': progress?.config,
                         selectedRestaurant,
+                        configDocName,
                         isEdit,
                         mode: isEdit ? 'edit' : 'create'
                       })

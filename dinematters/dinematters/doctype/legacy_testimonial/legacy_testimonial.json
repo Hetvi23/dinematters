@@ -7,17 +7,17 @@
  "engine": "InnoDB",
  "istable": 1,
  "field_order": [
-  "name",
-  "location",
-  "rating",
-  "text",
-  "dish_images",
-  "avatar",
-  "display_order"
+ "customer_name",
+ "location",
+ "rating",
+ "text",
+ "dish_images",
+ "avatar",
+ "display_order"
  ],
  "fields": [
   {
-   "fieldname": "name",
+   "fieldname": "customer_name",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Name",

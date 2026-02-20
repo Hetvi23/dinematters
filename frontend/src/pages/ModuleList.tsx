@@ -33,13 +33,17 @@ export default function ModuleList() {
   // Determine if this doctype should be filtered by restaurant
   const shouldFilterByRestaurant = doctype && restaurantBasedDoctypes.includes(doctype)
   
-  // Build filters
+  // Build filters (use array form expected by the API helper)
   const filters = shouldFilterByRestaurant && selectedRestaurant
-    ? { restaurant: selectedRestaurant }
+    ? ([['restaurant', '=', selectedRestaurant]] as any)
     : undefined
 
+  const requestedFields = doctype === 'Home Feature'
+    ? ['name', 'feature_id', 'title', 'subtitle', 'image_src', 'creation', 'modified']
+    : ['name', 'creation', 'modified']
+
   const { data: docs, isLoading } = useFrappeGetDocList(doctype || '', {
-    fields: ['name', 'creation', 'modified'],
+    fields: requestedFields,
     filters,
     limit: 100,
     orderBy: { field: 'modified', order: 'desc' }
@@ -121,54 +125,103 @@ export default function ModuleList() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Modified</TableHead>
-                  <TableHead>Actions</TableHead>
+                  {doctype === 'Home Feature' ? (
+                    <>
+                      <TableHead>Feature ID</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Subtitle</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Modified</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </>
+                  ) : (
+                    <>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Modified</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {docs.map((doc: any) => (
                   <TableRow key={doc.name}>
-                    <TableCell className="font-medium">
-                      {doc[titleField] || doc.name}
-                    </TableCell>
-                    <TableCell>
-                      {doc.creation ? new Date(doc.creation).toLocaleDateString() : 'N/A'}
-                    </TableCell>
-                    <TableCell>
-                      {doc.modified ? new Date(doc.modified).toLocaleDateString() : 'N/A'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Link to={`/${doctype}/${doc.name}`}>
-                          <Button variant="ghost" size="sm">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                        {permissions.write && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedDoc(doc.name)
-                              setShowEditDialog(true)
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {permissions.delete && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(doc.name)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
+                    {doctype === 'Home Feature' ? (
+                      <>
+                        <TableCell className="font-medium">{doc.feature_id || doc.name}</TableCell>
+                        <TableCell className="font-medium">{doc.title || '—'}</TableCell>
+                        <TableCell>{doc.subtitle || '—'}</TableCell>
+                        <TableCell>{doc.creation ? new Date(doc.creation).toLocaleDateString() : 'N/A'}</TableCell>
+                        <TableCell>{doc.modified ? new Date(doc.modified).toLocaleDateString() : 'N/A'}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Link to={`/${doctype}/${doc.name}`}>
+                              <Button variant="ghost" size="sm">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                            {permissions.write && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedDoc(doc.name)
+                                  setShowEditDialog(true)
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {permissions.delete && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete(doc.name)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </>
+                    ) : (
+                      <>
+                        <TableCell className="font-medium">{doc[titleField] || doc.name}</TableCell>
+                        <TableCell>{doc.creation ? new Date(doc.creation).toLocaleDateString() : 'N/A'}</TableCell>
+                        <TableCell>{doc.modified ? new Date(doc.modified).toLocaleDateString() : 'N/A'}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Link to={`/${doctype}/${doc.name}`}>
+                              <Button variant="ghost" size="sm">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                            {permissions.write && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedDoc(doc.name)
+                                  setShowEditDialog(true)
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {permissions.delete && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete(doc.name)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -193,7 +246,7 @@ export default function ModuleList() {
               initialData={shouldFilterByRestaurant && selectedRestaurant
                 ? { restaurant: selectedRestaurant }
                 : {}}
-              onSave={(data) => {
+              onSave={() => {
                 setShowCreateDialog(false)
                 setRefreshKey(prev => prev + 1)
                 toast.success(`${doctype} created successfully`)
@@ -214,7 +267,11 @@ export default function ModuleList() {
               doctype={doctype}
               docname={selectedDoc}
               mode="edit"
-              onSave={(data) => {
+              initialData={shouldFilterByRestaurant && selectedRestaurant
+                ? { restaurant: selectedRestaurant }
+                : {}}
+              readOnlyFields={shouldFilterByRestaurant ? ['restaurant'] : []}
+              onSave={() => {
                 setShowEditDialog(false)
                 setSelectedDoc(null)
                 setRefreshKey(prev => prev + 1)
@@ -228,6 +285,7 @@ export default function ModuleList() {
           </DialogContent>
         </Dialog>
       )}
+      {ConfirmDialogComponent}
     </div>
   )
 }

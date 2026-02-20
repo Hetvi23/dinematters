@@ -13,6 +13,8 @@ interface RestaurantContextType {
   restaurants: Restaurant[]
   isLoading: boolean
   setRestaurantsData: (data: Restaurant[]) => void
+  restaurantConfig?: any | null
+  setRestaurantConfig?: (cfg: any | null) => void
 }
 
 const RestaurantContext = createContext<RestaurantContextType | undefined>(undefined)
@@ -32,6 +34,7 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
   })
   const [restaurants, setRestaurants] = useState<Restaurant[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [restaurantConfig, setRestaurantConfig] = useState<any | null>(null)
 
   // Load restaurants (this will be set by Layout component)
   const setRestaurantsData = (data: Restaurant[]) => {
@@ -71,6 +74,34 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Fetch restaurant config (branding, features) when selectedRestaurant changes
+  useEffect(() => {
+    const fetchConfig = async () => {
+      if (!selectedRestaurant) {
+        setRestaurantConfig(null)
+        return
+      }
+      try {
+        const resp = await fetch(`/api/method/dinematters.dinematters.api.config.get_restaurant_config?restaurant_id=${encodeURIComponent(selectedRestaurant)}`)
+        const json = await resp.json()
+        // Frappe wraps returned value in message sometimes; handle both shapes
+        const payload = json?.message ?? json
+        if (payload?.success) {
+          setRestaurantConfig(payload.data || null)
+        } else if (payload?.data) {
+          setRestaurantConfig(payload.data)
+        } else {
+          setRestaurantConfig(null)
+        }
+      } catch (e) {
+        console.error('Failed to fetch restaurant config:', e)
+        setRestaurantConfig(null)
+      }
+    }
+
+    fetchConfig()
+  }, [selectedRestaurant])
+
   // Sync with localStorage changes (e.g., from Layout component)
   useEffect(() => {
     const handleStorageChange = () => {
@@ -101,7 +132,9 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
         setSelectedRestaurant,
         restaurants,
         isLoading,
-        setRestaurantsData
+        setRestaurantsData,
+        restaurantConfig,
+        setRestaurantConfig
       }}
     >
       {children}

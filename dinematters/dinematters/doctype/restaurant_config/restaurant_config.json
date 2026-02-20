@@ -103,8 +103,9 @@
   },
   {
    "fieldname": "hero_video",
-   "fieldtype": "Data",
-   "label": "Hero Video URL"
+   "fieldtype": "Attach",
+   "label": "Hero Video",
+   "description": "Upload a hero video file (mp4/webm) or attach a URL"
   },
   {
    "fieldname": "apple_touch_icon",
@@ -212,15 +213,17 @@
    "fieldname": "google_review_link",
    "fieldtype": "Data",
    "label": "Google Review Link",
-   "options": "URL",
-   "description": "Link to redirect to Google review page"
+    "options": "URL",
+    "description": "Link to redirect to Google review page",
+    "length": 1000
   },
   {
    "fieldname": "instagram_profile_link",
    "fieldtype": "Data",
    "label": "Instagram Profile Link",
-   "options": "URL",
-   "description": "Link to Instagram profile"
+    "options": "URL",
+    "description": "Link to Instagram profile",
+    "length": 1000
   },
   {
    "fieldname": "column_break_social_media",
@@ -230,8 +233,9 @@
    "fieldname": "facebook_profile_link",
    "fieldtype": "Data",
    "label": "Facebook Profile Link",
-   "options": "URL",
-   "description": "Link to Facebook profile"
+    "options": "URL",
+    "description": "Link to Facebook profile",
+    "length": 1000
   },
   {
    "fieldname": "whatsapp_phone_number",

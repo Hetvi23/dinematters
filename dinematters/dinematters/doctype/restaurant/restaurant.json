@@ -36,7 +36,8 @@
   "tables",
   "qr_codes_pdf_url",
   "section_break_branding",
-  "logo",
+   "logo",
+  "hero_video",
   "section_break_metadata",
   "description",
   "column_break_google_map",
@@ -222,6 +223,11 @@
    "fieldname": "logo",
    "fieldtype": "Attach Image",
    "label": "Logo"
+  },
+  {
+   "fieldname": "hero_video",
+   "fieldtype": "Attach",
+   "label": "Hero Video"
   },
   {
    "fieldname": "section_break_metadata",

@@ -91,22 +91,29 @@ def get_restaurant_config(restaurant_id):
 		apple_touch_icon = config.get("apple_touch_icon")
 		if apple_touch_icon and apple_touch_icon.startswith("/files/"):
 			apple_touch_icon = get_url(apple_touch_icon)
+
+		# Normalize hero video URL (if stored as a /files/ path, convert to absolute URL)
+		hero_video = config.get("hero_video", "")
+		if hero_video and isinstance(hero_video, str) and hero_video.startswith("/files/"):
+			hero_video = get_url(hero_video)
 		
 		# Get currency info with symbol
 		currency_info = get_restaurant_currency_info(restaurant)
 		
+		# Include restaurant basic info and location (google map URL from restaurant context)
 		response_data = {
 			"restaurant": {
 				"name": config.get("restaurant_name", ""),
 				"tagline": config.get("tagline", ""),
 				"subtitle": config.get("subtitle", ""),
-				"description": config.get("description", "")
+				"description": config.get("description", ""),
+				"googleMapUrl": (restaurant_context.get("google_map_url") if restaurant_context else "") or ""
 			},
 			"branding": {
 				"primaryColor": config.get("primary_color", "#DB782F"),
 				"defaultTheme": config.get("default_theme", "light"),
 				"logo": logo,
-				"heroVideo": config.get("hero_video", ""),
+				"heroVideo": hero_video or config.get("hero_video", ""),
 				"appleTouchIcon": apple_touch_icon,
 				"colorPalette": color_palette if color_palette else {
 					"violet": "#A992B2",
@@ -136,9 +143,20 @@ def get_restaurant_config(restaurant_id):
 				"instagramProfileLink": config.get("instagram_profile_link", ""),
 				"facebookProfileLink": config.get("facebook_profile_link", ""),
 				"whatsappPhoneNumber": config.get("whatsapp_phone_number", "")
-			}
+			},
+			# placeholder for feature cards (will be populated below)
+			"homeFeatures": []
 		}
-		
+
+		# Try to include Home Feature images (menu, book-table, legacy, offers-events, dine-play)
+		try:
+			features_resp = get_home_features(restaurant_id)
+			if isinstance(features_resp, dict) and features_resp.get("success"):
+				response_data["homeFeatures"] = features_resp.get("data", {}).get("features", [])
+		except Exception:
+			# Non-fatal: if fetching features fails, continue without them
+			pass
+
 		return {
 			"success": True,
 			"data": response_data
@@ -168,6 +186,7 @@ def get_home_features(restaurant_id):
 		features = frappe.get_all(
 			"Home Feature",
 			fields=[
+				"name",
 				"feature_id as id",
 				"title",
 				"subtitle",
@@ -232,6 +251,7 @@ def get_home_features(restaurant_id):
 				image_src = get_url(image_src)
 			
 			formatted_features.append({
+				"name": feature.get("name"),
 				"id": feature["id"],
 				"title": feature["title"],
 				"subtitle": feature.get("subtitle", ""),

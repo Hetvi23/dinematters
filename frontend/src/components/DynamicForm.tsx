@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { ColorPaletteSelector } from '@/components/ui/color-palette-selector'
 import { DatePicker } from '@/components/ui/date-picker'
 import { useFrappeGetDoc, useFrappePostCall, useFrappeGetDocList } from '@/lib/frappe'
+import { useRestaurant } from '@/contexts/RestaurantContext'
 import { toast } from 'sonner'
 import { Loader2, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -204,11 +205,14 @@ export default function DynamicForm({
         }
       })
       
-      // Also ensure restaurant field is always set from initialData if provided (even if not in readOnlyFields yet)
-      if (initialData.restaurant !== undefined && initialData.restaurant !== null && initialData.restaurant !== '') {
-        mergedData.restaurant = initialData.restaurant
-      } else if (initialDataRef.current.restaurant !== undefined && initialDataRef.current.restaurant !== null && initialDataRef.current.restaurant !== '') {
-        mergedData.restaurant = initialDataRef.current.restaurant
+      // Special handling for restaurant field to avoid currency codes from being stored
+      const restaurantFromInitial = initialData.restaurant || initialDataRef.current.restaurant
+      if (restaurantFromInitial && typeof restaurantFromInitial === 'string') {
+        // Skip if it looks like a currency code (3 uppercase letters)
+        const looksLikeCurrency = /^[A-Z]{3}$/.test(restaurantFromInitial)
+        if (!looksLikeCurrency) {
+          mergedData.restaurant = restaurantFromInitial
+        }
       }
       
       console.log(`[DynamicForm] ${doctype} - Setting formData with mergedData:`, {
@@ -279,9 +283,15 @@ export default function DynamicForm({
           const updated = { ...prev }
           let hasChanges = false
           readOnlyFields.forEach(fieldname => {
-            if (initialData[fieldname] !== undefined && initialData[fieldname] !== null && initialData[fieldname] !== '') {
+            const value = initialData[fieldname]
+            if (value !== undefined && value !== null && value !== '') {
+              // Special handling for restaurant field to avoid currency codes
+              if (fieldname === 'restaurant' && typeof value === 'string' && /^[A-Z]{3}$/.test(value)) {
+                // Skip currency codes like USD, INR, etc.
+                return
+              }
               // Always update read-only fields from initialData (like restaurant from context)
-              updated[fieldname] = initialData[fieldname]
+              updated[fieldname] = value
               hasChanges = true
             }
           })
@@ -672,6 +682,11 @@ export default function DynamicForm({
     
     // Always make base_url read-only regardless of doctype or mode
     if (field.fieldname === 'base_url') {
+      isReadOnly = true
+    }
+
+    // Always make the Restaurant Link field read-only in forms (we manage restaurant change via the header dropdown only)
+    if (field.fieldtype === 'Link' && field.options === 'Restaurant') {
       isReadOnly = true
     }
 
@@ -1362,13 +1377,51 @@ function LinkFieldReadOnly({
   const { data: linkedRecord } = useFrappeGetDoc(linkedDoctype, value || '', {
     enabled: !!value && !!linkedDoctype
   })
+  // Use selected restaurant from context as a more reliable fallback
+  const { selectedRestaurant } = useRestaurant()
+  const selectedRestaurantKey = selectedRestaurant || (typeof window !== 'undefined' && localStorage.getItem('dinematters-selected-restaurant')) || ''
+  const { data: selectedRestaurantDoc } = useFrappeGetDoc('Restaurant', selectedRestaurantKey || '', {
+    enabled: !!selectedRestaurantKey && linkedDoctype === 'Restaurant'
+  })
   
   const getDisplayValue = () => {
-    if (!linkedRecord) return value || ''
-    if (linkedDoctype === 'Restaurant' && linkedRecord.restaurant_name) {
-      return linkedRecord.restaurant_name
+    // If we have a valid linked record with a friendly name, use it
+    if (linkedRecord) {
+      if (linkedDoctype === 'Restaurant' && linkedRecord.restaurant_name) {
+        return linkedRecord.restaurant_name
+      }
+      return linkedRecord.name || value || ''
     }
-    return linkedRecord.name || value || ''
+
+    // If linkedRecord not found or doesn't match value, but selectedRestaurantDoc is available,
+    // prefer showing the selected restaurant's friendly name. This avoids showing raw values
+    // like currency codes (e.g., "INR", "USD") which can appear when initialData contains a label.
+    if (linkedDoctype === 'Restaurant' && selectedRestaurantDoc) {
+      return selectedRestaurantDoc.restaurant_name || selectedRestaurantDoc.name || value || ''
+    }
+
+    return value || ''
+  }
+  // If linkedRecord wasn't found, but we have a selectedRestaurantDoc, show its restaurant_name (render below)
+  if (!linkedRecord && selectedRestaurantDoc && linkedDoctype === 'Restaurant') {
+    const displayFromSelected = selectedRestaurantDoc.restaurant_name || selectedRestaurantDoc.name
+    return (
+      <div className="space-y-2">
+        <Label htmlFor={field.fieldname}>
+          {field.label}
+          {field.required && <span className="text-destructive">*</span>}
+        </Label>
+        <Input
+          id={field.fieldname}
+          value={displayFromSelected}
+          readOnly={true}
+          className="bg-muted cursor-not-allowed"
+        />
+        {field.description && (
+          <p className="text-xs text-muted-foreground">{field.description}</p>
+        )}
+      </div>
+    )
   }
   
   return (
@@ -1379,7 +1432,16 @@ function LinkFieldReadOnly({
       </Label>
       <Input
         id={field.fieldname}
-        value={getDisplayValue()}
+        value={(function() {
+          const raw = getDisplayValue()
+          const looksLikeCurrency = typeof raw === 'string' && /^[A-Z]{3}$/.test(raw)
+          if (linkedDoctype === 'Restaurant' && looksLikeCurrency) {
+            // Prefer selected restaurant friendly name if available, otherwise show loading placeholder
+            if (selectedRestaurantDoc) return selectedRestaurantDoc.restaurant_name || selectedRestaurantDoc.name || ''
+            return 'Loading...'
+          }
+          return raw
+        })()}
         readOnly={true}
         className="bg-muted cursor-not-allowed"
       />

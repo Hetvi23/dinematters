@@ -8,6 +8,7 @@ import { ArrowLeft, Edit, Trash2, QrCode, Download, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { useConfirm } from '@/hooks/useConfirm'
+import { useRestaurant } from '@/contexts/RestaurantContext'
 
 export default function ModuleDetail() {
   const { confirm, ConfirmDialogComponent } = useConfirm()
@@ -18,6 +19,7 @@ export default function ModuleDetail() {
   const [mode, setMode] = useState<'view' | 'edit'>('view')
   const { call: deleteDoc } = useFrappePostCall('frappe.client.delete')
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
+  const { selectedRestaurant } = useRestaurant()
   const { call: getQrCodeUrl } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.get_qr_codes_pdf_url')
   const { call: generateQrCodes } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.generate_qr_codes_pdf')
 
@@ -176,6 +178,8 @@ export default function ModuleDetail() {
         doctype={doctype || ''}
         docname={docname}
         mode={mode}
+        initialData={selectedRestaurant ? { restaurant: selectedRestaurant } : {}}
+        readOnlyFields={['restaurant']}
         onSave={(data) => {
           setMode('view')
           toast.success(`${doctype} updated successfully`)

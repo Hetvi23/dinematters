@@ -21,6 +21,7 @@ import CategoryDetail from './pages/CategoryDetail'
 import CategoryEdit from './pages/CategoryEdit'
 import CategoryNew from './pages/CategoryNew'
 import QRCodes from './pages/QRCodes'
+import HomeFeaturesManager from './pages/HomeFeaturesManager'
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -35,6 +36,9 @@ function AppContent() {
 						<Route path="/setup" element={<SetupWizard />} />
 						<Route path="/setup/:stepId" element={<SetupWizard />} />
 						<Route path="/modules" element={<Modules />} />
+						{/* Redirect Home Feature to dedicated page */}
+						<Route path="/Home Feature" element={<Navigate to="/home-features" replace />} />
+						<Route path="/Home%20Feature" element={<Navigate to="/home-features" replace />} />
 						<Route path="/:doctype" element={<ModuleList />} />
 						<Route path="/:doctype/:docname" element={<ModuleDetail />} />
 					{/* Legacy routes for backward compatibility */}
@@ -50,6 +54,7 @@ function AppContent() {
 						<Route path="/categories/:categoryId/edit" element={<CategoryEdit />} />
 						<Route path="/categories/:categoryId" element={<CategoryDetail />} />
 						<Route path="/qr-codes" element={<QRCodes />} />
+						<Route path="/home-features" element={<HomeFeaturesManager />} />
 					</Routes>
 				</Layout>
 			</BrowserRouter>

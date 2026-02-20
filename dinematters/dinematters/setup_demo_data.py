@@ -26,7 +26,19 @@ def create_demo_data():
 
 	print("🚀 Creating demo data for Dinematters...")
 
-	restaurant = create_restaurant()
+	# Use an existing restaurant if available. Do NOT create a new restaurant.
+	restaurant = None
+	try:
+		existing = frappe.get_all("Restaurant", fields=["name"], limit_page_length=1, order_by="creation asc")
+		if existing and len(existing) > 0:
+			restaurant = existing[0].name
+			print(f"ℹ️  Using existing Restaurant: {restaurant}")
+		else:
+			print("⚠️  No existing Restaurant found. Demo data will not be created. Please create a Restaurant first.")
+			return {}
+	except Exception as e:
+		print(f"❌ Error finding existing Restaurant: {str(e)}")
+		return {}
 	categories = create_categories(restaurant)
 	products = create_products(restaurant, categories)
 	offers = create_offers(restaurant)
@@ -94,6 +106,55 @@ def create_restaurant():
 	)
 	doc.insert(ignore_permissions=True)
 	print(f"✅ Created Restaurant: {doc.name}")
+	# Create default Restaurant Config for this restaurant if it doesn't exist
+	try:
+		if not frappe.db.exists("Restaurant Config", {"restaurant": doc.name}):
+			rc = frappe.get_doc({
+				"doctype": "Restaurant Config",
+				"restaurant": doc.name,
+				"restaurant_name": doc.restaurant_name,
+				"primary_color": "#DB782F",
+				"default_theme": "light",
+				"logo": doc.logo or "",
+				"hero_video": "/assets/dinematters/demo/hero-demo.mp4" if frappe.db.exists("File", {"file_name": "hero-demo.mp4"}) else "",
+				"currency": doc.currency or "USD",
+			})
+			rc.insert(ignore_permissions=True)
+			print(f"✅ Created default Restaurant Config for {doc.name}")
+	except Exception as e:
+		print(f"❌ Error creating Restaurant Config: {str(e)}")
+		frappe.log_error(f"Error creating Restaurant Config for demo restaurant: {str(e)}")
+
+	# Ensure default Home Feature entries exist for this restaurant
+	try:
+		default_features = [
+			{"id": "menu", "title": "Explore our Menu", "subtitle": "Food, Taste, Love", "image_src": "/files/explore.svg", "route": "/main-menu", "size": "large", "is_mandatory": 1},
+			{"id": "book-table", "title": "Book your Tables", "subtitle": "& banquets", "image_src": "/files/book-table.svg", "route": "/book-table", "size": "small", "is_mandatory": 1},
+			{"id": "legacy", "title": "The Place", "subtitle": "& it's legacy", "image_src": "/files/legacy.svg", "route": "/legacy", "size": "small", "is_mandatory": 1},
+			{"id": "offers-events", "title": "Offers & Events", "subtitle": "Treasure mine.", "image_src": "/files/events-offers.svg", "route": "/events", "size": "small", "is_mandatory": 0},
+			{"id": "dine-play", "title": "Dine & Play", "subtitle": "Enjoy your bites", "image_src": "/files/experience-lounge.svg", "route": "/experience-lounge-splash", "size": "small", "is_mandatory": 0}
+		]
+		for idx, feat in enumerate(default_features, 1):
+			if not frappe.db.exists("Home Feature", {"restaurant": doc.name, "feature_id": feat["id"]}):
+				feat_doc = frappe.get_doc({
+					"doctype": "Home Feature",
+					"restaurant": doc.name,
+					"feature_id": feat["id"],
+					"title": feat["title"],
+					"subtitle": feat.get("subtitle", ""),
+					"image_src": feat.get("image_src", ""),
+					"image_alt": feat.get("title", ""),
+					"route": feat.get("route", ""),
+					"size": feat.get("size", "small"),
+					"is_enabled": 1,
+					"is_mandatory": feat.get("is_mandatory", 0),
+					"display_order": idx
+				})
+				feat_doc.insert(ignore_permissions=True)
+		print(f"✅ Ensured default Home Feature entries for {doc.name}")
+	except Exception as e:
+		print(f"❌ Error creating Home Feature defaults: {str(e)}")
+		frappe.log_error(f"Error creating Home Feature defaults for demo restaurant: {str(e)}")
 	return doc.name
 
 
@@ -528,29 +589,29 @@ def create_orders(restaurant, products):
 	total_1 = subtotal_1 + tax_1
 
 	if not frappe.db.exists("Order", {"order_id": "ONO-ORDER-1001"}):
-	order_1 = frappe.get_doc(
-		{
-			"doctype": "Order",
-			"restaurant": restaurant,
-			"order_id": "ONO-ORDER-1001",
-			"order_number": "1001",
-			"customer_name": "Priya Sharma",
-			"customer_email": "priya.sharma@example.com",
-			"customer_phone": "+91 98765 00123",
-			"table_number": 3,
-			"order_items": order_1_items,
-			"subtotal": subtotal_1,
-			"discount": 0,
-			"tax": tax_1,
-			"delivery_fee": 0,
-			"total": total_1,
-			"status": "delivered",
-			"payment_method": "card",
-			"payment_status": "completed",
-		}
-	)
-	order_1.insert(ignore_permissions=True)
-	orders_created.append(order_1.name)
+		order_1 = frappe.get_doc(
+			{
+				"doctype": "Order",
+				"restaurant": restaurant,
+				"order_id": "ONO-ORDER-1001",
+				"order_number": "1001",
+				"customer_name": "Priya Sharma",
+				"customer_email": "priya.sharma@example.com",
+				"customer_phone": "+91 98765 00123",
+				"table_number": 3,
+				"order_items": order_1_items,
+				"subtotal": subtotal_1,
+				"discount": 0,
+				"tax": tax_1,
+				"delivery_fee": 0,
+				"total": total_1,
+				"status": "delivered",
+				"payment_method": "card",
+				"payment_status": "completed",
+			}
+		)
+		order_1.insert(ignore_permissions=True)
+		orders_created.append(order_1.name)
 		print(f"✅ Created order: {order_1.order_number} (table {order_1.table_number}, delivered)")
 	else:
 		print(f"⏭️  Order ONO-ORDER-1001 already exists")
@@ -578,33 +639,33 @@ def create_orders(restaurant, products):
 	total_2 = tax_base_2 + tax_2 + float(delivery_fee)
 
 	if not frappe.db.exists("Order", {"order_id": "ONO-ORDER-1002"}):
-	order_2 = frappe.get_doc(
-		{
-			"doctype": "Order",
-			"restaurant": restaurant,
-			"order_id": "ONO-ORDER-1002",
-			"order_number": "1002",
-			"customer_name": "Rahul Verma",
-			"customer_email": "rahul.verma@example.com",
-			"customer_phone": "+91 98765 00456",
-			"delivery_address": "Sunrise Apartments, Tower B, Flat 1402",
-			"delivery_city": "Metropolis",
-			"delivery_state": "CA",
-			"delivery_zip_code": "94107",
-			"delivery_instructions": "Call on arrival, main gate under renovation.",
-			"order_items": order_2_items,
-			"subtotal": subtotal_2,
-			"discount": discount_2,
-			"tax": tax_2,
+		order_2 = frappe.get_doc(
+			{
+				"doctype": "Order",
+				"restaurant": restaurant,
+				"order_id": "ONO-ORDER-1002",
+				"order_number": "1002",
+				"customer_name": "Rahul Verma",
+				"customer_email": "rahul.verma@example.com",
+				"customer_phone": "+91 98765 00456",
+				"delivery_address": "Sunrise Apartments, Tower B, Flat 1402",
+				"delivery_city": "Metropolis",
+				"delivery_state": "CA",
+				"delivery_zip_code": "94107",
+				"delivery_instructions": "Call on arrival, main gate under renovation.",
+				"order_items": order_2_items,
+				"subtotal": subtotal_2,
+				"discount": discount_2,
+				"tax": tax_2,
 				"delivery_fee": delivery_fee,
-			"total": total_2,
-			"status": "delivered",
-			"payment_method": "online",
-			"payment_status": "completed",
-		}
-	)
-	order_2.insert(ignore_permissions=True)
-	orders_created.append(order_2.name)
+				"total": total_2,
+				"status": "delivered",
+				"payment_method": "online",
+				"payment_status": "completed",
+			}
+		)
+		order_2.insert(ignore_permissions=True)
+		orders_created.append(order_2.name)
 		print(f"✅ Created order: {order_2.order_number} (delivery, delivered)")
 	else:
 		print(f"⏭️  Order ONO-ORDER-1002 already exists")

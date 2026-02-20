@@ -21,6 +21,7 @@ interface LayoutProps {
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
   { name: 'Setup Wizard', href: '/setup', icon: Sparkles },
+  { name: 'Home Features', href: '/home-features', icon: Grid3x3 },
   { name: 'All Modules', href: '/modules', icon: Grid3x3 },
   { name: 'Real Time Orders', href: '/orders', icon: ShoppingCart },
   { name: 'Past and Billed Orders', href: '/past-orders', icon: Clock },
@@ -179,10 +180,10 @@ export default function Layout({ children }: LayoutProps) {
     }
   }
 
-  // Get current restaurant details
+  // Get current restaurant details (from list) and fetch the selected restaurant doc directly
   const currentRestaurant = restaurants.find(r => r.name === selectedRestaurant || r.restaurant_id === selectedRestaurant)
 
-  // Fetch restaurant document to get slug
+  // Fetch restaurant document to get slug and authoritative restaurant_name
   const { data: restaurantDoc } = useFrappeGetDoc('Restaurant', selectedRestaurant || '', {
     enabled: !!selectedRestaurant
   })
@@ -335,8 +336,8 @@ export default function Layout({ children }: LayoutProps) {
                         <div className="flex items-center min-w-0 flex-1 max-w-[calc(100%-2rem)]">
                           <div className="min-w-0 flex-1 overflow-hidden">
                             <SelectValue className="text-sm font-semibold text-sidebar-foreground block">
-                              <span className="inline-block truncate max-w-full whitespace-nowrap overflow-hidden text-ellipsis">
-                                {currentRestaurant?.restaurant_name || restaurants[0]?.restaurant_name || 'Select Restaurant'}
+                            <span className="inline-block truncate max-w-full whitespace-nowrap overflow-hidden text-ellipsis">
+                                {restaurantDoc?.restaurant_name || currentRestaurant?.restaurant_name || restaurants[0]?.restaurant_name || 'Select Restaurant'}
                               </span>
                             </SelectValue>
                           </div>
