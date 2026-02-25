@@ -20,8 +20,13 @@ def get_razorpay_client(restaurant_id=None):
 	if restaurant_id:
 		try:
 			rest = frappe.get_doc("Restaurant", restaurant_id)
+			# For Password fields, retrieve decrypted secret via get_password
 			key_id = rest.get("razorpay_merchant_key_id")
-			key_secret = rest.get("razorpay_merchant_key_secret")
+			try:
+				key_secret = rest.get_password("razorpay_merchant_key_secret")
+			except Exception:
+				# fallback to plain field if get_password isn't available
+				key_secret = rest.get("razorpay_merchant_key_secret")
 		except Exception:
 			# ignore and fallback to site keys
 			key_id = None
@@ -122,8 +127,23 @@ def create_payment_order(restaurant_id, order_items, total_amount, customer_name
 		order_doc.razorpay_order_id = razorpay_order["id"]
 		order_doc.save()
 
-		# Get public key for frontend
-		key_id = frappe.conf.get("razorpay_key_id") or frappe.get_conf().get("razorpay_key_id")
+		# Get public key for frontend.
+		# If restaurant provided merchant keys, return merchant key_id so frontend Checkout uses merchant credentials.
+		try:
+			merchant_key_id = None
+			merchant_secret = None
+			if restaurant:
+				merchant_key_id = restaurant.get("razorpay_merchant_key_id")
+				try:
+					merchant_secret = restaurant.get_password("razorpay_merchant_key_secret")
+				except Exception:
+					merchant_secret = restaurant.get("razorpay_merchant_key_secret")
+			if merchant_key_id and merchant_secret:
+				key_id = merchant_key_id
+			else:
+				key_id = frappe.conf.get("razorpay_key_id") or frappe.get_conf().get("razorpay_key_id")
+		except Exception:
+			key_id = frappe.conf.get("razorpay_key_id") or frappe.get_conf().get("razorpay_key_id")
 
 		return {
 			"success": True,
@@ -148,26 +168,37 @@ def create_payment_order(restaurant_id, order_items, total_amount, customer_name
 def verify_payment(razorpay_order_id, razorpay_payment_id, razorpay_signature):
 	"""Verify payment signature (optional - webhooks are authoritative)"""
 	try:
-		client = get_razorpay_client()
-		
+		# Prefer using the merchant's keys if the order belongs to a restaurant that has merchant credentials.
+		order = None
+		try:
+			order = frappe.get_doc("Order", {"razorpay_order_id": razorpay_order_id})
+		except Exception:
+			order = None
+
+		if order and getattr(order, "restaurant", None):
+			client = get_razorpay_client(order.restaurant)
+		else:
+			client = get_razorpay_client()
+
 		# Verify signature
 		params_dict = {
 			'razorpay_order_id': razorpay_order_id,
 			'razorpay_payment_id': razorpay_payment_id,
 			'razorpay_signature': razorpay_signature
 		}
-		
 		client.utility.verify_payment_signature(params_dict)
-		
-		# Find order by Razorpay order ID
-		order = frappe.get_doc("Order", {"razorpay_order_id": razorpay_order_id})
-		
+
 		if order:
 			# Update payment details (webhook will be authoritative)
-			order.razorpay_payment_id = razorpay_payment_id
-			order.transaction_id = razorpay_payment_id
-			order.save()
-		
+			try:
+				order.razorpay_payment_id = razorpay_payment_id
+				order.transaction_id = razorpay_payment_id
+				order.save(ignore_permissions=True)
+			except Exception:
+				frappe.db.set_value("Order", order.name, "razorpay_payment_id", razorpay_payment_id)
+				frappe.db.set_value("Order", order.name, "transaction_id", razorpay_payment_id)
+				frappe.db.commit()
+
 		return {
 			"success": True,
 			"data": {
