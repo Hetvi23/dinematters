@@ -192,8 +192,8 @@ export default function Layout({ children }: LayoutProps) {
 
   // Fetch orders for analytics - filter by selected restaurant
   const { data: orders } = useFrappeGetDocList('Order', {
-    fields: ['name', 'status', 'total', 'creation', 'restaurant'],
-    filters: selectedRestaurant ? ({ restaurant: selectedRestaurant } as any) : undefined,
+    fields: ['name', 'status', 'total', 'creation', 'restaurant', 'is_tokenization'],
+    filters: selectedRestaurant ? ({ restaurant: selectedRestaurant, "is_tokenization": ["!=", 1] } as any) : undefined,
     limit: 200,
     orderBy: { field: 'creation', order: 'desc' }
   }, selectedRestaurant ? `orders-analytics-${selectedRestaurant}` : null)

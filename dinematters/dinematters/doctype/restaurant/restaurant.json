@@ -35,6 +35,16 @@
   "base_url",
   "tables",
   "qr_codes_pdf_url",
+ "section_break_razorpay",
+  "razorpay_account_id",
+  "razorpay_kyc_status",
+  "column_break_razorpay",
+  "platform_fee_percent",
+  "monthly_minimum",
+  "razorpay_customer_id",
+  "razorpay_token_id",
+  "mandate_status",
+  "billing_status",
   "section_break_branding",
    "logo",
   "hero_video",
@@ -99,6 +109,12 @@
    "fieldname": "section_break_owner",
    "fieldtype": "Section Break",
    "label": "Owner Information"
+  },
+  {
+   "fieldname": "onboarding_date",
+   "fieldtype": "Date",
+   "label": "Onboarding Date",
+   "description": "Date the restaurant was onboarded (used to schedule monthly billing)."
   },
   {
    "fieldname": "owner_email",
@@ -248,6 +264,117 @@
    "fieldtype": "Long Text",
    "label": "Google Map URL",
    "description": "Enter the Google Maps URL for your restaurant location"
+  },
+  {
+   "fieldname": "section_break_razorpay",
+   "fieldtype": "Section Break",
+   "label": "Razorpay Integration"
+  },
+  {
+   "fieldname": "razorpay_account_id",
+   "fieldtype": "Data",
+   "label": "Razorpay Account ID",
+   "read_only": 1,
+   "description": "Razorpay linked account ID for this restaurant"
+  },
+  {
+   "fieldname": "razorpay_kyc_status",
+   "fieldtype": "Select",
+   "label": "Razorpay KYC Status",
+   "options": "\nunder_review\nneeds_clarification\nactivated\nsuspended\nrejected",
+   "default": "",
+   "read_only": 1,
+   "description": "KYC verification status for Razorpay account"
+  },
+  {
+   "fieldname": "column_break_razorpay",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "platform_fee_percent",
+   "fieldtype": "Percent",
+   "label": "Platform Fee Percent",
+   "default": "1.5",
+   "precision": 2,
+   "description": "Platform fee percentage (default: 1.5%)"
+  },
+  {
+   "fieldname": "monthly_minimum",
+   "fieldtype": "Currency",
+   "label": "Monthly Minimum Fee",
+   "default": "999",
+   "description": "Minimum monthly platform fee (default: ₹999)"
+  }
+  ,
+  {
+   "fieldname": "razorpay_customer_id",
+   "fieldtype": "Data",
+   "label": "Razorpay Customer ID",
+   "read_only": 1,
+   "description": "Razorpay customer id used for tokenized recurring charges"
+  },
+  {
+   "fieldname": "razorpay_merchant_key_id",
+   "fieldtype": "Data",
+   "label": "Razorpay Merchant Key ID",
+   "description": "Merchant Razorpay Key ID for accepting customer payments (stored per-restaurant). Visible to admins only."
+  },
+  {
+   "fieldname": "razorpay_merchant_key_secret",
+   "fieldtype": "Password",
+   "label": "Razorpay Merchant Key Secret",
+   "description": "Merchant Razorpay Key Secret (encrypted). Only System Managers may set or view.",
+   "hidden": 1
+  },
+  {
+   "fieldname": "razorpay_keys_updated_at",
+   "fieldtype": "Datetime",
+   "label": "Razorpay Keys Updated At",
+   "read_only": 1,
+   "description": "Timestamp when merchant Razorpay keys were last updated"
+  },
+  {
+   "fieldname": "razorpay_keys_updated_by",
+   "fieldtype": "Data",
+   "label": "Razorpay Keys Updated By",
+   "read_only": 1,
+   "description": "User who last updated merchant Razorpay keys"
+  },
+  {
+   "fieldname": "razorpay_webhook_secret",
+   "fieldtype": "Password",
+   "label": "Razorpay Webhook Secret",
+   "description": "Optional merchant webhook secret for per-merchant webhook signature verification (store encrypted).",
+   "hidden": 1
+  },
+  {
+   "fieldname": "razorpay_account_id",
+   "fieldtype": "Data",
+   "label": "Razorpay Account ID",
+   "description": "Merchant Razorpay Account ID (used to map incoming webhook.account_id to this restaurant)."
+  },
+  {
+   "fieldname": "razorpay_token_id",
+   "fieldtype": "Data",
+   "label": "Razorpay Token ID",
+   "read_only": 1,
+   "description": "Stored payment token / token id for recurring debit"
+  },
+  {
+   "fieldname": "mandate_status",
+   "fieldtype": "Select",
+   "label": "Mandate Status",
+   "options": "\ninactive\nactive\nfailed",
+   "default": "inactive",
+   "description": "Status of the stored mandate or token"
+  },
+  {
+   "fieldname": "billing_status",
+   "fieldtype": "Select",
+   "label": "Billing Status",
+   "options": "\nactive\noverdue\nsuspended",
+   "default": "active",
+   "description": "Subscription billing status for the restaurant"
   }
  ],
  "index_web_pages_for_search": 1,

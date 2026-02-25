@@ -181,23 +181,19 @@ has_permission = {
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"dinematters.tasks.all"
-# 	],
-# 	"daily": [
-# 		"dinematters.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"dinematters.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"dinematters.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"dinematters.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"daily": [
+		"dinematters.dinematters.tasks.monthly_reconciliation.reconcile_transfers"
+	],
+	"hourly": [
+		"dinematters.dinematters.api.payments.process_retry_charges"
+	],
+	"cron": {
+		"0 0 * * *": [  # Run daily at midnight, each restaurant handled on its onboarding date
+			"dinematters.dinematters.tasks.monthly_reconciliation_onboarding.process_monthly_minimums_by_onboarding_date",
+		]
+	}
+}
 
 # Testing
 # -------

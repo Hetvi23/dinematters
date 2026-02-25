@@ -32,6 +32,11 @@
   "payment_method",
   "payment_status",
   "transaction_id",
+  "razorpay_order_id",
+  "razorpay_payment_id",
+  "is_tokenization",
+  "platform_fee_amount",
+  "restaurant_transfer_amount",
   "section_break_delivery",
   "estimated_delivery",
   "delivery_address",
@@ -199,6 +204,42 @@
    "fieldname": "transaction_id",
    "fieldtype": "Data",
    "label": "Transaction ID"
+  },
+  {
+   "fieldname": "razorpay_order_id",
+   "fieldtype": "Data",
+   "label": "Razorpay Order ID",
+   "read_only": 1,
+   "description": "Razorpay order ID for payment processing"
+  },
+  {
+   "fieldname": "razorpay_payment_id",
+   "fieldtype": "Data",
+   "label": "Razorpay Payment ID",
+   "read_only": 1,
+   "description": "Razorpay payment ID after successful payment"
+  },
+  {
+   "fieldname": "is_tokenization",
+   "fieldtype": "Check",
+   "label": "Is Tokenization",
+   "default": 0,
+   "in_list_view": 0,
+   "description": "Flag indicating this order was created for tokenization (system use only)"
+  },
+  {
+   "fieldname": "platform_fee_amount",
+   "fieldtype": "Int",
+   "label": "Platform Fee Amount (Paise)",
+   "read_only": 1,
+   "description": "Platform fee amount in paise (1.5% of total)"
+  },
+  {
+   "fieldname": "restaurant_transfer_amount",
+   "fieldtype": "Int",
+   "label": "Restaurant Transfer Amount (Paise)",
+   "read_only": 1,
+   "description": "Amount transferred to restaurant in paise"
   },
   {
    "fieldname": "section_break_delivery",

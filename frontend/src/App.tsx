@@ -22,6 +22,9 @@ import CategoryEdit from './pages/CategoryEdit'
 import CategoryNew from './pages/CategoryNew'
 import QRCodes from './pages/QRCodes'
 import HomeFeaturesManager from './pages/HomeFeaturesManager'
+import Payment from './pages/Payment'
+import PaymentStats from './pages/PaymentStats'
+import PaymentSettings from './pages/PaymentSettings'
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -55,6 +58,9 @@ function AppContent() {
 						<Route path="/categories/:categoryId" element={<CategoryDetail />} />
 						<Route path="/qr-codes" element={<QRCodes />} />
 						<Route path="/home-features" element={<HomeFeaturesManager />} />
+						<Route path="/payment-stats" element={<PaymentStats />} />
+						<Route path="/restaurant/:restaurantId/payment" element={<Payment />} />
+						<Route path="/restaurant/:restaurantId/billing" element={<PaymentSettings />} />
 					</Routes>
 				</Layout>
 			</BrowserRouter>
@@ -69,8 +75,8 @@ function App() {
 			swrConfig={{
 				errorRetryCount: 2
 			}}
-			socketPort={import.meta.env.VITE_SOCKET_PORT}
-			siteName={window.frappe?.boot?.sitename ?? import.meta.env.VITE_SITE_NAME}>
+			socketPort={import.meta.env.VITE_SOCKET_PORT || undefined}
+			siteName={(window as any)?.frappe?.boot?.sitename ?? import.meta.env.VITE_SITE_NAME}>
 			<ThemeProvider>
 				<RestaurantProvider>
 					<AppContent />

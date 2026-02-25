@@ -11,6 +11,13 @@ export default function Breadcrumb() {
   const location = useLocation()
   const params = useParams()
 
+  // If page already contains a server-rendered breadcrumb/header (Frappe website),
+  // don't render the SPA breadcrumb to avoid duplicate headers.
+  if (typeof window !== 'undefined') {
+    const serverHeader = document.querySelector('.page-head, .page-title, .page-header, .breadcrumb, header.page-head')
+    if (serverHeader) return null
+  }
+
   // Decode URL-encoded strings
   const decodeLabel = (label: string): string => {
     try {

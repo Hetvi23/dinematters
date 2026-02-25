@@ -97,7 +97,8 @@ export default function Orders() {
   }, [restaurantDoc?.tables])
   
   // Build filters - always filter by restaurant if one is selected
-  const filters = restaurantFilter ? { restaurant: restaurantFilter } : {}
+  // Exclude tokenization orders from merchant-facing Orders UI
+  const filters = restaurantFilter ? { restaurant: restaurantFilter, "is_tokenization": ["!=", 1] } as any : {}
   
   // Debug logging
   useEffect(() => {

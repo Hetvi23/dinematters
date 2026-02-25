@@ -55,7 +55,8 @@ export default function PastOrders() {
   }, [restaurantDoc?.tables])
   
   // Build filters - always filter by restaurant if one is selected
-  const filters = restaurantFilter ? { restaurant: restaurantFilter } : {}
+  // Exclude tokenization orders from Past Orders view
+  const filters = restaurantFilter ? { restaurant: restaurantFilter, "is_tokenization": ["!=", 1] } as any : {}
   
   // Fetch all orders for the restaurant
   const { data: orders, isLoading, mutate } = useFrappeGetDocList(
