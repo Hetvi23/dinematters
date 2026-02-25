@@ -11,6 +11,7 @@ const PaymentSettings: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false)
   const [merchantKeyId, setMerchantKeyId] = useState('')
   const [merchantKeySecret, setMerchantKeySecret] = useState('')
+  const [merchantWebhookSecret, setMerchantWebhookSecret] = useState('')
 
   const { call: createCustomer } = useFrappePostCall('dinematters.dinematters.api.payments.create_razorpay_customer_and_token')
   const { call: createTokenOrder } = useFrappePostCall('dinematters.dinematters.api.payments.create_tokenization_order')
@@ -108,7 +109,7 @@ const PaymentSettings: React.FC = () => {
     })()
     ;(async () => {
       try {
-        const resp = await canSetMerchantKeys()
+        const resp = await canSetMerchantKeys({})
         const body = resp?.message ?? resp
         if (body?.success) setIsAdmin(Boolean(body.allowed))
       } catch (e) {
@@ -164,8 +165,6 @@ const PaymentSettings: React.FC = () => {
             ) : (
               <div className="text-sm text-yellow-400 mb-2">Merchant keys not configured.</div>
             )}
-          </div>
-          )}
             <label className="block text-xs text-gray-400">Key ID</label>
             <input
               value={merchantKeyId}
@@ -219,6 +218,7 @@ const PaymentSettings: React.FC = () => {
               Save Merchant Keys
             </Button>
           </div>
+          )}
           <div>
             <Button onClick={handleSave} className="w-full" disabled={isSaving}>
               {isSaving ? 'Saving...' : 'Save Billing Details'}

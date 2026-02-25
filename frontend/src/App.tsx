@@ -5,6 +5,8 @@ import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import { RestaurantProvider } from './contexts/RestaurantContext'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
+import Login from './pages/Login'
+import ProtectedRoute from './components/ProtectedRoute'
 import SetupWizard from './pages/SetupWizard'
 import Modules from './pages/Modules'
 import ModuleList from './pages/ModuleList'
@@ -28,41 +30,44 @@ import PaymentSettings from './pages/PaymentSettings'
 
 function AppContent() {
 	const { theme } = useTheme()
-	
 	return (
 		<>
 			<BrowserRouter basename="/dinematters">
-				<Layout>
-					<Routes>
+				<Routes>
+					{/* Public routes */}
+					<Route path="/login" element={<Login />} />
+
+					{/* Protected routes */}
+					<Route element={<ProtectedRoute />}>
 						<Route path="/" element={<Navigate to="/dashboard" replace />} />
-						<Route path="/dashboard" element={<Dashboard />} />
-						<Route path="/setup" element={<SetupWizard />} />
-						<Route path="/setup/:stepId" element={<SetupWizard />} />
-						<Route path="/modules" element={<Modules />} />
+						<Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+						<Route path="/setup" element={<Layout><SetupWizard /></Layout>} />
+						<Route path="/setup/:stepId" element={<Layout><SetupWizard /></Layout>} />
+						<Route path="/modules" element={<Layout><Modules /></Layout>} />
 						{/* Redirect Home Feature to dedicated page */}
 						<Route path="/Home Feature" element={<Navigate to="/home-features" replace />} />
 						<Route path="/Home%20Feature" element={<Navigate to="/home-features" replace />} />
-						<Route path="/:doctype" element={<ModuleList />} />
-						<Route path="/:doctype/:docname" element={<ModuleDetail />} />
-					{/* Legacy routes for backward compatibility */}
-					<Route path="/orders" element={<Orders />} />
-					<Route path="/orders/:orderId" element={<OrderDetail />} />
-					<Route path="/past-orders" element={<PastOrders />} />
-						<Route path="/products" element={<Products />} />
-						<Route path="/products/new" element={<ProductNew />} />
-						<Route path="/products/:productId/edit" element={<ProductEdit />} />
-						<Route path="/products/:productId" element={<ProductDetail />} />
-						<Route path="/categories" element={<Categories />} />
-						<Route path="/categories/new" element={<CategoryNew />} />
-						<Route path="/categories/:categoryId/edit" element={<CategoryEdit />} />
-						<Route path="/categories/:categoryId" element={<CategoryDetail />} />
-						<Route path="/qr-codes" element={<QRCodes />} />
-						<Route path="/home-features" element={<HomeFeaturesManager />} />
-						<Route path="/payment-stats" element={<PaymentStats />} />
-						<Route path="/restaurant/:restaurantId/payment" element={<Payment />} />
-						<Route path="/restaurant/:restaurantId/billing" element={<PaymentSettings />} />
-					</Routes>
-				</Layout>
+						<Route path="/:doctype" element={<Layout><ModuleList /></Layout>} />
+						<Route path="/:doctype/:docname" element={<Layout><ModuleDetail /></Layout>} />
+						{/* Legacy routes for backward compatibility */}
+						<Route path="/orders" element={<Layout><Orders /></Layout>} />
+						<Route path="/orders/:orderId" element={<Layout><OrderDetail /></Layout>} />
+						<Route path="/past-orders" element={<Layout><PastOrders /></Layout>} />
+						<Route path="/products" element={<Layout><Products /></Layout>} />
+						<Route path="/products/new" element={<Layout><ProductNew /></Layout>} />
+						<Route path="/products/:productId/edit" element={<Layout><ProductEdit /></Layout>} />
+						<Route path="/products/:productId" element={<Layout><ProductDetail /></Layout>} />
+						<Route path="/categories" element={<Layout><Categories /></Layout>} />
+						<Route path="/categories/new" element={<Layout><CategoryNew /></Layout>} />
+						<Route path="/categories/:categoryId/edit" element={<Layout><CategoryEdit /></Layout>} />
+						<Route path="/categories/:categoryId" element={<Layout><CategoryDetail /></Layout>} />
+						<Route path="/qr-codes" element={<Layout><QRCodes /></Layout>} />
+						<Route path="/home-features" element={<Layout><HomeFeaturesManager /></Layout>} />
+						<Route path="/payment-stats" element={<Layout><PaymentStats /></Layout>} />
+						<Route path="/restaurant/:restaurantId/payment" element={<Layout><Payment /></Layout>} />
+						<Route path="/restaurant/:restaurantId/billing" element={<Layout><PaymentSettings /></Layout>} />
+					</Route>
+				</Routes>
 			</BrowserRouter>
 			<Toaster richColors theme={theme} />
 		</>
