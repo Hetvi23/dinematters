@@ -277,3 +277,7 @@ after_request = ["dinematters.dinematters.utils.cors_helpers.add_cors_headers"]
 # URL routing for dinematters UI (similar to Mint)
 website_route_rules = [{'from_route': '/dinematters/<path:app_path>', 'to_route': 'dinematters'}]
 
+# Redirect root to dinematters so unauthenticated users land on dinematters login
+# (ProtectedRoute then redirects to /dinematters/login)
+website_redirects = [{"source": "/", "target": "/dinematters"}]
+

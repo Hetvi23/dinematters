@@ -5,7 +5,8 @@ import {
   useFrappeGetCall,
   useFrappePostCall,
   useFrappeUpdateDoc,
-  useFrappeDeleteDoc
+  useFrappeDeleteDoc,
+  useFrappeAuth
 } from 'frappe-react-sdk'
 
 export { 
@@ -14,6 +15,7 @@ export {
   useFrappeGetCall,
   useFrappePostCall,
   useFrappeUpdateDoc,
-  useFrappeDeleteDoc
+  useFrappeDeleteDoc,
+  useFrappeAuth
 }
 

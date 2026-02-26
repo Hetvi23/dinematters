@@ -2,53 +2,52 @@ import { useMemo } from 'react'
 import { useFrappeGetDoc } from '@/lib/frappe'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 
+const FALLBACK_SYMBOLS: Record<string, string> = {
+  'USD': '$',
+  'INR': '₹',
+  'EUR': '€',
+  'GBP': '£',
+  'JPY': '¥',
+  'AUD': 'A$',
+  'CAD': 'C$',
+  'CHF': 'CHF',
+  'CNY': '¥',
+  'SGD': 'S$',
+}
+
 /**
- * Hook to get currency symbol for the selected restaurant
- * Fetches currency from Restaurant Config and then gets symbol from Currency doctype
+ * Hook to get currency symbol for the selected restaurant.
+ * Uses restaurantConfig from get_restaurant_config API as primary source (avoids SWR cache).
+ * Fallback to direct DocType fetch when config not yet loaded.
  */
 export function useCurrency() {
-  const { selectedRestaurant } = useRestaurant()
-  
-  // Fetch Restaurant Config to get currency
+  const { selectedRestaurant, restaurantConfig } = useRestaurant()
+  const pricing = restaurantConfig?.pricing
+
+  // Fallback: fetch Restaurant Config and Restaurant when pricing not from context
   const { data: configData } = useFrappeGetDoc('Restaurant Config', selectedRestaurant || '', {
-    enabled: !!selectedRestaurant,
+    enabled: !!selectedRestaurant && !pricing?.currency,
     fields: ['currency']
   })
-  
-  // If config doesn't exist, try fetching from Restaurant doctype
   const { data: restaurantData } = useFrappeGetDoc('Restaurant', selectedRestaurant || '', {
-    enabled: !!selectedRestaurant && !configData?.currency,
+    enabled: !!selectedRestaurant && !pricing?.currency && !configData?.currency,
     fields: ['currency']
   })
-  
-  const currencyCode = configData?.currency || restaurantData?.currency || 'USD'
-  
-  // Fetch Currency doctype to get symbol
+
+  const currencyCode = pricing?.currency || configData?.currency || restaurantData?.currency || 'USD'
+
+  // Fetch Currency doctype only when not using pricing from context
   const { data: currencyDoc } = useFrappeGetDoc('Currency', currencyCode, {
-    enabled: !!currencyCode
+    enabled: !!currencyCode && !pricing?.symbol
   })
-  
+
   const currencySymbol = useMemo(() => {
-    if (currencyDoc?.symbol) {
-      return currencyDoc.symbol
-    }
-    // Fallback to common currency symbols
-    const fallbackSymbols: Record<string, string> = {
-      'USD': '$',
-      'INR': '₹',
-      'EUR': '€',
-      'GBP': '£',
-      'JPY': '¥',
-      'AUD': 'A$',
-      'CAD': 'C$',
-      'CHF': 'CHF',
-      'CNY': '¥',
-      'SGD': 'S$',
-    }
-    return fallbackSymbols[currencyCode] || currencyCode
-  }, [currencyDoc?.symbol, currencyCode])
-  
-  const symbolOnRight = currencyDoc?.symbol_on_right || false
+    if (pricing?.symbol) return pricing.symbol
+    if (currencyDoc?.symbol) return currencyDoc.symbol
+    return FALLBACK_SYMBOLS[currencyCode] || currencyCode
+  }, [pricing?.symbol, currencyDoc?.symbol, currencyCode])
+
+  const symbolOnRight = pricing?.symbolOnRight ?? currencyDoc?.symbol_on_right ?? false
   
   return {
     currency: currencyCode,

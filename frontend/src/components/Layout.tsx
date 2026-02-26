@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, Menu, X, Lock, LockOpen, ChevronDown, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock } from 'lucide-react'
+import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, Menu, X, Lock, LockOpen, ChevronDown, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, LogOut, LayoutDashboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useFrappeGetDocList, useFrappeGetCall, useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe'
+import { useFrappeGetDocList, useFrappeGetCall, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
 import { useState, useEffect, useMemo } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -10,12 +10,79 @@ import { useCurrency } from '@/hooks/useCurrency'
 import Breadcrumb from './Breadcrumb'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 
 interface LayoutProps {
   children: React.ReactNode
+}
+
+function UserProfileDropdown() {
+  const { logout } = useFrappeAuth()
+  const bootUserRaw = (window as any)?.frappe?.boot?.user
+  // Frappe boot.user can be string (username) or object { name, email, ... }
+  const bootUser = typeof bootUserRaw === 'string'
+    ? bootUserRaw
+    : (bootUserRaw?.name ?? bootUserRaw?.email ?? 'Guest')
+  const userDisplay = bootUser !== 'Guest' ? String(bootUser) : 'User'
+  const userInitial = (userDisplay?.charAt?.(0) ?? 'U').toUpperCase()
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      // Full page reload clears cache and ensures session is gone
+      window.location.replace('/dinematters/login')
+    } catch {
+      // Still redirect on error so user can retry
+      window.location.replace('/dinematters/login')
+    }
+  }
+
+  // Redirect to ERPNext/Frappe site (e.g. http://localhost:8000/)
+  const siteOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
+  const deskUrl = `${siteOrigin}/app`
+  const userProfileUrl = `${siteOrigin}/app/user/${encodeURIComponent(String(bootUser))}`
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-primary hover:bg-primary/30 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          aria-label="User menu"
+        >
+          <span className="text-sm font-semibold">{userInitial}</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuItem asChild>
+          <a href={userProfileUrl} className="flex items-center gap-2 cursor-pointer">
+            <User className="h-4 w-4" />
+            My Account
+          </a>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <a href={deskUrl} className="flex items-center gap-2 cursor-pointer">
+            <LayoutDashboard className="h-4 w-4" />
+            Switch To Desk
+          </a>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={handleLogout}
+          className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+        >
+          <LogOut className="h-4 w-4" />
+          Log out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
 }
 
 const navigation = [
@@ -188,7 +255,8 @@ export default function Layout({ children }: LayoutProps) {
     enabled: !!selectedRestaurant
   })
 
-  const restaurantSlug = restaurantDoc?.slug || ''
+  // Preview URL path: slug preferred, fallback to restaurant_id for all pages
+  const previewPath = restaurantDoc?.slug || restaurantDoc?.restaurant_id || currentRestaurant?.restaurant_id || selectedRestaurant || ''
 
   // Fetch orders for analytics - filter by selected restaurant
   const { data: orders } = useFrappeGetDocList('Order', {
@@ -500,8 +568,34 @@ export default function Layout({ children }: LayoutProps) {
             })}
           </nav>
           
-          {/* Footer with Theme Toggle and Tagline */}
-          <div className="px-4 py-3 border-t border-sidebar-border bg-card">
+          {/* Footer with Watch Preview, Theme Toggle and Tagline */}
+          <div className="px-4 py-3 border-t border-sidebar-border bg-card space-y-2">
+            {/* Watch Preview - always visible in sidebar on all pages */}
+            {previewPath && (
+              <div className={showExpanded ? "flex" : "flex justify-center"}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const baseUrl = restaurantDoc?.base_url || 'https://demo.dinematters.com/'
+                    const url = baseUrl.replace(/\/$/, '') + '/' + previewPath
+                    window.open(url, '_blank', 'noopener,noreferrer')
+                  }}
+                  className={cn(
+                    "w-full gap-2",
+                    !showExpanded && "w-10 px-0 justify-center"
+                  )}
+                >
+                  <Eye className="h-4 w-4 flex-shrink-0" />
+                  {showExpanded && (
+                    <>
+                      Watch preview
+                      <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
             {showExpanded ? (
               <div className="flex items-center justify-between gap-3">
                 <p className="text-base italic text-red-500 dark:text-red-400 font-light flex-1">
@@ -538,6 +632,21 @@ export default function Layout({ children }: LayoutProps) {
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2">
+                {previewPath && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const baseUrl = restaurantDoc?.base_url || 'https://demo.dinematters.com/'
+                      const url = baseUrl.replace(/\/$/, '') + '/' + previewPath
+                      window.open(url, '_blank', 'noopener,noreferrer')
+                    }}
+                    className="w-10 h-10 p-0"
+                    title="Watch preview"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                )}
                 {/* Animated Theme Switch - Collapsed */}
                 <button
                   onClick={toggleTheme}
@@ -698,24 +807,6 @@ export default function Layout({ children }: LayoutProps) {
               </div>
             </div>
 
-            {/* Right Side: Watch Preview Button */}
-            {restaurantSlug && (
-              <div className="hidden lg:flex items-center pr-6 flex-shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    window.open(`https://demo.dinematters.com/${restaurantSlug}`, '_blank', 'noopener,noreferrer')
-                  }}
-                  className="gap-2"
-                >
-                  <Eye className="h-4 w-4" />
-                  Watch preview
-                  <ExternalLink className="h-3 w-3" />
-                </Button>
-              </div>
-            )}
-
             {/* Mobile Analytics Panel - Compact */}
             <div className="lg:hidden flex-1 overflow-x-auto px-2">
               <div className="flex items-center gap-2">
@@ -747,22 +838,10 @@ export default function Layout({ children }: LayoutProps) {
               </div>
             </div>
 
-            {/* Right Side: Watch Preview Button - Mobile */}
-            {restaurantSlug && (
-              <div className="lg:hidden flex items-center pr-2 flex-shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    window.open(`https://demo.dinematters.com/${restaurantSlug}`, '_blank', 'noopener,noreferrer')
-                  }}
-                  className="gap-1.5 px-2"
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  <span className="text-xs">Preview</span>
-                </Button>
-              </div>
-            )}
+            {/* User Profile Dropdown */}
+            <div className="flex items-center pl-2 pr-4 lg:pr-6 flex-shrink-0">
+              <UserProfileDropdown />
+            </div>
           </div>
         </header>
 

@@ -82,7 +82,10 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
         return
       }
       try {
-        const resp = await fetch(`/api/method/dinematters.dinematters.api.config.get_restaurant_config?restaurant_id=${encodeURIComponent(selectedRestaurant)}`)
+        const resp = await fetch(
+          `/api/method/dinematters.dinematters.api.config.get_restaurant_config?restaurant_id=${encodeURIComponent(selectedRestaurant)}`,
+          { cache: 'no-store' }
+        )
         const json = await resp.json()
         // Frappe wraps returned value in message sometimes; handle both shapes
         const payload = json?.message ?? json
