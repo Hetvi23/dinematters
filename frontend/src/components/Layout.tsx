@@ -95,6 +95,7 @@ const navigation = [
   { name: 'Products', href: '/products', icon: Package },
   { name: 'Categories', href: '/categories', icon: FolderTree },
   { name: 'Manage QR Codes', href: '/qr-codes', icon: QrCode },
+  { name: 'Recommendations Engine', href: '/recommendations-engine', icon: FolderTree },
 ]
 
 interface Restaurant {

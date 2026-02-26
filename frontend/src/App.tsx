@@ -27,6 +27,7 @@ import HomeFeaturesManager from './pages/HomeFeaturesManager'
 import Payment from './pages/Payment'
 import PaymentStats from './pages/PaymentStats'
 import PaymentSettings from './pages/PaymentSettings'
+import RecommendationsEngine from './pages/RecommendationsEngine'
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -66,6 +67,7 @@ function AppContent() {
 						<Route path="/payment-stats" element={<Layout><PaymentStats /></Layout>} />
 						<Route path="/restaurant/:restaurantId/payment" element={<Layout><Payment /></Layout>} />
 						<Route path="/restaurant/:restaurantId/billing" element={<Layout><PaymentSettings /></Layout>} />
+						<Route path="/recommendations-engine" element={<Layout><RecommendationsEngine /></Layout>} />
 					</Route>
 				</Routes>
 			</BrowserRouter>

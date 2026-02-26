@@ -270,11 +270,39 @@ def get_home_features(restaurant_id):
 				"isMandatory": bool(feature.get("is_mandatory", 0)),
 				"displayOrder": feature.get("display_order", 0)
 			})
+
+		# De-duplicate by feature id so each restaurant has at most one
+		# card per logical home feature (menu, book-table, etc.).
+		# If duplicates exist, prefer the one with an image, then the one
+		# that is enabled, while keeping display order where possible.
+		by_id = {}
+		for feat in formatted_features:
+			existing = by_id.get(feat["id"])
+			if not existing:
+				by_id[feat["id"]] = feat
+				continue
+
+			# Prefer entry that has an image
+			existing_has_image = bool(existing.get("imageSrc"))
+			new_has_image = bool(feat.get("imageSrc"))
+
+			if new_has_image and not existing_has_image:
+				by_id[feat["id"]] = feat
+				continue
+
+			# If image presence is same, prefer enabled over disabled
+			if feat.get("isEnabled") and not existing.get("isEnabled"):
+				by_id[feat["id"]] = feat
+				continue
+
+			# Otherwise keep the first one (stable)
+
+		deduped_features = sorted(by_id.values(), key=lambda f: f.get("displayOrder", 0))
 		
 		return {
 			"success": True,
 			"data": {
-				"features": formatted_features
+				"features": deduped_features
 			}
 		}
 	except Exception as e:

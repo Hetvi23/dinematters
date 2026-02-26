@@ -34,6 +34,7 @@
   "currency",
   "base_url",
   "tables",
+  "recommendation_run",
   "qr_codes_pdf_url",
  "section_break_razorpay",
   "razorpay_account_id",
@@ -222,6 +223,14 @@
    "fieldtype": "Int",
    "label": "Tables",
    "description": "Number of tables in the restaurant. QR codes will be generated when this field is updated."
+  },
+  {
+   "default": "0",
+   "fieldname": "recommendation_run",
+   "fieldtype": "Int",
+   "label": "Recommendation Run Count",
+   "read_only": 1,
+   "description": "How many times the AI menu recommendation engine has been executed for this restaurant."
   },
   {
    "fieldname": "qr_codes_pdf_url",

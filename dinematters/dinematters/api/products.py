@@ -289,11 +289,24 @@ def format_product(product_doc):
 	# Recommendations
 	if hasattr(product_doc, 'recommendations') and product_doc.recommendations:
 		try:
-			recommendations = json.loads(product_doc.recommendations) if isinstance(product_doc.recommendations, str) else product_doc.recommendations
+			recommendations = (
+				json.loads(product_doc.recommendations)
+				if isinstance(product_doc.recommendations, str)
+				else product_doc.recommendations
+			)
 			if recommendations and isinstance(recommendations, list):
+				# Keep full objects for internal / admin use
 				product["recommendations"] = recommendations
-		except:
-			# If JSON parsing fails, skip recommendations
+
+				# Frontend contract (see RECOMMENDATIONS_API.md):
+				# - recommendedDishIds: primary field, array of dish IDs
+				# - recommendedProducts: backward-compatible alias with the same IDs
+				ids = [r.get("id") for r in recommendations if isinstance(r, dict) and r.get("id")]
+				if ids:
+					product["recommendedDishIds"] = ids
+					product["recommendedProducts"] = ids
+		except Exception:
+			# If JSON parsing fails, skip recommendations gracefully
 			pass
 	
 	return product

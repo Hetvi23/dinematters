@@ -13,8 +13,6 @@ export default function HomeFeaturesManager() {
   const [editing, setEditing] = useState<any | null>(null)
   const [saving, setSaving] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [creating, setCreating] = useState<boolean>(false)
-  const [creatingData, setCreatingData] = useState<any>({ feature_id: '', title: '', subtitle: '', size: 'small', route: '', imageFile: null })
 
   useEffect(() => {
     if (restaurantConfig?.homeFeatures) {
@@ -35,11 +33,6 @@ export default function HomeFeaturesManager() {
 
   const openEdit = (f: any) => {
     setEditing({ ...f, newImageFile: null })
-  }
-
-  const openCreate = () => {
-    setCreating(true)
-    setCreatingData({ feature_id: '', title: '', subtitle: '', size: 'small', route: '', imageFile: null })
   }
 
   const handleDelete = async (name: string) => {
@@ -122,61 +115,6 @@ export default function HomeFeaturesManager() {
     }
   }
 
-  const handleCreate = async () => {
-    setSaving(true)
-    try {
-      let image_src = ''
-      if (creatingData.imageFile) {
-        image_src = await uploadFile(creatingData.imageFile)
-      }
-
-      const doc = {
-        doctype: 'Home Feature',
-        restaurant: selectedRestaurant,
-        feature_id: creatingData.feature_id,
-        title: creatingData.title,
-        subtitle: creatingData.subtitle,
-        image_src: image_src,
-        route: creatingData.route || '',
-        size: creatingData.size || 'small',
-        is_enabled: 1,
-        is_mandatory: 0,
-        display_order: (features.length || 0) + 1
-      }
-
-      const csrf = (window as any).frappe?.csrf_token || (window as any).csrf_token
-      const resp = await fetch('/api/method/dinematters.dinematters.api.documents.create_document', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-Frappe-CSRF-Token': csrf
-        },
-        body: JSON.stringify({ doctype: 'Home Feature', doc_data: doc })
-      })
-      const j = await resp.json()
-      if (j?.success && j.message) {
-        // API returns created doc in message
-        const created = j.message
-        // Ensure imageSrc normalized
-        created.imageSrc = created.image_src && created.image_src.startsWith('/files/') ? `${window.location.origin}${created.image_src}` : created.image_src
-        setFeatures(prev => [ ...prev, {
-          name: created.name || created.feature_id || Math.random().toString(36).slice(2),
-          id: created.feature_id,
-          title: created.title,
-          subtitle: created.subtitle,
-          imageSrc: created.imageSrc || ''
-        } ])
-        setCreating(false)
-      } else {
-        throw new Error(JSON.stringify(j))
-      }
-    } catch (e: any) {
-      alert('Create failed: ' + (e.message || e))
-    } finally {
-      setSaving(false)
-    }
-  }
-
   return (
     <div className="p-4">
       <h2 className="text-2xl font-semibold mb-4">Home Features</h2>
@@ -185,9 +123,6 @@ export default function HomeFeaturesManager() {
         <div className="flex items-center gap-2">
           <Button onClick={() => setViewMode('grid')} variant={viewMode==='grid' ? 'default' : 'ghost'}>Grid</Button>
           <Button onClick={() => setViewMode('list')} variant={viewMode==='list' ? 'default' : 'ghost'}>List</Button>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={openCreate}>Create New</Button>
         </div>
       </div>
 
@@ -240,52 +175,6 @@ export default function HomeFeaturesManager() {
           </div>
         )
       )}
-
-      {/* Create Dialog */}
-      <Dialog open={creating} onOpenChange={(open) => { if (!open) setCreating(false) }}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Create New Feature</DialogTitle>
-            <DialogDescription>Add a new feature card with image and details</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Feature ID</Label>
-              <Input value={creatingData.feature_id} onChange={(e: any) => setCreatingData({ ...creatingData, feature_id: e.target.value })} />
-            </div>
-            <div>
-              <Label>Title</Label>
-              <Input value={creatingData.title} onChange={(e: any) => setCreatingData({ ...creatingData, title: e.target.value })} />
-            </div>
-            <div>
-              <Label>Subtitle</Label>
-              <Input value={creatingData.subtitle} onChange={(e: any) => setCreatingData({ ...creatingData, subtitle: e.target.value })} />
-            </div>
-            <div>
-              <Label>Route</Label>
-              <Input value={creatingData.route} onChange={(e: any) => setCreatingData({ ...creatingData, route: e.target.value })} />
-            </div>
-            <div>
-              <Label>Size</Label>
-              <select value={creatingData.size} onChange={(e) => setCreatingData({ ...creatingData, size: e.target.value })} className="block w-full p-2 border rounded">
-                <option value="small">Small</option>
-                <option value="large">Large</option>
-              </select>
-            </div>
-            <div>
-              <Label>Image</Label>
-              <input type="file" accept="image/*" onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) setCreatingData({ ...creatingData, imageFile: file })
-              }} />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setCreating(false)} disabled={saving}>Cancel</Button>
-              <Button onClick={handleCreate} disabled={saving}>{saving ? 'Creating…' : 'Create'}</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={!!editing} onOpenChange={(open) => { if (!open) setEditing(null) }}>
         <DialogContent className="sm:max-w-[600px]">
