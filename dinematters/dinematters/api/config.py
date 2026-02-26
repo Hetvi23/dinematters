@@ -82,6 +82,13 @@ def get_restaurant_config(restaurant_id):
 			color_palette["orange"] = config["color_palette_orange"]
 		if config.get("color_palette_red"):
 			color_palette["red"] = config["color_palette_red"]
+
+		# For Dinematters UI, treat primary color and color palette as the same concept:
+		# if an explicit primary_color is not set, derive it from the first available
+		# palette color so the API always exposes a usable branding.primaryColor.
+		primary_color = config.get("primary_color")
+		if not primary_color:
+			primary_color = next(iter(color_palette.values()), "#DB782F")
 		
 		# Format logo and icons
 		logo = config.get("logo")
@@ -110,7 +117,7 @@ def get_restaurant_config(restaurant_id):
 				"googleMapUrl": (restaurant_context.get("google_map_url") if restaurant_context else "") or ""
 			},
 			"branding": {
-				"primaryColor": config.get("primary_color", "#DB782F"),
+				"primaryColor": primary_color,
 				"defaultTheme": config.get("default_theme", "light"),
 				"logo": logo,
 				"heroVideo": hero_video or config.get("hero_video", ""),

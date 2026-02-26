@@ -582,7 +582,8 @@ export default function Layout({ children }: LayoutProps) {
                     window.open(url, '_blank', 'noopener,noreferrer')
                   }}
                   className={cn(
-                    "w-full gap-2",
+                    "w-full gap-2 border-primary/70 bg-primary/10 hover:bg-primary/20 hover:border-primary shadow-sm shadow-primary/30",
+                    theme === 'dark' ? "text-white" : "text-primary",
                     !showExpanded && "w-10 px-0 justify-center"
                   )}
                 >
@@ -641,7 +642,10 @@ export default function Layout({ children }: LayoutProps) {
                       const url = baseUrl.replace(/\/$/, '') + '/' + previewPath
                       window.open(url, '_blank', 'noopener,noreferrer')
                     }}
-                    className="w-10 h-10 p-0"
+                    className={cn(
+                      "w-10 h-10 p-0 border-primary/70 bg-primary/10 hover:bg-primary/20 hover:border-primary shadow-sm shadow-primary/30",
+                      theme === 'dark' ? "text-white" : "text-primary",
+                    )}
                     title="Watch preview"
                   >
                     <Eye className="h-4 w-4" />
