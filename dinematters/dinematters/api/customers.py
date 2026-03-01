@@ -8,6 +8,7 @@ Customer APIs for cross-restaurant analytics.
 import frappe
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
 from dinematters.dinematters.utils.permission_helpers import get_user_restaurant_ids
+from dinematters.dinematters.utils.customer_helpers import normalize_phone, canonical_phone, _find_existing_customer_by_phone
 
 
 def update_customer_last_visited(doc, event=None):
@@ -110,6 +111,87 @@ def get_customer_profile(customer_id):
 
 
 @frappe.whitelist()
+def get_customer_by_phone(phone, restaurant_id):
+	"""
+	Get customer details by phone number and restaurant ID.
+	Returns customer info plus orders and bookings at this restaurant.
+	"""
+	try:
+		restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user)
+		restaurant_ids = get_user_restaurant_ids(frappe.session.user)
+		if "System Manager" not in frappe.get_roles() and restaurant not in restaurant_ids:
+			return {"success": False, "error": "Permission denied"}
+
+		existing_doc = _find_existing_customer_by_phone(phone)
+		if not existing_doc:
+			return {"success": False, "error": "Customer not found"}
+
+		cid = existing_doc.name
+		c = frappe.db.get_value(
+			"Customer",
+			cid,
+			["name", "phone", "mobile_no", "customer_name", "email", "verified_at"],
+			as_dict=True
+		)
+		if not c:
+			return {"success": False, "error": "Customer not found"}
+
+		order_fields = ["name", "order_number", "total", "status", "creation", "customer_phone"]
+		if frappe.db.has_column("Order", "customer_rating"):
+			order_fields.extend(["customer_rating", "customer_feedback"])
+		orders = frappe.get_all(
+			"Order",
+			filters={"restaurant": restaurant, "platform_customer": cid},
+			fields=order_fields
+		)
+		table_bookings = frappe.get_all(
+			"Table Booking",
+			filters={"restaurant": restaurant, "platform_customer": cid},
+			fields=["name", "booking_number", "date", "time_slot", "status", "creation", "customer_phone"]
+		)
+		banquet_bookings = frappe.get_all(
+			"Banquet Booking",
+			filters={"restaurant": restaurant, "platform_customer": cid},
+			fields=["name", "booking_number", "date", "event_type", "status", "creation", "customer_phone"]
+		)
+
+		phone_val = c.phone or c.mobile_no
+		if not phone_val and orders:
+			phone_val = orders[0].get("customer_phone")
+		if not phone_val and table_bookings:
+			phone_val = table_bookings[0].get("customer_phone")
+		if not phone_val and banquet_bookings:
+			phone_val = banquet_bookings[0].get("customer_phone")
+
+		last_dates = []
+		for o in orders:
+			if o.get("creation"):
+				last_dates.append(o["creation"])
+		for b in table_bookings + banquet_bookings:
+			if b.get("creation"):
+				last_dates.append(b["creation"])
+		last_visited = max(last_dates) if last_dates else None
+
+		return {
+			"success": True,
+			"data": {
+				"id": c.name,
+				"phone": phone_val,
+				"customerName": c.customer_name,
+				"email": c.email,
+				"verifiedAt": str(c.verified_at) if c.verified_at else None,
+				"lastVisited": str(last_visited) if last_visited else None,
+				"orders": orders,
+				"tableBookings": table_bookings,
+				"banquetBookings": banquet_bookings
+			}
+		}
+	except Exception as e:
+		frappe.log_error(f"get_customer_by_phone error: {e}", "Customer_API")
+		return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist()
 def get_restaurant_customers(restaurant_id, search=None, page=1, page_size=20):
 	"""
 	Restaurant: Get customers who have orders/bookings at this restaurant only. Supports search (name, phone), pagination.
@@ -202,6 +284,40 @@ def get_restaurant_customers(restaurant_id, search=None, page=1, page_size=20):
 				"tableBookings": table_bookings,
 				"banquetBookings": banquet_bookings
 			})
+
+		# Deduplicate by canonical phone: merge customers with same phone (e.g. +91 7487871213 vs 7487871213)
+		by_canonical = {}
+		for cust in customers:
+			canonical = canonical_phone(cust.get("phone") or "")
+			if not canonical or len(canonical) != 10:
+				canonical = cust.get("id") or cust.get("phone") or str(id(cust))
+			if canonical not in by_canonical:
+				by_canonical[canonical] = cust
+			else:
+				existing = by_canonical[canonical]
+				existing["orders"] = (existing.get("orders") or []) + (cust.get("orders") or [])
+				existing["tableBookings"] = (existing.get("tableBookings") or []) + (cust.get("tableBookings") or [])
+				existing["banquetBookings"] = (existing.get("banquetBookings") or []) + (cust.get("banquetBookings") or [])
+				# Prefer verified, then better name, then newer lastVisited
+				if cust.get("verifiedAt") and not existing.get("verifiedAt"):
+					existing["verifiedAt"] = cust["verifiedAt"]
+					existing["id"] = cust["id"]
+					existing["customerName"] = cust.get("customerName") or existing.get("customerName")
+				if (cust.get("lastVisited") or "") > (existing.get("lastVisited") or ""):
+					existing["lastVisited"] = cust.get("lastVisited")
+
+		customers = list(by_canonical.values())
+
+		# Recompute lastVisited from merged orders/bookings
+		for cust in customers:
+			all_dates = []
+			for o in cust.get("orders") or []:
+				if o.get("creation"):
+					all_dates.append(o["creation"])
+			for b in (cust.get("tableBookings") or []) + (cust.get("banquetBookings") or []):
+				if b.get("creation"):
+					all_dates.append(b["creation"])
+			cust["lastVisited"] = str(max(all_dates)) if all_dates else None
 
 		customers.sort(key=lambda x: (x.get("lastVisited") or "", x.get("customerName") or ""), reverse=True)
 		total_count = len(customers)
