@@ -110,7 +110,7 @@ def get_customer_profile(customer_id):
 		return {"success": False, "error": str(e)}
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def get_customer_by_phone(phone, restaurant_id):
 	"""
 	Get customer details by phone number and restaurant ID.
