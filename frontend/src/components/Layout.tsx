@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, Menu, X, Lock, LockOpen, ChevronDown, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, LogOut, LayoutDashboard } from 'lucide-react'
+import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, Menu, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetCall, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
 import { useState, useEffect, useMemo } from 'react'
@@ -85,17 +85,46 @@ function UserProfileDropdown() {
   )
 }
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Setup Wizard', href: '/setup', icon: Sparkles },
-  { name: 'Home Features', href: '/home-features', icon: Grid3x3 },
-  { name: 'All Modules', href: '/modules', icon: Grid3x3 },
-  { name: 'Real Time Orders', href: '/orders', icon: ShoppingCart },
-  { name: 'Past and Billed Orders', href: '/past-orders', icon: Clock },
-  { name: 'Products', href: '/products', icon: Package },
-  { name: 'Categories', href: '/categories', icon: FolderTree },
-  { name: 'Manage QR Codes', href: '/qr-codes', icon: QrCode },
-  { name: 'Recommendations Engine', href: '/recommendations-engine', icon: FolderTree },
+const SIDEBAR_GROUPS_KEY = 'dinematters_sidebar_groups_open'
+
+type NavLink = { type: 'link'; name: string; href: string; icon: React.ComponentType<{ className?: string }>; badgeHref?: string }
+type NavGroup = {
+  type: 'group'
+  id: string
+  name: string
+  icon: React.ComponentType<{ className?: string }>
+  children: { name: string; href: string; icon?: React.ComponentType<{ className?: string }>; badgeHref?: string }[]
+}
+type NavItem = NavLink | NavGroup
+
+const navigation: NavItem[] = [
+  { type: 'link', name: 'Dashboard', href: '/dashboard', icon: Home },
+  { type: 'link', name: 'Setup Wizard', href: '/setup', icon: Sparkles },
+  { type: 'link', name: 'Home Features', href: '/home-features', icon: Grid3x3 },
+  { type: 'link', name: 'All Modules', href: '/modules', icon: Grid3x3 },
+  {
+    type: 'group',
+    id: 'manage-orders',
+    name: 'Manage Orders',
+    icon: ShoppingCart,
+    children: [
+      { name: 'Real Time Orders', href: '/orders', icon: ShoppingCart, badgeHref: '/orders' },
+      { name: 'Past and Billed Orders', href: '/past-orders', icon: Clock },
+    ],
+  },
+  { type: 'link', name: 'Customers', href: '/customers', icon: Users },
+  {
+    type: 'group',
+    id: 'manage-product',
+    name: 'Manage Product',
+    icon: Package,
+    children: [
+      { name: 'Products', href: '/products', icon: Package },
+      { name: 'Categories', href: '/categories', icon: FolderTree },
+      { name: 'Recommendations Engine', href: '/recommendations-engine', icon: FolderTree },
+    ],
+  },
+  { type: 'link', name: 'Manage QR Codes', href: '/qr-codes', icon: QrCode },
 ]
 
 interface Restaurant {
@@ -117,6 +146,50 @@ export default function Layout({ children }: LayoutProps) {
   const [hoverDisabled, setHoverDisabled] = useState(false) // Temporarily disable hover after toggle
   const [selectOpen, setSelectOpen] = useState(false) // Track if restaurant select is open
   const [lockAnimating, setLockAnimating] = useState(false) // Track lock animation state
+
+  // Expanded nav groups (persisted in localStorage)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set()
+    try {
+      const saved = localStorage.getItem(SIDEBAR_GROUPS_KEY)
+      return new Set(saved ? JSON.parse(saved) : [])
+    } catch {
+      return new Set()
+    }
+  })
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(groupId)) next.delete(groupId)
+      else next.add(groupId)
+      try {
+        localStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify([...next]))
+      } catch {}
+      return next
+    })
+  }
+
+  // Auto-expand group when current path is under one of its children; persist so it stays open after refresh
+  useEffect(() => {
+    const path = location.pathname
+    navigation.forEach((item) => {
+      if (item.type === 'group') {
+        const hasActiveChild = item.children.some(
+          (c) => path === c.href || (c.href !== '/dashboard' && path.startsWith(c.href))
+        )
+        if (hasActiveChild) {
+          setExpandedGroups((prev) => {
+            if (prev.has(item.id)) return prev
+            const next = new Set(prev).add(item.id)
+            try {
+              localStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify([...next]))
+            } catch {}
+            return next
+          })
+        }
+      }
+    })
+  }, [location.pathname])
   
   // Modal state for creating new restaurant
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -519,52 +592,190 @@ export default function Layout({ children }: LayoutProps) {
           {/* Navigation */}
           <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto">
             {navigation.map((item) => {
-              const Icon = item.icon
-              const isActive = location.pathname === item.href || 
-                (item.href !== '/dashboard' && location.pathname.startsWith(item.href))
-              
-              const showBadge = item.href === '/orders' && pendingOrders > 0
-              
+              if (item.type === 'link') {
+                const Icon = item.icon
+                const isActive = location.pathname === item.href ||
+                  (item.href !== '/dashboard' && location.pathname.startsWith(item.href))
+                const showBadge = item.badgeHref === '/orders' && pendingOrders > 0
+
+                return (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    onClick={() => setSidebarOpen(false)}
+                    className={cn(
+                      "relative flex items-center rounded-md text-sm font-normal transition-all group",
+                      showExpanded ? "gap-3 px-3 py-2" : "justify-center px-2 py-2",
+                      "hover:bg-sidebar-accent active:bg-sidebar-accent/80",
+                      isActive
+                        ? "bg-primary/10 text-primary font-medium dark:bg-primary/20"
+                        : "text-sidebar-foreground hover:text-sidebar-foreground"
+                    )}
+                    title={!showExpanded ? item.name : undefined}
+                  >
+                    {isActive && (
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r" />
+                    )}
+                    <Icon className={cn(
+                      "h-4 w-4 flex-shrink-0",
+                      isActive ? "text-primary" : "text-muted-foreground"
+                    )} />
+                    {showExpanded && (
+                      <>
+                        <span className="flex-1">{item.name}</span>
+                        {showBadge && (
+                          <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
+                            {pendingOrders > 9 ? '9+' : pendingOrders}
+                          </span>
+                        )}
+                      </>
+                    )}
+                    {!showExpanded && (
+                      <span className="absolute left-full ml-2 px-2 py-1 rounded-md bg-foreground text-background text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 shadow-lg">
+                        {item.name}
+                        {showBadge && ` (${pendingOrders} pending)`}
+                      </span>
+                    )}
+                  </Link>
+                )
+              }
+
+              // Group (dropdown)
+              const group = item
+              const Icon = group.icon
+              const isExpanded = expandedGroups.has(group.id)
+              const hasActiveChild = group.children.some(
+                (c) => location.pathname === c.href || (c.href !== '/dashboard' && location.pathname.startsWith(c.href))
+              )
+              const showBadge = group.children.some((c) => c.badgeHref === '/orders') && pendingOrders > 0
+
+              // Collapsed sidebar: show dropdown menu with child links
+              if (!showExpanded) {
+                return (
+                  <DropdownMenu key={group.id}>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className={cn(
+                          "relative flex items-center justify-center w-full rounded-md p-2 transition-all",
+                          "hover:bg-sidebar-accent",
+                          hasActiveChild ? "text-primary" : "text-muted-foreground hover:text-sidebar-foreground"
+                        )}
+                        title={group.name}
+                      >
+                        <Icon className="h-4 w-4" />
+                        {showBadge && (
+                          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" />
+                        )}
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent side="right" align="start" className="min-w-[180px]" sideOffset={8}>
+                      {group.children.map((child) => {
+                        const ChildIcon = child.icon || group.icon
+                        const isChildActive = location.pathname === child.href || (child.href !== '/' && location.pathname.startsWith(child.href + '/'))
+                        return (
+                          <DropdownMenuItem key={child.href} asChild>
+                            <Link
+                              to={child.href}
+                              onClick={() => setSidebarOpen(false)}
+                              className={cn("flex items-center gap-2 cursor-pointer", isChildActive && "bg-primary/10 text-primary")}
+                            >
+                              <ChildIcon className="h-4 w-4" />
+                              {child.name}
+                              {child.badgeHref === '/orders' && pendingOrders > 0 && (
+                                <span className="ml-auto bg-destructive text-white text-xs px-1.5 rounded-full">
+                                  {pendingOrders > 9 ? '9+' : pendingOrders}
+                                </span>
+                              )}
+                            </Link>
+                          </DropdownMenuItem>
+                        )
+                      })}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )
+              }
+
               return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  onClick={() => setSidebarOpen(false)}
-                  className={cn(
-                    "relative flex items-center rounded-md text-sm font-normal transition-all group",
-                    showExpanded ? "gap-3 px-3 py-2" : "justify-center px-2 py-2",
-                    "hover:bg-sidebar-accent active:bg-sidebar-accent/80",
-                    isActive
-                      ? "bg-primary/10 text-primary font-medium dark:bg-primary/20"
-                      : "text-sidebar-foreground hover:text-sidebar-foreground"
+                <div key={group.id} className="space-y-0.5">
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.id)}
+                    className={cn(
+                      "relative flex items-center rounded-md text-sm font-normal transition-all group w-full",
+                      showExpanded ? "gap-3 px-3 py-2" : "justify-center px-2 py-2",
+                      "hover:bg-sidebar-accent active:bg-sidebar-accent/80",
+                      (hasActiveChild || isExpanded)
+                        ? "text-sidebar-foreground hover:text-sidebar-foreground"
+                        : "text-sidebar-foreground hover:text-sidebar-foreground"
+                    )}
+                    title={!showExpanded ? group.name : undefined}
+                  >
+                    {hasActiveChild && !isExpanded && (
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r" />
+                    )}
+                    <Icon className={cn(
+                      "h-4 w-4 flex-shrink-0",
+                      hasActiveChild ? "text-primary" : "text-muted-foreground"
+                    )} />
+                    {showExpanded && (
+                      <>
+                        <span className="flex-1 text-left">{group.name}</span>
+                        {showBadge && (
+                          <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
+                            {pendingOrders > 9 ? '9+' : pendingOrders}
+                          </span>
+                        )}
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        )}
+                      </>
+                    )}
+                    {!showExpanded && (
+                      <span className="absolute left-full ml-2 px-2 py-1 rounded-md bg-foreground text-background text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 shadow-lg">
+                        {group.name}
+                        {showBadge && ` (${pendingOrders} pending)`}
+                      </span>
+                    )}
+                  </button>
+                  {showExpanded && isExpanded && (
+                    <div className="ml-4 pl-2 border-l border-sidebar-border space-y-0.5">
+                      {group.children.map((child) => {
+                        const ChildIcon = child.icon || group.icon
+                        const isChildActive = location.pathname === child.href ||
+                          (child.href !== '/dashboard' && location.pathname.startsWith(child.href))
+                        const showChildBadge = child.badgeHref === '/orders' && pendingOrders > 0
+                        return (
+                          <Link
+                            key={child.href}
+                            to={child.href}
+                            onClick={() => setSidebarOpen(false)}
+                            className={cn(
+                              "relative flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-all group",
+                              "hover:bg-sidebar-accent",
+                              isChildActive
+                                ? "bg-primary/10 text-primary font-medium dark:bg-primary/20"
+                                : "text-muted-foreground hover:text-sidebar-foreground"
+                            )}
+                          >
+                            {isChildActive && (
+                              <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r -ml-2" />
+                            )}
+                            <ChildIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                            <span className="flex-1 truncate">{child.name}</span>
+                            {showChildBadge && (
+                              <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
+                                {pendingOrders > 9 ? '9+' : pendingOrders}
+                              </span>
+                            )}
+                          </Link>
+                        )
+                      })}
+                    </div>
                   )}
-                  title={!showExpanded ? item.name : undefined}
-                >
-                  {isActive && (
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r" />
-                  )}
-                  <Icon className={cn(
-                    "h-4 w-4 flex-shrink-0",
-                    isActive ? "text-primary" : "text-muted-foreground"
-                  )} />
-                  {showExpanded && (
-                    <>
-                      <span className="flex-1">{item.name}</span>
-                      {showBadge && (
-                        <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
-                          {pendingOrders > 9 ? '9+' : pendingOrders}
-                        </span>
-                      )}
-                    </>
-                  )}
-                  {/* Tooltip for collapsed state */}
-                  {!showExpanded && (
-                    <span className="absolute left-full ml-2 px-2 py-1 rounded-md bg-foreground text-background text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 shadow-lg">
-                      {item.name}
-                      {showBadge && ` (${pendingOrders} pending)`}
-                    </span>
-                  )}
-                </Link>
+                </div>
               )
             })}
           </nav>

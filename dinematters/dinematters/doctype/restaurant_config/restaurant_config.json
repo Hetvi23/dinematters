@@ -37,6 +37,7 @@
   "enable_offers",
   "enable_coupons",
   "enable_experience_lounge",
+  "verify_my_user",
   "section_break_social_media",
   "google_review_link",
   "instagram_profile_link",
@@ -203,6 +204,13 @@
    "fieldname": "enable_experience_lounge",
    "fieldtype": "Check",
    "label": "Enable Experience Lounge"
+  },
+  {
+   "default": "0",
+   "fieldname": "verify_my_user",
+   "fieldtype": "Check",
+   "label": "Verify My User",
+   "description": "Require OTP verification before table booking, coupons, events, games"
   },
   {
    "fieldname": "section_break_social_media",

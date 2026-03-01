@@ -21,6 +21,7 @@
   "customer_name",
   "customer_phone",
   "customer_email",
+  "platform_customer",
   "notes"
  ],
  "fields": [
@@ -118,6 +119,13 @@
    "fieldtype": "Data",
    "label": "Customer Email",
    "options": "Email"
+  },
+  {
+   "fieldname": "platform_customer",
+   "fieldtype": "Link",
+   "label": "Platform Customer",
+   "options": "Customer",
+   "read_only": 1
   },
   {
    "fieldname": "notes",

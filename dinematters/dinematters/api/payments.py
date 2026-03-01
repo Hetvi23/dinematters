@@ -8,6 +8,7 @@ import json
 import math
 from frappe import _
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
+from dinematters.dinematters.utils.customer_helpers import require_verified_phone, get_or_create_customer
 
 
 def get_razorpay_client(restaurant_id=None):
@@ -57,6 +58,18 @@ def create_payment_order(restaurant_id, order_items, total_amount, customer_name
 		_restaurant_name = validate_restaurant_for_api(restaurant_id)
 		restaurant = frappe.get_doc("Restaurant", _restaurant_name)
 
+		# OTP gate: require verified phone when verify_my_user is on
+		if customer_phone:
+			config = frappe.db.get_value("Restaurant Config", {"restaurant": _restaurant_name}, "verify_my_user")
+			if config and not require_verified_phone(restaurant_id, customer_phone):
+				return {"success": False, "error": {"code": "PHONE_NOT_VERIFIED", "message": "Please verify your phone with OTP first"}}
+
+		# Get platform customer for linking
+		platform_customer = None
+		if customer_phone:
+			cust = get_or_create_customer(customer_phone, customer_name, customer_email)
+			platform_customer = cust.name if cust else None
+
 		# Parse order items if string
 		if isinstance(order_items, str):
 			order_items = json.loads(order_items)
@@ -77,6 +90,7 @@ def create_payment_order(restaurant_id, order_items, total_amount, customer_name
 			"customer_name": customer_name,
 			"customer_email": customer_email,
 			"customer_phone": customer_phone,
+			"platform_customer": platform_customer,
 			"table_number": table_number,
 			"subtotal": total_amount,
 			"total": total_amount,

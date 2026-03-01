@@ -3,6 +3,8 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useFrappeGetDoc, useFrappePostCall } from 'frappe-react-sdk';
 import Layout from '../components/Layout';
 import RazorpayCheckout from '../components/RazorpayCheckout';
+import { OTPVerification } from '../components/OTPVerification';
+import { useRestaurant } from '../contexts/RestaurantContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -10,6 +12,7 @@ import { Label } from '../components/ui/label';
 import { Separator } from '../components/ui/separator';
 import { ArrowLeft, ShoppingCart, User, Phone, Mail } from 'lucide-react';
 import { toast } from 'sonner';
+import { getStoredVerifiedPhone, setVerifiedPhone, normalizePhone, isVerifiedExpired } from '../utils/otpStorage';
 
 interface OrderItem {
   product_id: string;
@@ -44,12 +47,19 @@ const Payment: React.FC = () => {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [totalAmount, setTotalAmount] = useState(0);
   const [showPayment, setShowPayment] = useState(false);
+  const [showOTPStep, setShowOTPStep] = useState(false);
+
+  const { restaurantConfig } = useRestaurant();
+  const verifyMyUser = restaurantConfig?.settings?.verifyMyUser === true;
 
   // API calls
   const { data: restaurant } = useFrappeGetDoc('Restaurant', restaurantId);
   
   const { call: getCartItems } = useFrappePostCall<{success: boolean, data: CartItem[]}>(
     'dinematters.dinematters.api.cart.get_cart'
+  );
+  const { call: checkVerified } = useFrappePostCall<{success: boolean, verified: boolean}>(
+    'dinematters.dinematters.api.otp.check_verified'
   );
 
   // Load cart items on component mount
@@ -83,19 +93,42 @@ const Payment: React.FC = () => {
     }
   };
 
-  const handleCustomerDetailsSubmit = (e: React.FormEvent) => {
+  const handleCustomerDetailsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!customerName.trim()) {
       toast.error('Please enter your name');
       return;
     }
-    
+
     if (!customerPhone.trim()) {
       toast.error('Please enter your phone number');
       return;
     }
-    
+
+    if (verifyMyUser) {
+      const normalized = normalizePhone(customerPhone);
+      const stored = getStoredVerifiedPhone();
+      if (stored === normalized && !isVerifiedExpired()) {
+        try {
+          const res = await checkVerified({ phone: customerPhone });
+          if (res?.success && res.verified) {
+            setShowPayment(true);
+            return;
+          }
+        } catch {
+          // fall through to OTP step
+        }
+      }
+      setShowOTPStep(true);
+    } else {
+      setShowPayment(true);
+    }
+  };
+
+  const handleOTPVerified = () => {
+    setVerifiedPhone(customerPhone);
+    setShowOTPStep(false);
     setShowPayment(true);
   };
 
@@ -117,6 +150,8 @@ const Payment: React.FC = () => {
   const goBack = () => {
     if (showPayment) {
       setShowPayment(false);
+    } else if (showOTPStep) {
+      setShowOTPStep(false);
     } else {
       navigate(`/restaurant/${restaurantId}/menu`);
     }
@@ -219,9 +254,28 @@ const Payment: React.FC = () => {
             </Card>
           </div>
 
-          {/* Right Column - Customer Details or Payment */}
+          {/* Right Column - Customer Details, OTP, or Payment */}
           <div>
-            {!showPayment ? (
+            {showOTPStep ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Verify Your Phone</CardTitle>
+                  <CardDescription>
+                    Enter the 4-digit OTP sent to {customerPhone}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <OTPVerification
+                    restaurantId={restaurantId!}
+                    restaurantName={restaurant.restaurant_name}
+                    phone={customerPhone}
+                    name={customerName}
+                    email={customerEmail}
+                    onVerified={handleOTPVerified}
+                  />
+                </CardContent>
+              </Card>
+            ) : !showPayment ? (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">

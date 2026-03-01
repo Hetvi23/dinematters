@@ -10,6 +10,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, get_datetime_str, getdate, today
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
+from dinematters.dinematters.utils.customer_helpers import require_verified_phone, get_or_create_customer
 import json
 
 
@@ -30,6 +31,20 @@ def create_table_booking(restaurant_id, number_of_diners, date, time_slot, custo
 			customer_info = json.loads(customer_info) if customer_info else {}
 		customer_info = customer_info or {}
 		
+		# OTP gate: require verified phone when verify_my_user is on
+		phone = customer_info.get("phone")
+		if phone and not require_verified_phone(restaurant_id, phone):
+			return {
+				"success": False,
+				"error": {"code": "PHONE_NOT_VERIFIED", "message": "Please verify your phone with OTP first"}
+			}
+		
+		# Get platform customer for linking
+		platform_customer = None
+		if phone:
+			cust = get_or_create_customer(phone, customer_info.get("fullName"), customer_info.get("email"))
+			platform_customer = cust.name if cust else None
+		
 		# Get user
 		user = frappe.session.user if frappe.session.user != "Guest" else None
 		if not user and not session_id:
@@ -48,6 +63,7 @@ def create_table_booking(restaurant_id, number_of_diners, date, time_slot, custo
 			"customer_name": customer_info.get("fullName"),
 			"customer_phone": customer_info.get("phone"),
 			"customer_email": customer_info.get("email"),
+			"platform_customer": platform_customer,
 			"notes": customer_info.get("notes")
 		})
 		booking_doc.insert(ignore_permissions=True)
@@ -251,6 +267,20 @@ def create_banquet_booking(restaurant_id, number_of_guests, event_type, date, ti
 			customer_info = json.loads(customer_info) if customer_info else {}
 		customer_info = customer_info or {}
 		
+		# OTP gate: require verified phone when verify_my_user is on
+		phone = customer_info.get("phone")
+		if phone and not require_verified_phone(restaurant_id, phone):
+			return {
+				"success": False,
+				"error": {"code": "PHONE_NOT_VERIFIED", "message": "Please verify your phone with OTP first"}
+			}
+		
+		# Get platform customer for linking
+		platform_customer = None
+		if phone:
+			cust = get_or_create_customer(phone, customer_info.get("fullName"), customer_info.get("email"))
+			platform_customer = cust.name if cust else None
+		
 		# Get user
 		user = frappe.session.user if frappe.session.user != "Guest" else None
 		if not user and not session_id:
@@ -270,6 +300,7 @@ def create_banquet_booking(restaurant_id, number_of_guests, event_type, date, ti
 			"customer_name": customer_info.get("fullName"),
 			"customer_phone": customer_info.get("phone"),
 			"customer_email": customer_info.get("email"),
+			"platform_customer": platform_customer,
 			"notes": customer_info.get("notes")
 		})
 		booking_doc.insert(ignore_permissions=True)

@@ -11,6 +11,7 @@ from frappe import _
 from frappe.utils import flt, now_datetime, get_datetime_str, add_to_date
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api, validate_product_belongs_to_restaurant
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
+from dinematters.dinematters.utils.customer_helpers import require_verified_phone, get_or_create_customer
 import json
 import random
 import string
@@ -38,6 +39,20 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 			customer_info = json.loads(customer_info) if customer_info else {}
 		if isinstance(delivery_info, str):
 			delivery_info = json.loads(delivery_info) if delivery_info else {}
+		customer_info = customer_info or {}
+		
+		# OTP gate: require verified phone when verify_my_user is on
+		phone = customer_info.get("phone")
+		if phone and not require_verified_phone(restaurant_id, phone):
+			return {
+				"success": False,
+				"error": {"code": "PHONE_NOT_VERIFIED", "message": "Please verify your phone with OTP first"}
+			}
+
+		platform_customer = None
+		if phone:
+			cust = get_or_create_customer(phone, customer_info.get("name"), customer_info.get("email"))
+			platform_customer = cust.name if cust else None
 		
 		# Get user
 		user = frappe.session.user if frappe.session.user != "Guest" else None
@@ -166,6 +181,7 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 			"customer_name": customer_info.get("name") if customer_info else None,
 			"customer_email": customer_info.get("email") if customer_info else None,
 			"customer_phone": customer_info.get("phone") if customer_info else None,
+			"platform_customer": platform_customer,
 			"subtotal": subtotal,
 			"discount": discount,
 			"tax": tax,

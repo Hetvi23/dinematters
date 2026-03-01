@@ -1,0 +1,81 @@
+{
+ "actions": [],
+ "creation": "2025-02-27 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "section_otp",
+  "fast2sms_api_key",
+  "fast2sms_sender_id",
+  "fast2sms_dlt_template_id",
+  "otp_expiry_minutes",
+  "column_break_otp",
+  "whatsapp_phone_number_id",
+  "whatsapp_otp_template_name"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_otp",
+   "fieldtype": "Section Break",
+   "label": "OTP Verification (Fast2SMS)"
+  },
+  {
+   "fieldname": "fast2sms_api_key",
+   "fieldtype": "Password",
+   "label": "Fast2SMS API Key",
+   "description": "API key from Fast2SMS dashboard"
+  },
+  {
+   "fieldname": "fast2sms_sender_id",
+   "fieldtype": "Data",
+   "label": "DLT Sender ID",
+   "description": "Optional. e.g. DINMAT for DLT route"
+  },
+  {
+   "fieldname": "fast2sms_dlt_template_id",
+   "fieldtype": "Data",
+   "label": "DLT Template ID",
+   "description": "Optional. Message ID from DLT Manager for OTP template"
+  },
+  {
+   "default": "5",
+   "fieldname": "otp_expiry_minutes",
+   "fieldtype": "Int",
+   "label": "OTP Expiry (Minutes)"
+  },
+  {
+   "fieldname": "column_break_otp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "whatsapp_phone_number_id",
+   "fieldtype": "Data",
+   "label": "WhatsApp Phone Number ID",
+   "description": "For fallback. From Fast2SMS WhatsApp setup"
+  },
+  {
+   "fieldname": "whatsapp_otp_template_name",
+   "fieldtype": "Data",
+   "label": "WhatsApp OTP Template Name",
+   "description": "Meta-approved OTP template name"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-02-27 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Dinematters",
+ "name": "Dinematters Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "states": [],
+ "track_changes": 1
+}
