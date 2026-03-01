@@ -543,3 +543,38 @@ def cint(value):
 	from frappe.utils import cint as frappe_cint
 	return frappe_cint(value)
 
+
+@frappe.whitelist()
+def update_order_feedback(order_id, customer_rating=None, customer_feedback=None):
+	"""
+	Update customer rating and feedback for an order.
+	Restaurant staff (with access to the order's restaurant) or System Manager.
+	"""
+	try:
+		if not frappe.db.exists("Order", order_id):
+			return {"success": False, "error": "Order not found"}
+
+		order = frappe.get_doc("Order", order_id)
+		restaurant_id = order.restaurant
+
+		# Permission: restaurant access or System Manager
+		from dinematters.dinematters.utils.permission_helpers import get_user_restaurant_ids
+		restaurant_ids = get_user_restaurant_ids(frappe.session.user)
+		if "System Manager" not in frappe.get_roles() and restaurant_id not in restaurant_ids:
+			return {"success": False, "error": "Permission denied"}
+
+		if customer_rating is not None:
+			rating = int(customer_rating)
+			if 1 <= rating <= 5:
+				order.customer_rating = rating
+		if customer_feedback is not None:
+			order.customer_feedback = str(customer_feedback).strip() or None
+
+		order.flags.ignore_permissions = True
+		order.save()
+
+		return {"success": True, "message": "Feedback updated"}
+	except Exception as e:
+		frappe.log_error(f"update_order_feedback error: {e}", "Order_Feedback")
+		return {"success": False, "error": str(e)}
+

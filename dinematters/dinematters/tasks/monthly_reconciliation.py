@@ -180,5 +180,5 @@ def send_minimum_fee_notification(restaurant, amount, payment_url, month):
 
 @frappe.whitelist()
 def reconcile_transfers():
-	\"\"\"Transfer reconciliation removed for SaaS billing (no Route/transfers).\"\"\"
+	"""Transfer reconciliation removed for SaaS billing (no Route/transfers)."""
 	return {"success": False, "error": "transfer reconciliation is deprecated in SaaS billing mode"}

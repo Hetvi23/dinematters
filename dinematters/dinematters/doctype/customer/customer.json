@@ -11,7 +11,8 @@
   "email",
   "column_break_1",
   "verified_at",
-  "first_verified_at_restaurant"
+  "first_verified_at_restaurant",
+  "last_visited"
  ],
  "fields": [
   {
@@ -50,6 +51,13 @@
    "fieldtype": "Link",
    "label": "First Verified At Restaurant",
    "options": "Restaurant",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_visited",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Last Visited",
    "read_only": 1
   }
  ],

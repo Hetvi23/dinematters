@@ -170,6 +170,18 @@ has_permission = {
 # ---------------
 # Hook on document methods and events
 
+doc_events = {
+	"Order": {
+		"after_insert": "dinematters.dinematters.api.customers.update_customer_last_visited",
+	},
+	"Table Booking": {
+		"after_insert": "dinematters.dinematters.api.customers.update_customer_last_visited",
+	},
+	"Banquet Booking": {
+		"after_insert": "dinematters.dinematters.api.customers.update_customer_last_visited",
+	},
+}
+
 # doc_events = {
 # 	"*": {
 # 		"on_update": "method",

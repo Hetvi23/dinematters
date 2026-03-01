@@ -47,7 +47,10 @@
   "delivery_zip_code",
   "delivery_instructions",
   "section_break_requests",
-  "cooking_requests"
+  "cooking_requests",
+  "section_break_feedback",
+  "customer_rating",
+  "customer_feedback"
  ],
  "fields": [
   {
@@ -298,6 +301,24 @@
    "fieldname": "cooking_requests",
    "fieldtype": "JSON",
    "label": "Cooking Requests"
+  },
+  {
+   "fieldname": "section_break_feedback",
+   "fieldtype": "Section Break",
+   "label": "Customer Feedback"
+  },
+  {
+   "fieldname": "customer_rating",
+   "fieldtype": "Int",
+   "label": "Customer Rating",
+   "description": "1-5 stars from customer",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "customer_feedback",
+   "fieldtype": "Small Text",
+   "label": "Customer Feedback",
+   "description": "Feedback or review shared by customer for this order"
   }
  ],
  "index_web_pages_for_search": 1,

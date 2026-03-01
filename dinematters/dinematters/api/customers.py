@@ -10,6 +10,18 @@ from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_ap
 from dinematters.dinematters.utils.permission_helpers import get_user_restaurant_ids
 
 
+def update_customer_last_visited(doc, event=None):
+	"""Update Customer.last_visited when Order/Table Booking/Banquet Booking is submitted."""
+	customer_id = getattr(doc, "platform_customer", None)
+	if not customer_id or not frappe.db.exists("Customer", customer_id):
+		return
+	if not frappe.db.has_column("Customer", "last_visited"):
+		return
+	ts = doc.creation or doc.modified
+	frappe.db.set_value("Customer", customer_id, "last_visited", ts)
+	frappe.db.commit()
+
+
 @frappe.whitelist()
 def get_customer_profile(customer_id):
 	"""
@@ -26,11 +38,14 @@ def get_customer_profile(customer_id):
 		customer = frappe.get_doc("Customer", customer_id)
 		restaurants = []
 
-		# Orders
+		# Orders (include feedback)
+		order_fields = ["name", "restaurant", "order_number", "total", "status", "creation"]
+		if frappe.db.has_column("Order", "customer_rating"):
+			order_fields.extend(["customer_rating", "customer_feedback"])
 		orders = frappe.get_all(
 			"Order",
 			filters={"platform_customer": customer_id},
-			fields=["name", "restaurant", "order_number", "total", "status", "creation"]
+			fields=order_fields
 		)
 		order_by_rest = {}
 		for o in orders:
@@ -95,15 +110,19 @@ def get_customer_profile(customer_id):
 
 
 @frappe.whitelist()
-def get_restaurant_customers(restaurant_id):
+def get_restaurant_customers(restaurant_id, search=None, page=1, page_size=20):
 	"""
-	Restaurant: Get customers who have orders/bookings at this restaurant only.
+	Restaurant: Get customers who have orders/bookings at this restaurant only. Supports search (name, phone), pagination.
 	"""
 	try:
 		restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user)
 		restaurant_ids = get_user_restaurant_ids(frappe.session.user)
 		if "System Manager" not in frappe.get_roles() and restaurant not in restaurant_ids:
 			return {"success": False, "error": "Permission denied"}
+
+		page = max(1, int(page))
+		page_size = max(1, min(100, int(page_size)))
+		search_term = (search or "").strip().lower() if search else None
 
 		customer_ids = set()
 		for doctype, field in [
@@ -129,10 +148,13 @@ def get_restaurant_customers(restaurant_id):
 			if not c:
 				continue
 
+			order_fields = ["name", "order_number", "total", "status", "creation", "customer_phone"]
+			if frappe.db.has_column("Order", "customer_rating"):
+				order_fields.extend(["customer_rating", "customer_feedback"])
 			orders = frappe.get_all(
 				"Order",
 				filters={"restaurant": restaurant, "platform_customer": cid},
-				fields=["name", "order_number", "total", "status", "creation", "customer_phone"]
+				fields=order_fields
 			)
 			table_bookings = frappe.get_all(
 				"Table Booking",
@@ -154,17 +176,40 @@ def get_restaurant_customers(restaurant_id):
 			if not phone and banquet_bookings:
 				phone = banquet_bookings[0].get("customer_phone")
 
+			if search_term:
+				name_match = (c.customer_name or "").lower().find(search_term) >= 0
+				ph = (phone or "")
+				phone_match = search_term in ph or search_term in ph.lower()
+				if not name_match and not phone_match:
+					continue
+
+			last_dates = []
+			for o in orders:
+				if o.get("creation"):
+					last_dates.append(o["creation"])
+			for b in table_bookings + banquet_bookings:
+				if b.get("creation"):
+					last_dates.append(b["creation"])
+			last_visited = max(last_dates) if last_dates else None
+
 			customers.append({
 				"id": c.name,
 				"phone": phone,
 				"customerName": c.customer_name,
 				"verifiedAt": str(c.verified_at) if c.verified_at else None,
+				"lastVisited": str(last_visited) if last_visited else None,
 				"orders": orders,
 				"tableBookings": table_bookings,
 				"banquetBookings": banquet_bookings
 			})
 
-		return {"success": True, "data": {"customers": customers}}
+		customers.sort(key=lambda x: (x.get("lastVisited") or "", x.get("customerName") or ""), reverse=True)
+		total_count = len(customers)
+		start = (page - 1) * page_size
+		customers = customers[start:start + page_size]
+
+		is_admin = "System Manager" in frappe.get_roles()
+		return {"success": True, "data": {"customers": customers, "isAdmin": is_admin, "totalCount": total_count}}
 	except Exception as e:
 		frappe.log_error(f"get_restaurant_customers error: {e}", "Customer_API")
 		return {"success": False, "error": str(e)}
