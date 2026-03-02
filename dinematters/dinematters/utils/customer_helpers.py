@@ -15,38 +15,40 @@ def normalize_phone(phone: str) -> str:
 	return digits[-10:] if len(digits) >= 10 else digits
 
 
+def _phone_variants(normalized: str):
+	"""Return normalized and common format variants for lookup."""
+	return [normalized, f"0{normalized}", f"+91{normalized}", f"+91 {normalized}", f"91{normalized}"]
+
+
 def _find_customer_by_normalized_phone(normalized: str):
-	"""Find Customer by phone - tries normalized and common variants to avoid duplicates."""
-	existing = frappe.db.get_value("Customer", {"phone": normalized}, "name")
-	if existing:
-		return existing
-	for variant in [f"0{normalized}", f"+91{normalized}", f"+91 {normalized}", f"91{normalized}"]:
-		existing = frappe.db.get_value("Customer", {"phone": variant}, "name")
+	"""Find Customer by phone (single source of truth). Tries normalized and common format variants."""
+	if not frappe.db.has_column("Customer", "phone"):
+		return None
+	for v in _phone_variants(normalized):
+		existing = frappe.db.get_value("Customer", {"phone": v}, "name")
 		if existing:
 			return existing
 	return None
 
 
 def get_or_create_customer(phone: str, name: str = None, email: str = None):
-	"""Get or create Customer by phone. Used when verifying OTP and when creating Order/Booking.
-	Phone is the unique identifier - no duplicates. Normalizes to 10 digits."""
+	"""Get or create Customer by phone. Phone is the unique identifier - no duplicates."""
 	normalized = normalize_phone(phone)
 	if not normalized or len(normalized) != 10:
 		return None
 
 	existing = _find_customer_by_normalized_phone(normalized)
 	if existing:
-		doc = frappe.get_doc("Customer", existing)
+		# Update via db to avoid attr errors when ERPNext Customer lacks fields
 		if name:
-			doc.customer_name = name
+			frappe.db.set_value("Customer", existing, "customer_name", name)
 		if email is not None:
-			doc.email = email
-		# Normalize stored phone if it was stored in variant format (e.g. 0987.., +91..)
-		if doc.phone != normalized:
-			doc.phone = normalized
-		doc.flags.ignore_permissions = True
-		doc.save()
-		return doc
+			frappe.db.set_value("Customer", existing, "email", email or "")
+		frappe.db.set_value("Customer", existing, "phone", normalized)
+		frappe.db.commit()
+		# Re-fetch by phone in case ERPNext renamed doc when customer_name changed
+		current = _find_customer_by_normalized_phone(normalized)
+		return frappe.get_doc("Customer", current or existing)
 
 	try:
 		return frappe.get_doc({
@@ -56,17 +58,15 @@ def get_or_create_customer(phone: str, name: str = None, email: str = None):
 			"email": email or ""
 		}).insert(ignore_permissions=True)
 	except (frappe.DuplicateEntryError, frappe.UniqueValidationError):
-		# Race condition or duplicate phone: another request created same customer
 		existing = _find_customer_by_normalized_phone(normalized)
 		if existing:
-			doc = frappe.get_doc("Customer", existing)
 			if name:
-				doc.customer_name = name
+				frappe.db.set_value("Customer", existing, "customer_name", name)
 			if email is not None:
-				doc.email = email
-			doc.flags.ignore_permissions = True
-			doc.save()
-			return doc
+				frappe.db.set_value("Customer", existing, "email", email or "")
+			frappe.db.commit()
+			current = _find_customer_by_normalized_phone(normalized)
+			return frappe.get_doc("Customer", current or existing)
 		raise
 
 
@@ -75,7 +75,13 @@ def is_phone_verified(phone: str) -> bool:
 	normalized = normalize_phone(phone)
 	if not normalized or len(normalized) != 10:
 		return False
-	return bool(frappe.db.get_value("Customer", {"phone": normalized}, "verified_at"))
+	if not frappe.db.has_column("Customer", "verified_at"):
+		return False
+	for v in _phone_variants(normalized):
+		val = frappe.db.get_value("Customer", {"phone": v}, "verified_at")
+		if val:
+			return True
+	return False
 
 
 def require_verified_phone(restaurant_id: str, phone: str) -> bool:

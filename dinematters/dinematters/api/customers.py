@@ -41,13 +41,13 @@ def get_customer_by_phone(phone, restaurant_id):
 		c = frappe.db.get_value(
 			"Customer",
 			customer_id,
-			["name", "phone", "mobile_no", "customer_name", "email", "verified_at"],
+			["name", "phone", "customer_name", "email", "verified_at"],
 			as_dict=True
 		)
 		if not c:
 			return {"success": True, "data": None}
 
-		ph = c.phone or c.mobile_no
+		ph = c.phone
 		order_fields = ["name", "order_number", "total", "status", "creation", "customer_phone"]
 		if frappe.db.has_column("Order", "customer_rating"):
 			order_fields.extend(["customer_rating", "customer_feedback"])
@@ -233,7 +233,7 @@ def get_restaurant_customers(restaurant_id, search=None, page=1, page_size=20):
 			c = frappe.db.get_value(
 				"Customer",
 				cid,
-				["name", "phone", "mobile_no", "customer_name", "email", "verified_at"],
+				["name", "phone", "customer_name", "email", "verified_at"],
 				as_dict=True
 			)
 			if not c:
@@ -258,8 +258,7 @@ def get_restaurant_customers(restaurant_id, search=None, page=1, page_size=20):
 				fields=["name", "booking_number", "date", "event_type", "status", "creation", "customer_phone"]
 			)
 
-			# Phone: prefer Customer.phone, then mobile_no, else from first Order/Booking
-			phone = c.phone or c.mobile_no
+			phone = c.phone
 			if not phone and orders:
 				phone = orders[0].get("customer_phone")
 			if not phone and table_bookings:

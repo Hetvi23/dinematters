@@ -113,7 +113,7 @@ def verify_otp(restaurant_id, phone, otp, token, name=None, email=None):
 		if not customer:
 			return {"success": False, "error": "CUSTOMER_CREATE_FAILED"}
 
-		# Update verified_at (use db.set_value when ERPNext Customer lacks the attr)
+		# Update verified_at and ensure phone is set (use db.set_value when ERPNext Customer lacks attrs)
 		now_ts = frappe.utils.now()
 		if frappe.db.has_column("Customer", "verified_at"):
 			current = frappe.db.get_value("Customer", customer.name, "verified_at")
@@ -121,7 +121,12 @@ def verify_otp(restaurant_id, phone, otp, token, name=None, email=None):
 				frappe.db.set_value("Customer", customer.name, "verified_at", now_ts)
 			if frappe.db.has_column("Customer", "first_verified_at_restaurant"):
 				frappe.db.set_value("Customer", customer.name, "first_verified_at_restaurant", restaurant_id)
-			frappe.db.commit()
+		# Ensure phone is set so is_phone_verified() finds this customer when order checks
+		if frappe.db.has_column("Customer", "phone"):
+			current_phone = frappe.db.get_value("Customer", customer.name, "phone")
+			if not current_phone:
+				frappe.db.set_value("Customer", customer.name, "phone", normalized)
+		frappe.db.commit()
 
 		return {"success": True, "verified": True, "customer_id": customer.name}
 	except Exception as e:
