@@ -365,8 +365,15 @@ def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=Fa
 			where_sql = "restaurant = %s AND customer_phone IN (" + ph + ")"
 			params = [restaurant] + phone_variants
 
+		base_cols = "name, order_id, order_number, status, total, subtotal, discount, creation, estimated_delivery"
+		feedback_cols = ""
+		if frappe.db.has_column("Order", "customer_rating"):
+			feedback_cols = ", customer_rating, customer_feedback"
+		if frappe.db.has_column("Order", "food_rating"):
+			feedback_cols += ", food_rating, service_rating"
+
 		order_list = frappe.db.sql("""
-			SELECT name, order_id, order_number, status, total, subtotal, discount, creation, estimated_delivery
+			SELECT """ + base_cols + feedback_cols + """
 			FROM `tabOrder`
 			WHERE """ + where_sql + """
 			ORDER BY creation DESC
@@ -381,6 +388,7 @@ def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=Fa
 		total_pages = (total + limit - 1) // limit if limit > 0 else 1
 
 		orders = []
+		has_feedback_cols = frappe.db.has_column("Order", "customer_rating")
 		for o in order_list:
 			order_data = {
 				"id": o.get("order_id") or o.get("name"),
@@ -391,6 +399,10 @@ def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=Fa
 				"discount": flt(o.get("discount") or 0),
 				"createdAt": get_datetime_str(o.get("creation")),
 				"estimatedDelivery": get_datetime_str(o.get("estimated_delivery")) if o.get("estimated_delivery") else None,
+				"customerRating": cint(o.get("customer_rating")) if has_feedback_cols and o.get("customer_rating") is not None else None,
+				"customerFeedback": ((o.get("customer_feedback") or "").strip() or None) if has_feedback_cols else None,
+				"foodRating": cint(o.get("food_rating")) if o.get("food_rating") is not None else None,
+				"serviceRating": cint(o.get("service_rating")) if o.get("service_rating") is not None else None,
 			}
 			if include_items:
 				order_doc = frappe.get_doc("Order", o.get("name"))
@@ -624,6 +636,17 @@ def format_order(order_doc):
 		except frappe.DoesNotExistError:
 			# Coupon was deleted, just include the reference
 			order_data["coupon"] = order_doc.coupon
+
+	# Add feedback if available
+	if frappe.db.has_column("Order", "customer_rating"):
+		order_data["customerRating"] = cint(order_doc.customer_rating) if order_doc.customer_rating else None
+		order_data["customerFeedback"] = order_doc.customer_feedback or None
+	if frappe.db.has_column("Order", "food_rating"):
+		fr = getattr(order_doc, "food_rating", None)
+		order_data["foodRating"] = cint(fr) if fr is not None else None
+	if frappe.db.has_column("Order", "service_rating"):
+		sr = getattr(order_doc, "service_rating", None)
+		order_data["serviceRating"] = cint(sr) if sr is not None else None
 	
 	return order_data
 
@@ -657,6 +680,86 @@ def cint(value):
 	"""Convert to integer"""
 	from frappe.utils import cint as frappe_cint
 	return frappe_cint(value)
+
+
+@frappe.whitelist(allow_guest=True)
+def post_order_feedback(restaurant_id, order_id, phone, food_rating=None, service_rating=None, suggestion=None):
+	"""
+	POST feedback for an order. Customer-facing, requires verified phone.
+	Input: restaurant_id, order_id, phone, food_rating (1-5), service_rating (1-5), suggestion (optional)
+	Verifies phone owns the order (customer_phone or platform_customer match).
+	"""
+	try:
+		restaurant = validate_restaurant_for_api(restaurant_id)
+
+		normalized = normalize_phone(phone)
+		if not normalized or len(normalized) != 10:
+			return {
+				"success": False,
+				"error": {"code": "INVALID_PHONE", "message": "Invalid phone number"}
+			}
+
+		if not require_verified_phone(restaurant_id, phone):
+			return {
+				"success": False,
+				"error": {"code": "PHONE_NOT_VERIFIED", "message": "Please verify your phone with OTP first"}
+			}
+
+		order_name = frappe.db.get_value("Order", {"order_id": order_id}, "name")
+		if not order_name:
+			order_name = order_id
+		if not frappe.db.exists("Order", order_name):
+			return {
+				"success": False,
+				"error": {"code": "ORDER_NOT_FOUND", "message": "Order not found"}
+			}
+
+		order = frappe.get_doc("Order", order_name)
+		if order.restaurant != restaurant:
+			return {
+				"success": False,
+				"error": {"code": "ORDER_NOT_FOUND", "message": "Order not found for this restaurant"}
+			}
+
+		phone_variants = get_phone_variants_for_lookup(normalized)
+		customer_id = _find_customer_by_normalized_phone(normalized)
+		order_phone_normalized = normalize_phone(order.customer_phone or "")
+		order_phone_ok = order_phone_normalized == normalized or (order.customer_phone and order.customer_phone.strip() in phone_variants)
+		order_customer_ok = customer_id and order.platform_customer == customer_id
+		if not order_phone_ok and not order_customer_ok:
+			return {
+				"success": False,
+				"error": {"code": "UNAUTHORIZED", "message": "This order does not belong to this phone number"}
+			}
+
+		if food_rating is not None:
+			r = int(food_rating)
+			if 1 <= r <= 5:
+				frappe.db.set_value("Order", order_name, "food_rating", r)
+		if service_rating is not None:
+			r = int(service_rating)
+			if 1 <= r <= 5:
+				frappe.db.set_value("Order", order_name, "service_rating", r)
+		if suggestion is not None:
+			frappe.db.set_value("Order", order_name, "customer_feedback", str(suggestion).strip() or None)
+		if food_rating is not None or service_rating is not None:
+			avg = None
+			f = int(food_rating) if food_rating is not None else None
+			s = int(service_rating) if service_rating is not None else None
+			if f is not None and s is not None:
+				avg = round((f + s) / 2)
+			elif f is not None:
+				avg = f
+			elif s is not None:
+				avg = s
+			if avg is not None:
+				frappe.db.set_value("Order", order_name, "customer_rating", avg)
+		frappe.db.commit()
+
+		return {"success": True, "message": "Feedback submitted"}
+	except Exception as e:
+		frappe.log_error(f"post_order_feedback error: {e}", "Order_Feedback")
+		return {"success": False, "error": {"code": "FEEDBACK_ERROR", "message": str(e)}}
 
 
 @frappe.whitelist()

@@ -1285,6 +1285,10 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
         "discount": 0,
         "createdAt": "2026-03-02 12:24:20",
         "estimatedDelivery": "2026-03-02 12:54:20",
+        "customerRating": 4,
+        "customerFeedback": "Great food!",
+        "foodRating": 5,
+        "serviceRating": 4,
         "items": [
           {
             "dishId": "aamchi-mumbai-burger",
@@ -1307,10 +1311,39 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
 **Notes**:
 - Requires verified phone (OTP). Returns `PHONE_NOT_VERIFIED` if not verified.
 - `items` included only when `include_items=true` (backward compatible, default false).
+- **Feedback fields (included for every order):**
+  - `customerRating` (number|null) - Combined 1–5 rating; `null` if not set
+  - `customerFeedback` (string|null) - Suggestion/comment text; `null` if not set
+  - `foodRating` (number|null) - 1–5 food rating; `null` if not set
+  - `serviceRating` (number|null) - 1–5 service rating; `null` if not set
 
 ---
 
-#### 9.4 Get Order Details
+#### 9.4 Post Order Feedback
+
+**Endpoint**: `POST /api/method/dinematters.dinematters.api.orders.post_order_feedback`
+
+**Parameters**:
+- `restaurant_id` (required) - Restaurant identifier
+- `order_id` (required) - Order ID (e.g. `order-xxx` or document name)
+- `phone` (required) - 10-digit India phone (verified via OTP)
+- `food_rating` (optional) - 1-5 stars for food
+- `service_rating` (optional) - 1-5 stars for service
+- `suggestion` (optional) - Free-text feedback
+
+**Response**:
+```json
+{"success": true, "message": "Feedback submitted"}
+```
+
+**Notes**:
+- Customer-facing, `allow_guest=True`. Requires verified phone.
+- Verifies order belongs to the phone (customer_phone or platform_customer match).
+- Returns `UNAUTHORIZED` if order does not belong to the phone.
+
+---
+
+#### 9.5 Get Order Details
 
 **Endpoint**: `GET /api/method/dinematters.dinematters.api.orders.get_order`
 
@@ -1339,7 +1372,11 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
         "createdAt": "2025-01-15 10:30:00",
         "estimatedDelivery": "2025-01-15 11:00:00",
         "customerInfo": {...},
-        "deliveryInfo": {...}
+        "deliveryInfo": {...},
+        "customerRating": 4,
+        "customerFeedback": "Great food!",
+        "foodRating": 5,
+        "serviceRating": 4
       }
     }
   }
@@ -1348,6 +1385,7 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
 
 **Notes**:
 - `tableNumber` is included in response if table was specified when creating the order
+- Feedback fields: `customerRating`, `customerFeedback`, `foodRating`, `serviceRating` (included when present, `null` if not set)
 
 ---
 
@@ -1575,8 +1613,9 @@ All APIs return errors in this format:
 | 26 | POST | `cart.parse_qr_code` | Public | N/A | ✅ QR code parsing for table numbers |
 | 27 | POST | `orders.create_order` | Public | ✅ Present | ✅ Restaurant validation with table_number support |
 | 28 | GET | `orders.get_orders` | Public | ✅ Present | ✅ Restaurant-specific |
-| 29 | GET | `orders.get_customer_orders` | Public | ✅ Present | ✅ By phone + restaurant, pagination, include_items |
-| 30 | GET | `orders.get_order` | Public | ✅ Present | ✅ Restaurant validation included |
+| 29 | GET | `orders.get_customer_orders` | Public | ✅ Present | ✅ By phone + restaurant, pagination, include_items, feedback |
+| 30 | POST | `orders.post_order_feedback` | Public | ✅ Present | ✅ Order/restaurant/phone, food + service rating, suggestion |
+| 31 | GET | `orders.get_order` | Public | ✅ Present | ✅ Restaurant validation, feedback included |
 
 ---
 
