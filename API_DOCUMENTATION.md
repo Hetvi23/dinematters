@@ -1259,7 +1259,58 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
 
 ---
 
-#### 9.3 Get Order Details
+#### 9.3 Get Customer Orders (by phone)
+
+**Endpoint**: `GET /api/method/dinematters.dinematters.api.orders.get_customer_orders`
+
+**Parameters**:
+- `restaurant_id` (required) - Restaurant identifier
+- `phone` (required) - 10-digit India phone (verified via OTP)
+- `page` (optional, default: 1) - Page number
+- `limit` (optional, default: 20) - Items per page
+- `include_items` (optional, default: false) - Include dish details in each order
+
+**Response Structure**:
+```json
+{
+  "success": true,
+  "data": {
+    "orders": [
+      {
+        "id": "order-xxx",
+        "order_number": "ORD-2026-025",
+        "status": "cancelled",
+        "total": 630,
+        "subtotal": 630,
+        "discount": 0,
+        "createdAt": "2026-03-02 12:24:20",
+        "estimatedDelivery": "2026-03-02 12:54:20",
+        "items": [
+          {
+            "dishId": "aamchi-mumbai-burger",
+            "quantity": 1,
+            "dish": {
+              "id": "aamchi-mumbai-burger",
+              "name": "Aamchi Mumbai Burger",
+              "media": ["https://backend.dinematters.com/files/burger.jpg"],
+              "price": 440
+            }
+          }
+        ]
+      }
+    ],
+    "pagination": { "page": 1, "limit": 20, "total": 12, "totalPages": 1 }
+  }
+}
+```
+
+**Notes**:
+- Requires verified phone (OTP). Returns `PHONE_NOT_VERIFIED` if not verified.
+- `items` included only when `include_items=true` (backward compatible, default false).
+
+---
+
+#### 9.4 Get Order Details
 
 **Endpoint**: `GET /api/method/dinematters.dinematters.api.orders.get_order`
 
@@ -1524,7 +1575,8 @@ All APIs return errors in this format:
 | 26 | POST | `cart.parse_qr_code` | Public | N/A | ✅ QR code parsing for table numbers |
 | 27 | POST | `orders.create_order` | Public | ✅ Present | ✅ Restaurant validation with table_number support |
 | 28 | GET | `orders.get_orders` | Public | ✅ Present | ✅ Restaurant-specific |
-| 29 | GET | `orders.get_order` | Public | ✅ Present | ✅ Restaurant validation included |
+| 29 | GET | `orders.get_customer_orders` | Public | ✅ Present | ✅ By phone + restaurant, pagination, include_items |
+| 30 | GET | `orders.get_order` | Public | ✅ Present | ✅ Restaurant validation included |
 
 ---
 

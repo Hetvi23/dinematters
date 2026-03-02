@@ -20,6 +20,11 @@ def _phone_variants(normalized: str):
 	return [normalized, f"0{normalized}", f"+91{normalized}", f"+91 {normalized}", f"91{normalized}"]
 
 
+def get_phone_variants_for_lookup(normalized: str):
+	"""Public helper for matching phone in Order.customer_phone etc. Returns list of variants."""
+	return _phone_variants(normalized)
+
+
 def _find_customer_by_normalized_phone(normalized: str):
 	"""Find Customer by phone (single source of truth). Tries normalized and common format variants."""
 	if not frappe.db.has_column("Customer", "phone"):

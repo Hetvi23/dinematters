@@ -11,7 +11,13 @@ from frappe import _
 from frappe.utils import flt, now_datetime, get_datetime_str, add_to_date
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api, validate_product_belongs_to_restaurant
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
-from dinematters.dinematters.utils.customer_helpers import require_verified_phone, get_or_create_customer
+from dinematters.dinematters.utils.customer_helpers import (
+	require_verified_phone,
+	get_or_create_customer,
+	normalize_phone,
+	_find_customer_by_normalized_phone,
+	get_phone_variants_for_lookup,
+)
 import json
 import random
 import string
@@ -317,6 +323,115 @@ def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None):
 				"message": str(e)
 			}
 		}
+
+
+@frappe.whitelist(allow_guest=True)
+def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=False):
+	"""
+	GET /api/v1/customer-orders
+	Get orders for a customer by phone and restaurant.
+	For frontend "My Orders" - requires verified phone (OTP).
+	Input: restaurant_id, phone, page, limit, include_items (optional, default false)
+	Response: orders list with pagination; items included when include_items=true.
+	"""
+	try:
+		restaurant = validate_restaurant_for_api(restaurant_id)
+
+		normalized = normalize_phone(phone)
+		if not normalized or len(normalized) != 10:
+			return {
+				"success": False,
+				"error": {"code": "INVALID_PHONE", "message": "Invalid phone number"}
+			}
+
+		if not require_verified_phone(restaurant_id, phone):
+			return {
+				"success": False,
+				"error": {"code": "PHONE_NOT_VERIFIED", "message": "Please verify your phone with OTP first"}
+			}
+
+		customer_id = _find_customer_by_normalized_phone(normalized)
+		phone_variants = get_phone_variants_for_lookup(normalized)
+
+		page = cint(page) or 1
+		limit = cint(limit) or 20
+		start = (page - 1) * limit
+
+		ph = ", ".join(["%s"] * len(phone_variants))
+		if customer_id:
+			where_sql = "restaurant = %s AND (platform_customer = %s OR customer_phone IN (" + ph + "))"
+			params = [restaurant, customer_id] + phone_variants
+		else:
+			where_sql = "restaurant = %s AND customer_phone IN (" + ph + ")"
+			params = [restaurant] + phone_variants
+
+		order_list = frappe.db.sql("""
+			SELECT name, order_id, order_number, status, total, subtotal, discount, creation, estimated_delivery
+			FROM `tabOrder`
+			WHERE """ + where_sql + """
+			ORDER BY creation DESC
+			LIMIT %s OFFSET %s
+		""", params + [limit, start], as_dict=True)
+
+		total = frappe.db.sql(
+			"SELECT COUNT(*) FROM `tabOrder` WHERE " + where_sql,
+			params,
+			as_list=True
+		)[0][0]
+		total_pages = (total + limit - 1) // limit if limit > 0 else 1
+
+		orders = []
+		for o in order_list:
+			order_data = {
+				"id": o.get("order_id") or o.get("name"),
+				"order_number": o.get("order_number"),
+				"status": o.get("status"),
+				"total": flt(o.get("total")),
+				"subtotal": flt(o.get("subtotal")),
+				"discount": flt(o.get("discount") or 0),
+				"createdAt": get_datetime_str(o.get("creation")),
+				"estimatedDelivery": get_datetime_str(o.get("estimated_delivery")) if o.get("estimated_delivery") else None,
+			}
+			if include_items:
+				order_doc = frappe.get_doc("Order", o.get("name"))
+				order_data["items"] = _format_order_items_light(order_doc)
+			orders.append(order_data)
+
+		return {
+			"success": True,
+			"data": {
+				"orders": orders,
+				"pagination": {"page": page, "limit": limit, "total": total, "totalPages": total_pages}
+			}
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in get_customer_orders: {str(e)}")
+		return {
+			"success": False,
+			"error": {"code": "ORDER_FETCH_ERROR", "message": str(e)}
+		}
+
+
+def _format_order_items_light(order_doc):
+	"""Format order items with lightweight dish: id, name, media, price."""
+	from dinematters.dinematters.api.products import format_product
+	items = []
+	for item in order_doc.order_items:
+		product = frappe.get_doc("Menu Product", item.product)
+		full = format_product(product)
+		dish = {
+			"id": full.get("id"),
+			"name": full.get("name"),
+			"price": flt(item.unit_price),
+		}
+		if full.get("media"):
+			dish["media"] = full["media"]
+		items.append({
+			"dishId": item.product,
+			"quantity": item.quantity,
+			"dish": dish
+		})
+	return items
 
 
 @frappe.whitelist(allow_guest=True)
