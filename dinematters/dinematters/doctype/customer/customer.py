@@ -3,22 +3,15 @@
 
 import frappe
 from frappe.model.document import Document
-from frappe import _
+from dinematters.dinematters.utils.customer_helpers import normalize_phone
 
 
 class Customer(Document):
-	"""Platform-wide customer record. One per unique phone."""
+	"""Platform-wide customer record. One per unique phone (10-digit normalized)."""
 
 	def validate(self):
-		from dinematters.dinematters.utils.customer_helpers import canonical_phone, _find_existing_customer_by_phone
-		canonical = canonical_phone(self.phone)
-		if not canonical or len(canonical) != 10:
-			frappe.throw(_("Phone must be a valid 10-digit number"))
-
-		# Always store canonical form
-		self.phone = canonical
-
-		# Prevent duplicate: another Customer with same phone (canonical) already exists
-		existing = _find_existing_customer_by_phone(self.phone)
-		if existing and existing.name != self.name:
-			frappe.throw(_("Customer with phone {0} already exists").format(self.phone))
+		# Normalize phone to 10 digits to prevent duplicates from format variations (0987.., +91..)
+		if self.phone:
+			normalized = normalize_phone(self.phone)
+			if normalized and len(normalized) == 10:
+				self.phone = normalized

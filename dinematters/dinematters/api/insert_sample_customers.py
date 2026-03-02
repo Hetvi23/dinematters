@@ -7,6 +7,8 @@ import random
 import string
 from datetime import datetime
 
+from dinematters.dinematters.utils.customer_helpers import get_or_create_customer
+
 
 @frappe.whitelist()
 def insert_sample_customers():
@@ -26,21 +28,13 @@ def insert_sample_customers():
 		{"phone": "9876502002", "name": "Vikram Singh", "email": "vikram@example.com", "verified": False, "rest": R2},
 	]
 
-	# Customer name may be phone (dinematters) or CUST-XXX (ERPNext); use name after create
+	# Use get_or_create_customer to avoid duplicates (phone is unique)
 	created = []
 	for c in customers_data:
-		existing = frappe.db.get_value("Customer", {"phone": c["phone"]}, "name")
-		if existing:
-			cust_name = existing
-		else:
-			cust = frappe.new_doc("Customer")
-			cust.phone = c["phone"]
-			cust.mobile_no = c["phone"]  # ERPNext standard field
-			cust.customer_name = c["name"]
-			cust.email = c["email"] or ""
-			cust.flags.ignore_permissions = True
-			cust.insert()
-			cust_name = cust.name
+		cust = get_or_create_customer(c["phone"], c["name"], c["email"])
+		cust_name = cust.name if cust else None
+		if not cust_name:
+			continue
 
 		if c["verified"]:
 			frappe.db.set_value(
