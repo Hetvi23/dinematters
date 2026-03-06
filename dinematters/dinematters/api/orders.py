@@ -181,12 +181,12 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 			parsed_table_number = parse_table_number_from_qr(table_number, restaurant_id)
 		
 		# Determine order status and payment method based on payment flow
-		# pay_at_counter: Pending Verification - staff must accept before KOT
-		# pay_online or omit: Pending Payment - goes to create_payment_order/Razorpay flow
-		initial_status = "Pending Payment"
+		# Uses "pending" (valid in all schema versions) - Accept Orders filters by payment_method
+		# pay_at_counter: pending + pay_at_counter - staff must accept before KOT
+		# pay_online or omit: pending - goes to create_payment_order/Razorpay flow
+		initial_status = "pending"
 		order_payment_method = None
 		if payment_method and str(payment_method).strip().lower() in ("pay_at_counter", "pay at counter"):
-			initial_status = "Pending Verification"
 			order_payment_method = "pay_at_counter"
 		
 		# Create order document

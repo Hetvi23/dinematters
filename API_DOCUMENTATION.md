@@ -1135,8 +1135,8 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
 - `table_number` (optional) - Table number from scanned QR code (format: `restaurant-id/table-number` or just the number)
 - `coupon_code` (optional) - Coupon code to apply discount (e.g., "COUPON1-1")
 - `payment_method` (optional) - `"pay_at_counter"` | `"pay_online"`
-  - **pay_at_counter**: Order created with status `Pending Verification`. Staff must accept (via Accept Orders UI) before order is pushed to KOT.
-  - **pay_online** or omit: Order follows Razorpay flow; use `create_payment_order` for checkout. After payment confirmed, status = `Auto Accepted`.
+  - **pay_at_counter**: Order created with status `pending` and `payment_method = "pay_at_counter"`. Accept Orders UI filters by this and staff must accept before order is pushed to KOT.
+  - **pay_online** or omit: Order should use `payments.create_payment_order` (Razorpay checkout). After payment confirmed via webhook, status = `Auto Accepted`.
 
 **Request Example**:
 ```bash
@@ -1222,10 +1222,10 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
 - If coupon validation fails, the order continues without the coupon discount
 
 **Order Status by Payment Method**:
-| `payment_method` | Initial status | Next step |
-|------------------|----------------|-----------|
-| `pay_at_counter` | `Pending Verification` | Staff accepts via Accept Orders UI → status `Accepted` → pushed to KOT |
-| `pay_online` or omit | Use `create_payment_order` (Razorpay) | After payment confirmed → status `Auto Accepted` → pushed to KOT |
+| `payment_method` | Initial status in DB | Frontend behaviour / Next step |
+|------------------|----------------------|---------------------------------|
+| `pay_at_counter` | `pending` + `payment_method = "pay_at_counter"` | Shown in **Accept Orders** (Pending column). Staff accepts → API `order_status.update_status` sets status `confirmed` (kitchen can start) → pushed to KOT. |
+| `pay_online` or omit | `pending` (via `payments.create_payment_order`) | Razorpay payment → webhook (`webhooks.razorpay_webhook`) updates order to `Auto Accepted` → pushed to KOT. |
 
 ---
 

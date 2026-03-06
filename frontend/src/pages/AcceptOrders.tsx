@@ -37,8 +37,11 @@ interface Order {
   payment_status?: string
 }
 
-const PENDING_VERIFICATION = 'Pending Verification'
-const ACCEPTED = 'Accepted'
+// Pay-at-counter orders use status "pending" (works with all schema versions)
+// Accept Orders filters by payment_method to show only pay-at-counter orders
+const PENDING_STATUS = 'pending'
+const ACCEPTED_STATUS = 'confirmed' // Kitchen-ready status (sent to API)
+const ACCEPTED_COLUMN_ID = 'accepted' // Droppable zone id for "Accepted" column (UI only)
 
 function OrderCard({
   order,
@@ -176,7 +179,7 @@ function DroppableColumn({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id })
 
-  const isAccepted = id === ACCEPTED
+  const isAccepted = id === ACCEPTED_COLUMN_ID
 
   return (
     <div className="flex flex-col flex-1 min-w-0">
@@ -255,11 +258,13 @@ export default function AcceptOrders() {
         'payment_method',
         'payment_status',
       ],
-      filters: {
-        restaurant: selectedRestaurant || '',
-        status: PENDING_VERIFICATION,
-        payment_method: 'pay_at_counter',
-      },
+      // Note: Frappe React hooks expect filters as an array for strict typing.
+      // We use a typed filter array here to keep TS happy and avoid shape errors.
+      filters: [
+        ['restaurant', '=', selectedRestaurant || ''],
+        ['status', '=', PENDING_STATUS],
+        ['payment_method', '=', 'pay_at_counter'],
+      ] as any,
       limit: 200,
       orderBy: { field: 'creation', order: 'asc' },
     },
@@ -280,7 +285,7 @@ export default function AcceptOrders() {
     if (!orders || !Array.isArray(orders)) return []
     return orders.filter(
       (o: Order) =>
-        o.status === PENDING_VERIFICATION &&
+        o.status === PENDING_STATUS &&
         (o.payment_method === 'pay_at_counter' || !o.payment_method)
     )
   }, [orders])
@@ -301,12 +306,12 @@ export default function AcceptOrders() {
     if (!over || active.id === over.id) return
 
     const targetId = over.id as string
-    if (targetId !== ACCEPTED) return
+    if (targetId !== ACCEPTED_COLUMN_ID) return
 
     const orderId = active.id as string
 
     try {
-      await updateOrderStatus({ order_id: orderId, status: ACCEPTED })
+      await updateOrderStatus({ order_id: orderId, status: ACCEPTED_STATUS })
       toast.success('Order accepted — pushed to KOT')
       mutate()
     } catch (error: unknown) {
@@ -324,7 +329,7 @@ export default function AcceptOrders() {
 
   const handleAccept = async (orderId: string) => {
     try {
-      await updateOrderStatus({ order_id: orderId, status: ACCEPTED })
+      await updateOrderStatus({ order_id: orderId, status: ACCEPTED_STATUS })
       toast.success('Order accepted — pushed to KOT')
       mutate()
     } catch (error: unknown) {
@@ -369,7 +374,7 @@ export default function AcceptOrders() {
             >
               <div className="flex gap-6 overflow-x-auto pb-4" style={{ minHeight: '420px' }}>
                 <DroppableColumn
-                  id={PENDING_VERIFICATION}
+                  id={PENDING_STATUS}
                   title="Pending Verification"
                   orders={pendingOrders}
                   onViewDetails={handleViewDetails}
@@ -377,7 +382,7 @@ export default function AcceptOrders() {
                   activeId={activeId}
                 />
                 <DroppableColumn
-                  id={ACCEPTED}
+                  id={ACCEPTED_COLUMN_ID}
                   title="Accepted (push to KOT)"
                   orders={[]}
                   onViewDetails={handleViewDetails}
