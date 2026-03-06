@@ -47,7 +47,6 @@ interface OrdersKanbanProps {
 }
 
 const STATUSES = [
-  { value: 'pending', label: 'Pending', color: 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44] border-[#ffe69d] dark:border-[#ca5010]/40' },
   { value: 'confirmed', label: 'Confirmed', color: 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#ea580c] dark:text-[#ff8c42] border-orange-200 dark:border-[#ea580c]/40' },
   { value: 'preparing', label: 'Preparing', color: 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border-[#d4b9e8] dark:border-[#6a1b9a]' },
   { value: 'delivered', label: 'Delivered', color: 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] border-[#92c5f7] dark:border-[#4caf50]' },
@@ -56,8 +55,6 @@ const STATUSES = [
 
 // Map new workflow statuses to Kanban columns for display
 const STATUS_TO_COLUMN: Record<string, string> = {
-  'Pending Payment': 'pending',
-  'Pending Verification': 'pending',
   'Auto Accepted': 'confirmed',
   'Accepted': 'confirmed',
 }
@@ -123,13 +120,13 @@ function DraggableOrderCard({
               {order.order_number || order.name}
             </span>
           </div>
-          {safeTableOptions.length > 0 && onTableNumberChange ? (
+          {safeTableOptions.length > 0 && onTableNumberChange && typeof order.table_number === 'number' && order.table_number > 0 ? (
             <Select
-              value={(order.table_number ?? 0).toString()}
+              value={order.table_number.toString()}
               onValueChange={(value) => {
                 const parsed = parseInt(value, 10)
-                const tableNum = Number.isNaN(parsed) ? 0 : parsed
-                onTableNumberChange(order.name, tableNum)
+                const tableNum = Number.isNaN(parsed) ? 1 : parsed
+                onTableNumberChange?.(order.name, tableNum)
               }}
             >
               <SelectTrigger
@@ -147,11 +144,11 @@ function DraggableOrderCard({
                 ))}
               </SelectContent>
             </Select>
-          ) : (
+          ) : typeof order.table_number === 'number' && order.table_number > 0 ? (
             <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border border-gray-700 dark:border-gray-300 flex-shrink-0">
-              Table {order.table_number ?? 0}
+              Table {order.table_number}
             </span>
-          )}
+          ) : null}
         </div>
         
         {/* Customer Info - Single Row */}
@@ -188,7 +185,7 @@ function DraggableOrderCard({
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <CreditCard className="h-3 w-3 text-muted-foreground/70 flex-shrink-0" />
               <span className="capitalize truncate">{order.payment_method.replace('_', ' ')}</span>
-              {order.payment_status && (
+              {order.payment_status && order.payment_method !== 'pay_at_counter' && (
                 <span className={cn(
                   "ml-1 px-1 py-0.5 rounded-md text-[10px] font-semibold",
                   order.payment_status === 'completed' 
@@ -197,7 +194,11 @@ function DraggableOrderCard({
                     ? "bg-[#fde7e9] dark:bg-[#b71c1c] text-[#b91c1c] dark:text-[#ffcdd2]"
                     : "bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#b45309] dark:text-[#ffd89b]"
                 )}>
-                  {order.payment_status}
+                  {order.payment_status === 'completed'
+                    ? 'Paid'
+                    : order.payment_status === 'failed'
+                    ? 'Payment Failed'
+                    : 'Payment Pending'}
                 </span>
               )}
             </div>
@@ -370,10 +371,10 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   
-  // Generate table options based on restaurant tables count (always include Table 0)
+  // Generate table options based on restaurant tables count
   const tableOptions = useMemo(() => {
     const maxTables = Number(restaurantTables ?? 0)
-    const options: number[] = [0]
+    const options: number[] = []
     if (maxTables > 0) {
       for (let i = 1; i <= maxTables; i++) {
         options.push(i)
@@ -411,7 +412,7 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
       grouped[status.value] = []
     })
     orders.forEach(order => {
-      const raw = normalizeStatus(order.status || 'pending')
+      const raw = normalizeStatus(order.status || 'confirmed')
       const status = STATUS_TO_COLUMN[raw] ?? raw
       if (!grouped[status]) {
         grouped[status] = []
@@ -567,23 +568,19 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
         }}
       >
         {activeOrder ? (
-          <Card className="cursor-grabbing shadow-2xl bg-card border-2 border-primary w-80 rotate-1 scale-105 transition-transform duration-200">
+          <Card className="shadow-2xl border-2 border-primary rotate-1 scale-105 bg-card">
             <CardContent className="px-3 py-3">
-              {/* Header: Order ID and Table */}
               <div className="flex items-center justify-between mb-2.5">
-                <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                  <span className="text-xs font-semibold text-foreground uppercase truncate">
-                    {activeOrder.order_number || activeOrder.name}
+                <span className="text-xs font-semibold text-foreground uppercase truncate">
+                  {activeOrder.order_number || activeOrder.name}
+                </span>
+                {typeof activeOrder.table_number === 'number' && activeOrder.table_number > 0 ? (
+                  <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border border-gray-700 dark:border-gray-300 flex-shrink-0">
+                    Table {activeOrder.table_number}
                   </span>
-                </div>
-                  {activeOrder.table_number != null ? (
-                    <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border border-gray-700 dark:border-gray-300 flex-shrink-0">
-                      Table {activeOrder.table_number}
-                    </span>
-                  ) : null}
+                ) : null}
               </div>
-              
-              {/* Customer Info - Single Row */}
+
               {(activeOrder.customer_name || activeOrder.customer_phone) && (
                 <div className="flex items-center gap-2 mb-2.5 text-xs text-muted-foreground">
                   {activeOrder.customer_name && (
@@ -600,8 +597,7 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
                   )}
                 </div>
               )}
-              
-              {/* Order Total - TO PAY */}
+
               <div className="mb-2.5 pb-2.5 border-b border-border">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-xs text-muted-foreground font-medium">TO PAY</span>
@@ -610,8 +606,7 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
                   </span>
                 </div>
               </div>
-              
-              {/* Timestamp */}
+
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Clock className="h-3 w-3 text-muted-foreground/70 flex-shrink-0" />
                 <span>
@@ -630,5 +625,3 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
     </DndContext>
   )
 }
-
-

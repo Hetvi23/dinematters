@@ -38,7 +38,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
       case 'cancelled':
         return 'bg-[#fde7e9] dark:bg-[#b71c1c] text-[#d13438] dark:text-[#ef5350]'
       case 'Pending Verification':
-      case 'pending':
+      case 'pending_verification':
         return 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44]'
       case 'Pending Payment':
         return 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
@@ -84,6 +84,12 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
           <div className="text-center py-8 text-muted-foreground">Loading order details...</div>
         ) : order ? (
           <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">Status</div>
+              <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold border ${getStatusColor(order.status)}`}>
+                {order.status}
+              </span>
+            </div>
             {/* Order Items with Customizations */}
             {order.order_items && order.order_items.length > 0 && (
               <Card>

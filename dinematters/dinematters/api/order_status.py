@@ -23,7 +23,7 @@ def update_status(order_id, status):
 		# Validate status
 		valid_statuses = [
 			"Pending Payment", "Pending Verification", "Auto Accepted", "Accepted",
-			"pending", "confirmed", "preparing", "ready", "In Billing", "delivered", "billed", "cancelled"
+			"pending_verification", "confirmed", "preparing", "ready", "In Billing", "delivered", "billed", "cancelled"
 		]
 		if status not in valid_statuses:
 			frappe.throw(_("Invalid status. Must be one of: {0}").format(", ".join(valid_statuses)))

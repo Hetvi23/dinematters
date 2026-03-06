@@ -1135,8 +1135,23 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
 - `table_number` (optional) - Table number from scanned QR code (format: `restaurant-id/table-number` or just the number)
 - `coupon_code` (optional) - Coupon code to apply discount (e.g., "COUPON1-1")
 - `payment_method` (optional) - `"pay_at_counter"` | `"pay_online"`
-  - **pay_at_counter**: Order created with status `pending` and `payment_method = "pay_at_counter"`. Accept Orders UI filters by this and staff must accept before order is pushed to KOT.
-  - **pay_online** or omit: Order should use `payments.create_payment_order` (Razorpay checkout). After payment confirmed via webhook, status = `Auto Accepted`.
+  - **pay_at_counter**: Order created with `status = "pending_verification"` and `payment_method = "pay_at_counter"`.
+    - This is what the **Accept Orders → Pending Verification** tab should query.
+    - Staff accepts → status moves forward (e.g. `Accepted` / `confirmed` depending on your workflow).
+  - **pay_online**: Accepted for compatibility, but the recommended online flow is to call `payments.create_payment_order` (see below). If you call `create_order` with `pay_online`, the order will be created with `status = "pending"`.
+
+**Recommended Payment Flows**:
+
+- **Pay at counter (KOT after staff accepts)**
+  - Call `orders.create_order` with `payment_method = "pay_at_counter"`
+  - Order is created as `status = "pending_verification"`, `payment_status = "pending"`
+  - Accept Orders UI shows it → staff accepts → call `order_status.update_status`
+
+- **Pay online (Razorpay checkout)**
+  - Call `payments.create_payment_order` (this endpoint creates the `Order` doc and the Razorpay order)
+  - Frontend completes Razorpay Checkout
+  - Order is created with `status = confirmed` and `payment_status = pending`
+  - Razorpay webhook updates the `Order` to `payment_status = completed` and `status = Auto Accepted`
 
 **Request Example**:
 ```bash
@@ -1191,7 +1206,7 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
         "deliveryFee": 0,
         "total": 28.78,
         "cookingRequests": [],
-        "status": "Pending Verification",
+        "status": "pending_verification",
         "tableNumber": 5,
         "createdAt": "2025-01-15 10:30:00",
         "estimatedDelivery": "2025-01-15 11:00:00",
@@ -1214,6 +1229,7 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
 ```
 
 **Notes**:
+- `Order.payment_method` is a DocType Select field. If you change allowed values in code (DocType JSON), you must apply them to the site with `bench --site <site> reload-doc dinematters doctype order` (or `bench --site <site> migrate`).
 - If `table_number` is provided in QR code format (`restaurant-id/table-number`), it will be parsed automatically
 - `tableNumber` is included in response if table was specified
 - Cart is automatically cleared after successful order creation
@@ -1224,8 +1240,9 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
 **Order Status by Payment Method**:
 | `payment_method` | Initial status in DB | Frontend behaviour / Next step |
 |------------------|----------------------|---------------------------------|
-| `pay_at_counter` | `pending` + `payment_method = "pay_at_counter"` | Shown in **Accept Orders** (Pending column). Staff accepts → API `order_status.update_status` sets status `confirmed` (kitchen can start) → pushed to KOT. |
-| `pay_online` or omit | `pending` (via `payments.create_payment_order`) | Razorpay payment → webhook (`webhooks.razorpay_webhook`) updates order to `Auto Accepted` → pushed to KOT. |
+| `pay_at_counter` | `pending_verification` + `payment_method = "pay_at_counter"` | Shown in **Accept Orders** (Pending Verification column). Staff accepts → call `order_status.update_status` to move to `Accepted` / `confirmed` → pushed to KOT. |
+| `pay_online` | `confirmed` | Recommended: use `payments.create_payment_order` instead of `create_order` for online. |
+| (online via `payments.create_payment_order`) | `confirmed` | Razorpay payment → webhook (`webhooks.razorpay_webhook`) updates order to `Auto Accepted` → pushed to KOT. |
 
 ---
 
@@ -1233,8 +1250,8 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
 
 | Status | Description |
 |--------|-------------|
-| Pending Payment | Order awaiting online payment (Razorpay flow) |
-| Pending Verification | Pay-at-counter order; staff must verify at table and accept |
+| pending_verification | Pay-at-counter order created. Shown in Accept Orders “Pending Verification” column. |
+| confirmed | Order accepted into kitchen pipeline (also used as initial status for online checkout orders). |
 | Auto Accepted | Online payment confirmed; order pushed to KOT |
 | Accepted | Pay-at-counter order accepted by staff; pushed to KOT |
 | preparing | Kitchen is preparing the order |
@@ -1252,7 +1269,7 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
 
 **Parameters**:
 - `restaurant_id` (required) - Restaurant identifier
-- `status` (optional) - Filter by status: `Pending Payment`, `Pending Verification`, `Auto Accepted`, `Accepted`, `pending`, `confirmed`, `preparing`, `ready`, `In Billing`, `delivered`, `billed`, `cancelled`
+- `status` (optional) - Filter by status: `pending_verification`, `pending`, `Auto Accepted`, `Accepted`, `confirmed`, `preparing`, `ready`, `In Billing`, `delivered`, `billed`, `cancelled`
 - `page` (optional, default: 1) - Page number
 - `limit` (optional, default: 20) - Items per page
 - `session_id` (optional) - For guest users
@@ -1294,7 +1311,7 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
 - `order_id` (required) - Order document name
 - `status` (required) - New status (see Order Status Lifecycle above)
 
-**Valid statuses**: `Pending Payment`, `Pending Verification`, `Auto Accepted`, `Accepted`, `pending`, `confirmed`, `preparing`, `ready`, `In Billing`, `delivered`, `billed`, `cancelled`
+**Valid statuses**: `pending_verification`, `pending`, `Auto Accepted`, `Accepted`, `confirmed`, `preparing`, `ready`, `In Billing`, `delivered`, `billed`, `cancelled`
 
 **Response**:
 ```json
@@ -1904,8 +1921,8 @@ curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.leg
 
 ### Recent Updates:
 - ✅ **Order Acceptance Workflow** (Mar 2025):
-  - `create_order`: Added `payment_method` param (`pay_at_counter` | `pay_online`). Pay-at-counter orders get status `Pending Verification`; staff accepts via Accept Orders UI to push to KOT.
-  - Order status lifecycle: `Pending Payment`, `Pending Verification`, `Auto Accepted`, `Accepted`, `preparing`, `ready`, `In Billing`, `delivered`, `billed`, `cancelled`.
+  - `create_order`: Added `payment_method` param (`pay_at_counter` | `pay_online`). Orders are created with `status = pending`; Accept Orders UI filters pay-at-counter orders using `payment_method = pay_at_counter`.
+  - Order status lifecycle: `pending`, `Auto Accepted`, `Accepted`, `preparing`, `ready`, `In Billing`, `delivered`, `billed`, `cancelled`.
   - `order_status.update_status`: Documented for staff/admin (Accept Orders drag-drop, Kanban).
 - ✅ **New Restaurant API**: Added 3 endpoints for restaurant lookup
   - `get_restaurant_id(restaurant_name)` - Get restaurant_id from name
@@ -1913,4 +1930,3 @@ curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.leg
   - `list_restaurants(active_only)` - List all restaurants
 - ✅ **Base URL Updated**: Changed from `localhost:8000` to `backend.dinematters.com`
 - ⚠️ **Non-Compliant APIs Identified**: Products, Categories, Cart, Orders APIs need restaurant_id added
-

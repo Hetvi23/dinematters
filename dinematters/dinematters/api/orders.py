@@ -181,13 +181,18 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 			parsed_table_number = parse_table_number_from_qr(table_number, restaurant_id)
 		
 		# Determine order status and payment method based on payment flow
-		# Uses "pending" (valid in all schema versions) - Accept Orders filters by payment_method
-		# pay_at_counter: pending + pay_at_counter - staff must accept before KOT
-		# pay_online or omit: pending - goes to create_payment_order/Razorpay flow
-		initial_status = "pending"
+		# pay_at_counter: pending_verification + pay_at_counter - staff must accept before KOT
+		# pay_online or omit: confirmed - order is created and immediately visible in Real Time Orders
+		initial_status = "confirmed"
 		order_payment_method = None
-		if payment_method and str(payment_method).strip().lower() in ("pay_at_counter", "pay at counter"):
-			order_payment_method = "pay_at_counter"
+		if payment_method:
+			pm = str(payment_method).strip().lower()
+			if pm in ("pay_at_counter", "pay at counter"):
+				order_payment_method = "pay_at_counter"
+				initial_status = "pending_verification"
+			elif pm in ("pay_online", "pay online"):
+				order_payment_method = "pay_online"
+				initial_status = "confirmed"
 		
 		# Create order document
 		order_doc = frappe.get_doc({
@@ -528,7 +533,7 @@ def update_order_status(order_id, status):
 			}
 		
 		# Validate status
-		valid_statuses = ["pending", "confirmed", "preparing", "ready", "In Billing", "delivered", "billed", "cancelled"]
+		valid_statuses = ["pending_verification", "confirmed", "preparing", "ready", "In Billing", "delivered", "billed", "cancelled"]
 		if status not in valid_statuses:
 			return {
 				"success": False,

@@ -84,10 +84,10 @@ export default function Orders() {
     fields: ['name', 'tables']
   })
   
-  // Generate table options based on restaurant tables count (always include Table 0)
+  // Generate table options based on restaurant tables count
   const tableOptions = useMemo(() => {
     const maxTables = Number(restaurantDoc?.tables ?? 0)
-    const options: number[] = [0]
+    const options: number[] = []
     if (maxTables > 0) {
       for (let i = 1; i <= maxTables; i++) {
         options.push(i)
@@ -115,7 +115,10 @@ export default function Orders() {
     'Order',
     {
       fields: ['name', 'order_number', 'status', 'total', 'creation', 'restaurant', 'table_number', 'coupon', 'customer_name', 'customer_phone', 'payment_method', 'payment_status', 'subtotal', 'discount', 'tax', 'delivery_fee'],
-      filters: restaurantFilter ? { restaurant: restaurantFilter } as any : undefined,
+      filters: restaurantFilter ? ([
+        ['restaurant', '=', restaurantFilter],
+        ['status', '!=', 'pending_verification'],
+      ] as any) : undefined,
       limit: 100,
       orderBy: { field: 'creation', order: 'desc' }
     },
@@ -189,7 +192,6 @@ export default function Orders() {
       })
       
       const statusLabels: Record<string, string> = {
-        'pending': 'Pending',
         'confirmed': 'Confirmed',
         'preparing': 'Preparing',
         'ready': 'Ready',
@@ -237,7 +239,7 @@ export default function Orders() {
     
     const tables = new Set<number>()
     restaurantOrders.forEach((order: any) => {
-      if (order.table_number != null) {
+      if (typeof order.table_number === 'number' && order.table_number > 0) {
         tables.add(order.table_number)
       }
     })
@@ -448,7 +450,6 @@ export default function Orders() {
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="Pending Verification">Pending Verification</SelectItem>
                   <SelectItem value="Pending Payment">Pending Payment</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="Auto Accepted">Auto Accepted</SelectItem>
                   <SelectItem value="Accepted">Accepted</SelectItem>
                   <SelectItem value="confirmed">Confirmed</SelectItem>
@@ -570,26 +571,24 @@ export default function Orders() {
                           </p>
                         </div>
                         <Select
-                          value={order.status || 'pending'}
+                          value={order.status || 'confirmed'}
                           onValueChange={(newStatus) => handleStatusChange(order.name, newStatus)}
                         >
                           <SelectTrigger className={cn(
                             "h-7 w-[110px] text-xs border-0 shadow-none font-semibold",
                             order.status === 'delivered' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#0d5d0d] dark:text-[#a5d6a7] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
                             order.status === 'cancelled' ? 'bg-[#fde7e9] dark:bg-[#b71c1c] text-[#b91c1c] dark:text-[#ffcdd2] hover:bg-[#fcc5c9] dark:hover:bg-[#c62828]' :
-                            order.status === 'pending' ? 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#b45309] dark:text-[#ffd89b] hover:bg-[#ffe69d] dark:hover:bg-[#ca5010]/30' :
                             order.status === 'confirmed' ? 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#c2410c] dark:text-[#ffb88c] hover:bg-orange-100 dark:hover:bg-[#ea580c]/30' :
                             order.status === 'preparing' ? 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#6b21a8] dark:text-[#ce93d8] hover:bg-[#d4b9e8] dark:hover:bg-[#6a1b9a]' :
                             order.status === 'ready' ? 'bg-[#cce5ff] dark:bg-[#0d47a1] text-[#003d7a] dark:text-[#90caf9] hover:bg-[#99ccff] dark:hover:bg-[#1565c0]' :
                             'bg-muted text-muted-foreground hover:bg-accent'
                           )}>
                             <SelectValue>
-                              <span className="capitalize font-semibold">{order.status || 'pending'}</span>
+                              <span className="capitalize font-semibold">{order.status || 'confirmed'}</span>
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="Pending Verification">Pending Verification</SelectItem>
-                            <SelectItem value="pending">Pending</SelectItem>
                             <SelectItem value="Auto Accepted">Auto Accepted</SelectItem>
                             <SelectItem value="Accepted">Accepted</SelectItem>
                             <SelectItem value="confirmed">Confirmed</SelectItem>
@@ -603,10 +602,10 @@ export default function Orders() {
                       <div className="flex items-center gap-3 mb-3 flex-wrap">
                         {tableOptions.length > 0 ? (
                           <Select
-                            value={(order.table_number ?? 0).toString()}
+                            value={typeof order.table_number === 'number' && order.table_number > 0 ? order.table_number.toString() : ''}
                             onValueChange={(value) => {
                               const parsed = parseInt(value, 10)
-                              const tableNum = Number.isNaN(parsed) ? 0 : parsed
+                              const tableNum = Number.isNaN(parsed) ? 1 : parsed
                               handleTableNumberChange(order.name, tableNum)
                             }}
                           >
@@ -621,11 +620,11 @@ export default function Orders() {
                               ))}
                             </SelectContent>
                           </Select>
-                        ) : (
+                        ) : typeof order.table_number === 'number' && order.table_number > 0 ? (
                           <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border border-gray-700 dark:border-gray-300">
-                            Table {order.table_number ?? 0}
+                            Table {order.table_number}
                           </span>
-                        )}
+                        ) : null}
                         {order.coupon && (
                           <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] border border-[#92c5f7] dark:border-[#4caf50]">
                             {order.coupon}
@@ -666,7 +665,7 @@ export default function Orders() {
                       <TableCell className="font-medium">{order.order_number || order.name}</TableCell>
                       <TableCell>
                             <Select
-                              value={normalizeStatus(order.status || 'pending')}
+                              value={normalizeStatus(order.status || 'confirmed')}
                               onValueChange={(newStatus) => handleStatusChange(order.name, newStatus)}
                             >
                               <SelectTrigger className={cn(
@@ -674,7 +673,6 @@ export default function Orders() {
                                 order.status === 'delivered' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
                                 order.status === 'billed' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
                                 order.status === 'cancelled' ? 'bg-[#fde7e9] dark:bg-[#b71c1c] text-[#d13438] dark:text-[#ef5350] hover:bg-[#fcc5c9] dark:hover:bg-[#c62828]' :
-                                order.status === 'pending' ? 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44] hover:bg-[#ffe69d] dark:hover:bg-[#ca5010]/30' :
                                 order.status === 'confirmed' ? 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#ea580c] dark:text-[#ff8c42] hover:bg-orange-100 dark:hover:bg-[#ea580c]/30' :
                                 order.status === 'preparing' ? 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] hover:bg-[#d4b9e8] dark:hover:bg-[#6a1b9a]' :
                                 order.status === 'ready' ? 'bg-[#cce5ff] dark:bg-[#0d47a1] text-[#004578] dark:text-[#64b5f6] hover:bg-[#99ccff] dark:hover:bg-[#1565c0]' :
@@ -682,12 +680,11 @@ export default function Orders() {
                                 'bg-muted text-muted-foreground hover:bg-accent'
                               )}>
                                 <SelectValue>
-                                  <span className="capitalize font-semibold">{order.status || 'pending'}</span>
+                                  <span className="capitalize font-semibold">{order.status || 'confirmed'}</span>
                                 </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="Pending Verification">Pending Verification</SelectItem>
-                                <SelectItem value="pending">Pending</SelectItem>
                                 <SelectItem value="Auto Accepted">Auto Accepted</SelectItem>
                                 <SelectItem value="Accepted">Accepted</SelectItem>
                                 <SelectItem value="confirmed">Confirmed</SelectItem>
@@ -703,10 +700,10 @@ export default function Orders() {
                       <TableCell>
                         {tableOptions.length > 0 ? (
                           <Select
-                            value={(order.table_number ?? 0).toString()}
+                            value={typeof order.table_number === 'number' && order.table_number > 0 ? order.table_number.toString() : ''}
                             onValueChange={(value) => {
                               const parsed = parseInt(value, 10)
-                              const tableNum = Number.isNaN(parsed) ? 0 : parsed
+                              const tableNum = Number.isNaN(parsed) ? 1 : parsed
                               handleTableNumberChange(order.name, tableNum)
                             }}
                           >
@@ -721,11 +718,11 @@ export default function Orders() {
                               ))}
                             </SelectContent>
                           </Select>
-                        ) : (
+                        ) : typeof order.table_number === 'number' && order.table_number > 0 ? (
                           <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border border-gray-700 dark:border-gray-300">
-                            Table {order.table_number ?? 0}
+                            Table {order.table_number}
                           </span>
-                        )}
+                        ) : <span className="text-muted-foreground">-</span>}
                       </TableCell>
                       <TableCell>
                         {order.coupon ? (

@@ -384,8 +384,22 @@ export default function Layout({ children }: LayoutProps) {
     const totalOrders = orders.length
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
     const pendingOrders = orders.filter((order: any) => {
-      const s = order.status || ''
-      return s === 'pending' || s === 'Pending Verification' || s === 'Pending Payment'
+      // Match Real Time Orders behaviour: count only today's orders
+      if (!order?.creation) return false
+      const createdAt = new Date(order.creation)
+      if (Number.isNaN(createdAt.getTime())) return false
+      if (createdAt < today) return false
+
+      const raw = String(order.status || '')
+      const s = raw.trim().toLowerCase()
+      return (
+        s === 'auto accepted' ||
+        s === 'accepted' ||
+        s === 'confirmed' ||
+        s === 'preparing' ||
+        s === 'ready' ||
+        s === 'in billing'
+      )
     }).length
 
     // Calculate changes

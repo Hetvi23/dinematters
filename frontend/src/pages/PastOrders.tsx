@@ -42,10 +42,10 @@ export default function PastOrders() {
     fields: ['name', 'tables']
   })
   
-  // Generate table options based on restaurant tables count (always include Table 0)
+  // Generate table options based on restaurant tables count
   const tableOptions = useMemo(() => {
     const maxTables = Number(restaurantDoc?.tables ?? 0)
-    const options: number[] = [0]
+    const options: number[] = []
     if (maxTables > 0) {
       for (let i = 1; i <= maxTables; i++) {
         options.push(i)
@@ -64,7 +64,7 @@ export default function PastOrders() {
     {
       fields: ['name', 'order_number', 'status', 'table_number', 'coupon', 'total', 'creation', 'restaurant'],
       filters: filters,
-      order_by: 'creation desc',
+      orderBy: { field: 'creation', order: 'desc' },
       limit: 1000 // Get all orders
     },
     restaurantFilter ? `past-orders-${restaurantFilter}` : null
@@ -93,7 +93,6 @@ export default function PastOrders() {
       })
       
       const statusLabels: Record<string, string> = {
-        'pending': 'Pending',
         'confirmed': 'Confirmed',
         'preparing': 'Preparing',
         'ready': 'Ready',
@@ -143,7 +142,7 @@ export default function PastOrders() {
     if (!restaurantOrders || restaurantOrders.length === 0) return []
     const tables = new Set<number>()
     restaurantOrders.forEach((order: any) => {
-      if (order.table_number != null) {
+      if (typeof order.table_number === 'number' && order.table_number > 0) {
         tables.add(order.table_number)
       }
     })
@@ -171,7 +170,7 @@ export default function PastOrders() {
       
       filtered = filtered.filter((order: any) => {
         // Filter by billed status
-        const normalized = normalizeStatus(order.status || 'pending')
+        const normalized = normalizeStatus(order.status || 'confirmed')
         if (normalized !== 'billed') return false
         
         // Filter by today's date
@@ -194,7 +193,7 @@ export default function PastOrders() {
     // Apply status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter((order: any) => {
-        const normalized = normalizeStatus(order.status || 'pending')
+        const normalized = normalizeStatus(order.status || 'confirmed')
         return normalized === statusFilter
       })
     }
@@ -296,7 +295,6 @@ export default function PastOrders() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="confirmed">Confirmed</SelectItem>
                   <SelectItem value="preparing">Preparing</SelectItem>
                   <SelectItem value="ready">Ready</SelectItem>
@@ -397,7 +395,7 @@ export default function PastOrders() {
                         </p>
                       </div>
                       <Select
-                        value={normalizeStatus(order.status || 'pending')}
+                        value={normalizeStatus(order.status || 'confirmed')}
                         onValueChange={(newStatus) => handleStatusChange(order.name, newStatus)}
                       >
                         <SelectTrigger className={cn(
@@ -405,7 +403,6 @@ export default function PastOrders() {
                           order.status === 'delivered' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
                             order.status === 'billed' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
                             order.status === 'cancelled' ? 'bg-[#fde7e9] dark:bg-[#b71c1c] text-[#d13438] dark:text-[#ef5350] hover:bg-[#fcc5c9] dark:hover:bg-[#c62828]' :
-                            order.status === 'pending' ? 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44] hover:bg-[#ffe69d] dark:hover:bg-[#ca5010]/30' :
                             order.status === 'confirmed' ? 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#ea580c] dark:text-[#ff8c42] hover:bg-orange-100 dark:hover:bg-[#ea580c]/30' :
                             order.status === 'preparing' ? 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] hover:bg-[#d4b9e8] dark:hover:bg-[#6a1b9a]' :
                             order.status === 'ready' ? 'bg-[#cce5ff] dark:bg-[#0d47a1] text-[#004578] dark:text-[#64b5f6] hover:bg-[#99ccff] dark:hover:bg-[#1565c0]' :
@@ -413,11 +410,10 @@ export default function PastOrders() {
                             'bg-muted text-muted-foreground hover:bg-accent'
                         )}>
                           <SelectValue>
-                            <span className="capitalize">{normalizeStatus(order.status || 'pending')}</span>
+                            <span className="capitalize">{normalizeStatus(order.status || 'confirmed')}</span>
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="pending">Pending</SelectItem>
                           <SelectItem value="confirmed">Confirmed</SelectItem>
                           <SelectItem value="preparing">Preparing</SelectItem>
                           <SelectItem value="ready">Ready</SelectItem>
@@ -431,10 +427,10 @@ export default function PastOrders() {
                     <div className="flex items-center gap-3 mb-3 flex-wrap">
                       {tableOptions.length > 0 ? (
                         <Select
-                          value={(order.table_number ?? 0).toString()}
+                          value={typeof order.table_number === 'number' && order.table_number > 0 ? order.table_number.toString() : ''}
                           onValueChange={(value) => {
                             const parsed = parseInt(value, 10)
-                            const tableNum = Number.isNaN(parsed) ? 0 : parsed
+                            const tableNum = Number.isNaN(parsed) ? 1 : parsed
                             handleTableNumberChange(order.name, tableNum)
                           }}
                         >
@@ -449,11 +445,11 @@ export default function PastOrders() {
                             ))}
                           </SelectContent>
                         </Select>
-                      ) : (
+                      ) : typeof order.table_number === 'number' && order.table_number > 0 ? (
                         <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a]">
-                          Table {order.table_number ?? 0}
+                          Table {order.table_number}
                         </span>
-                      )}
+                      ) : null}
                       {order.coupon && (
                         <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] border border-[#92c5f7] dark:border-[#4caf50]">
                           {order.coupon}
@@ -494,7 +490,7 @@ export default function PastOrders() {
                         <TableCell className="font-medium">{order.order_number || order.name}</TableCell>
                         <TableCell>
                           <Select
-                            value={normalizeStatus(order.status || 'pending')}
+                            value={normalizeStatus(order.status || 'confirmed')}
                             onValueChange={(newStatus) => handleStatusChange(order.name, newStatus)}
                           >
                             <SelectTrigger className={cn(
@@ -502,19 +498,17 @@ export default function PastOrders() {
                               order.status === 'delivered' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
                                 order.status === 'billed' ? 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] hover:bg-[#c8e6c9] dark:hover:bg-[#2e7d32]' :
                                 order.status === 'cancelled' ? 'bg-[#fde7e9] dark:bg-[#b71c1c] text-[#d13438] dark:text-[#ef5350] hover:bg-[#fcc5c9] dark:hover:bg-[#c62828]' :
-                                order.status === 'pending' ? 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44] hover:bg-[#ffe69d] dark:hover:bg-[#ca5010]/30' :
                                 order.status === 'confirmed' ? 'bg-orange-50 dark:bg-[#ea580c]/20 text-[#ea580c] dark:text-[#ff8c42] hover:bg-orange-100 dark:hover:bg-[#ea580c]/30' :
-                                order.status === 'preparing' ? 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] hover:bg-[#d4b9e8] dark:hover:bg-[#6a1b9a]' :
-                                order.status === 'ready' ? 'bg-[#cce5ff] dark:bg-[#0d47a1] text-[#004578] dark:text-[#64b5f6] hover:bg-[#99ccff] dark:hover:bg-[#1565c0]' :
-                                (order.status === 'In Billing' || order.status === 'in_billing') ? 'bg-[#fff3e0] dark:bg-[#e65100]/20 text-[#e65100] dark:text-[#ff9800] hover:bg-[#ffe0b2] dark:hover:bg-[#e65100]/30' :
-                                'bg-muted text-muted-foreground hover:bg-accent'
+                              order.status === 'preparing' ? 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] hover:bg-[#d4b9e8] dark:hover:bg-[#6a1b9a]' :
+                              order.status === 'ready' ? 'bg-[#cce5ff] dark:bg-[#0d47a1] text-[#004578] dark:text-[#64b5f6] hover:bg-[#99ccff] dark:hover:bg-[#1565c0]' :
+                              (order.status === 'In Billing' || order.status === 'in_billing') ? 'bg-[#fff3e0] dark:bg-[#e65100]/20 text-[#e65100] dark:text-[#ff9800] hover:bg-[#ffe0b2] dark:hover:bg-[#e65100]/30' :
+                              'bg-muted text-muted-foreground hover:bg-accent'
                             )}>
                               <SelectValue>
-                                <span className="capitalize">{normalizeStatus(order.status || 'pending')}</span>
+                                <span className="capitalize">{normalizeStatus(order.status || 'confirmed')}</span>
                               </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="pending">Pending</SelectItem>
                               <SelectItem value="confirmed">Confirmed</SelectItem>
                               <SelectItem value="preparing">Preparing</SelectItem>
                               <SelectItem value="ready">Ready</SelectItem>
@@ -528,10 +522,10 @@ export default function PastOrders() {
                         <TableCell>
                           {tableOptions.length > 0 ? (
                             <Select
-                              value={(order.table_number ?? 0).toString()}
+                              value={typeof order.table_number === 'number' && order.table_number > 0 ? order.table_number.toString() : ''}
                               onValueChange={(value) => {
                                 const parsed = parseInt(value, 10)
-                                const tableNum = Number.isNaN(parsed) ? 0 : parsed
+                                const tableNum = Number.isNaN(parsed) ? 1 : parsed
                                 handleTableNumberChange(order.name, tableNum)
                               }}
                             >
@@ -546,11 +540,11 @@ export default function PastOrders() {
                                 ))}
                               </SelectContent>
                             </Select>
-                          ) : (
+                          ) : typeof order.table_number === 'number' && order.table_number > 0 ? (
                             <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a]">
-                              Table {order.table_number ?? 0}
+                              Table {order.table_number}
                             </span>
-                          )}
+                          ) : <span className="text-muted-foreground">-</span>}
                         </TableCell>
                         <TableCell>
                           {order.coupon ? (

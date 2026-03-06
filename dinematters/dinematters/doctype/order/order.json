@@ -189,12 +189,12 @@
    "label": "Status"
   },
   {
-   "default": "pending",
+   "default": "confirmed",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "pending\nPending Payment\nPending Verification\nAuto Accepted\nAccepted\nconfirmed\npreparing\nready\nIn Billing\ndelivered\nbilled\ncancelled",
+   "options": "pending_verification\nPending Payment\nPending Verification\nAuto Accepted\nAccepted\nconfirmed\npreparing\nready\nIn Billing\ndelivered\nbilled\ncancelled",
    "reqd": 1
   },
   {
@@ -205,7 +205,7 @@
    "fieldname": "payment_method",
    "fieldtype": "Select",
    "label": "Payment Method",
-   "options": "\npay_at_counter\nonline\ncard\ncash\ndigital_wallet"
+   "options": "\npay_at_counter\npay_online\nonline\ncard\ncash\ndigital_wallet"
   },
   {
    "default": "pending",

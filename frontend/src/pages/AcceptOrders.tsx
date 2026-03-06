@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { OrderDetailsDialog } from '@/components/OrderDetailsDialog'
+import { useConfirm } from '@/hooks/useConfirm'
 import { toast } from 'sonner'
 
 interface Order {
@@ -39,20 +40,23 @@ interface Order {
 
 // Pay-at-counter orders use status "pending" (works with all schema versions)
 // Accept Orders filters by payment_method to show only pay-at-counter orders
-const PENDING_STATUS = 'pending'
+const PENDING_STATUS = 'pending_verification'
 const ACCEPTED_STATUS = 'confirmed' // Kitchen-ready status (sent to API)
+const REJECTED_STATUS = 'cancelled'
 const ACCEPTED_COLUMN_ID = 'accepted' // Droppable zone id for "Accepted" column (UI only)
 
 function OrderCard({
   order,
   onViewDetails,
   onAccept,
+  onReject,
   isDragging = false,
   isOverlay = false,
 }: {
   order: Order
   onViewDetails: (id: string) => void
   onAccept?: (id: string) => void
+  onReject?: (id: string) => void
   isDragging?: boolean
   isOverlay?: boolean
 }) {
@@ -86,9 +90,11 @@ function OrderCard({
           <span className="text-sm font-semibold text-foreground">
             {order.order_number || order.name}
           </span>
-          <span className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
-            Table {order.table_number ?? 0}
-          </span>
+          {typeof order.table_number === 'number' && order.table_number > 0 ? (
+            <span className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
+              Table {order.table_number}
+            </span>
+          ) : null}
         </div>
         {(order.customer_name || order.customer_phone) && (
           <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
@@ -143,6 +149,20 @@ function OrderCard({
               Accept
             </Button>
           )}
+          {onReject && !isOverlay && (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={(e) => {
+                e.stopPropagation()
+                onReject(order.name)
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="flex-1 h-8 text-xs text-white"
+            >
+              Cancel
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -168,6 +188,7 @@ function DroppableColumn({
   orders,
   onViewDetails,
   onAccept,
+  onReject,
   activeId,
 }: {
   id: string
@@ -175,6 +196,7 @@ function DroppableColumn({
   orders: Order[]
   onViewDetails: (id: string) => void
   onAccept?: (id: string) => void
+  onReject?: (id: string) => void
   activeId: string | null
 }) {
   const { setNodeRef, isOver } = useDroppable({ id })
@@ -226,6 +248,7 @@ function DroppableColumn({
                 order={order}
                 onViewDetails={onViewDetails}
                 onAccept={onAccept}
+                onReject={onReject}
               />
             </div>
           ))
@@ -241,6 +264,7 @@ export default function AcceptOrders() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const { confirm, ConfirmDialogComponent } = useConfirm()
 
   const { data: orders, isLoading, mutate } = useFrappeGetDocList(
     'Order',
@@ -340,6 +364,28 @@ export default function AcceptOrders() {
     }
   }
 
+  const handleReject = async (orderId: string) => {
+    try {
+      const ok = await confirm({
+        title: 'Cancel Order',
+        description: 'Are you sure you want to cancel this order? This action cannot be undone.',
+        confirmText: 'Cancel Order',
+        cancelText: 'Keep Order',
+        variant: 'destructive',
+      })
+      if (!ok) return
+
+      await updateOrderStatus({ order_id: orderId, status: REJECTED_STATUS })
+      toast.success('Order cancelled')
+      mutate()
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Failed to cancel order'
+      console.error('Failed to cancel order:', error)
+      toast.error(msg)
+      mutate()
+    }
+  }
+
   if (!selectedRestaurant) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
@@ -379,6 +425,7 @@ export default function AcceptOrders() {
                   orders={pendingOrders}
                   onViewDetails={handleViewDetails}
                   onAccept={handleAccept}
+                  onReject={handleReject}
                   activeId={activeId}
                 />
                 <DroppableColumn
@@ -415,6 +462,8 @@ export default function AcceptOrders() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
       />
+
+      {ConfirmDialogComponent}
     </div>
   )
 }

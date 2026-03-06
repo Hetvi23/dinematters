@@ -94,7 +94,7 @@ def create_payment_order(restaurant_id, order_items, total_amount, customer_name
 			"table_number": table_number,
 			"subtotal": total_amount,
 			"total": total_amount,
-			"status": "pending",
+			"status": "confirmed",
 			"payment_status": "pending",
 			"payment_method": "online",
 			"platform_fee_amount": platform_fee_paise,
