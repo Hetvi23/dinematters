@@ -21,7 +21,10 @@ def update_status(order_id, status):
 			frappe.throw(_("Order {0} not found").format(order_id))
 		
 		# Validate status
-		valid_statuses = ["pending", "confirmed", "preparing", "ready", "In Billing", "delivered", "billed", "cancelled"]
+		valid_statuses = [
+			"Pending Payment", "Pending Verification", "Auto Accepted", "Accepted",
+			"pending", "confirmed", "preparing", "ready", "In Billing", "delivered", "billed", "cancelled"
+		]
 		if status not in valid_statuses:
 			frappe.throw(_("Invalid status. Must be one of: {0}").format(", ".join(valid_statuses)))
 		

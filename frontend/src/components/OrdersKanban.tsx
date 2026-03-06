@@ -54,6 +54,14 @@ const STATUSES = [
   { value: 'In Billing', label: 'In Billing', color: 'bg-[#fff3e0] dark:bg-[#e65100]/20 text-[#e65100] dark:text-[#ff9800] border-[#ffe0b2] dark:border-[#e65100]/40' },
 ]
 
+// Map new workflow statuses to Kanban columns for display
+const STATUS_TO_COLUMN: Record<string, string> = {
+  'Pending Payment': 'pending',
+  'Pending Verification': 'pending',
+  'Auto Accepted': 'confirmed',
+  'Accepted': 'confirmed',
+}
+
 // Draggable Order Card Component
 function DraggableOrderCard({ 
   order, 
@@ -403,7 +411,8 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
       grouped[status.value] = []
     })
     orders.forEach(order => {
-      const status = normalizeStatus(order.status || 'pending')
+      const raw = normalizeStatus(order.status || 'pending')
+      const status = STATUS_TO_COLUMN[raw] ?? raw
       if (!grouped[status]) {
         grouped[status] = []
       }

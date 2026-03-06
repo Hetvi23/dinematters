@@ -242,6 +242,8 @@ def get_restaurant_customers(restaurant_id, search=None, page=1, page_size=20):
 			order_fields = ["name", "order_number", "total", "status", "creation", "customer_phone"]
 			if frappe.db.has_column("Order", "customer_rating"):
 				order_fields.extend(["customer_rating", "customer_feedback"])
+			if frappe.db.has_column("Order", "food_rating"):
+				order_fields.extend(["food_rating", "service_rating"])
 			orders = frappe.get_all(
 				"Order",
 				filters={"restaurant": restaurant, "platform_customer": cid},

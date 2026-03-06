@@ -25,12 +25,15 @@ from datetime import datetime
 
 
 @frappe.whitelist(allow_guest=True)
-def create_order(restaurant_id, items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None, table_number=None, coupon_code=None):
+def create_order(restaurant_id, items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None, table_number=None, coupon_code=None, payment_method=None):
 	"""
 	POST /api/v1/orders
 	Place a new order
 	Requires restaurant_id for SaaS multi-tenancy
 	Optional: coupon_code for applying discount
+	Optional: payment_method - 'pay_at_counter' | 'pay_online'
+	  - pay_at_counter: status = Pending Verification, not pushed to KOT until staff accepts
+	  - pay_online or omit: order goes through payment flow (create_payment_order), status set on payment
 	"""
 	try:
 		# Validate restaurant
@@ -177,6 +180,15 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 			from dinematters.dinematters.api.cart import parse_table_number_from_qr
 			parsed_table_number = parse_table_number_from_qr(table_number, restaurant_id)
 		
+		# Determine order status and payment method based on payment flow
+		# pay_at_counter: Pending Verification - staff must accept before KOT
+		# pay_online or omit: Pending Payment - goes to create_payment_order/Razorpay flow
+		initial_status = "Pending Payment"
+		order_payment_method = None
+		if payment_method and str(payment_method).strip().lower() in ("pay_at_counter", "pay at counter"):
+			initial_status = "Pending Verification"
+			order_payment_method = "pay_at_counter"
+		
 		# Create order document
 		order_doc = frappe.get_doc({
 			"doctype": "Order",
@@ -195,8 +207,9 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 			"total": total,
 			"coupon": applied_coupon,
 			"cooking_requests": json.dumps(cooking_requests) if cooking_requests else None,
-			"status": "pending",
+			"status": initial_status,
 			"payment_status": "pending",
+			"payment_method": order_payment_method,
 			"table_number": parsed_table_number,
 			"delivery_address": delivery_info.get("address") if delivery_info else None,
 			"delivery_city": delivery_info.get("city") if delivery_info else None,

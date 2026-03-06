@@ -12,6 +12,7 @@ import Modules from './pages/Modules'
 import ModuleList from './pages/ModuleList'
 import ModuleDetail from './pages/ModuleDetail'
 import Orders from './pages/Orders'
+import AcceptOrders from './pages/AcceptOrders'
 import PastOrders from './pages/PastOrders'
 import Products from './pages/Products'
 import Categories from './pages/Categories'
@@ -53,6 +54,7 @@ function AppContent() {
 						<Route path="/:doctype/:docname" element={<Layout><ModuleDetail /></Layout>} />
 						{/* Legacy routes for backward compatibility */}
 						<Route path="/orders" element={<Layout><Orders /></Layout>} />
+						<Route path="/accept-orders" element={<Layout><AcceptOrders /></Layout>} />
 						<Route path="/orders/:orderId" element={<Layout><OrderDetail /></Layout>} />
 						<Route path="/past-orders" element={<Layout><PastOrders /></Layout>} />
 						<Route path="/customers" element={<Layout><Customers /></Layout>} />

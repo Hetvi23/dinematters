@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, Menu, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard } from 'lucide-react'
+import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, Menu, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetCall, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
 import { useState, useEffect, useMemo } from 'react'
@@ -109,6 +109,7 @@ const navigation: NavItem[] = [
     icon: ShoppingCart,
     children: [
       { name: 'Real Time Orders', href: '/orders', icon: ShoppingCart, badgeHref: '/orders' },
+      { name: 'Accept Orders', href: '/accept-orders', icon: CheckCircle2 },
       { name: 'Past and Billed Orders', href: '/past-orders', icon: Clock },
     ],
   },
@@ -382,9 +383,10 @@ export default function Layout({ children }: LayoutProps) {
     const totalRevenue = orders.reduce((sum: number, order: any) => sum + (order.total || 0), 0)
     const totalOrders = orders.length
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
-    const pendingOrders = orders.filter((order: any) => 
-      order.status?.toLowerCase() === 'pending'
-    ).length
+    const pendingOrders = orders.filter((order: any) => {
+      const s = order.status || ''
+      return s === 'pending' || s === 'Pending Verification' || s === 'Pending Payment'
+    }).length
 
     // Calculate changes
     const revenueChange = yesterdayRevenue > 0 

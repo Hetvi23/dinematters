@@ -33,17 +33,25 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'delivered':
+      case 'billed':
         return 'bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784]'
       case 'cancelled':
         return 'bg-[#fde7e9] dark:bg-[#b71c1c] text-[#d13438] dark:text-[#ef5350]'
+      case 'Pending Verification':
       case 'pending':
         return 'bg-[#fff4ce] dark:bg-[#ca5010]/20 text-[#ca5010] dark:text-[#ffaa44]'
+      case 'Pending Payment':
+        return 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+      case 'Auto Accepted':
+      case 'Accepted':
       case 'confirmed':
         return 'bg-orange-50 dark:bg-primary/20 text-primary dark:text-primary/80'
       case 'preparing':
         return 'bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8]'
       case 'ready':
         return 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-300'
+      case 'In Billing':
+        return 'bg-[#fff3e0] dark:bg-[#e65100]/20 text-[#e65100] dark:text-[#ff9800]'
       default:
         return 'bg-muted text-muted-foreground'
     }

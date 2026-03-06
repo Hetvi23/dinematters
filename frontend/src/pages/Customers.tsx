@@ -26,6 +26,8 @@ interface OrderItem {
   creation: string
   customer_rating?: number
   customer_feedback?: string
+  food_rating?: number
+  service_rating?: number
 }
 
 interface RestaurantCustomer {
@@ -264,7 +266,8 @@ export default function Customers() {
                                     <TableHead>Date</TableHead>
                                     <TableHead>Total</TableHead>
                                     <TableHead>Status</TableHead>
-                                    <TableHead>Rating</TableHead>
+                                    <TableHead>Food</TableHead>
+                                    <TableHead>Service</TableHead>
                                     <TableHead>Feedback</TableHead>
                                     <TableHead />
                                   </TableRow>
@@ -284,7 +287,7 @@ export default function Customers() {
                                         {formatDate(o.creation)}
                                       </TableCell>
                                       <TableCell>
-                                        ₹{formatAmountNoDecimals(o.total ?? 0)}
+                                        {formatAmountNoDecimals(o.total ?? 0)}
                                       </TableCell>
                                       <TableCell>
                                         <Badge variant="outline" className="capitalize">
@@ -292,10 +295,20 @@ export default function Customers() {
                                         </Badge>
                                       </TableCell>
                                       <TableCell>
-                                        {o.customer_rating ? (
+                                        {(o.food_rating ?? o.customer_rating) != null ? (
                                           <span className="flex items-center gap-0.5">
                                             <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                                            {o.customer_rating}/5
+                                            {o.food_rating ?? o.customer_rating}/5
+                                          </span>
+                                        ) : (
+                                          <span className="text-muted-foreground">—</span>
+                                        )}
+                                      </TableCell>
+                                      <TableCell>
+                                        {(o.service_rating ?? o.customer_rating) != null ? (
+                                          <span className="flex items-center gap-0.5">
+                                            <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                                            {o.service_rating ?? o.customer_rating}/5
                                           </span>
                                         ) : (
                                           <span className="text-muted-foreground">—</span>
@@ -405,12 +418,18 @@ export default function Customers() {
                               {o.order_number}
                             </Link>
                             <span className="text-muted-foreground">
-                              {formatDate(o.creation)} • ₹{formatAmountNoDecimals(o.total ?? 0)}
+                              {formatDate(o.creation)} • {formatAmountNoDecimals(o.total ?? 0)}
                             </span>
-                            {o.customer_rating && (
+                            {(o.food_rating ?? o.customer_rating) != null && (
                               <span className="flex items-center gap-0.5">
                                 <Star className="h-3 w-3 fill-amber-400" />
-                                {o.customer_rating}/5
+                                Food {o.food_rating ?? o.customer_rating}/5
+                              </span>
+                            )}
+                            {(o.service_rating ?? o.customer_rating) != null && o.service_rating != null && (
+                              <span className="flex items-center gap-0.5">
+                                <Star className="h-3 w-3 fill-amber-400" />
+                                Service {o.service_rating}/5
                               </span>
                             )}
                             {o.customer_feedback && (

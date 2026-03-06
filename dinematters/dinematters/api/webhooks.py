@@ -207,11 +207,12 @@ def handle_payment_captured(payload):
 		
 		order_name = orders[0].name
 		# Update order status using DB to avoid form validation issues in background worker
+		# Online paid: Auto Accepted → pushed to KOT, kitchen starts preparation
 		try:
 			frappe.db.set_value("Order", order_name, "razorpay_payment_id", payment_id)
 			frappe.db.set_value("Order", order_name, "transaction_id", payment_id)
 			frappe.db.set_value("Order", order_name, "payment_status", "completed")
-			frappe.db.set_value("Order", order_name, "status", "confirmed")
+			frappe.db.set_value("Order", order_name, "status", "Auto Accepted")
 			frappe.db.commit()
 		except Exception:
 			# fallback to safe doc update if DB updates fail
@@ -220,7 +221,7 @@ def handle_payment_captured(payload):
 				order.razorpay_payment_id = payment_id
 				order.transaction_id = payment_id
 				order.payment_status = "completed"
-				order.status = "confirmed"
+				order.status = "Auto Accepted"
 				order.save(ignore_permissions=True)
 			except Exception as ex:
 				frappe.log_error(f"Failed to update Order {order_name}: {str(ex)}", "razorpay.webhook.order_update")

@@ -446,9 +446,14 @@ export default function Orders() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="Pending Verification">Pending Verification</SelectItem>
+                  <SelectItem value="Pending Payment">Pending Payment</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="Auto Accepted">Auto Accepted</SelectItem>
+                  <SelectItem value="Accepted">Accepted</SelectItem>
                   <SelectItem value="confirmed">Confirmed</SelectItem>
                   <SelectItem value="preparing">Preparing</SelectItem>
+                  <SelectItem value="ready">Ready</SelectItem>
                   <SelectItem value="delivered">Delivered</SelectItem>
                   <SelectItem value="billed">Billed</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -583,7 +588,10 @@ export default function Orders() {
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="Pending Verification">Pending Verification</SelectItem>
                             <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="Auto Accepted">Auto Accepted</SelectItem>
+                            <SelectItem value="Accepted">Accepted</SelectItem>
                             <SelectItem value="confirmed">Confirmed</SelectItem>
                             <SelectItem value="preparing">Preparing</SelectItem>
                             <SelectItem value="ready">Ready</SelectItem>
@@ -678,7 +686,10 @@ export default function Orders() {
                                 </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
+                                <SelectItem value="Pending Verification">Pending Verification</SelectItem>
                                 <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="Auto Accepted">Auto Accepted</SelectItem>
+                                <SelectItem value="Accepted">Accepted</SelectItem>
                                 <SelectItem value="confirmed">Confirmed</SelectItem>
                                 <SelectItem value="preparing">Preparing</SelectItem>
                                 <SelectItem value="ready">Ready</SelectItem>

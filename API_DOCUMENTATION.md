@@ -1134,6 +1134,9 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
 - `session_id` (optional) - For guest users
 - `table_number` (optional) - Table number from scanned QR code (format: `restaurant-id/table-number` or just the number)
 - `coupon_code` (optional) - Coupon code to apply discount (e.g., "COUPON1-1")
+- `payment_method` (optional) - `"pay_at_counter"` | `"pay_online"`
+  - **pay_at_counter**: Order created with status `Pending Verification`. Staff must accept (via Accept Orders UI) before order is pushed to KOT.
+  - **pay_online** or omit: Order follows Razorpay flow; use `create_payment_order` for checkout. After payment confirmed, status = `Auto Accepted`.
 
 **Request Example**:
 ```bash
@@ -1154,7 +1157,8 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
       "phone": "+1234567890"
     },
     "table_number": "test-restaurant-1/5",
-    "coupon_code": "COUPON1-1"
+    "coupon_code": "COUPON1-1",
+    "payment_method": "pay_at_counter"
   }'
 ```
 
@@ -1187,7 +1191,7 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
         "deliveryFee": 0,
         "total": 28.78,
         "cookingRequests": [],
-        "status": "pending",
+        "status": "Pending Verification",
         "tableNumber": 5,
         "createdAt": "2025-01-15 10:30:00",
         "estimatedDelivery": "2025-01-15 11:00:00",
@@ -1217,15 +1221,38 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
 - Coupon details (if applied) are included in the response with discount amount and type
 - If coupon validation fails, the order continues without the coupon discount
 
+**Order Status by Payment Method**:
+| `payment_method` | Initial status | Next step |
+|------------------|----------------|-----------|
+| `pay_at_counter` | `Pending Verification` | Staff accepts via Accept Orders UI → status `Accepted` → pushed to KOT |
+| `pay_online` or omit | Use `create_payment_order` (Razorpay) | After payment confirmed → status `Auto Accepted` → pushed to KOT |
+
 ---
 
-#### 9.2 Get Orders
+#### 9.2 Order Status Lifecycle
+
+| Status | Description |
+|--------|-------------|
+| Pending Payment | Order awaiting online payment (Razorpay flow) |
+| Pending Verification | Pay-at-counter order; staff must verify at table and accept |
+| Auto Accepted | Online payment confirmed; order pushed to KOT |
+| Accepted | Pay-at-counter order accepted by staff; pushed to KOT |
+| preparing | Kitchen is preparing the order |
+| ready | Order ready for delivery/serving |
+| In Billing | Order at billing stage |
+| delivered | Order delivered to customer |
+| billed | Order billed and completed |
+| cancelled | Order cancelled |
+
+---
+
+#### 9.3 Get Orders
 
 **Endpoint**: `GET /api/method/dinematters.dinematters.api.orders.get_orders`
 
 **Parameters**:
 - `restaurant_id` (required) - Restaurant identifier
-- `status` (optional) - Filter by status (pending, confirmed, preparing, ready, delivered, cancelled)
+- `status` (optional) - Filter by status: `Pending Payment`, `Pending Verification`, `Auto Accepted`, `Accepted`, `pending`, `confirmed`, `preparing`, `ready`, `In Billing`, `delivered`, `billed`, `cancelled`
 - `page` (optional, default: 1) - Page number
 - `limit` (optional, default: 20) - Items per page
 - `session_id` (optional) - For guest users
@@ -1259,7 +1286,37 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
 
 ---
 
-#### 9.3 Get Customer Orders (by phone)
+#### 9.4 Update Order Status (Staff/Admin)
+
+**Endpoint**: `POST /api/method/dinematters.dinematters.api.order_status.update_status`
+
+**Parameters**:
+- `order_id` (required) - Order document name
+- `status` (required) - New status (see Order Status Lifecycle above)
+
+**Valid statuses**: `Pending Payment`, `Pending Verification`, `Auto Accepted`, `Accepted`, `pending`, `confirmed`, `preparing`, `ready`, `In Billing`, `delivered`, `billed`, `cancelled`
+
+**Response**:
+```json
+{
+  "message": {
+    "success": true,
+    "message": "Order status updated successfully",
+    "data": {
+      "order_id": "order-xxx",
+      "status": "Accepted"
+    }
+  }
+}
+```
+
+**Notes**:
+- Requires authenticated user (Restaurant Staff/Admin or System Manager)
+- Used by Accept Orders UI (drag-and-drop) and Real Time Orders Kanban
+
+---
+
+#### 9.5 Get Customer Orders (by phone)
 
 **Endpoint**: `GET /api/method/dinematters.dinematters.api.orders.get_customer_orders`
 
@@ -1319,7 +1376,7 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
 
 ---
 
-#### 9.4 Post Order Feedback
+#### 9.6 Post Order Feedback
 
 **Endpoint**: `POST /api/method/dinematters.dinematters.api.orders.post_order_feedback`
 
@@ -1343,7 +1400,7 @@ curl -X POST "https://backend.dinematters.com/api/method/dinematters.dinematters
 
 ---
 
-#### 9.5 Get Order Details
+#### 9.7 Get Order Details
 
 **Endpoint**: `GET /api/method/dinematters.dinematters.api.orders.get_order`
 
@@ -1611,11 +1668,13 @@ All APIs return errors in this format:
 | 24 | POST | `cart.remove_cart_item` | Public | ✅ Present | ✅ Restaurant validation included |
 | 25 | POST | `cart.clear_cart` | Public | ✅ Present | ✅ Restaurant-specific |
 | 26 | POST | `cart.parse_qr_code` | Public | N/A | ✅ QR code parsing for table numbers |
-| 27 | POST | `orders.create_order` | Public | ✅ Present | ✅ Restaurant validation with table_number support |
-| 28 | GET | `orders.get_orders` | Public | ✅ Present | ✅ Restaurant-specific |
-| 29 | GET | `orders.get_customer_orders` | Public | ✅ Present | ✅ By phone + restaurant, pagination, include_items, feedback |
-| 30 | POST | `orders.post_order_feedback` | Public | ✅ Present | ✅ Order/restaurant/phone, food + service rating, suggestion |
-| 31 | GET | `orders.get_order` | Public | ✅ Present | ✅ Restaurant validation, feedback included |
+| 27 | POST | `orders.create_order` | Public | ✅ Present | ✅ Restaurant validation, table_number, payment_method (pay_at_counter) |
+| 28 | POST | `order_status.update_status` | Auth | N/A | ✅ Staff/Admin: update order status (Accept Orders, Kanban) |
+| 29 | POST | `order_status.update_table_number` | Auth | N/A | ✅ Staff/Admin: update order table number |
+| 30 | GET | `orders.get_orders` | Public | ✅ Present | ✅ Restaurant-specific |
+| 31 | GET | `orders.get_customer_orders` | Public | ✅ Present | ✅ By phone + restaurant, pagination, include_items, feedback |
+| 32 | POST | `orders.post_order_feedback` | Public | ✅ Present | ✅ Order/restaurant/phone, food + service rating, suggestion |
+| 33 | GET | `orders.get_order` | Public | ✅ Present | ✅ Restaurant validation, feedback included |
 
 ---
 
@@ -1844,6 +1903,10 @@ curl "https://backend.dinematters.com/api/method/dinematters.dinematters.api.leg
 **Test Coverage**: 100%
 
 ### Recent Updates:
+- ✅ **Order Acceptance Workflow** (Mar 2025):
+  - `create_order`: Added `payment_method` param (`pay_at_counter` | `pay_online`). Pay-at-counter orders get status `Pending Verification`; staff accepts via Accept Orders UI to push to KOT.
+  - Order status lifecycle: `Pending Payment`, `Pending Verification`, `Auto Accepted`, `Accepted`, `preparing`, `ready`, `In Billing`, `delivered`, `billed`, `cancelled`.
+  - `order_status.update_status`: Documented for staff/admin (Accept Orders drag-drop, Kanban).
 - ✅ **New Restaurant API**: Added 3 endpoints for restaurant lookup
   - `get_restaurant_id(restaurant_name)` - Get restaurant_id from name
   - `get_restaurant_info(restaurant_id)` - Get full restaurant details

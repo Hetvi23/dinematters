@@ -2,7 +2,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Star } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Select,
@@ -187,6 +187,42 @@ export default function OrderDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {((order as any).customer_rating != null || (order as any).food_rating != null || (order as any).service_rating != null || !!((order as any).customer_feedback && String((order as any).customer_feedback).trim())) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Customer Feedback</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-6">
+              {((order as any).food_rating ?? (order as any).customer_rating) != null && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Food Rating</p>
+                  <span className="flex items-center gap-1">
+                    <Star className="h-5 w-5 fill-amber-400 text-amber-400" />
+                    {(order as any).food_rating ?? (order as any).customer_rating}/5
+                  </span>
+                </div>
+              )}
+              {(order as any).service_rating != null && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Service Rating</p>
+                  <span className="flex items-center gap-1">
+                    <Star className="h-5 w-5 fill-amber-400 text-amber-400" />
+                    {(order as any).service_rating}/5
+                  </span>
+                </div>
+              )}
+            </div>
+            {(order as any).customer_feedback && (
+              <div>
+                <p className="text-sm text-muted-foreground">Feedback</p>
+                <p className="text-sm">{(order as any).customer_feedback}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {order.order_items && order.order_items.length > 0 && (
         <Card>

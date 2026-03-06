@@ -194,7 +194,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "pending\nconfirmed\npreparing\nready\nIn Billing\ndelivered\nbilled\ncancelled",
+   "options": "pending\nPending Payment\nPending Verification\nAuto Accepted\nAccepted\nconfirmed\npreparing\nready\nIn Billing\ndelivered\nbilled\ncancelled",
    "reqd": 1
   },
   {
@@ -205,7 +205,7 @@
    "fieldname": "payment_method",
    "fieldtype": "Select",
    "label": "Payment Method",
-   "options": "\ncard\ncash\ndigital_wallet\nonline"
+   "options": "\npay_at_counter\nonline\ncard\ncash\ndigital_wallet"
   },
   {
    "default": "pending",
