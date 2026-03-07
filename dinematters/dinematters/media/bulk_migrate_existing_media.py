@@ -189,6 +189,10 @@ def migrate_restaurant_media(restaurant, dry_run=True, overwrite_fields=False):
 						overwrite_expected_value=file_url,
 					)
 					
+					if result and result.get("skipped"):
+						stats["skipped"] += 1
+						continue
+
 					if result:
 						stats["migrated"] += 1
 						print(f"    ✅ Migrated: {doctype}/{doc_name}/{field_name} → {result['cdn_url'][:60]}...")
@@ -277,6 +281,10 @@ def migrate_product_media(restaurant, dry_run=True, overwrite_fields=False):
 					overwrite_expected_value=file_url,
 				)
 				
+				if result and result.get("skipped"):
+					stats["skipped"] += 1
+					continue
+
 				if result:
 					stats["migrated"] += 1
 					print(f"    ✅ Product Media: {product['name']}/{media_item.name}")
@@ -325,6 +333,9 @@ def migrate_legacy_child_tables(restaurant, dry_run=True, overwrite_fields=False
 							overwrite_field="image",
 							overwrite_expected_value=member.image,
 						)
+						if result and result.get("skipped"):
+							stats["skipped"] += 1
+							continue
 						if result:
 							stats["migrated"] += 1
 						else:
@@ -351,6 +362,9 @@ def migrate_legacy_child_tables(restaurant, dry_run=True, overwrite_fields=False
 							overwrite_field="image",
 							overwrite_expected_value=img.image,
 						)
+						if result and result.get("skipped"):
+							stats["skipped"] += 1
+							continue
 						if result:
 							stats["migrated"] += 1
 						else:
@@ -378,6 +392,9 @@ def migrate_legacy_child_tables(restaurant, dry_run=True, overwrite_fields=False
 							overwrite_field="avatar",
 							overwrite_expected_value=test_row.avatar,
 						)
+						if result and result.get("skipped"):
+							stats["skipped"] += 1
+							continue
 						if result:
 							stats["migrated"] += 1
 						else:
@@ -404,6 +421,9 @@ def migrate_legacy_child_tables(restaurant, dry_run=True, overwrite_fields=False
 									overwrite_field="image",
 									overwrite_expected_value=dish_img.image,
 								)
+								if result and result.get("skipped"):
+									stats["skipped"] += 1
+									continue
 								if result:
 									stats["migrated"] += 1
 								else:
@@ -494,8 +514,8 @@ def migrate_single_file(
 		file_path = _resolve_local_file_path(file_url)
 		
 		if not file_path or not os.path.exists(file_path):
-			print(f"      ⚠️  File not found: {file_path}")
-			return None
+			print(f"      ⏭️  Missing file on disk (skipping): {file_url} -> {file_path}")
+			return {"skipped": True, "reason": "file_missing"}
 		
 		# Get file info
 		filename = os.path.basename(file_path)
@@ -507,13 +527,17 @@ def migrate_single_file(
 		
 		# Generate media_id and object key
 		media_id = str(uuid.uuid4())
-		object_key = generate_object_key(restaurant, owner_doctype, media_id, filename)
+		object_key = generate_object_key(
+			restaurant,
+			owner_doctype,
+			owner_name,
+			media_role,
+			media_id,
+			filename,
+		)
 		
-		# Upload to R2
-		with open(file_path, 'rb') as f:
-			file_data = f.read()
-		
-		upload_object(object_key, file_data, content_type)
+		# Upload to R2 (storage.upload_object expects a local path)
+		upload_object(file_path, object_key, content_type)
 		
 		# Get CDN URL
 		cdn_url = get_cdn_url(object_key)
