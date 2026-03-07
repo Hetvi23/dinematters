@@ -335,44 +335,20 @@ def migrate_legacy_child_tables(restaurant, dry_run=True):
 							stats["errors"] += 1
 					except:
 						stats["errors"] += 1
-	
-	# Process testimonials
-	testimonials = frappe.get_all("Legacy Testimonial", filters={"restaurant": restaurant}, fields=["name"])
-	
-	for test in testimonials:
-		test_doc = frappe.get_doc("Legacy Testimonial", test["name"])
 		
-		# Avatar
-		if test_doc.avatar and test_doc.avatar.startswith("/files/"):
-			stats["total"] += 1
-			try:
-				result = migrate_single_file(
-					restaurant=restaurant,
-					owner_doctype="Legacy Testimonial",
-					owner_name=test_doc.name,
-					media_role="legacy_testimonial_avatar",
-					file_url=test_doc.avatar,
-					dry_run=dry_run
-				)
-				if result:
-					stats["migrated"] += 1
-				else:
-					stats["errors"] += 1
-			except:
-				stats["errors"] += 1
-		
-		# Dish images
-		if hasattr(test_doc, 'dish_images') and test_doc.dish_images:
-			for dish_img in test_doc.dish_images:
-				if dish_img.image and dish_img.image.startswith("/files/"):
+		# Process testimonials (Legacy Testimonial is a child table on Legacy Content)
+		if hasattr(legacy_doc, 'testimonials') and legacy_doc.testimonials:
+			for test_row in legacy_doc.testimonials:
+				# Avatar
+				if test_row.avatar and test_row.avatar.startswith("/files/"):
 					stats["total"] += 1
 					try:
 						result = migrate_single_file(
 							restaurant=restaurant,
-							owner_doctype="Legacy Testimonial Image",
-							owner_name=dish_img.name,
-							media_role="legacy_testimonial_dish_image",
-							file_url=dish_img.image,
+							owner_doctype="Legacy Testimonial",
+							owner_name=test_row.name,
+							media_role="legacy_testimonial_avatar",
+							file_url=test_row.avatar,
 							dry_run=dry_run
 						)
 						if result:
@@ -381,6 +357,27 @@ def migrate_legacy_child_tables(restaurant, dry_run=True):
 							stats["errors"] += 1
 					except:
 						stats["errors"] += 1
+				
+				# Dish images (Legacy Testimonial Image is a child table on Legacy Testimonial)
+				if hasattr(test_row, 'dish_images') and test_row.dish_images:
+					for dish_img in test_row.dish_images:
+						if dish_img.image and dish_img.image.startswith("/files/"):
+							stats["total"] += 1
+							try:
+								result = migrate_single_file(
+									restaurant=restaurant,
+									owner_doctype="Legacy Testimonial Image",
+									owner_name=dish_img.name,
+									media_role="legacy_testimonial_dish_image",
+									file_url=dish_img.image,
+									dry_run=dry_run
+								)
+								if result:
+									stats["migrated"] += 1
+								else:
+									stats["errors"] += 1
+							except:
+								stats["errors"] += 1
 	
 	return stats
 
