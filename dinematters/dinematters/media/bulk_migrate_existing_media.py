@@ -202,7 +202,10 @@ def migrate_restaurant_media(restaurant, dry_run=True, overwrite_fields=False):
 				except Exception as e:
 					stats["errors"] += 1
 					print(f"    ❌ Error: {doctype}/{doc_name}/{field_name} - {str(e)}")
-					frappe.log_error(f"Migration error: {str(e)}", f"Bulk Migration Error - {doctype}")
+					frappe.log_error(
+						f"Migration error: {str(e)}",
+						f"Bulk Migration Error - {doctype}"[:140],
+					)
 	
 	# Process Product Media (child table)
 	product_stats = migrate_product_media(restaurant, dry_run, overwrite_fields=overwrite_fields)
@@ -604,5 +607,6 @@ def migrate_single_file(
 		}
 	
 	except Exception as e:
-		frappe.log_error(f"File migration error: {str(e)}", f"Migrate {file_url}")
+		title = f"Migrate {file_url}"[:140]
+		frappe.log_error(f"File migration error: {str(e)}", title)
 		return None
