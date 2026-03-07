@@ -164,8 +164,7 @@ def migrate_restaurant_media(restaurant, dry_run=True, overwrite_fields=False):
 				existing_asset = frappe.db.exists("Media Asset", {
 					"owner_doctype": doctype,
 					"owner_name": doc_name,
-					"media_role": media_role,
-					"status": "ready"
+					"media_role": media_role
 				})
 				
 				if existing_asset:
@@ -255,7 +254,6 @@ def migrate_product_media(restaurant, dry_run=True, overwrite_fields=False):
 			existing_asset = frappe.db.exists("Media Asset", {
 				"owner_doctype": "Product Media",
 				"owner_name": media_item.name,
-				"status": "ready"
 			})
 			
 			if existing_asset:
@@ -273,6 +271,9 @@ def migrate_product_media(restaurant, dry_run=True, overwrite_fields=False):
 					owner_name=media_item.name,
 					media_role=media_role,
 					file_url=file_url,
+					# Store under the owning Menu Product path for cleaner CDN structure
+					storage_owner_doctype="Menu Product",
+					storage_owner_name=product_doc.name,
 					dry_run=dry_run,
 					overwrite_fields=overwrite_fields,
 					overwrite_doctype="Product Media",
@@ -494,6 +495,8 @@ def migrate_single_file(
 	owner_name,
 	media_role,
 	file_url,
+	storage_owner_doctype=None,
+	storage_owner_name=None,
 	dry_run=True,
 	overwrite_fields=False,
 	overwrite_doctype=None,
@@ -527,10 +530,12 @@ def migrate_single_file(
 		
 		# Generate media_id and object key
 		media_id = str(uuid.uuid4())
+		storage_doctype = storage_owner_doctype or owner_doctype
+		storage_name = storage_owner_name or owner_name
 		object_key = generate_object_key(
 			restaurant,
-			owner_doctype,
-			owner_name,
+			storage_doctype,
+			storage_name,
 			media_role,
 			media_id,
 			filename,
