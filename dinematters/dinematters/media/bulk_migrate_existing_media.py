@@ -18,6 +18,7 @@ import os
 import uuid
 from pathlib import Path
 import mimetypes
+from urllib.parse import urlparse, unquote
 from dinematters.dinematters.media.storage import upload_object, generate_object_key, get_cdn_url
 from dinematters.dinematters.media.config import get_media_config
 
@@ -431,6 +432,42 @@ def _overwrite_owner_field(doctype, name, field, value, expected_value=None):
 	return True
 
 
+def _resolve_local_file_path(file_url: str):
+	"""Resolve an Attach/Attach Image URL to an absolute filesystem path.
+
+	Supports:
+	- /files/xxx
+	- /private/files/xxx
+	- full URLs like https://domain/files/xxx
+	- URL encoded filenames
+	"""
+	if not file_url:
+		return None
+
+	parsed_path = file_url
+	if file_url.startswith("http://") or file_url.startswith("https://"):
+		parsed_path = urlparse(file_url).path
+
+	parsed_path = unquote(parsed_path)
+	parsed_path = parsed_path.lstrip("/")
+
+	# Determine whether file is public or private
+	base_folder = "public"
+	rel_path = parsed_path
+	if parsed_path.startswith("private/"):
+		base_folder = "private"
+		rel_path = parsed_path[len("private/") :]
+
+	# Only handle files managed by Frappe (/files/*)
+	if not (rel_path.startswith("files/") or rel_path == "files"):
+		return None
+
+	bench_path = frappe.utils.get_bench_path()
+	site_name = frappe.local.site
+	# Absolute path: <bench>/sites/<site>/(public|private)/files/...
+	return os.path.join(bench_path, "sites", site_name, base_folder, rel_path)
+
+
 def migrate_single_file(
 	restaurant,
 	owner_doctype,
@@ -453,11 +490,10 @@ def migrate_single_file(
 		}
 	
 	try:
-		# Get file path
-		site_path = frappe.get_site_path()
-		file_path = os.path.join(site_path, "public", file_url.lstrip("/"))
+		# Resolve file path
+		file_path = _resolve_local_file_path(file_url)
 		
-		if not os.path.exists(file_path):
+		if not file_path or not os.path.exists(file_path):
 			print(f"      ⚠️  File not found: {file_path}")
 			return None
 		
