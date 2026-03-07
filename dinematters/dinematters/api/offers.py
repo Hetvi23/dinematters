@@ -8,8 +8,9 @@ All endpoints require restaurant_id for SaaS multi-tenancy
 
 import frappe
 from frappe import _
-from frappe.utils import get_url, getdate, today
+from frappe.utils import today, get_url
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
+from dinematters.dinematters.media.utils import format_media_field
 
 
 @frappe.whitelist(allow_guest=True)
@@ -85,11 +86,8 @@ def get_offers(restaurant_id, featured=None, category=None, active_only=True):
 				"isActive": bool(offer.get("is_active", False))
 			}
 			
-			if offer.get("image_src"):
-				image_src = offer["image_src"]
-				if image_src.startswith("/files/"):
-					image_src = get_url(image_src)
-				offer_data["imageSrc"] = image_src
+			# Use centralized media fetcher for CDN URLs and blur placeholders
+			format_media_field(offer_data, "image_src", "Offer", offer.get("name"), "offer_image", "imageSrc")
 			
 			if offer.get("image_alt"):
 				offer_data["imageAlt"] = offer["image_alt"]
@@ -158,11 +156,8 @@ def create_offer(restaurant_id, title, description=None, discount=None, valid_un
 			"isActive": bool(offer_doc.is_active)
 		}
 		
-		if offer_doc.image_src:
-			image_src = offer_doc.image_src
-			if image_src.startswith("/files/"):
-				image_src = get_url(image_src)
-			offer_data["imageSrc"] = image_src
+		# Use centralized media fetcher for CDN URLs
+		format_media_field(offer_data, "image_src", "Offer", offer_doc.name, "offer_image", "imageSrc")
 		
 		if offer_doc.image_alt:
 			offer_data["imageAlt"] = offer_doc.image_alt

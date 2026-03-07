@@ -8,8 +8,9 @@ All endpoints require restaurant_id for SaaS multi-tenancy
 
 import frappe
 from frappe import _
-from frappe.utils import get_url, formatdate, format_time, getdate
+from frappe.utils import today, get_url
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
+from dinematters.dinematters.media.utils import format_media_field
 
 
 @frappe.whitelist(allow_guest=True)
@@ -122,11 +123,8 @@ def get_events(restaurant_id, featured=None, category=None, upcoming_only=True):
 					"repeatThisEvent": False
 			}
 			
-			if event.get("image_src"):
-				image_src = event["image_src"]
-				if image_src.startswith("/files/"):
-					image_src = get_url(image_src)
-				event_data["imageSrc"] = image_src
+			# Use centralized media fetcher for CDN URLs and blur placeholders
+			format_media_field(event_data, "image_src", "Event", event.get("name"), "event_image", "imageSrc")
 			
 			if event.get("image_alt"):
 				event_data["imageAlt"] = event["image_alt"]

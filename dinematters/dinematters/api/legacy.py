@@ -8,8 +8,10 @@ All endpoints require restaurant_id for SaaS multi-tenancy
 
 import frappe
 from frappe import _
+import json
 from frappe.utils import get_url
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
+from dinematters.dinematters.media.utils import get_media_asset_data
 import json
 
 
@@ -79,14 +81,18 @@ def get_legacy_content(restaurant_id):
 		testimonials = []
 		for testimonial in legacy_doc.testimonials:
 			dish_images = []
-			# Handle new table structure
+			# Handle dish images (new table structure) with Media Asset data
 			if hasattr(testimonial, 'dish_images') and testimonial.dish_images:
 				for img_row in testimonial.dish_images:
-					img_url = img_row.image
-					if img_url:
-						if img_url.startswith("/files/"):
-							img_url = get_url(img_url)
-						dish_images.append(img_url)
+					# Get dish image from Media Asset or fallback
+					dish_media = get_media_asset_data(
+						"Legacy Testimonial Image",
+						img_row.name,
+						"legacy_testimonial_dish_image",
+						img_row.image
+					)
+					if dish_media["url"]:
+						dish_images.append(dish_media["url"])
 			# Fallback: handle old JSON format for backward compatibility
 			elif hasattr(testimonial, 'dish_images') and isinstance(testimonial.dish_images, str):
 				try:
@@ -95,13 +101,14 @@ def get_legacy_content(restaurant_id):
 				except:
 					pass
 			
-			# Get avatar image URL
-			avatar_url = ""
-			if testimonial.avatar:
-				if testimonial.avatar.startswith("/files/"):
-					avatar_url = get_url(testimonial.avatar)
-				else:
-					avatar_url = testimonial.avatar
+			# Get avatar from Media Asset or fallback
+			avatar_media = get_media_asset_data(
+				"Legacy Testimonial",
+				testimonial.name,
+				"legacy_testimonial_avatar",
+				testimonial.avatar
+			)
+			avatar_url = avatar_media["url"]
 			
 			testimonials.append({
 				"id": int(testimonial.idx) if hasattr(testimonial, 'idx') else len(testimonials) + 1,
@@ -113,32 +120,42 @@ def get_legacy_content(restaurant_id):
 				"avatar": avatar_url or testimonial.name[:2].upper()
 			})
 		
-		# Format members
+		# Format members with Media Asset data
 		members = []
 		for member in legacy_doc.members:
-			member_image = member.image
-			if member_image and member_image.startswith("/files/"):
-				member_image = get_url(member_image)
+			# Get member image from Media Asset or fallback
+			member_media = get_media_asset_data(
+				"Legacy Member",
+				member.name,
+				"legacy_member_image",
+				member.image
+			)
 			
 			members.append({
 				"id": int(member.idx) if hasattr(member, 'idx') else len(members) + 1,
 				"name": member.name,
-				"image": member_image or "",
+				"image": member_media["url"],
+				"imageBlurPlaceholder": member_media.get("blur_placeholder"),
 				"role": member.role or "",
 				"displayOrder": member.display_order
 			})
 		
-		# Format gallery
+		# Format gallery with Media Asset data
 		gallery_images = []
 		# Handle new table structure
 		if hasattr(legacy_doc, 'gallery_featured_images') and legacy_doc.gallery_featured_images:
 			for img_row in legacy_doc.gallery_featured_images:
-				img_url = img_row.image
-				if img_url:
-					if img_url.startswith("/files/"):
-						img_url = get_url(img_url)
+				# Get gallery image from Media Asset or fallback
+				gallery_media = get_media_asset_data(
+					"Legacy Gallery Image",
+					img_row.name,
+					"legacy_gallery_image",
+					img_row.image
+				)
+				if gallery_media["url"]:
 					gallery_images.append({
-						"src": img_url,
+						"src": gallery_media["url"],
+						"blurPlaceholder": gallery_media.get("blur_placeholder"),
 						"title": img_row.title or ""
 					})
 		# Fallback: handle old JSON format for backward compatibility

@@ -3,6 +3,7 @@
 // - Maximum 3 media items per product
 // - Maximum 1 video per product
 // - File type must match media_type (image files for image, video files for video)
+// - Integrates with Cloudflare R2 media architecture
 
 frappe.ui.form.on('Menu Product', {
 	product_name: function(frm) {
@@ -36,6 +37,16 @@ frappe.ui.form.on('Menu Product', {
 		} else {
 			// Show product_id field for saved documents
 			frm.set_df_property('product_id', 'hidden', 0);
+		}
+		
+		// Initialize media uploader
+		if (!frm.is_new() && window.dinematters && window.dinematters.media) {
+			frm.media_uploader = new window.dinematters.media.ProductMediaUploader(frm);
+		}
+		
+		// Add custom upload button
+		if (!frm.is_new()) {
+			setup_media_upload_button(frm);
 		}
 		
 		// Validate media on refresh
@@ -138,5 +149,87 @@ function validate_media_file_type(frm, cdt, cdn) {
 	return true;
 }
 
+function setup_media_upload_button(frm) {
+	// Add custom upload button for R2 direct upload
+	if (!frm.fields_dict.product_media) return;
+	
+	const grid = frm.fields_dict.product_media.grid;
+	
+	// Add custom button to grid
+	if (!grid.custom_buttons_added) {
+		grid.add_custom_button(__('Upload to R2'), function() {
+			upload_media_to_r2(frm);
+		});
+		grid.custom_buttons_added = true;
+	}
+}
 
-
+function upload_media_to_r2(frm) {
+	if (!frm.media_uploader) {
+		frappe.msgprint(__('Please save the document first'));
+		return;
+	}
+	
+	// Create file input
+	const input = document.createElement('input');
+	input.type = 'file';
+	input.accept = 'image/*,video/*';
+	input.multiple = false;
+	
+	input.onchange = async (e) => {
+		const file = e.target.files[0];
+		if (!file) return;
+		
+		const media_type = frm.media_uploader.get_media_type(file);
+		
+		// Validate before upload
+		if (!frm.media_uploader.validate_can_add_media(media_type)) {
+			return;
+		}
+		
+		// Add new row
+		const row = frappe.model.add_child(frm.doc, 'Product Media', 'product_media');
+		row.media_type = media_type;
+		row.display_order = frm.doc.product_media.length;
+		frm.refresh_field('product_media');
+		
+		const row_idx = frm.doc.product_media.length - 1;
+		
+		// Show progress
+		frappe.show_progress(__('Uploading to R2'), 30, 100, __('Uploading file...'));
+		
+		try {
+			// Upload to R2
+			const result = await frm.media_uploader.upload_file(file, row_idx);
+			
+			frappe.show_progress(__('Uploading to R2'), 70, 100, __('Processing media...'));
+			
+			// Wait a bit for processing to start
+			await new Promise(resolve => setTimeout(resolve, 2000));
+			
+			frappe.hide_progress();
+			
+			frappe.show_alert({
+				message: __('Media uploaded successfully! Processing in background...'),
+				indicator: 'green'
+			}, 5);
+			
+			// Save the form
+			frm.save();
+			
+		} catch (error) {
+			frappe.hide_progress();
+			frappe.msgprint({
+				title: __('Upload Failed'),
+				message: error.message || __('Failed to upload media'),
+				indicator: 'red'
+			});
+			
+			// Remove the failed row
+			frm.doc.product_media.splice(row_idx, 1);
+			frm.refresh_field('product_media');
+		}
+	};
+	
+	input.click();
+}

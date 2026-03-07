@@ -19,6 +19,7 @@ import MenuImagesTable from './MenuImagesTable'
 import ExtractedDishesTable from './ExtractedDishesTable'
 import ProductMediaTable from './ProductMediaTable'
 import CustomizationQuestionsTable from './CustomizationQuestionsTable'
+import { uploadToR2 } from '@/lib/r2Upload'
 
 interface DynamicFormProps {
   doctype: string
@@ -734,36 +735,24 @@ export default function DynamicForm({
                     const file = e.target.files?.[0]
                     if (!file) return
 
+                    if (!docname) {
+                      toast.error('Please save the document before uploading files')
+                      return
+                    }
+
                     try {
-                      // Upload file to Frappe
-                      const formData = new FormData()
-                      formData.append('file', file)
-                      formData.append('is_private', '0')
-                      formData.append('folder', 'Home/Attachments')
-
-                      const csrfToken = (window as any).frappe?.csrf_token || (window as any).csrf_token
-
-                      const response = await fetch('/api/method/upload_file', {
-                        method: 'POST',
-                        body: formData,
-                        headers: {
-                          'X-Frappe-CSRF-Token': csrfToken,
-                        },
+                      const result = await uploadToR2({
+                        ownerDoctype: doctype,
+                        ownerName: docname,
+                        mediaRole: 'restaurant_config_hero_video',
+                        file,
                       })
 
-                      if (!response.ok) {
-                        const error = await response.json()
-                        throw new Error(error.message?.message || error.message || 'Upload failed')
-                      }
-
-                      const result = await response.json()
-                      const fileUrl = result.message?.file_url || result.message?.name || ''
-                      handleFieldChange(field.fieldname, fileUrl)
+                      handleFieldChange(field.fieldname, result.primary_url || '')
                       toast.success('Video uploaded successfully')
                     } catch (error: any) {
                       toast.error(error?.message || 'Failed to upload video')
                     } finally {
-                      // Reset input
                       e.target.value = ''
                     }
                   }}
@@ -991,36 +980,28 @@ export default function DynamicForm({
                   const file = e.target.files?.[0]
                   if (!file) return
 
+                  if (!docname) {
+                    toast.error('Please save the document before uploading files')
+                    return
+                  }
+
                   try {
-                    // Upload file to Frappe
-                    const formData = new FormData()
-                    formData.append('file', file)
-                    formData.append('is_private', '0')
-                    formData.append('folder', 'Home/Attachments')
+                    const mediaRole = field.fieldname === 'logo' ? 'restaurant_config_logo' :
+                                     field.fieldname === 'apple_touch_icon' ? 'apple_touch_icon' :
+                                     `${doctype.toLowerCase().replace(' ', '_')}_${field.fieldname}`
 
-                    const csrfToken = (window as any).frappe?.csrf_token || (window as any).csrf_token
-
-                    const response = await fetch('/api/method/upload_file', {
-                      method: 'POST',
-                      body: formData,
-                      headers: {
-                        'X-Frappe-CSRF-Token': csrfToken,
-                      },
+                    const result = await uploadToR2({
+                      ownerDoctype: doctype,
+                      ownerName: docname,
+                      mediaRole,
+                      file,
                     })
 
-                    if (!response.ok) {
-                      const error = await response.json()
-                      throw new Error(error.message?.message || error.message || 'Upload failed')
-                    }
-
-                    const result = await response.json()
-                    const fileUrl = result.message?.file_url || result.message?.name || ''
-                    handleFieldChange(field.fieldname, fileUrl)
+                    handleFieldChange(field.fieldname, result.primary_url || '')
                     toast.success('File uploaded successfully')
                   } catch (error: any) {
                     toast.error(error?.message || 'Failed to upload file')
                   } finally {
-                    // Reset input
                     e.target.value = ''
                   }
                 }}
@@ -1072,6 +1053,7 @@ export default function DynamicForm({
                 onChange={(items) => handleFieldChange(field.fieldname, items)}
                 required={field.required}
                 disabled={isReadOnly}
+                categoryName={docname}
               />
               {field.description && (
                 <p className="text-xs text-muted-foreground">{field.description}</p>
@@ -1088,6 +1070,7 @@ export default function DynamicForm({
                 onChange={(items) => handleFieldChange(field.fieldname, items)}
                 required={field.required}
                 disabled={isReadOnly}
+                productName={docname}
               />
               {field.description && (
                 <p className="text-xs text-muted-foreground">{field.description}</p>

@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Trash2, Edit, Eye } from 'lucide-react'
+import { uploadToR2 } from '@/lib/r2Upload'
 
 export default function HomeFeaturesManager() {
   const { selectedRestaurant, restaurantConfig } = useRestaurant()
@@ -59,19 +60,18 @@ export default function HomeFeaturesManager() {
   }
 
   const uploadFile = async (file: File) => {
-    const form = new FormData()
-    form.append('file', file)
-    form.append('is_private', '0')
-    form.append('folder', 'Home/Attachments')
-    const csrf = (window as any).frappe?.csrf_token || (window as any).csrf_token
-    const res = await fetch('/api/method/upload_file', {
-      method: 'POST',
-      body: form,
-      headers: { 'X-Frappe-CSRF-Token': csrf }
+    if (!editing?.name) throw new Error('Missing Home Feature id')
+
+    // Use centralized R2 upload utility
+    const result = await uploadToR2({
+      ownerDoctype: 'Home Feature',
+      ownerName: editing.name,
+      mediaRole: 'home_feature_image',
+      file,
     })
-    if (!res.ok) throw new Error('Upload failed')
-    const j = await res.json()
-    return j.message?.file_url || j.message?.name
+
+    // Return CDN URL from upload result
+    return result.primary_url || ''
   }
 
   const handleSave = async () => {

@@ -6,9 +6,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Trash2, Upload, Image as ImageIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { uploadToR2 } from '@/lib/r2Upload'
 
 interface MenuImageItem {
   name?: string
+  media_asset?: string
   menu_image?: string
 }
 
@@ -17,9 +19,10 @@ interface MenuImagesTableProps {
   onChange?: (items: MenuImageItem[]) => void
   required?: boolean
   disabled?: boolean
+  categoryName?: string
 }
 
-export default function MenuImagesTable({ value = [], onChange, required, disabled }: MenuImagesTableProps) {
+export default function MenuImagesTable({ value = [], onChange, required, disabled, categoryName }: MenuImagesTableProps) {
   const [uploading, setUploading] = useState(false)
   
   // Ensure value is always an array
@@ -37,6 +40,11 @@ export default function MenuImagesTable({ value = [], onChange, required, disabl
 
     setUploading(true)
 
+    if (!categoryName) {
+      toast.error('Category must be saved before uploading images')
+      return
+    }
+
     try {
       const uploadPromises = Array.from(files).map(async (file) => {
         // Validate file type
@@ -44,30 +52,17 @@ export default function MenuImagesTable({ value = [], onChange, required, disabl
           throw new Error(`${file.name} is not an image file`)
         }
 
-        // Upload file to Frappe
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('is_private', '0')
-        formData.append('folder', 'Home/Attachments')
-
-        const csrfToken = (window as any).frappe?.csrf_token || (window as any).csrf_token
-
-        const response = await fetch('/api/method/upload_file', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'X-Frappe-CSRF-Token': csrfToken,
-          },
+        // Upload to R2
+        const result = await uploadToR2({
+          ownerDoctype: 'Menu Category',
+          ownerName: categoryName,
+          mediaRole: 'category_image',
+          file,
         })
 
-        if (!response.ok) {
-          const error = await response.json()
-          throw new Error(error.message?.message || error.message || 'Upload failed')
-        }
-
-        const result = await response.json()
         return {
-          menu_image: result.message?.file_url || result.message?.name || ''
+          media_asset: result.media_id,
+          menu_image: result.primary_url || ''
         }
       })
 

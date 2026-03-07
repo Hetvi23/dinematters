@@ -8,9 +8,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Trash2, Upload, Image as ImageIcon, Video, Edit2, X, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { uploadToR2, getMediaType } from '@/lib/r2Upload'
 
 interface ProductMediaItem {
   name?: string
+  media_asset?: string
   media_url?: string
   media_type?: 'image' | 'video'
   display_order?: number
@@ -23,9 +25,10 @@ interface ProductMediaTableProps {
   onChange?: (items: ProductMediaItem[]) => void
   required?: boolean
   disabled?: boolean
+  productName?: string
 }
 
-export default function ProductMediaTable({ value = [], onChange, required, disabled }: ProductMediaTableProps) {
+export default function ProductMediaTable({ value = [], onChange, required, disabled, productName }: ProductMediaTableProps) {
   const [uploading, setUploading] = useState(false)
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [editData, setEditData] = useState<Partial<ProductMediaItem>>({})
@@ -59,41 +62,28 @@ export default function ProductMediaTable({ value = [], onChange, required, disa
 
     setUploading(true)
 
+    if (!productName) {
+      toast.error('Product must be saved before uploading media')
+      return
+    }
+
     try {
       const uploadPromises = Array.from(files).map(async (file, index) => {
-        // Determine media type
-        const isVideo = file.type.startsWith('video/') || 
-          ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.flv', '.wmv'].some(ext => 
-            file.name.toLowerCase().endsWith(ext)
-          )
-        const mediaType = isVideo ? 'video' : 'image'
+        const mediaType = getMediaType(file)
+        const mediaRole = mediaType === 'video' ? 'product_video' : 'product_image'
 
-        // Upload file to Frappe
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('is_private', '0')
-        formData.append('folder', 'Home/Attachments')
-
-        const csrfToken = (window as any).frappe?.csrf_token || (window as any).csrf_token
-
-        const response = await fetch('/api/method/upload_file', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'X-Frappe-CSRF-Token': csrfToken,
-          },
+        // Upload to R2
+        const result = await uploadToR2({
+          ownerDoctype: 'Menu Product',
+          ownerName: productName,
+          mediaRole,
+          file,
+          displayOrder: currentValue.length + index + 1,
         })
 
-        if (!response.ok) {
-          const error = await response.json()
-          throw new Error(error.message?.message || error.message || 'Upload failed')
-        }
-
-        const result = await response.json()
-        const fileUrl = result.message?.file_url || result.message?.name || ''
-
         return {
-          media_url: fileUrl,
+          media_asset: result.media_id,
+          media_url: result.primary_url || '',
           media_type: mediaType,
           display_order: currentValue.length + index + 1,
           alt_text: '',
@@ -160,7 +150,6 @@ export default function ProductMediaTable({ value = [], onChange, required, disa
 
   const canAddMore = currentValue.length < 3
   const videoCount = currentValue.filter(item => item.media_type === 'video').length
-  const canAddVideo = videoCount < 1
 
   return (
     <div className="space-y-4">

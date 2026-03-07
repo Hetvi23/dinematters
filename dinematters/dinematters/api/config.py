@@ -10,6 +10,7 @@ import frappe
 from frappe import _
 from frappe.utils import get_url
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api, get_restaurant_context
+from dinematters.dinematters.media.utils import get_media_asset_data
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 import json
 
@@ -91,19 +92,39 @@ def get_restaurant_config(restaurant_id):
 		if not primary_color:
 			primary_color = next(iter(color_palette.values()), "#DB782F")
 		
-		# Format logo and icons
-		logo = config.get("logo")
-		if logo and logo.startswith("/files/"):
-			logo = get_url(logo)
+		# Get Media Assets using centralized utility
+		config_name = frappe.db.get_value("Restaurant Config", {"restaurant": restaurant}, "name")
 		
-		apple_touch_icon = config.get("apple_touch_icon")
-		if apple_touch_icon and apple_touch_icon.startswith("/files/"):
-			apple_touch_icon = get_url(apple_touch_icon)
-
-		# Normalize hero video URL (if stored as a /files/ path, convert to absolute URL)
-		hero_video = config.get("hero_video", "")
-		if hero_video and isinstance(hero_video, str) and hero_video.startswith("/files/"):
-			hero_video = get_url(hero_video)
+		# Get logo with variants and blur placeholder
+		logo_data = get_media_asset_data(
+			"Restaurant Config",
+			config_name,
+			"restaurant_config_logo",
+			config.get("logo")
+		)
+		logo = logo_data["url"]
+		logo_blur = logo_data.get("blur_placeholder")
+		logo_variants = logo_data.get("variants", {})
+		logo_srcset = logo_data.get("srcset")
+		
+		# Get hero video
+		hero_data = get_media_asset_data(
+			"Restaurant Config",
+			config_name,
+			"restaurant_config_hero_video",
+			config.get("hero_video")
+		)
+		hero_video = hero_data["url"]
+		
+		# Get apple touch icon with variants
+		icon_data = get_media_asset_data(
+			"Restaurant Config",
+			config_name,
+			"apple_touch_icon",
+			config.get("apple_touch_icon")
+		)
+		apple_touch_icon = icon_data["url"]
+		icon_variants = icon_data.get("variants", {})
 		
 		# Get currency info with symbol
 		currency_info = get_restaurant_currency_info(restaurant)
@@ -121,8 +142,12 @@ def get_restaurant_config(restaurant_id):
 				"primaryColor": primary_color,
 				"defaultTheme": config.get("default_theme", "light"),
 				"logo": logo,
+				"logoBlurPlaceholder": logo_blur,
+				"logoVariants": logo_variants,
+				"logoSrcset": logo_srcset,
 				"heroVideo": hero_video or config.get("hero_video", ""),
 				"appleTouchIcon": apple_touch_icon,
+				"appleTouchIconVariants": icon_variants,
 				"colorPalette": color_palette if color_palette else {
 					"violet": "#A992B2",
 					"indigo": "#8892B0",
@@ -191,7 +216,7 @@ def get_home_features(restaurant_id):
 		# Validate restaurant
 		restaurant = validate_restaurant_for_api(restaurant_id)
 		
-		# Get home features
+		# Get home features (include 'name' for Media Asset lookup)
 		features = frappe.get_all(
 			"Home Feature",
 			fields=[
@@ -243,35 +268,41 @@ def get_home_features(restaurant_id):
 				})
 				feat_doc.insert(ignore_permissions=True)
 			
-			# Re-fetch
+			# Re-fetch (include 'name' for Media Asset lookup)
 			features = frappe.get_all(
 				"Home Feature",
-				fields=["feature_id as id", "title", "subtitle", "image_src", "image_alt", "route",
+				fields=["name", "feature_id as id", "title", "subtitle", "image_src", "image_alt", "route",
 				        "size", "is_enabled", "is_mandatory", "display_order"],
 				filters={"restaurant": restaurant},
 				order_by="display_order asc"
 			)
 		
-		# Format features
+		# Format features with Media Asset data
+		from dinematters.dinematters.media.utils import format_media_field
+		
 		formatted_features = []
 		for feature in features:
-			image_src = feature.get("image_src", "")
-			if image_src and image_src.startswith("/files/"):
-				image_src = get_url(image_src)
-			
-			formatted_features.append({
+			feature_data = {
 				"name": feature.get("name"),
 				"id": feature["id"],
 				"title": feature["title"],
 				"subtitle": feature.get("subtitle", ""),
-				"imageSrc": image_src,
+				"image_src": feature.get("image_src", ""),
 				"imageAlt": feature.get("image_alt", feature["title"]),
 				"size": feature.get("size", "small"),
 				"route": feature.get("route", ""),
 				"isEnabled": bool(feature.get("is_enabled", 1)),
 				"isMandatory": bool(feature.get("is_mandatory", 0)),
 				"displayOrder": feature.get("display_order", 0)
-			})
+			}
+			
+			# Use centralized media formatter for CDN URLs, blur placeholders, and variants
+			format_media_field(feature_data, "image_src", "Home Feature", feature.get("name"), "home_feature_image", "imageSrc")
+			
+			# Remove raw image_src field
+			feature_data.pop("image_src", None)
+			
+			formatted_features.append(feature_data)
 
 		# De-duplicate by feature id so each restaurant has at most one
 		# card per logical home feature (menu, book-table, etc.).

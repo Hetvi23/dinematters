@@ -7,6 +7,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "media_asset",
   "media_url",
   "media_type",
   "display_order",
@@ -16,11 +17,17 @@
  ],
  "fields": [
   {
+   "fieldname": "media_asset",
+   "fieldtype": "Link",
+   "label": "Media Asset",
+   "options": "Media Asset",
+   "read_only": 1
+  },
+  {
    "fieldname": "media_url",
-   "fieldtype": "Attach",
+   "fieldtype": "Small Text",
    "in_list_view": 1,
    "label": "Media File",
-   "make_attachment_public": 1,
    "reqd": 1
   },
   {

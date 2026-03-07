@@ -39,7 +39,8 @@ from routes import (
 	document_routes,
 	restaurant_routes,
 	frappe_routes,
-	resource_routes
+	resource_routes,
+	media_routes
 )
 
 # Setup logging
@@ -130,6 +131,7 @@ app.include_router(document_routes.router, prefix="/api/method", tags=["Document
 app.include_router(restaurant_routes.router, prefix="/api/method", tags=["Restaurant"])
 app.include_router(frappe_routes.router, prefix="/api/method", tags=["Frappe Client"])
 app.include_router(resource_routes.router, prefix="/api/resource", tags=["Resource API"])
+app.include_router(media_routes.router, prefix="/api/media", tags=["Media Management"])
 
 
 # Debug: Catch-all route to see what paths are being requested

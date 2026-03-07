@@ -7,8 +7,10 @@ Matches format from BACKEND_API_DOCUMENTATION.md
 """
 
 import frappe
+from frappe import _
 from frappe.utils import get_url
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
+from dinematters.dinematters.media.utils import format_media_field
 
 
 @frappe.whitelist(allow_guest=True)
@@ -54,12 +56,9 @@ def get_categories(restaurant_id):
 				"productCount": product_count
 			}
 			
-			# Add image URL if exists
+			# Use centralized media fetcher for CDN URLs and blur placeholders
 			if cat.get("category_image"):
-				image_url = cat["category_image"]
-				if image_url.startswith("/files/"):
-					image_url = get_url(image_url)
-				category_data["image"] = image_url
+				format_media_field(category_data, "category_image", "Menu Category", cat.get("name"), "category_image", "image")
 			
 			formatted_categories.append(category_data)
 		

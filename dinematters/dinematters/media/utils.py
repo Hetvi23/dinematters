@@ -1,0 +1,157 @@
+"""
+Centralized Media Asset Utilities
+Provides helper functions for fetching and formatting Media Asset data across all APIs
+"""
+
+import frappe
+from frappe.utils import get_url
+
+
+def get_media_asset_data(owner_doctype, owner_name, media_role, fallback_url=None):
+	"""
+	Centralized function to get Media Asset data for any DocType field
+	
+	Args:
+		owner_doctype: Owner DocType (e.g., "Event", "Offer")
+		owner_name: Owner document name
+		media_role: Media role (e.g., "event_image", "offer_image")
+		fallback_url: Fallback URL if no Media Asset exists (legacy /files/ path)
+	
+	Returns:
+		dict: {
+			"url": CDN URL or fallback (primary/medium variant),
+			"blur_placeholder": Base64 blur placeholder (if image),
+			"media_id": Media Asset name,
+			"variants": {
+				"thumbnail": {"url": str, "width": int, "height": int},
+				"small": {...},
+				"medium": {...},
+				"large": {...}
+			},
+			"srcset": "url1 width1w, url2 width2w, ..." (for responsive images)
+		}
+	"""
+	if not owner_name:
+		return {
+			"url": fallback_url or "",
+			"blur_placeholder": None,
+			"media_id": None,
+			"variants": {},
+			"srcset": None
+		}
+	
+	# Try to get Media Asset
+	media_asset = frappe.db.get_value(
+		"Media Asset",
+		{
+			"owner_doctype": owner_doctype,
+			"owner_name": owner_name,
+			"media_role": media_role,
+			"status": "ready"
+		},
+		["name", "primary_url", "blur_placeholder", "media_kind"],
+		as_dict=True
+	)
+	
+	if media_asset and media_asset.get("primary_url"):
+		result = {
+			"url": media_asset["primary_url"],
+			"blur_placeholder": media_asset.get("blur_placeholder"),
+			"media_id": media_asset["name"],
+			"variants": {},
+			"srcset": None
+		}
+		
+		# Get variants if image
+		if media_asset.get("media_kind") == "image":
+			variants = frappe.get_all(
+				"Media Variant",
+				filters={"parent": media_asset["name"]},
+				fields=["variant_name", "url", "width", "height"],
+				order_by="width asc"
+			)
+			
+			# Format variants as dictionary for easy frontend access
+			variants_dict = {}
+			srcset_parts = []
+			
+			for v in variants:
+				variant_name = v.get("variant_name", "")
+				variants_dict[variant_name] = {
+					"url": v["url"],
+					"width": v.get("width"),
+					"height": v.get("height")
+				}
+				
+				# Build srcset string for responsive images
+				if v.get("width"):
+					srcset_parts.append(f"{v['url']} {v['width']}w")
+			
+			result["variants"] = variants_dict
+			
+			# Set srcset for responsive images
+			if srcset_parts:
+				result["srcset"] = ", ".join(srcset_parts)
+		
+		return result
+	
+	# Fallback to legacy URL
+	url = fallback_url or ""
+	if url and url.startswith("/files/"):
+		url = get_url(url)
+	
+	return {
+		"url": url,
+		"blur_placeholder": None,
+		"media_id": None,
+		"variants": {},
+		"srcset": None
+	}
+
+
+def format_media_field(data_dict, field_name, owner_doctype, owner_name, media_role, output_key=None):
+	"""
+	Helper to format a media field in API response data with CDN URLs, blur placeholders, and responsive variants
+	
+	Args:
+		data_dict: Dictionary to update (API response data)
+		field_name: Source field name in data (e.g., "image_src")
+		owner_doctype: Owner DocType
+		owner_name: Owner document name
+		media_role: Media role
+		output_key: Output key in response (defaults to camelCase of field_name)
+	
+	Example:
+		format_media_field(event_data, "image_src", "Event", event_name, "event_image")
+		# Adds: 
+		#   event_data["imageSrc"] - Primary CDN URL
+		#   event_data["imageSrcBlurPlaceholder"] - Base64 blur placeholder
+		#   event_data["imageSrcVariants"] - Dict of variant sizes
+		#   event_data["imageSrcSrcset"] - Srcset string for <img srcset>
+	"""
+	if output_key is None:
+		# Convert snake_case to camelCase
+		parts = field_name.split('_')
+		output_key = parts[0] + ''.join(word.capitalize() for word in parts[1:])
+	
+	fallback_url = data_dict.get(field_name, "")
+	media_data = get_media_asset_data(owner_doctype, owner_name, media_role, fallback_url)
+	
+	# Primary URL
+	data_dict[output_key] = media_data["url"]
+	
+	# Blur placeholder for progressive loading
+	if media_data.get("blur_placeholder"):
+		data_dict[f"{output_key}BlurPlaceholder"] = media_data["blur_placeholder"]
+	
+	# Media Asset ID
+	if media_data.get("media_id"):
+		data_dict["mediaId"] = media_data["media_id"]
+	
+	# Variants dictionary for manual selection
+	if media_data.get("variants"):
+		data_dict[f"{output_key}Variants"] = media_data["variants"]
+	
+	# Srcset for responsive images
+	if media_data.get("srcset"):
+		data_dict[f"{output_key}Srcset"] = media_data["srcset"]

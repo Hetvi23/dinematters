@@ -8,6 +8,7 @@
  "istable": 1,
  "field_order": [
   "image",
+  "media_asset",
   "display_order"
  ],
  "fields": [
@@ -17,6 +18,13 @@
    "in_list_view": 1,
    "label": "Image",
    "reqd": 1
+  },
+  {
+   "fieldname": "media_asset",
+   "fieldtype": "Link",
+   "label": "Media Asset",
+   "options": "Media Asset",
+   "read_only": 1
   },
   {
    "default": "0",

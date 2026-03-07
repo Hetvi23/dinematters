@@ -8,8 +8,9 @@ Matches format from BACKEND_API_DOCUMENTATION.md
 
 import frappe
 from frappe import _
-from frappe.utils import cint, flt
+from frappe.utils import flt, cint
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
+from dinematters.dinematters.media.utils import get_media_asset_data
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 import json
 
@@ -219,16 +220,35 @@ def format_product(product_doc):
 	if product_doc.main_category:
 		product["mainCategory"] = product_doc.main_category
 	
-	# Media
+	# Media - Using centralized Media Asset utility
 	media = []
 	if product_doc.product_media:
 		for media_item in product_doc.product_media:
-			if media_item.media_url:
-				# Get full URL if it's a file attachment
-				media_url = media_item.media_url
-				if media_url.startswith("/files/"):
-					media_url = frappe.utils.get_url(media_url)
-				media.append(media_url)
+			# Use centralized utility to get Media Asset data
+			media_asset_data = get_media_asset_data(
+				"Product Media",
+				media_item.name,
+				f"product_{media_item.media_type or 'image'}",
+				media_item.media_url
+			)
+			
+			if media_asset_data["url"]:
+				media_data = {
+					"url": media_asset_data["url"],
+					"type": media_item.media_type or "image",
+					"blurPlaceholder": media_asset_data.get("blur_placeholder"),
+					"variants": media_asset_data.get("variants", {}),
+					"srcset": media_asset_data.get("srcset")
+				}
+				
+				if media_item.alt_text:
+					media_data["altText"] = media_item.alt_text
+				if media_item.caption:
+					media_data["caption"] = media_item.caption
+				if media_item.display_order:
+					media_data["displayOrder"] = media_item.display_order
+				
+				media.append(media_data)
 	
 	if media:
 		product["media"] = media
