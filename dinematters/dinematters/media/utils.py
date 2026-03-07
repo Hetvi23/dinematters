@@ -67,7 +67,7 @@ def get_media_asset_data(owner_doctype, owner_name, media_role, fallback_url=Non
 			variants = frappe.get_all(
 				"Media Variant",
 				filters={"parent": media_asset["name"]},
-				fields=["variant_name", "url", "width", "height"],
+				fields=["variant_name", "file_url as url", "width", "height"],
 				order_by="width asc"
 			)
 			
