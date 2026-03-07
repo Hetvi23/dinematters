@@ -22,12 +22,13 @@ from dinematters.dinematters.media.storage import upload_object, generate_object
 from dinematters.dinematters.media.config import get_media_config
 
 
-def migrate_all_media(dry_run=True):
+def migrate_all_media(dry_run=True, overwrite_fields=False):
 	"""Migrate all existing media files to R2 for all restaurants"""
 	
 	print("\n" + "="*80)
 	print(f"🚀 BULK MEDIA MIGRATION TO R2 CDN")
 	print(f"Mode: {'DRY RUN (Preview Only)' if dry_run else 'FULL MIGRATION'}")
+	print(f"Overwrite Fields: {'YES' if overwrite_fields else 'NO'}")
 	print("="*80 + "\n")
 	
 	# Get all active restaurants
@@ -45,7 +46,7 @@ def migrate_all_media(dry_run=True):
 		print(f"🏪 Processing Restaurant: {restaurant}")
 		print(f"{'─'*80}\n")
 		
-		stats = migrate_restaurant_media(restaurant, dry_run)
+		stats = migrate_restaurant_media(restaurant, dry_run, overwrite_fields=overwrite_fields)
 		total_files += stats["total"]
 		total_migrated += stats["migrated"]
 		total_skipped += stats["skipped"]
@@ -75,7 +76,7 @@ def migrate_all_media(dry_run=True):
 	}
 
 
-def migrate_restaurant_media(restaurant, dry_run=True):
+def migrate_restaurant_media(restaurant, dry_run=True, overwrite_fields=False):
 	"""Migrate all media for a single restaurant"""
 	
 	stats = {"total": 0, "migrated": 0, "skipped": 0, "errors": 0}
@@ -179,7 +180,12 @@ def migrate_restaurant_media(restaurant, dry_run=True):
 						owner_name=doc_name,
 						media_role=media_role,
 						file_url=file_url,
-						dry_run=dry_run
+						dry_run=dry_run,
+						overwrite_fields=overwrite_fields,
+						overwrite_doctype=doctype,
+						overwrite_name=doc_name,
+						overwrite_field=field_name,
+						overwrite_expected_value=file_url,
 					)
 					
 					if result:
@@ -195,14 +201,14 @@ def migrate_restaurant_media(restaurant, dry_run=True):
 					frappe.log_error(f"Migration error: {str(e)}", f"Bulk Migration Error - {doctype}")
 	
 	# Process Product Media (child table)
-	product_stats = migrate_product_media(restaurant, dry_run)
+	product_stats = migrate_product_media(restaurant, dry_run, overwrite_fields=overwrite_fields)
 	stats["total"] += product_stats["total"]
 	stats["migrated"] += product_stats["migrated"]
 	stats["skipped"] += product_stats["skipped"]
 	stats["errors"] += product_stats["errors"]
 	
 	# Process Legacy child tables
-	legacy_stats = migrate_legacy_child_tables(restaurant, dry_run)
+	legacy_stats = migrate_legacy_child_tables(restaurant, dry_run, overwrite_fields=overwrite_fields)
 	stats["total"] += legacy_stats["total"]
 	stats["migrated"] += legacy_stats["migrated"]
 	stats["skipped"] += legacy_stats["skipped"]
@@ -213,7 +219,7 @@ def migrate_restaurant_media(restaurant, dry_run=True):
 	return stats
 
 
-def migrate_product_media(restaurant, dry_run=True):
+def migrate_product_media(restaurant, dry_run=True, overwrite_fields=False):
 	"""Migrate product media (child table)"""
 	
 	stats = {"total": 0, "migrated": 0, "skipped": 0, "errors": 0}
@@ -262,7 +268,12 @@ def migrate_product_media(restaurant, dry_run=True):
 					owner_name=media_item.name,
 					media_role=media_role,
 					file_url=file_url,
-					dry_run=dry_run
+					dry_run=dry_run,
+					overwrite_fields=overwrite_fields,
+					overwrite_doctype="Product Media",
+					overwrite_name=media_item.name,
+					overwrite_field="media_url",
+					overwrite_expected_value=file_url,
 				)
 				
 				if result:
@@ -278,7 +289,7 @@ def migrate_product_media(restaurant, dry_run=True):
 	return stats
 
 
-def migrate_legacy_child_tables(restaurant, dry_run=True):
+def migrate_legacy_child_tables(restaurant, dry_run=True, overwrite_fields=False):
 	"""Migrate legacy child table media"""
 	
 	stats = {"total": 0, "migrated": 0, "skipped": 0, "errors": 0}
@@ -306,7 +317,12 @@ def migrate_legacy_child_tables(restaurant, dry_run=True):
 							owner_name=member.name,
 							media_role="legacy_member_image",
 							file_url=member.image,
-							dry_run=dry_run
+							dry_run=dry_run,
+							overwrite_fields=overwrite_fields,
+							overwrite_doctype="Legacy Member",
+							overwrite_name=member.name,
+							overwrite_field="image",
+							overwrite_expected_value=member.image,
 						)
 						if result:
 							stats["migrated"] += 1
@@ -327,7 +343,12 @@ def migrate_legacy_child_tables(restaurant, dry_run=True):
 							owner_name=img.name,
 							media_role="legacy_gallery_image",
 							file_url=img.image,
-							dry_run=dry_run
+							dry_run=dry_run,
+							overwrite_fields=overwrite_fields,
+							overwrite_doctype="Legacy Gallery Image",
+							overwrite_name=img.name,
+							overwrite_field="image",
+							overwrite_expected_value=img.image,
 						)
 						if result:
 							stats["migrated"] += 1
@@ -349,7 +370,12 @@ def migrate_legacy_child_tables(restaurant, dry_run=True):
 							owner_name=test_row.name,
 							media_role="legacy_testimonial_avatar",
 							file_url=test_row.avatar,
-							dry_run=dry_run
+							dry_run=dry_run,
+							overwrite_fields=overwrite_fields,
+							overwrite_doctype="Legacy Testimonial",
+							overwrite_name=test_row.name,
+							overwrite_field="avatar",
+							overwrite_expected_value=test_row.avatar,
 						)
 						if result:
 							stats["migrated"] += 1
@@ -370,7 +396,12 @@ def migrate_legacy_child_tables(restaurant, dry_run=True):
 									owner_name=dish_img.name,
 									media_role="legacy_testimonial_dish_image",
 									file_url=dish_img.image,
-									dry_run=dry_run
+									dry_run=dry_run,
+									overwrite_fields=overwrite_fields,
+									overwrite_doctype="Legacy Testimonial Image",
+									overwrite_name=dish_img.name,
+									overwrite_field="image",
+									overwrite_expected_value=dish_img.image,
 								)
 								if result:
 									stats["migrated"] += 1
@@ -382,11 +413,44 @@ def migrate_legacy_child_tables(restaurant, dry_run=True):
 	return stats
 
 
-def migrate_single_file(restaurant, owner_doctype, owner_name, media_role, file_url, dry_run=True):
+def _overwrite_owner_field(doctype, name, field, value, expected_value=None):
+	"""Overwrite a field using SQL (avoids timestamp conflicts). If expected_value is provided, only overwrite if current value matches it."""
+	if expected_value is not None:
+		current = frappe.db.get_value(doctype, name, field)
+		if current != expected_value:
+			return False
+
+	frappe.db.sql(
+		"""
+		UPDATE `tab{doctype}`
+		SET `{field}` = %s, `modified` = NOW()
+		WHERE `name` = %s
+		""".format(doctype=doctype, field=field),
+		(value, name),
+	)
+	return True
+
+
+def migrate_single_file(
+	restaurant,
+	owner_doctype,
+	owner_name,
+	media_role,
+	file_url,
+	dry_run=True,
+	overwrite_fields=False,
+	overwrite_doctype=None,
+	overwrite_name=None,
+	overwrite_field=None,
+	overwrite_expected_value=None,
+):
 	"""Migrate a single file to R2"""
 	
 	if dry_run:
-		return {"cdn_url": f"[DRY RUN] Would migrate: {file_url}"}
+		return {
+			"cdn_url": f"[DRY RUN] Would migrate: {file_url}",
+			"would_overwrite": bool(overwrite_fields and overwrite_doctype and overwrite_name and overwrite_field),
+		}
 	
 	try:
 		# Get file path
@@ -443,6 +507,18 @@ def migrate_single_file(restaurant, owner_doctype, owner_name, media_role, file_
 		})
 		
 		media_asset.insert(ignore_permissions=True)
+		
+		# Optionally overwrite the original field with CDN URL (only after upload + Media Asset insert)
+		overwritten = False
+		if overwrite_fields and overwrite_doctype and overwrite_name and overwrite_field:
+			overwritten = _overwrite_owner_field(
+				overwrite_doctype,
+				overwrite_name,
+				overwrite_field,
+				cdn_url,
+				expected_value=overwrite_expected_value,
+			)
+		
 		frappe.db.commit()
 		
 		# Enqueue processing for images/videos
@@ -458,7 +534,8 @@ def migrate_single_file(restaurant, owner_doctype, owner_name, media_role, file_
 		
 		return {
 			"cdn_url": cdn_url,
-			"media_asset": media_asset.name
+			"media_asset": media_asset.name,
+			"overwritten": overwritten,
 		}
 	
 	except Exception as e:
