@@ -30,6 +30,7 @@ import PaymentStats from './pages/PaymentStats'
 import PaymentSettings from './pages/PaymentSettings'
 import RecommendationsEngine from './pages/RecommendationsEngine'
 import Customers from './pages/Customers'
+import Bookings from './pages/Bookings'
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -57,6 +58,7 @@ function AppContent() {
 						<Route path="/accept-orders" element={<Layout><AcceptOrders /></Layout>} />
 						<Route path="/orders/:orderId" element={<Layout><OrderDetail /></Layout>} />
 						<Route path="/past-orders" element={<Layout><PastOrders /></Layout>} />
+						<Route path="/bookings" element={<Layout><Bookings /></Layout>} />
 						<Route path="/customers" element={<Layout><Customers /></Layout>} />
 						<Route path="/products" element={<Layout><Products /></Layout>} />
 						<Route path="/products/new" element={<Layout><ProductNew /></Layout>} />

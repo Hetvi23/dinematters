@@ -135,10 +135,15 @@ def confirm_upload(upload_id, owner_doctype, owner_name, media_role, alt_text=No
 	if existing_asset:
 		# Return existing asset
 		asset_doc = frappe.get_doc("Media Asset", existing_asset)
+		# Use primary_url if available, otherwise construct from raw_object_key
+		url = asset_doc.primary_url
+		if not url and asset_doc.raw_object_key:
+			from dinematters.dinematters.media.storage import get_cdn_url
+			url = get_cdn_url(asset_doc.raw_object_key)
 		return {
 			"media_id": asset_doc.media_id,
 			"status": asset_doc.status,
-			"primary_url": asset_doc.primary_url,
+			"primary_url": url,
 			"message": "Media asset already exists"
 		}
 	
@@ -207,10 +212,15 @@ def confirm_upload(upload_id, owner_doctype, owner_name, media_role, alt_text=No
 		now=False
 	)
 	
+	# Construct CDN URL immediately (don't wait for processing)
+	from dinematters.dinematters.media.storage import get_cdn_url
+	cdn_url = get_cdn_url(upload_session.object_key)
+	
 	return {
 		"media_id": media_asset.media_id,
 		"status": media_asset.status,
-		"primary_url": media_asset.primary_url,
+		"primary_url": cdn_url,
+		"raw_object_key": upload_session.object_key,
 		"message": "Upload confirmed, processing started"
 	}
 

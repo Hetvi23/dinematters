@@ -13,6 +13,7 @@ from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_ap
 from dinematters.dinematters.media.utils import get_media_asset_data
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 import json
+from collections import defaultdict
 
 
 @frappe.whitelist(allow_guest=True)
@@ -56,6 +57,7 @@ def get_products(restaurant_id, category=None, type=None, vegetarian=None, searc
 		products = frappe.get_all(
 			"Menu Product",
 			fields=[
+				"name as docname",
 				"product_id as id",
 				"product_name as name",
 				"price",
@@ -68,7 +70,10 @@ def get_products(restaurant_id, category=None, type=None, vegetarian=None, searc
 				"estimated_time as estimatedTime",
 				"serving_size as servingSize",
 				"has_no_media",
-				"main_category as mainCategory"
+				"main_category as mainCategory",
+				"display_order",
+				"is_active",
+				"recommendations"
 			],
 			filters=filters,
 			or_filters=or_filters if or_filters else None,
@@ -84,12 +89,8 @@ def get_products(restaurant_id, category=None, type=None, vegetarian=None, searc
 		else:
 			total = frappe.db.count("Menu Product", filters=filters)
 		
-		# Format products with media and customizations
-		formatted_products = []
-		for product in products:
-			product_doc = frappe.get_doc("Menu Product", product["id"])
-			formatted_product = format_product(product_doc)
-			formatted_products.append(formatted_product)
+		# Format products with media and customizations using bulk-loaded child tables
+		formatted_products = format_products_for_listing(products)
 		
 		# Calculate pagination
 		total_pages = (total + limit - 1) // limit if limit > 0 else 1
@@ -121,6 +122,214 @@ def get_products(restaurant_id, category=None, type=None, vegetarian=None, searc
 				"message": str(e)
 			}
 		}
+
+
+def format_products_for_listing(products):
+	"""
+	Format Menu Product rows for the listing API using bulk-loaded child tables.
+	This avoids N+1 document and child-table queries while preserving the response shape.
+	"""
+	if not products:
+		return []
+
+	product_names = [product["docname"] for product in products if product.get("docname")]
+	media_by_product = get_product_media_map(product_names)
+	questions_by_product, question_names = get_customization_questions_map(product_names)
+	options_by_question = get_customization_options_map(question_names)
+
+	formatted_products = []
+	for product in products:
+		formatted_products.append(
+			format_product_from_row(
+				product,
+				media_by_product.get(product.get("docname"), []),
+				questions_by_product.get(product.get("docname"), []),
+				options_by_question,
+			)
+		)
+
+	return formatted_products
+
+
+def get_product_media_map(product_names):
+	media_by_product = defaultdict(list)
+	if not product_names:
+		return media_by_product
+
+	media_rows = frappe.get_all(
+		"Product Media",
+		filters={
+			"parent": ["in", product_names],
+			"parenttype": "Menu Product",
+			"parentfield": "product_media"
+		},
+		fields=["name", "parent", "media_url", "media_type", "display_order", "alt_text", "caption"],
+		order_by="parent asc, display_order asc, idx asc"
+	)
+
+	for media_row in media_rows:
+		media_by_product[media_row["parent"]].append(media_row)
+
+	return media_by_product
+
+
+def get_customization_questions_map(product_names):
+	questions_by_product = defaultdict(list)
+	question_names = []
+	if not product_names:
+		return questions_by_product, question_names
+
+	question_rows = frappe.get_all(
+		"Customization Question",
+		filters={
+			"parent": ["in", product_names],
+			"parenttype": "Menu Product",
+			"parentfield": "customization_questions"
+		},
+		fields=["name", "parent", "question_id", "title", "subtitle", "question_type", "is_required", "display_order"],
+		order_by="parent asc, display_order asc, idx asc"
+	)
+
+	for question_row in question_rows:
+		questions_by_product[question_row["parent"]].append(question_row)
+		question_names.append(question_row["name"])
+
+	return questions_by_product, question_names
+
+
+def get_customization_options_map(question_names):
+	options_by_question = defaultdict(list)
+	if not question_names:
+		return options_by_question
+
+	option_rows = frappe.get_all(
+		"Customization Option",
+		filters={
+			"parent": ["in", question_names],
+			"parenttype": "Customization Question",
+			"parentfield": "options"
+		},
+		fields=["parent", "option_id", "label", "price", "is_vegetarian", "is_default"],
+		order_by="parent asc, display_order asc, idx asc"
+	)
+
+	for option_row in option_rows:
+		options_by_question[option_row["parent"]].append(option_row)
+
+	return options_by_question
+
+
+def format_product_from_row(product_row, media_rows=None, customization_questions=None, options_by_question=None):
+	"""
+	Format a Menu Product row and bulk-loaded child rows to match the listing API contract.
+	"""
+	product = {
+		"id": product_row["id"],
+		"name": product_row["name"],
+		"price": flt(product_row.get("price")),
+		"category": product_row.get("category"),
+		"description": product_row.get("description") or "",
+		"isVegetarian": bool(product_row.get("is_vegetarian")),
+		"calories": cint(product_row.get("calories")) or 0,
+		"servingSize": product_row.get("servingSize") or "1",
+		"displayOrder": cint(product_row.get("display_order")) if product_row.get("display_order") is not None else 0,
+		"isActive": bool(product_row.get("is_active")) if product_row.get("is_active") is not None else True,
+	}
+
+	if product_row.get("original_price"):
+		product["originalPrice"] = flt(product_row.get("original_price"))
+
+	if product_row.get("type"):
+		product["type"] = product_row.get("type")
+
+	if product_row.get("estimatedTime"):
+		product["estimatedTime"] = cint(product_row.get("estimatedTime"))
+
+	if product_row.get("mainCategory"):
+		product["mainCategory"] = product_row.get("mainCategory")
+
+	media = []
+	for media_item in media_rows or []:
+		media_asset_data = get_media_asset_data(
+			"Product Media",
+			media_item.get("name"),
+			f"product_{media_item.get('media_type') or 'image'}",
+			media_item.get("media_url")
+		)
+
+		if media_asset_data["url"]:
+			media_data = {
+				"url": media_asset_data["url"],
+				"type": media_item.get("media_type") or "image",
+				"blurPlaceholder": media_asset_data.get("blur_placeholder"),
+				"variants": media_asset_data.get("variants", {}),
+				"srcset": media_asset_data.get("srcset")
+			}
+
+			if media_item.get("alt_text"):
+				media_data["altText"] = media_item.get("alt_text")
+			if media_item.get("caption"):
+				media_data["caption"] = media_item.get("caption")
+			if media_item.get("display_order"):
+				media_data["displayOrder"] = media_item.get("display_order")
+
+			media.append(media_data)
+
+	if media:
+		product["media"] = media
+	elif product_row.get("has_no_media"):
+		product["hasNoMedia"] = True
+
+	formatted_questions = []
+	for question in customization_questions or []:
+		question_data = {
+			"id": question.get("question_id"),
+			"title": question.get("title"),
+			"type": question.get("question_type"),
+			"required": bool(question.get("is_required"))
+		}
+
+		if question.get("subtitle"):
+			question_data["subtitle"] = question.get("subtitle")
+
+		options = []
+		for opt in (options_by_question or {}).get(question.get("name"), []):
+			option_data = {
+				"id": opt.get("option_id"),
+				"label": opt.get("label"),
+				"price": flt(opt.get("price")) or 0
+			}
+
+			if opt.get("is_vegetarian") is not None:
+				option_data["isVegetarian"] = bool(opt.get("is_vegetarian"))
+
+			if opt.get("is_default"):
+				option_data["isDefault"] = True
+
+			options.append(option_data)
+
+		if options:
+			question_data["options"] = options
+
+		formatted_questions.append(question_data)
+
+	if formatted_questions:
+		product["customizationQuestions"] = formatted_questions
+
+	recommendations = product_row.get("recommendations")
+	if recommendations:
+		try:
+			recommendations = json.loads(recommendations) if isinstance(recommendations, str) else recommendations
+			if recommendations and isinstance(recommendations, list):
+				product["recommendations"] = recommendations
+				ids = [r.get("id") for r in recommendations if isinstance(r, dict) and r.get("id")]
+				if ids:
+					product["recommendedDishIds"] = ids
+					product["recommendedProducts"] = ids
+		except Exception:
+			pass
+
+	return product
 
 
 @frappe.whitelist(allow_guest=True)

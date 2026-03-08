@@ -16,12 +16,28 @@
   "date",
   "time_slot",
   "status",
+  "section_break_table",
+  "assigned_table",
+  "table_assignment_method",
+  "column_break_table",
+  "auto_assign_table",
   "section_break_customer",
   "customer_name",
   "customer_phone",
   "customer_email",
   "platform_customer",
-  "notes"
+  "notes",
+  "section_break_timestamps",
+  "confirmed_at",
+  "confirmed_by",
+  "column_break_timestamps",
+  "rejected_at",
+  "rejected_by",
+  "rejection_reason",
+  "column_break_timestamps2",
+  "completed_at",
+  "no_show_at",
+  "cancelled_at"
  ],
  "fields": [
   {
@@ -86,8 +102,39 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "pending\nconfirmed\ncancelled\ncompleted",
+   "options": "pending\nconfirmed\nrejected\ncancelled\ncompleted\nno-show",
    "reqd": 1
+  },
+  {
+   "fieldname": "section_break_table",
+   "fieldtype": "Section Break",
+   "label": "Table Assignment"
+  },
+  {
+   "fieldname": "assigned_table",
+   "fieldtype": "Link",
+   "label": "Assigned Table",
+   "options": "Restaurant Table",
+   "description": "Table assigned to this booking"
+  },
+  {
+   "fieldname": "table_assignment_method",
+   "fieldtype": "Select",
+   "label": "Assignment Method",
+   "options": "\nauto\nmanual",
+   "read_only": 1,
+   "description": "How the table was assigned"
+  },
+  {
+   "fieldname": "column_break_table",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "auto_assign_table",
+   "fieldtype": "Check",
+   "label": "Auto Assign Table",
+   "description": "Automatically assign a suitable table when booking is confirmed"
   },
   {
    "fieldname": "section_break_customer",
@@ -122,6 +169,69 @@
    "fieldname": "notes",
    "fieldtype": "Small Text",
    "label": "Notes"
+  },
+  {
+   "fieldname": "section_break_timestamps",
+   "fieldtype": "Section Break",
+   "label": "Status Tracking"
+  },
+  {
+   "fieldname": "confirmed_at",
+   "fieldtype": "Datetime",
+   "label": "Confirmed At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "confirmed_by",
+   "fieldtype": "Link",
+   "label": "Confirmed By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_timestamps",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "rejected_at",
+   "fieldtype": "Datetime",
+   "label": "Rejected At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "rejected_by",
+   "fieldtype": "Link",
+   "label": "Rejected By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "rejection_reason",
+   "fieldtype": "Small Text",
+   "label": "Rejection Reason",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_timestamps2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "completed_at",
+   "fieldtype": "Datetime",
+   "label": "Completed At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "no_show_at",
+   "fieldtype": "Datetime",
+   "label": "No Show At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cancelled_at",
+   "fieldtype": "Datetime",
+   "label": "Cancelled At",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,

@@ -350,25 +350,20 @@ def cleanup_deleted_media(media_asset_name):
 def get_image_variant_configs(media_role):
 	"""Get variant configurations based on media role"""
 	
-	# Default variants for all images
+	# Canonical frontend-facing variants only.
+	# These map directly to current UI usage and srcset breakpoints.
 	base_variants = [
-		{"name": "thumb", "size": 120, "quality": 70, "is_primary": False},
-		{"name": "sm", "size": 400, "quality": 75, "is_primary": False},
-		{"name": "md", "size": 800, "quality": 75, "is_primary": True},
-		{"name": "lg", "size": 1200, "quality": 80, "is_primary": False}
+		{"name": "small", "size": 400, "quality": 75, "is_primary": False},
+		{"name": "medium", "size": 800, "quality": 75, "is_primary": True},
+		{"name": "large", "size": 1200, "quality": 80, "is_primary": False}
 	]
 	
 	# Role-specific adjustments
 	if media_role in ["restaurant_logo", "restaurant_config_logo", "apple_touch_icon"]:
 		return [
-			{"name": "thumb", "size": 64, "quality": 70, "is_primary": False},
-			{"name": "sm", "size": 128, "quality": 75, "is_primary": False},
-			{"name": "md", "size": 256, "quality": 80, "is_primary": True},
-			{"name": "lg", "size": 512, "quality": 85, "is_primary": False}
-		]
-	elif media_role in ["restaurant_hero_video", "restaurant_banner"]:
-		return base_variants + [
-			{"name": "xl", "size": 1600, "quality": 85, "is_primary": False}
+			{"name": "small", "size": 128, "quality": 75, "is_primary": False},
+			{"name": "medium", "size": 256, "quality": 80, "is_primary": True},
+			{"name": "large", "size": 512, "quality": 85, "is_primary": False}
 		]
 	else:
 		return base_variants

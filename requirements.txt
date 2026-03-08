@@ -1,4 +1,5 @@
 qrcode[pil]
 reportlab
 Pillow
-
+segno
+qrcode-artistic

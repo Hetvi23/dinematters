@@ -748,8 +748,32 @@ export default function DynamicForm({
                         file,
                       })
 
-                      handleFieldChange(field.fieldname, result.primary_url || '')
-                      toast.success('Video uploaded successfully')
+                      const uploadedUrl = result.primary_url || ''
+                      handleFieldChange(field.fieldname, uploadedUrl)
+                      
+                      // Auto-save the field to database immediately
+                      console.log('[DynamicForm] Auto-saving video upload:', { doctype, docname, field: field.fieldname, uploadedUrl })
+                      if (docname && uploadedUrl) {
+                        try {
+                          const saveResult = await updateDoc({
+                            doctype,
+                            name: docname,
+                            doc_data: { [field.fieldname]: uploadedUrl }
+                          })
+                          console.log('[DynamicForm] Auto-save result:', saveResult)
+                          toast.success('Video uploaded and saved successfully')
+                          // Refresh the document to show updated data
+                          if (refreshDoc) {
+                            await refreshDoc()
+                          }
+                        } catch (saveError: any) {
+                          console.error('[DynamicForm] Auto-save error:', saveError)
+                          toast.error(saveError?.message || 'Video uploaded but failed to save')
+                        }
+                      } else {
+                        console.warn('[DynamicForm] Skipping auto-save - missing docname or uploadedUrl')
+                        toast.success('Video uploaded successfully')
+                      }
                     } catch (error: any) {
                       toast.error(error?.message || 'Failed to upload video')
                     } finally {
@@ -966,7 +990,102 @@ export default function DynamicForm({
               {field.label}
               {field.required && <span className="text-destructive">*</span>}
             </Label>
-            <div className="flex items-center gap-2">
+            {value ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 p-3 border rounded-md bg-muted/30">
+                  {(field.fieldtype === 'Attach Image' || (field.fieldtype === 'Attach' && field.fieldname?.includes('image'))) && (
+                    <img 
+                      src={value.startsWith('http') ? value : `/${value}`} 
+                      alt={field.label}
+                      className="h-16 w-16 object-cover rounded border bg-white"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none'
+                      }}
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">File uploaded</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {value.split('/').pop() || value}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleFieldChange(field.fieldname, '')}
+                    disabled={isReadOnly}
+                  >
+                    Remove
+                  </Button>
+                </div>
+                {!isReadOnly && (
+                  <Input
+                    type="file"
+                    accept={
+                      field.fieldtype === 'Attach Image' || 
+                      (field.fieldtype === 'Attach' && (field.fieldname?.includes('image') || field.label?.toLowerCase().includes('image')))
+                        ? 'image/*' 
+                        : undefined
+                    }
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+
+                      if (!docname) {
+                        toast.error('Please save the document before uploading files')
+                        return
+                      }
+
+                      try {
+                        const mediaRole = field.fieldname === 'logo' ? 'restaurant_config_logo' :
+                                         field.fieldname === 'apple_touch_icon' ? 'apple_touch_icon' :
+                                         `${doctype.toLowerCase().replace(' ', '_')}_${field.fieldname}`
+
+                        const result = await uploadToR2({
+                          ownerDoctype: doctype,
+                          ownerName: docname,
+                          mediaRole,
+                          file,
+                        })
+
+                        const uploadedUrl = result.primary_url || ''
+                        handleFieldChange(field.fieldname, uploadedUrl)
+                        
+                        // Auto-save the field to database immediately
+                        console.log('[DynamicForm] Auto-saving file upload:', { doctype, docname, field: field.fieldname, uploadedUrl })
+                        if (docname && uploadedUrl) {
+                          try {
+                            const saveResult = await updateDoc({
+                              doctype,
+                              name: docname,
+                              doc_data: { [field.fieldname]: uploadedUrl }
+                            })
+                            console.log('[DynamicForm] Auto-save result:', saveResult)
+                            toast.success('File uploaded and saved successfully')
+                            // Refresh the document to show updated data
+                            if (refreshDoc) {
+                              await refreshDoc()
+                            }
+                          } catch (saveError: any) {
+                            console.error('[DynamicForm] Auto-save error:', saveError)
+                            toast.error(saveError?.message || 'File uploaded but failed to save')
+                          }
+                        } else {
+                          console.warn('[DynamicForm] Skipping auto-save - missing docname or uploadedUrl')
+                          toast.success('File uploaded successfully')
+                        }
+                      } catch (error: any) {
+                        toast.error(error?.message || 'Failed to upload file')
+                      } finally {
+                        e.target.value = ''
+                      }
+                    }}
+                    className="cursor-pointer"
+                  />
+                )}
+              </div>
+            ) : (
               <Input
                 id={field.fieldname}
                 type="file"
@@ -997,8 +1116,32 @@ export default function DynamicForm({
                       file,
                     })
 
-                    handleFieldChange(field.fieldname, result.primary_url || '')
-                    toast.success('File uploaded successfully')
+                    const uploadedUrl = result.primary_url || ''
+                    handleFieldChange(field.fieldname, uploadedUrl)
+                    
+                    // Auto-save the field to database immediately
+                    console.log('[DynamicForm] Auto-saving file upload:', { doctype, docname, field: field.fieldname, uploadedUrl })
+                    if (docname && uploadedUrl) {
+                      try {
+                        const saveResult = await updateDoc({
+                          doctype,
+                          name: docname,
+                          doc_data: { [field.fieldname]: uploadedUrl }
+                        })
+                        console.log('[DynamicForm] Auto-save result:', saveResult)
+                        toast.success('File uploaded and saved successfully')
+                        // Refresh the document to show updated data
+                        if (refreshDoc) {
+                          await refreshDoc()
+                        }
+                      } catch (saveError: any) {
+                        console.error('[DynamicForm] Auto-save error:', saveError)
+                        toast.error(saveError?.message || 'File uploaded but failed to save')
+                      }
+                    } else {
+                      console.warn('[DynamicForm] Skipping auto-save - missing docname or uploadedUrl')
+                      toast.success('File uploaded successfully')
+                    }
                   } catch (error: any) {
                     toast.error(error?.message || 'Failed to upload file')
                   } finally {
@@ -1010,33 +1153,7 @@ export default function DynamicForm({
                 disabled={isReadOnly}
                 className="cursor-pointer"
               />
-              {value && (
-                <div className="flex items-center gap-2">
-                  {(field.fieldtype === 'Attach Image' || (field.fieldtype === 'Attach' && field.fieldname?.includes('image'))) && (
-                    <img 
-                      src={value.startsWith('http') ? value : `/${value}`} 
-                      alt={field.label}
-                      className="h-16 w-16 object-cover rounded border"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none'
-                      }}
-                    />
-                  )}
-                  <span className="text-sm text-muted-foreground truncate max-w-xs">
-                    {value.split('/').pop() || value}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleFieldChange(field.fieldname, '')}
-                    disabled={isReadOnly}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              )}
-            </div>
+            )}
             {field.description && (
               <p className="text-xs text-muted-foreground">{field.description}</p>
             )}

@@ -7,6 +7,17 @@ import frappe
 from frappe.utils import get_url
 
 
+def normalize_variant_name(variant_name):
+	"""Map legacy short variant names to canonical API keys."""
+	variant_map = {
+		"thumb": "thumbnail",
+		"sm": "small",
+		"md": "medium",
+		"lg": "large",
+	}
+	return variant_map.get(variant_name, variant_name)
+
+
 def get_media_asset_data(owner_doctype, owner_name, media_role, fallback_url=None):
 	"""
 	Centralized function to get Media Asset data for any DocType field
@@ -77,11 +88,15 @@ def get_media_asset_data(owner_doctype, owner_name, media_role, fallback_url=Non
 			
 			for v in variants:
 				variant_name = v.get("variant_name", "")
-				variants_dict[variant_name] = {
+				canonical_name = normalize_variant_name(variant_name)
+				variant_payload = {
 					"url": v["url"],
 					"width": v.get("width"),
 					"height": v.get("height")
 				}
+				variants_dict[canonical_name] = variant_payload
+				if variant_name and variant_name != canonical_name:
+					variants_dict[variant_name] = variant_payload
 				
 				# Build srcset string for responsive images
 				if v.get("width"):

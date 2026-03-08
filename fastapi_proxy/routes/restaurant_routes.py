@@ -41,6 +41,12 @@ class GetQRCodesPdfUrlRequest(BaseModel):
 	restaurant: str
 
 
+class GetTableQrAssetsRequest(BaseModel):
+	"""Request for get_table_qr_assets"""
+	restaurant: str
+	force: int = 0
+
+
 # Route Implementations
 
 @router.post("/dinematters.dinematters.doctype.restaurant.restaurant.generate_qr_codes_pdf")
@@ -67,6 +73,36 @@ async def generate_qr_codes_pdf(
 		
 	except Exception as e:
 		logger.error(f"Error in generate_qr_codes_pdf: {str(e)}")
+		raise HTTPException(
+			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			detail=str(e)
+		)
+
+
+@router.post("/dinematters.dinematters.doctype.restaurant.restaurant.get_table_qr_assets")
+async def get_table_qr_assets(
+	request: GetTableQrAssetsRequest,
+	current_user: TokenData = Depends(get_current_user)
+):
+	"""
+	Get branded SVG and PNG QR assets for restaurant tables
+	
+	Mirrors: dinematters.dinematters.doctype.restaurant.restaurant.get_table_qr_assets
+	Type: READ
+	Cache: Yes (60s)
+	"""
+	client = get_erpnext_client()
+	
+	try:
+		response = await client.call_method(
+			"dinematters.dinematters.doctype.restaurant.restaurant.get_table_qr_assets",
+			data=request.dict(),
+			http_method="POST"
+		)
+		return response
+		
+	except Exception as e:
+		logger.error(f"Error in get_table_qr_assets: {str(e)}")
 		raise HTTPException(
 			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
 			detail=str(e)

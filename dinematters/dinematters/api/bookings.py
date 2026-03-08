@@ -491,3 +491,412 @@ def get_banquet_available_time_slots(restaurant_id, date, number_of_guests=None,
 		}
 
 
+# ========== STAFF MANAGEMENT APIs ==========
+
+@frappe.whitelist()
+def confirm_booking(booking_id, restaurant_id, assigned_table=None):
+	"""
+	POST /api/method/dinematters.dinematters.api.bookings.confirm_booking
+	Confirm a pending booking (staff only)
+	"""
+	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
+		# Get booking
+		booking = frappe.get_doc("Table Booking", booking_id)
+		
+		# Verify booking belongs to this restaurant
+		if booking.restaurant != restaurant:
+			return {
+				"success": False,
+				"error": {"code": "INVALID_BOOKING", "message": "Booking does not belong to this restaurant"}
+			}
+		
+		# Check if already confirmed
+		if booking.status == "confirmed":
+			return {
+				"success": False,
+				"error": {"code": "ALREADY_CONFIRMED", "message": "Booking is already confirmed"}
+			}
+		
+		# Update status
+		booking.status = "confirmed"
+		
+		# Assign table if provided
+		if assigned_table:
+			booking.assigned_table = assigned_table
+			booking.table_assignment_method = "manual"
+		
+		booking.save(ignore_permissions=True)
+		
+		return {
+			"success": True,
+			"data": {
+				"booking": {
+					"id": booking.name,
+					"status": booking.status,
+					"assignedTable": booking.assigned_table,
+					"confirmedAt": get_datetime_str(booking.confirmed_at) if booking.confirmed_at else None
+				}
+			}
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in confirm_booking: {str(e)}")
+		return {
+			"success": False,
+			"error": {"code": "CONFIRM_ERROR", "message": str(e)}
+		}
+
+
+@frappe.whitelist()
+def reject_booking(booking_id, restaurant_id, reason=None):
+	"""
+	POST /api/method/dinematters.dinematters.api.bookings.reject_booking
+	Reject a pending booking (staff only)
+	"""
+	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
+		# Get booking
+		booking = frappe.get_doc("Table Booking", booking_id)
+		
+		# Verify booking belongs to this restaurant
+		if booking.restaurant != restaurant:
+			return {
+				"success": False,
+				"error": {"code": "INVALID_BOOKING", "message": "Booking does not belong to this restaurant"}
+			}
+		
+		# Update status
+		booking.status = "rejected"
+		if reason:
+			booking.rejection_reason = reason
+		
+		booking.save(ignore_permissions=True)
+		
+		return {
+			"success": True,
+			"data": {
+				"booking": {
+					"id": booking.name,
+					"status": booking.status,
+					"rejectedAt": get_datetime_str(booking.rejected_at) if booking.rejected_at else None,
+					"rejectionReason": booking.rejection_reason
+				}
+			}
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in reject_booking: {str(e)}")
+		return {
+			"success": False,
+			"error": {"code": "REJECT_ERROR", "message": str(e)}
+		}
+
+
+@frappe.whitelist()
+def reassign_table(booking_id, restaurant_id, new_table_id):
+	"""
+	POST /api/method/dinematters.dinematters.api.bookings.reassign_table
+	Reassign a booking to a different table (staff only)
+	"""
+	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
+		# Get booking
+		booking = frappe.get_doc("Table Booking", booking_id)
+		
+		# Verify booking belongs to this restaurant
+		if booking.restaurant != restaurant:
+			return {
+				"success": False,
+				"error": {"code": "INVALID_BOOKING", "message": "Booking does not belong to this restaurant"}
+			}
+		
+		# Verify new table belongs to restaurant
+		table = frappe.get_doc("Restaurant Table", new_table_id)
+		if table.restaurant != restaurant:
+			return {
+				"success": False,
+				"error": {"code": "INVALID_TABLE", "message": "Table does not belong to this restaurant"}
+			}
+		
+		# Update table assignment
+		booking.assigned_table = new_table_id
+		booking.table_assignment_method = "manual"
+		booking.save(ignore_permissions=True)
+		
+		return {
+			"success": True,
+			"data": {
+				"booking": {
+					"id": booking.name,
+					"assignedTable": booking.assigned_table,
+					"tableNumber": table.table_number,
+					"tableCapacity": table.capacity
+				}
+			}
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in reassign_table: {str(e)}")
+		return {
+			"success": False,
+			"error": {"code": "REASSIGN_ERROR", "message": str(e)}
+		}
+
+
+@frappe.whitelist()
+def mark_no_show(booking_id, restaurant_id):
+	"""
+	POST /api/method/dinematters.dinematters.api.bookings.mark_no_show
+	Mark a booking as no-show (staff only)
+	"""
+	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
+		# Get booking
+		booking = frappe.get_doc("Table Booking", booking_id)
+		
+		# Verify booking belongs to this restaurant
+		if booking.restaurant != restaurant:
+			return {
+				"success": False,
+				"error": {"code": "INVALID_BOOKING", "message": "Booking does not belong to this restaurant"}
+			}
+		
+		# Update status
+		booking.status = "no-show"
+		booking.save(ignore_permissions=True)
+		
+		return {
+			"success": True,
+			"data": {
+				"booking": {
+					"id": booking.name,
+					"status": booking.status,
+					"noShowAt": get_datetime_str(booking.no_show_at) if booking.no_show_at else None
+				}
+			}
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in mark_no_show: {str(e)}")
+		return {
+			"success": False,
+			"error": {"code": "NO_SHOW_ERROR", "message": str(e)}
+		}
+
+
+@frappe.whitelist()
+def mark_completed(booking_id, restaurant_id):
+	"""
+	POST /api/method/dinematters.dinematters.api.bookings.mark_completed
+	Mark a booking as completed (staff only)
+	"""
+	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
+		# Get booking
+		booking = frappe.get_doc("Table Booking", booking_id)
+		
+		# Verify booking belongs to this restaurant
+		if booking.restaurant != restaurant:
+			return {
+				"success": False,
+				"error": {"code": "INVALID_BOOKING", "message": "Booking does not belong to this restaurant"}
+			}
+		
+		# Update status
+		booking.status = "completed"
+		booking.save(ignore_permissions=True)
+		
+		return {
+			"success": True,
+			"data": {
+				"booking": {
+					"id": booking.name,
+					"status": booking.status,
+					"completedAt": get_datetime_str(booking.completed_at) if booking.completed_at else None
+				}
+			}
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in mark_completed: {str(e)}")
+		return {
+			"success": False,
+			"error": {"code": "COMPLETE_ERROR", "message": str(e)}
+		}
+
+
+@frappe.whitelist()
+def get_admin_bookings(restaurant_id, date_from=None, date_to=None, status=None, page=1, limit=50):
+	"""
+	GET /api/method/dinematters.dinematters.api.bookings.get_admin_bookings
+	Get all bookings for restaurant admin dashboard
+	"""
+	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
+		# Build filters
+		filters = {"restaurant": restaurant}
+		
+		if status:
+			filters["status"] = status
+		
+		if date_from and date_to:
+			filters["date"] = ["between", [date_from, date_to]]
+		elif date_from:
+			filters["date"] = [">=", date_from]
+		elif date_to:
+			filters["date"] = ["<=", date_to]
+		
+		# Pagination
+		page = int(page) or 1
+		limit = int(limit) or 50
+		start = (page - 1) * limit
+		
+		# Get bookings with table info
+		bookings = frappe.get_all(
+			"Table Booking",
+			fields=[
+				"name as id",
+				"booking_number",
+				"number_of_diners",
+				"date",
+				"time_slot",
+				"status",
+				"customer_name",
+				"customer_phone",
+				"customer_email",
+				"assigned_table",
+				"notes",
+				"creation",
+				"confirmed_at",
+				"rejected_at",
+				"rejection_reason"
+			],
+			filters=filters,
+			limit_start=start,
+			limit_page_length=limit,
+			order_by="date desc, time_slot desc"
+		)
+		
+		# Enrich with table details
+		formatted_bookings = []
+		for booking in bookings:
+			booking_data = {
+				"id": str(booking["id"]),
+				"bookingNumber": booking["booking_number"],
+				"numberOfDiners": booking["number_of_diners"],
+				"date": str(booking["date"]),
+				"timeSlot": booking["time_slot"],
+				"status": booking["status"],
+				"customerName": booking["customer_name"],
+				"customerPhone": booking["customer_phone"],
+				"customerEmail": booking["customer_email"],
+				"notes": booking["notes"],
+				"createdAt": get_datetime_str(booking["creation"]),
+				"confirmedAt": get_datetime_str(booking["confirmed_at"]) if booking.get("confirmed_at") else None,
+				"rejectedAt": get_datetime_str(booking["rejected_at"]) if booking.get("rejected_at") else None,
+				"rejectionReason": booking.get("rejection_reason")
+			}
+			
+			# Add table info if assigned
+			if booking.get("assigned_table"):
+				try:
+					table = frappe.get_doc("Restaurant Table", booking["assigned_table"])
+					booking_data["assignedTable"] = {
+						"id": table.name,
+						"tableNumber": table.table_number,
+						"capacity": table.capacity,
+						"location": table.location
+					}
+				except:
+					booking_data["assignedTable"] = None
+			else:
+				booking_data["assignedTable"] = None
+			
+			formatted_bookings.append(booking_data)
+		
+		# Get total count
+		total = frappe.db.count("Table Booking", filters=filters)
+		total_pages = (total + limit - 1) // limit if limit > 0 else 1
+		
+		return {
+			"success": True,
+			"data": {
+				"bookings": formatted_bookings,
+				"pagination": {
+					"page": page,
+					"limit": limit,
+					"total": total,
+					"totalPages": total_pages
+				}
+			}
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in get_admin_bookings: {str(e)}")
+		return {
+			"success": False,
+			"error": {"code": "FETCH_ERROR", "message": str(e)}
+		}
+
+
+@frappe.whitelist()
+def get_restaurant_tables(restaurant_id):
+	"""
+	GET /api/method/dinematters.dinematters.api.bookings.get_restaurant_tables
+	Get all tables for a restaurant
+	"""
+	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
+		# Get all tables
+		tables = frappe.get_all(
+			"Restaurant Table",
+			filters={"restaurant": restaurant},
+			fields=[
+				"name as id",
+				"table_number",
+				"table_name",
+				"capacity",
+				"status",
+				"location",
+				"floor",
+				"priority"
+			],
+			order_by="table_number asc"
+		)
+		
+		formatted_tables = []
+		for table in tables:
+			formatted_tables.append({
+				"id": table["id"],
+				"tableNumber": table["table_number"],
+				"tableName": table["table_name"],
+				"capacity": table["capacity"],
+				"status": table["status"],
+				"location": table["location"],
+				"floor": table["floor"],
+				"priority": table["priority"]
+			})
+		
+		return {
+			"success": True,
+			"data": {
+				"tables": formatted_tables
+			}
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in get_restaurant_tables: {str(e)}")
+		return {
+			"success": False,
+			"error": {"code": "FETCH_ERROR", "message": str(e)}
+		}
+
+

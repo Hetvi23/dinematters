@@ -1,10 +1,12 @@
 # Copyright (c) 2025, Dinematters and contributors
 # For license information, please see license.txt
 
+import urllib.request
 import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import get_url
+from dinematters.dinematters.doctype.restaurant.qr_branding import build_table_qr_assets
 
 
 class Restaurant(Document):
@@ -208,154 +210,130 @@ class Restaurant(Document):
 	def generate_table_qr_codes_pdf(self):
 		"""Generate PDF with QR codes for all tables"""
 		try:
-			import qrcode
+			import os
+			import tempfile
 			from io import BytesIO
-			from reportlab.lib.pagesizes import letter, A4
+			from dinematters.dinematters.media.storage import download_object
+			from reportlab.lib.pagesizes import A4
 			from reportlab.lib.units import inch
 			from reportlab.pdfgen import canvas
 			from reportlab.lib.utils import ImageReader
-			from PIL import Image
-			import os
-			
-			if not self.restaurant_id:
-				frappe.throw(_("Restaurant ID is required to generate QR codes"))
-			
-			if not self.tables or self.tables <= 0:
-				frappe.throw(_("Number of tables must be greater than 0"))
-			
-			# Create a BytesIO buffer for the PDF
+
+			assets = build_table_qr_assets(self, force=True)
+
 			pdf_buffer = BytesIO()
 			pdf_canvas = canvas.Canvas(pdf_buffer, pagesize=A4)
-			
-			# Page dimensions
+
 			page_width, page_height = A4
-			margin = 0.5 * inch
-			qr_size = 3 * inch  # Larger QR code for single page
-			
-			# Get base URL, default to https://demo.dinematters.com/ if not set
-			base_url = getattr(self, 'base_url', None) or "https://demo.dinematters.com/"
-			# Ensure base_url ends with /
-			if not base_url.endswith('/'):
-				base_url += '/'
-			
-			# Generate QR code for each table (one per page)
-			for table_num in range(1, self.tables + 1):
-				# Create QR code data: base_url/restaurant/table
-				qr_data = f"{base_url}{self.restaurant_id}/{table_num}"
-				
-				# Generate QR code
-				qr = qrcode.QRCode(
-					version=1,
-					error_correction=qrcode.constants.ERROR_CORRECT_L,
-					box_size=10,
-					border=4,
-				)
-				qr.add_data(qr_data)
-				qr.make(fit=True)
-				
-				# Create QR code image
-				qr_img = qr.make_image(fill_color="black", back_color="white")
-				qr_img = qr_img.resize((int(qr_size), int(qr_size)), Image.Resampling.LANCZOS)
-				
-				# Calculate position (centered on page)
-				x = (page_width - qr_size) / 2
-				y = (page_height - qr_size) / 2 + 0.5 * inch  # Slightly below center
-				
-				# Draw QR code
-				pdf_canvas.drawImage(ImageReader(qr_img), x, y, width=qr_size, height=qr_size)
-				
-				# Draw table number label below QR code
-				label_y = y - 0.3 * inch
-				pdf_canvas.setFont("Helvetica-Bold", 16)
-				pdf_canvas.drawCentredString(page_width / 2, label_y, f"Table {table_num}")
-				
-				# Draw QR data below table number
+			card_width = 4.4 * inch
+			card_height = 5.85 * inch
+
+			for index, asset in enumerate(assets, start=1):
+				with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
+					temp_path = temp_file.name
+				try:
+					download_object(asset["png_object_key"], temp_path)
+					# Compress image to reduce PDF size
+					from PIL import Image
+					with Image.open(temp_path) as img:
+						# Convert to RGB and compress as JPEG
+						if img.mode in ('RGBA', 'LA', 'P'):
+							rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+							if img.mode == 'P':
+								img = img.convert('RGBA')
+							rgb_img.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+							img = rgb_img
+						else:
+							img = img.convert('RGB')
+						
+						card_buffer = BytesIO()
+						img.save(card_buffer, format='JPEG', quality=85, optimize=True)
+						card_buffer.seek(0)
+				finally:
+					if os.path.exists(temp_path):
+						os.remove(temp_path)
+				x = (page_width - card_width) / 2
+				y = (page_height - card_height) / 2 + 0.1 * inch
+				pdf_canvas.drawImage(ImageReader(card_buffer), x, y, width=card_width, height=card_height)
 				pdf_canvas.setFont("Helvetica", 10)
-				pdf_canvas.drawCentredString(page_width / 2, label_y - 0.2 * inch, qr_data)
-				
-				# Draw restaurant name at top
-				if self.restaurant_name:
-					pdf_canvas.setFont("Helvetica-Bold", 14)
-					pdf_canvas.drawCentredString(page_width / 2, page_height - margin - 0.3 * inch, self.restaurant_name)
-				
-				# New page for next QR code (except for the last one)
-				if table_num < self.tables:
+				pdf_canvas.drawCentredString(page_width / 2, y - 0.18 * inch, asset["qr_data"])
+				if index < len(assets):
 					pdf_canvas.showPage()
-			
-			# Save PDF
+
 			pdf_canvas.save()
 			pdf_buffer.seek(0)
-			
-			# Delete existing QR codes PDF if it exists
+
 			file_name = f"{self.restaurant_id}_table_qr_codes.pdf"
-			
-			# Find all existing files with this name for this restaurant
-			existing_files = frappe.get_all("File", {
-				"file_name": file_name,
-				"attached_to_doctype": "Restaurant",
-				"attached_to_name": self.name
-			}, ["name"])
-			
-			# Delete all existing files
+
+			existing_files = frappe.get_all(
+				"File",
+				{
+					"file_name": file_name,
+					"attached_to_doctype": "Restaurant",
+					"attached_to_name": self.name,
+				},
+				["name"],
+			)
+
 			for file_doc in existing_files:
 				try:
 					frappe.delete_doc("File", file_doc.name, ignore_permissions=True, force=True)
 					frappe.db.commit()
 				except Exception as e:
-					frappe.log_error(f"Error deleting existing QR code file {file_doc.name}: {str(e)}", "QR Code File Deletion")
-					# Continue even if deletion fails
-			
-			# Save as attachment
+					frappe.log_error(
+						f"Error deleting existing QR code file {file_doc.name}: {str(e)}",
+						"QR Code File Deletion",
+					)
+
 			import time
+
 			timestamp = int(time.time())
-			
-			file_doc = frappe.get_doc({
-				"doctype": "File",
-				"file_name": file_name,
-				"content": pdf_buffer.getvalue(),
-				"is_private": 0,
-				"attached_to_doctype": "Restaurant",
-				"attached_to_name": self.name
-			})
+
+			file_doc = frappe.get_doc(
+				{
+					"doctype": "File",
+					"file_name": file_name,
+					"content": pdf_buffer.getvalue(),
+					"is_private": 0,
+					"attached_to_doctype": "Restaurant",
+					"attached_to_name": self.name,
+				}
+			)
 			file_doc.save(ignore_permissions=True)
-			
+
+			self._last_table_qr_assets = assets
 			frappe.msgprint(
 				f"✅ QR codes PDF generated successfully for {self.tables} tables. File: {file_name}",
-				indicator="green"
+				indicator="green",
 			)
-			
-			# Store file URL in document for easy access (if field exists)
-			# Use the unique file URL to avoid caching issues
+
 			file_url = file_doc.file_url
-			# Add timestamp to URL to force browser refresh
 			if "?" in file_url:
 				file_url += f"&t={timestamp}"
 			else:
 				file_url += f"?t={timestamp}"
-			
+
 			try:
 				if frappe.db.has_column("Restaurant", "qr_codes_pdf_url"):
 					self.db_set("qr_codes_pdf_url", file_url, update_modified=False)
-			except:
-				# Field doesn't exist yet, will be available after migration
+			except Exception:
 				pass
-			
+
 			return file_url
-			
+
 		except ImportError:
 			frappe.throw(_("Required libraries not installed. Please install: pip install qrcode[pil] reportlab"))
 		except Exception as e:
 			frappe.log_error(f"Error generating QR codes PDF: {str(e)}", "Restaurant QR Code Generation")
 			frappe.msgprint(
 				f"Error generating QR codes PDF: {str(e)}",
-				indicator="red"
+				indicator="red",
 			)
 			raise
 	
 	@frappe.whitelist()
 	def get_qr_codes_pdf_url(self):
 		"""Get the URL of the QR codes PDF if it exists"""
-		# Check for existing QR codes PDF file
 		file_name = f"{self.restaurant_id}_table_qr_codes.pdf"
 		existing_file = frappe.db.get_value("File", {
 			"file_name": file_name,
@@ -366,12 +344,21 @@ class Restaurant(Document):
 		if existing_file:
 			return existing_file
 		
-		# If not found, check the stored URL in the document
 		doc_url = frappe.db.get_value("Restaurant", self.name, "qr_codes_pdf_url")
 		if doc_url:
 			return doc_url
 		
 		return None
+
+	@frappe.whitelist()
+	def get_table_qr_assets(self, force=False):
+		assets = build_table_qr_assets(self, force=frappe.utils.cint(force))
+		return {
+			"restaurant": self.name,
+			"restaurant_id": self.restaurant_id,
+			"tables": len(assets),
+			"items": assets,
+		}
 	
 	@frappe.whitelist()
 	def generate_qr_codes_pdf(self):
@@ -387,9 +374,13 @@ def get_qr_codes_pdf_url(restaurant):
 
 
 @frappe.whitelist()
+def get_table_qr_assets(restaurant, force=0):
+	restaurant_doc = frappe.get_doc("Restaurant", restaurant)
+	return restaurant_doc.get_table_qr_assets(force=force)
+
+
+@frappe.whitelist()
 def generate_qr_codes_pdf(restaurant):
 	"""Generate QR codes PDF for a restaurant"""
 	restaurant_doc = frappe.get_doc("Restaurant", restaurant)
 	return restaurant_doc.generate_table_qr_codes_pdf()
-
-

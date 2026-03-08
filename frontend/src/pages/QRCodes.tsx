@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useFrappeGetDoc, useFrappePostCall, useFrappeUpdateDoc } from '@/lib/frappe'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -6,24 +6,26 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { 
   QrCode, 
   Download, 
   Eye, 
-  RefreshCw, 
-  Copy, 
-  Check, 
   Settings, 
-  FileText, 
-  ExternalLink,
   Loader2,
   AlertCircle,
   Info,
-  Scan,
-  Printer
+  Trash2
 } from 'lucide-react'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { cn } from '@/lib/utils'
 import QRCodeScanner from '@/components/QRCodeScanner'
 
 export default function QRCodes() {
@@ -33,10 +35,9 @@ export default function QRCodes() {
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
-  const [copiedTable, setCopiedTable] = useState<number | null>(null)
   const [showScanner, setShowScanner] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
-  const [previewTable, setPreviewTable] = useState<number | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   // Fetch restaurant document
   const { data: restaurantDoc, mutate: refreshRestaurant } = useFrappeGetDoc('Restaurant', selectedRestaurant || '', {
@@ -170,36 +171,32 @@ export default function QRCodes() {
     }
   }
 
-  // Copy QR code URL for a specific table
-  const handleCopyTableQrUrl = (tableNumber: number) => {
-    if (!restaurantDoc?.restaurant_id) return
-    
-    const qrData = `${baseUrl.replace(/\/$/, '')}/${restaurantDoc.restaurant_id}/${tableNumber}`
-    navigator.clipboard.writeText(qrData)
-    setCopiedTable(tableNumber)
-    toast.success(`QR code URL for Table ${tableNumber} copied!`)
-    setTimeout(() => setCopiedTable(null), 2000)
+  // Delete QR codes PDF - show confirmation dialog
+  const handleDeleteQrCodes = () => {
+    setShowDeleteDialog(true)
   }
 
-  // Generate QR code data URL for preview
-  const generateQrCodeDataUrl = (tableNumber: number): string => {
-    if (!restaurantDoc?.restaurant_id) return ''
-    const qrData = `${baseUrl.replace(/\/$/, '')}/${restaurantDoc.restaurant_id}/${tableNumber}`
-    // Use a QR code API service for preview (like qr-server.com)
-    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`
+  // Confirm and execute deletion
+  const confirmDeleteQrCodes = async () => {
+    if (!selectedRestaurant || !qrCodeUrl) return
+
+    setShowDeleteDialog(false)
+    setIsDeleting(true)
+    try {
+      await updateRestaurant('Restaurant', selectedRestaurant, {
+        qr_codes_pdf_url: null
+      })
+      
+      setQrCodeUrl(null)
+      await refreshRestaurant()
+      toast.success('QR codes PDF deleted successfully')
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to delete QR codes PDF')
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
-  // Preview individual QR code
-  const handlePreviewQrCode = (tableNumber: number) => {
-    setPreviewTable(tableNumber)
-    setShowPreview(true)
-  }
-
-  // Table list for QR codes
-  const tableList = useMemo(() => {
-    if (!tables || tables <= 0) return []
-    return Array.from({ length: tables }, (_, i) => i + 1)
-  }, [tables])
 
   if (!selectedRestaurant) {
     return (
@@ -240,6 +237,24 @@ export default function QRCodes() {
             <Button variant="outline" onClick={handleDownloadQrCodes}>
               <Download className="h-4 w-4 mr-2" />
               Download PDF
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={handleDeleteQrCodes}
+              disabled={isDeleting}
+              className="text-destructive hover:text-destructive"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete PDF
+                </>
+              )}
             </Button>
           </div>
         )}
@@ -376,87 +391,6 @@ export default function QRCodes() {
         </CardContent>
       </Card>
 
-      {/* QR Codes List */}
-      {tableList.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Table QR Codes ({tableList.length} tables)
-            </CardTitle>
-            <CardDescription>
-              Individual QR codes for each table. Click to preview or copy the URL.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {tableList.map((tableNum) => {
-                const qrData = restaurantDoc?.restaurant_id 
-                  ? `${baseUrl.replace(/\/$/, '')}/${restaurantDoc.restaurant_id}/${tableNum}`
-                  : ''
-                const qrImageUrl = generateQrCodeDataUrl(tableNum)
-                
-                return (
-                  <Card key={tableNum} className="hover:shadow-md transition-shadow">
-                    <CardContent className="pt-6">
-                      <div className="flex flex-col items-center gap-3">
-                        {/* QR Code Preview */}
-                        <div className="relative">
-                          <img 
-                            src={qrImageUrl} 
-                            alt={`QR Code for Table ${tableNum}`}
-                            className="w-32 h-32 border-2 border-border rounded-md p-2 bg-white"
-                          />
-                        </div>
-                        
-                        {/* Table Number */}
-                        <div className="text-center">
-                          <h3 className="font-semibold text-lg">Table {tableNum}</h3>
-                          <p className="text-xs text-muted-foreground mt-1 break-all">
-                            {qrData}
-                          </p>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex gap-2 w-full">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handlePreviewQrCode(tableNum)}
-                            className="flex-1"
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            Preview
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleCopyTableQrUrl(tableNum)}
-                            className="flex-1"
-                          >
-                            {copiedTable === tableNum ? (
-                              <>
-                                <Check className="h-3 w-3 mr-1" />
-                                Copied
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="h-3 w-3 mr-1" />
-                                Copy
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Info Card */}
       <Card className="border-primary/20 bg-primary/5">
         <CardContent className="pt-6">
@@ -482,89 +416,34 @@ export default function QRCodes() {
         restaurantId={restaurantDoc?.restaurant_id || ''}
         open={showScanner}
         onOpenChange={setShowScanner}
-        onScan={(tableNumber, restaurantId) => {
+        onScan={(tableNumber) => {
           toast.success(`Table ${tableNumber} scanned successfully!`)
           setShowScanner(false)
         }}
       />
 
-      {/* QR Code Preview Dialog */}
-      <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>QR Code Preview - Table {previewTable}</DialogTitle>
-            <DialogDescription>
-              Preview and copy the QR code URL for this table
-            </DialogDescription>
-          </DialogHeader>
-          {previewTable && (
-            <div className="space-y-4">
-              <div className="flex justify-center">
-                <img 
-                  src={generateQrCodeDataUrl(previewTable)} 
-                  alt={`QR Code for Table ${previewTable}`}
-                  className="w-64 h-64 border-2 border-border rounded-md p-4 bg-white"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>QR Code URL</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={restaurantDoc?.restaurant_id 
-                      ? `${baseUrl.replace(/\/$/, '')}/${restaurantDoc.restaurant_id}/${previewTable}`
-                      : ''
-                    }
-                    readOnly
-                    className="font-mono text-sm"
-                  />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      if (previewTable) {
-                        handleCopyTableQrUrl(previewTable)
-                      }
-                    }}
-                  >
-                    {copiedTable === previewTable ? (
-                      <Check className="h-4 w-4" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => {
-                    if (previewTable && restaurantDoc?.restaurant_id) {
-                      const url = `${baseUrl.replace(/\/$/, '')}/${restaurantDoc.restaurant_id}/${previewTable}`
-                      window.open(url, '_blank', 'noopener,noreferrer')
-                    }
-                  }}
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Test URL
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => {
-                    if (previewTable) {
-                      handleCopyTableQrUrl(previewTable)
-                    }
-                  }}
-                >
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy URL
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete QR Codes PDF?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the QR codes PDF? You will need to regenerate it if you want to use it again.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteQrCodes}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete PDF
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   )
 }

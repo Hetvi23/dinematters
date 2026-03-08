@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
@@ -15,22 +15,32 @@ export default function HomeFeaturesManager() {
   const [saving, setSaving] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
+  const fetchFeatures = useCallback(async () => {
+    if (!selectedRestaurant) return
+    setLoading(true)
+    try {
+      const response = await fetch(
+        `/api/method/dinematters.dinematters.api.config.get_home_features?restaurant_id=${encodeURIComponent(selectedRestaurant)}`
+      )
+      const json = await response.json()
+      const payload = json?.message ?? json
+      if (payload?.success) {
+        setFeatures(payload.data.features || [])
+      }
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setLoading(false)
+    }
+  }, [selectedRestaurant])
+
   useEffect(() => {
     if (restaurantConfig?.homeFeatures) {
       setFeatures(restaurantConfig.homeFeatures)
       return
     }
-    if (!selectedRestaurant) return
-    setLoading(true)
-    fetch(`/api/method/dinematters.dinematters.api.config.get_home_features?restaurant_id=${encodeURIComponent(selectedRestaurant)}`)
-      .then(r => r.json())
-      .then(j => {
-        const payload = j?.message ?? j
-        if (payload?.success) setFeatures(payload.data.features || [])
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [restaurantConfig, selectedRestaurant])
+    fetchFeatures()
+  }, [restaurantConfig, fetchFeatures])
 
   const openEdit = (f: any) => {
     setEditing({ ...f, newImageFile: null })
@@ -62,35 +72,29 @@ export default function HomeFeaturesManager() {
   const uploadFile = async (file: File) => {
     if (!editing?.name) throw new Error('Missing Home Feature id')
 
-    // Use centralized R2 upload utility
-    const result = await uploadToR2({
+    await uploadToR2({
       ownerDoctype: 'Home Feature',
       ownerName: editing.name,
       mediaRole: 'home_feature_image',
       file,
     })
-
-    // Return CDN URL from upload result
-    return result.primary_url || ''
   }
 
   const handleSave = async () => {
     if (!editing) return
     setSaving(true)
     try {
-      let imageSrc = editing.imageSrc
-      if (editing.newImageFile) {
-        imageSrc = await uploadFile(editing.newImageFile)
-      }
-
       const docData: any = {
         title: editing.title,
         subtitle: editing.subtitle,
-        image_src: imageSrc
+      }
+
+      if (!editing.newImageFile) {
+        docData.image_src = editing.imageSrc
       }
 
       const csrf = (window as any).frappe?.csrf_token || (window as any).csrf_token
-      const resp = await fetch('/api/method/dinematters.dinematters.api.documents.update_document', {
+      const updateDocPromise = fetch('/api/method/dinematters.dinematters.api.documents.update_document', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -101,12 +105,21 @@ export default function HomeFeaturesManager() {
           name: editing.name,
           doc_data: docData
         })
-      })
-      const json = await resp.json()
+      }).then(resp => resp.json())
+
+      const uploadPromise = editing.newImageFile ? uploadFile(editing.newImageFile) : Promise.resolve()
+
+      const [json] = await Promise.all([updateDocPromise, uploadPromise])
+
       if (!json.success && json.error) throw new Error(json.error.message || JSON.stringify(json))
-      // update local list
-      setFeatures(prev => prev.map(p => p.name === editing.name ? { ...p, title: editing.title, subtitle: editing.subtitle, imageSrc: imageSrc } : p))
+
+      setFeatures(prev => prev.map(p => p.name === editing.name ? {
+        ...p,
+        title: editing.title,
+        subtitle: editing.subtitle,
+      } : p))
       setEditing(null)
+      await fetchFeatures()
     } catch (e: any) {
       console.error('Save failed', e)
       alert('Save failed: ' + (e.message || e))
@@ -200,7 +213,13 @@ export default function HomeFeaturesManager() {
                   const file = e.target.files?.[0]
                   if (file) setEditing({ ...editing, newImageFile: file })
                 }} />
-                {editing.imageSrc && <img src={editing.imageSrc} alt="preview" className="h-24 mt-2 rounded object-cover" />}
+                {(editing.newImageFile || editing.imageSrc) && (
+                  <img
+                    src={editing.newImageFile ? URL.createObjectURL(editing.newImageFile) : editing.imageSrc}
+                    alt="preview"
+                    className="h-24 mt-2 rounded object-cover"
+                  />
+                )}
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
