@@ -12,6 +12,12 @@ class TableBooking(Document):
 		"""Generate booking number"""
 		if not self.booking_number:
 			self.booking_number = self.generate_booking_number()
+
+	def _get_assigned_table(self):
+		return self.get("assigned_table") if hasattr(self, "get") else None
+
+	def _get_auto_assign_table(self):
+		return self.get("auto_assign_table") if hasattr(self, "get") else None
 	
 	def validate(self):
 		"""Validate booking data"""
@@ -20,7 +26,7 @@ class TableBooking(Document):
 			self.check_booking_limit()
 		
 		# Validate table assignment if manually set
-		if self.assigned_table:
+		if self._get_assigned_table():
 			self.validate_table_assignment()
 	
 	def on_update(self):
@@ -31,13 +37,30 @@ class TableBooking(Document):
 	def generate_booking_number(self):
 		"""Generate unique booking number: TB-YYYY-NNN"""
 		year = datetime.now().year
-		count = frappe.db.count("Table Booking", filters={
-			"creation": [">=", f"{year}-01-01"],
-			"creation": ["<=", f"{year}-12-31"],
-			"restaurant": self.restaurant
-		})
-		sequence = str(count + 1).zfill(3)
-		return f"TB-{year}-{sequence}"
+		prefix = f"TB-{year}-"
+		last_booking = frappe.get_all(
+			"Table Booking",
+			filters={
+				"booking_number": ["like", f"{prefix}%"]
+			},
+			fields=["booking_number"],
+			order_by="creation desc",
+			limit=1
+		)
+
+		last_sequence = 0
+		if last_booking and last_booking[0].get("booking_number"):
+			try:
+				last_sequence = int(last_booking[0]["booking_number"].split("-")[-1])
+			except (ValueError, TypeError):
+				last_sequence = 0
+
+		for sequence in range(last_sequence + 1, last_sequence + 1000):
+			candidate = f"{prefix}{str(sequence).zfill(3)}"
+			if not frappe.db.exists("Table Booking", {"booking_number": candidate}):
+				return candidate
+
+		frappe.throw("Unable to generate a unique booking number. Please try again.")
 	
 	def check_booking_limit(self):
 		"""Anti-abuse: Check if customer has too many active bookings"""
@@ -53,9 +76,13 @@ class TableBooking(Document):
 	
 	def validate_table_assignment(self):
 		"""Validate that assigned table exists and belongs to restaurant"""
-		table = frappe.get_doc("Restaurant Table", self.assigned_table)
+		assigned_table = self._get_assigned_table()
+		if not assigned_table:
+			return
+
+		table = frappe.get_doc("Restaurant Table", assigned_table)
 		if table.restaurant != self.restaurant:
-			frappe.throw(f"Table {self.assigned_table} does not belong to this restaurant")
+			frappe.throw(f"Table {assigned_table} does not belong to this restaurant")
 		
 		# Check if table has sufficient capacity
 		if table.capacity < self.number_of_diners:
@@ -74,32 +101,32 @@ class TableBooking(Document):
 			self.confirmed_by = current_user
 			
 			# Auto-assign table if enabled and not already assigned
-			if self.auto_assign_table and not self.assigned_table:
+			if self._get_auto_assign_table() and not self._get_assigned_table():
 				self.auto_assign_best_table()
 		
 		elif self.status == "rejected":
 			self.rejected_at = current_time
 			self.rejected_by = current_user
 			# Release table if assigned
-			if self.assigned_table:
+			if self._get_assigned_table():
 				self.release_table()
 		
 		elif self.status == "completed":
 			self.completed_at = current_time
 			# Release table
-			if self.assigned_table:
+			if self._get_assigned_table():
 				self.release_table()
 		
 		elif self.status == "no-show":
 			self.no_show_at = current_time
 			# Release table
-			if self.assigned_table:
+			if self._get_assigned_table():
 				self.release_table()
 		
 		elif self.status == "cancelled":
 			self.cancelled_at = current_time
 			# Release table
-			if self.assigned_table:
+			if self._get_assigned_table():
 				self.release_table()
 	
 	def auto_assign_best_table(self):
@@ -139,8 +166,8 @@ class TableBooking(Document):
 					break
 		
 		if best_table:
-			self.assigned_table = best_table.name
-			self.table_assignment_method = "auto"
+			self.set("assigned_table", best_table.name)
+			self.set("table_assignment_method", "auto")
 			frappe.msgprint(
 				f"Table {best_table.table_number} (capacity: {best_table.capacity}) auto-assigned",
 				indicator="green"
@@ -184,9 +211,10 @@ class TableBooking(Document):
 	
 	def release_table(self):
 		"""Release the assigned table"""
-		if self.assigned_table:
+		assigned_table = self._get_assigned_table()
+		if assigned_table:
 			try:
-				table = frappe.get_doc("Restaurant Table", self.assigned_table)
+				table = frappe.get_doc("Restaurant Table", assigned_table)
 				if table.status == "reserved":
 					table.status = "available"
 					table.save(ignore_permissions=True)

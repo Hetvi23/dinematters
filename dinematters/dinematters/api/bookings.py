@@ -758,27 +758,33 @@ def get_admin_bookings(restaurant_id, date_from=None, date_to=None, status=None,
 		page = int(page) or 1
 		limit = int(limit) or 50
 		start = (page - 1) * limit
+
+		booking_meta = frappe.get_meta("Table Booking")
+		has_assigned_table = booking_meta.has_field("assigned_table")
 		
 		# Get bookings with table info
+		booking_fields = [
+			"name as id",
+			"booking_number",
+			"number_of_diners",
+			"date",
+			"time_slot",
+			"status",
+			"customer_name",
+			"customer_phone",
+			"customer_email",
+			"notes",
+			"creation",
+			"confirmed_at",
+			"rejected_at",
+			"rejection_reason"
+		]
+		if has_assigned_table:
+			booking_fields.append("assigned_table")
+
 		bookings = frappe.get_all(
 			"Table Booking",
-			fields=[
-				"name as id",
-				"booking_number",
-				"number_of_diners",
-				"date",
-				"time_slot",
-				"status",
-				"customer_name",
-				"customer_phone",
-				"customer_email",
-				"assigned_table",
-				"notes",
-				"creation",
-				"confirmed_at",
-				"rejected_at",
-				"rejection_reason"
-			],
+			fields=booking_fields,
 			filters=filters,
 			limit_start=start,
 			limit_page_length=limit,
