@@ -45,6 +45,7 @@ export default function CustomizationQuestionsTable({
   required, 
   disabled 
 }: CustomizationQuestionsTableProps) {
+  const { formatAmountNoDecimals } = useCurrency()
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set())
   const [editingQuestion, setEditingQuestion] = useState<number | null>(null)
   const [editingOption, setEditingOption] = useState<{ questionIndex: number; optionIndex: number } | null>(null)

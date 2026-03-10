@@ -23,6 +23,33 @@ import random
 import string
 from datetime import datetime
 
+def load_customization_options(product_doc):
+	"""
+	Load customization options for a product
+	Frappe doesn't automatically load nested child tables, so we need to manually load options
+	"""
+	if not product_doc.customization_questions:
+		return
+	
+	for question in product_doc.customization_questions:
+		# Load options for this question
+		options_list = frappe.get_all(
+			"Customization Option",
+			filters={
+				"parent": question.name,
+				"parenttype": "Customization Question",
+				"parentfield": "options"
+			},
+			fields=["option_id", "label", "price", "is_vegetarian", "is_default", "display_order"],
+			order_by="display_order asc"
+		)
+		
+		# Convert to objects and attach to question
+		question.options = []
+		for opt in options_list:
+			# Create a simple object with the option data
+			option_obj = frappe._dict(opt)
+			question.options.append(option_obj)
 
 @frappe.whitelist(allow_guest=True)
 def create_order(restaurant_id, items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None, table_number=None, coupon_code=None, payment_method=None):
@@ -104,6 +131,7 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 				}
 			
 			product = frappe.get_doc("Menu Product", dish_id)
+			load_customization_options(product)
 			
 			# Validate product belongs to restaurant
 			if product.restaurant != restaurant:
@@ -573,17 +601,39 @@ def format_order(order_doc):
 	
 	# Format order items
 	items = []
+	recalculated_subtotal = 0
+	
 	for item in order_doc.order_items:
 		product = frappe.get_doc("Menu Product", item.product)
+		load_customization_options(product)
 		customizations = json.loads(item.customizations) if item.customizations else {}
+		
+		# Recalculate unit price with customizations (fixes old orders with incorrect pricing)
+		unit_price = flt(product.price)
+		if customizations and product.customization_questions:
+			for question in product.customization_questions:
+				question_id = question.question_id
+				if question_id in customizations:
+					selected_options = customizations[question_id]
+					if isinstance(selected_options, str):
+						selected_options = [selected_options]
+					
+					for option_id in selected_options:
+						for option in question.options:
+							if option.option_id == option_id:
+								unit_price += flt(option.price) or 0
+								break
+		
+		total_price = unit_price * item.quantity
+		recalculated_subtotal += total_price
 		
 		item_data = {
 			"dishId": item.product,
 			"dish": format_product(product),
 			"quantity": item.quantity,
 			"customizations": customizations,
-			"unitPrice": flt(item.unit_price),
-			"totalPrice": flt(item.total_price)
+			"unitPrice": unit_price,
+			"totalPrice": total_price
 		}
 		
 		if item.original_price:
@@ -599,15 +649,19 @@ def format_order(order_doc):
 	# Get currency info for restaurant
 	currency_info = get_restaurant_currency_info(order_doc.restaurant)
 	
+	# Recalculate tax and total based on corrected subtotal
+	recalculated_tax = calculate_tax(recalculated_subtotal)
+	recalculated_total = recalculated_subtotal - flt(order_doc.discount) + recalculated_tax + flt(order_doc.delivery_fee)
+	
 	order_data = {
 		"id": order_doc.order_id,
 		"orderNumber": order_doc.order_number,
 		"items": items,
-		"subtotal": flt(order_doc.subtotal),
+		"subtotal": recalculated_subtotal,
 		"discount": flt(order_doc.discount),
-		"tax": flt(order_doc.tax),
+		"tax": recalculated_tax,
 		"deliveryFee": flt(order_doc.delivery_fee),
-		"total": flt(order_doc.total),
+		"total": recalculated_total,
 		"cookingRequests": cooking_requests,
 		"status": order_doc.status,
 		"createdAt": get_datetime_str(order_doc.creation),

@@ -35,7 +35,7 @@ def get_restaurant_config(restaurant_id):
 			["restaurant_name", "tagline", "subtitle", "description", "primary_color", "default_theme",
 			 "logo", "hero_video", "apple_touch_icon", "color_palette_violet", "color_palette_indigo",
 			 "color_palette_blue", "color_palette_green", "color_palette_yellow", "color_palette_orange",
-			 "color_palette_red", "currency", "enable_table_booking", "enable_banquet_booking",
+			 "color_palette_red", "currency", "menu_layout", "enable_table_booking", "enable_banquet_booking",
 			 "enable_events", "enable_offers", "enable_coupons", "enable_experience_lounge", "verify_my_user",
 			 "google_review_link", "instagram_profile_link", "facebook_profile_link", "whatsapp_phone_number"],
 			as_dict=True
@@ -164,13 +164,13 @@ def get_restaurant_config(restaurant_id):
 				"symbolOnRight": currency_info.get("symbolOnRight", False)
 			},
 			"settings": {
-				"enableTableBooking": bool(config.get("enable_table_booking", 1)),
-				"enableBanquetBooking": bool(config.get("enable_banquet_booking", 1)),
-				"enableEvents": bool(config.get("enable_events", 1)),
-				"enableOffers": bool(config.get("enable_offers", 1)),
-				"enableCoupons": bool(config.get("enable_coupons", 1)),
-				"enableExperienceLounge": bool(config.get("enable_experience_lounge", 1)),
-				"verifyMyUser": bool(config.get("verify_my_user", 0))
+				"menuLayout": config.get("menu_layout") or "2 Columns",
+				"enableTableBooking": bool(config.get("enable_table_booking")),
+				"enableBanquetBooking": bool(config.get("enable_banquet_booking")),
+				"enableEvents": bool(config.get("enable_events")),
+				"enableOffers": bool(config.get("enable_offers")),
+				"enableCoupons": bool(config.get("enable_coupons")),
+				"enableExperienceLounge": bool(config.get("enable_experience_lounge"))
 			},
 			"socialMedia": {
 				"googleReviewLink": config.get("google_review_link", ""),

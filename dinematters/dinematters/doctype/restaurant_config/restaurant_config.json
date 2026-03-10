@@ -30,6 +30,7 @@
   "color_palette_red",
   "section_break_settings",
   "currency",
+  "menu_layout",
   "enable_table_booking",
   "enable_banquet_booking",
   "column_break_settings",
@@ -164,6 +165,14 @@
    "label": "Currency",
    "options": "Currency",
    "default": "USD"
+  },
+  {
+   "fieldname": "menu_layout",
+   "fieldtype": "Select",
+   "label": "Menu Layout",
+   "options": "1 Column\n2 Columns",
+   "default": "2 Columns",
+   "description": "Choose the default layout for the menu page"
   },
   {
    "default": "1",

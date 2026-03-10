@@ -16,6 +16,34 @@ import random
 import string
 from datetime import datetime
 
+def load_customization_options(product_doc):
+	"""
+	Load customization options for a product
+	Frappe doesn't automatically load nested child tables, so we need to manually load options
+	"""
+	if not product_doc.customization_questions:
+		return
+	
+	for question in product_doc.customization_questions:
+		# Load options for this question
+		options_list = frappe.get_all(
+			"Customization Option",
+			filters={
+				"parent": question.name,
+				"parenttype": "Customization Question",
+				"parentfield": "options"
+			},
+			fields=["option_id", "label", "price", "is_vegetarian", "is_default", "display_order"],
+			order_by="display_order asc"
+		)
+		
+		# Convert to objects and attach to question
+		question.options = []
+		for opt in options_list:
+			# Create a simple object with the option data
+			option_obj = frappe._dict(opt)
+			question.options.append(option_obj)
+
 
 @frappe.whitelist(allow_guest=True)
 def add_to_cart(restaurant_id, dish_id, quantity=1, customizations=None, session_id=None, table_number=None):
@@ -44,6 +72,9 @@ def add_to_cart(restaurant_id, dish_id, quantity=1, customizations=None, session
 			}
 		
 		product = frappe.get_doc("Menu Product", dish_id)
+		
+		# Load customization options (nested child table)
+		load_customization_options(product)
 		
 		# Validate product belongs to restaurant
 		if product.restaurant != restaurant:
