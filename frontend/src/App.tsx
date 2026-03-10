@@ -31,6 +31,7 @@ import PaymentSettings from './pages/PaymentSettings'
 import RecommendationsEngine from './pages/RecommendationsEngine'
 import Customers from './pages/Customers'
 import Bookings from './pages/Bookings'
+import Coupons from './pages/Coupons'
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -69,6 +70,7 @@ function AppContent() {
 						<Route path="/categories/:categoryId/edit" element={<Layout><CategoryEdit /></Layout>} />
 						<Route path="/categories/:categoryId" element={<Layout><CategoryDetail /></Layout>} />
 						<Route path="/qr-codes" element={<Layout><QRCodes /></Layout>} />
+						<Route path="/coupons" element={<Layout><Coupons /></Layout>} />
 						<Route path="/home-features" element={<Layout><HomeFeaturesManager /></Layout>} />
 						<Route path="/payment-stats" element={<Layout><PaymentStats /></Layout>} />
 						<Route path="/restaurant/:restaurantId/payment" element={<Layout><Payment /></Layout>} />

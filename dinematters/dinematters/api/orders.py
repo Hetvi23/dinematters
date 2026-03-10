@@ -182,23 +182,61 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 		tax = calculate_tax(subtotal)
 		delivery_fee = flt(delivery_info.get("deliveryFee", 0)) if delivery_info else 0
 		
-		# Apply coupon discount if provided
+		# Apply coupon discount if provided, or detect auto-offers
 		coupon_discount = 0
 		applied_coupon = None
+		applied_coupon_code = None
+		
 		if coupon_code:
 			try:
-				# Validate coupon
+				# Validate coupon with enhanced validation
 				from dinematters.dinematters.api.coupons import validate_coupon
-				coupon_result = validate_coupon(restaurant_id, coupon_code, subtotal)
+				
+				# Prepare cart items for combo validation
+				cart_items_for_validation = [{"dishId": item.get("product")} for item in order_items]
+				
+				coupon_result = validate_coupon(
+					restaurant_id, 
+					coupon_code, 
+					subtotal,
+					customer_id=platform_customer,
+					cart_items=json.dumps(cart_items_for_validation)
+				)
 				
 				if coupon_result.get("success"):
 					coupon_data = coupon_result.get("data", {}).get("coupon", {})
 					coupon_discount = flt(coupon_data.get("discountAmount", 0))
 					applied_coupon = coupon_data.get("id")
+					applied_coupon_code = coupon_data.get("code")
 					discount += coupon_discount
 			except Exception as e:
 				frappe.log_error(f"Coupon validation error: {str(e)}")
 				# Continue without coupon if validation fails
+		else:
+			# No coupon code provided - check for auto-offers
+			try:
+				from dinematters.dinematters.api.coupons import get_applicable_offers
+				
+				# Prepare cart items for auto-offer detection
+				cart_items_for_offers = [{"dishId": item.get("product")} for item in order_items]
+				
+				offers_result = get_applicable_offers(
+					restaurant_id,
+					json.dumps(cart_items_for_offers),
+					subtotal,
+					customer_id=platform_customer
+				)
+				
+				if offers_result.get("success"):
+					best_offer = offers_result.get("data", {}).get("bestOffer")
+					if best_offer:
+						coupon_discount = flt(best_offer.get("discountAmount", 0))
+						applied_coupon = best_offer.get("id")
+						applied_coupon_code = best_offer.get("code")
+						discount += coupon_discount
+			except Exception as e:
+				frappe.log_error(f"Auto-offer detection error: {str(e)}")
+				# Continue without auto-offer if detection fails
 		
 		total = subtotal - discount + tax + delivery_fee
 		
@@ -257,6 +295,28 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 			order_doc.append("order_items", item_data)
 		
 		order_doc.insert(ignore_permissions=True)
+		
+		# Track coupon usage if coupon was applied
+		if applied_coupon and platform_customer:
+			try:
+				# Create coupon usage record
+				usage_doc = frappe.get_doc({
+					"doctype": "Coupon Usage",
+					"coupon": applied_coupon,
+					"customer": platform_customer,
+					"order": order_doc.name,
+					"restaurant": restaurant,
+					"discount_amount": coupon_discount
+				})
+				usage_doc.insert(ignore_permissions=True)
+				
+				# Increment coupon usage count
+				frappe.db.set_value("Coupon", applied_coupon, "usage_count", 
+					frappe.db.get_value("Coupon", applied_coupon, "usage_count") + 1)
+				frappe.db.commit()
+			except Exception as e:
+				frappe.log_error(f"Error tracking coupon usage: {str(e)}")
+				# Don't fail order if usage tracking fails
 		
 		# Format response
 		formatted_order = format_order(order_doc)

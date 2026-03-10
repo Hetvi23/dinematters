@@ -8,21 +8,34 @@
  "engine": "InnoDB",
  "field_order": [
   "restaurant",
+  "offer_type",
   "code",
   "discount_type",
   "discount_value",
   "min_order_amount",
+  "max_discount_cap",
   "column_break_1",
   "category",
   "description",
   "detailed_description",
+  "priority",
+  "can_stack",
+  "section_break_combo",
+  "required_items",
+  "combo_price",
+  "free_item",
   "section_break_validity",
   "valid_from",
   "valid_until",
   "is_active",
-  "column_break_limits",
+  "column_break_time",
+  "valid_days_of_week",
+  "valid_time_start",
+  "valid_time_end",
+  "section_break_limits",
   "max_uses",
   "usage_count",
+  "column_break_limits",
   "max_uses_per_user"
  ],
  "fields": [
@@ -35,6 +48,16 @@
    "options": "Restaurant",
    "reqd": 1,
    "search_index": 1
+  },
+  {
+   "default": "coupon",
+   "fieldname": "offer_type",
+   "fieldtype": "Select",
+   "label": "Offer Type",
+   "options": "coupon\nauto\ncombo",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "Coupon: Manual code entry | Auto: Applies automatically | Combo: Bundle pricing"
   },
   {
    "fieldname": "code",
@@ -67,6 +90,12 @@
    "label": "Min Order Amount"
   },
   {
+   "fieldname": "max_discount_cap",
+   "fieldtype": "Currency",
+   "label": "Max Discount Cap",
+   "description": "Maximum discount amount (useful for percentage discounts)"
+  },
+  {
    "fieldname": "column_break_1",
    "fieldtype": "Column Break"
   },
@@ -84,6 +113,48 @@
    "fieldname": "detailed_description",
    "fieldtype": "Small Text",
    "label": "Detailed Description"
+  },
+  {
+   "default": "0",
+   "fieldname": "priority",
+   "fieldtype": "Int",
+   "label": "Priority",
+   "description": "Higher priority offers apply first (0 = lowest)"
+  },
+  {
+   "default": "0",
+   "fieldname": "can_stack",
+   "fieldtype": "Check",
+   "label": "Can Stack with Other Offers",
+   "description": "Allow this offer to be combined with others"
+  },
+  {
+   "fieldname": "section_break_combo",
+   "fieldtype": "Section Break",
+   "label": "Combo/Bundle Settings",
+   "depends_on": "eval:doc.offer_type=='combo'"
+  },
+  {
+   "fieldname": "required_items",
+   "fieldtype": "JSON",
+   "label": "Required Items",
+   "description": "JSON array of dish IDs required for combo: [\"dish-id-1\", \"dish-id-2\"]",
+   "depends_on": "eval:doc.offer_type=='combo'"
+  },
+  {
+   "fieldname": "combo_price",
+   "fieldtype": "Currency",
+   "label": "Combo Price",
+   "description": "Fixed price for combo (alternative to discount)",
+   "depends_on": "eval:doc.offer_type=='combo'"
+  },
+  {
+   "fieldname": "free_item",
+   "fieldtype": "Link",
+   "label": "Free Item",
+   "options": "Menu Product",
+   "description": "Free item for buy-X-get-Y offers",
+   "depends_on": "eval:doc.offer_type=='combo'"
   },
   {
    "fieldname": "section_break_validity",
@@ -108,8 +179,31 @@
    "label": "Is Active"
   },
   {
-   "fieldname": "column_break_limits",
+   "fieldname": "column_break_time",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "valid_days_of_week",
+   "fieldtype": "JSON",
+   "label": "Valid Days of Week",
+   "description": "JSON array: [\"monday\", \"tuesday\", \"wednesday\", \"thursday\", \"friday\", \"saturday\", \"sunday\"]"
+  },
+  {
+   "fieldname": "valid_time_start",
+   "fieldtype": "Time",
+   "label": "Valid Time Start",
+   "description": "Offer valid from this time (24-hour format)"
+  },
+  {
+   "fieldname": "valid_time_end",
+   "fieldtype": "Time",
+   "label": "Valid Time End",
+   "description": "Offer valid until this time (24-hour format)"
+  },
+  {
+   "fieldname": "section_break_limits",
+   "fieldtype": "Section Break",
+   "label": "Usage Limits"
   },
   {
    "fieldname": "max_uses",

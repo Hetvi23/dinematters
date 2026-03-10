@@ -6,7 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DatePicker } from '@/components/ui/date-picker'
-import { Eye, LayoutGrid, List, Filter, X, Search } from 'lucide-react'
+import { Eye, LayoutGrid, List, Filter, X, Search, ShoppingBag, AlertCircle } from 'lucide-react'
+import { EmptyState } from '@/components/EmptyState'
 import { OrdersKanban } from '@/components/OrdersKanban'
 import { OrderDetailsDialog } from '@/components/OrderDetailsDialog'
 import {
@@ -524,18 +525,39 @@ export default function Orders() {
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Loading orders...</div>
           ) : !restaurantFilter ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <p className="text-sm">Please select a restaurant from the dropdown above to view orders</p>
-            </div>
+            <EmptyState
+              icon={AlertCircle}
+              title="Select a Restaurant"
+              description="Please select a restaurant from the dropdown above to view and manage orders."
+            />
           ) : !filteredOrders || filteredOrders?.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <p className="text-sm">No orders found for restaurant: {restaurantFilter}</p>
-              {orders && orders.length > 0 && (
-                <p className="text-xs mt-2 text-destructive">
-                  Warning: {orders.length} orders in database, but none match selected restaurant
-                </p>
+            <>
+              {orders && orders.length > 0 ? (
+                <EmptyState
+                  icon={Filter}
+                  title="No Matching Orders"
+                  description={`Found ${orders.length} orders in the database, but none match the selected restaurant "${restaurantFilter}". Try selecting a different restaurant or check your filters.`}
+                  action={{
+                    label: "Clear Filters",
+                    onClick: () => window.location.reload()
+                  }}
+                />
+              ) : (
+                <EmptyState
+                  icon={ShoppingBag}
+                  title="No Orders Yet"
+                  description="This restaurant hasn't received any orders yet. Orders will appear here once customers start placing them through the menu."
+                  action={{
+                    label: "Refresh Orders",
+                    onClick: () => mutate()
+                  }}
+                  secondaryAction={{
+                    label: "View Menu",
+                    onClick: () => window.open(`/${restaurantFilter}`, '_blank')
+                  }}
+                />
               )}
-            </div>
+            </>
           ) : (
             <>
               {/* Kanban View - Desktop Only */}
