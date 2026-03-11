@@ -1,0 +1,617 @@
+import { useState, useEffect } from 'react'
+import { useFrappeGetDoc, useFrappeGetDocList, useFrappePostCall, useFrappeUpdateDoc, useFrappeDeleteDoc } from '@/lib/frappe'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Plus, Edit2, Trash2, Users, Star, Camera, Instagram, Image, Video, Upload, X, Check } from 'lucide-react'
+import { toast } from 'sonner'
+import { uploadToR2, getMediaType } from '@/lib/r2Upload'
+
+interface LegacyContentStepProps {
+  selectedRestaurant: string
+  onComplete: () => void
+}
+
+interface MenuProduct {
+  name: string
+  product_name: string
+  image?: string
+  category_name?: string
+  main_category?: string
+}
+
+export default function LegacyContentStep({ selectedRestaurant, onComplete }: LegacyContentStepProps) {
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<any>(null)
+  const [currentSection, setCurrentSection] = useState<string>('')
+  const [uploading, setUploading] = useState(false)
+
+  // Get the main legacy content document
+  const { data: legacyContent, isLoading: contentLoading } = useFrappeGetDoc(
+    'Legacy Content',
+    selectedRestaurant,
+    { enabled: !!selectedRestaurant }
+  )
+
+  // Get child table data
+  const { data: signatureDishes } = useFrappeGetDocList('Legacy Signature Dish', {
+    filters: selectedRestaurant ? ({ parent: selectedRestaurant } as any) : undefined,
+    fields: ['name', 'dish', 'display_order', 'dish_name'],
+    orderBy: { field: 'display_order', order: 'asc' } as any
+  })
+
+  const { data: testimonials } = useFrappeGetDocList('Legacy Testimonial', {
+    filters: selectedRestaurant ? ({ parent: selectedRestaurant } as any) : undefined,
+    fields: ['name', 'customer_name', 'rating', 'text', 'location', 'avatar', 'display_order'],
+    orderBy: { field: 'display_order', order: 'asc' } as any
+  })
+
+  const { data: members } = useFrappeGetDocList('Legacy Member', {
+    filters: selectedRestaurant ? ({ parent: selectedRestaurant } as any) : undefined,
+    fields: ['name', 'member_name', 'role', 'image', 'display_order'],
+    orderBy: { field: 'display_order', order: 'asc' } as any
+  })
+
+  const { data: galleryImages } = useFrappeGetDocList('Legacy Gallery Image', {
+    filters: selectedRestaurant ? ({ parent: selectedRestaurant } as any) : undefined,
+    fields: ['name', 'image', 'title', 'display_order'],
+    orderBy: { field: 'display_order', order: 'asc' } as any
+  })
+
+  const { data: instagramReels } = useFrappeGetDocList('Legacy Instagram Reel', {
+    filters: selectedRestaurant ? ({ parent: selectedRestaurant } as any) : undefined,
+    fields: ['name', 'reel_link', 'title', 'display_order'],
+    orderBy: { field: 'display_order', order: 'asc' } as any
+  })
+
+  // Get all menu products for signature dishes selection (like recommendation engine)
+  const { data: allMenuProducts } = useFrappeGetDocList('Menu Product', {
+    filters: selectedRestaurant ? ({ restaurant: selectedRestaurant, is_active: 1 } as any) : undefined,
+    fields: ['name', 'product_name', 'image', 'category_name', 'main_category'],
+    orderBy: { field: 'product_name', order: 'asc' } as any
+  })
+
+  const { call: createDoc, loading: isCreating } = useFrappePostCall('frappe.client.insert')
+  const { updateDoc, loading: isUpdating } = useFrappeUpdateDoc()
+  const { deleteDoc, loading: isDeleting } = useFrappeDeleteDoc()
+  const { call: updateLegacyContent } = useFrappePostCall('dinematters.dinematters.api.legacy.update_legacy_content')
+
+  const handleSave = async (data: any, type: string, doctype: string) => {
+    try {
+      if (editingItem?.name) {
+        await updateDoc(doctype, editingItem.name, data)
+        toast.success(`${type} updated successfully`)
+      } else {
+        await createDoc({
+          ...data,
+          doctype: doctype,
+          parent: selectedRestaurant,
+          parenttype: 'Legacy Content',
+          parentfield: getChildTableField(doctype)
+        })
+        toast.success(`${type} added successfully`)
+      }
+      
+      setIsDialogOpen(false)
+      setEditingItem(null)
+      
+      // Force a page refresh to show updated data
+      window.location.reload()
+    } catch (error) {
+      toast.error(`Failed to save ${type}`)
+    }
+  }
+
+  const handleDelete = async (doctype: string, name: string, type: string) => {
+    try {
+      await deleteDoc(doctype, name)
+      toast.success(`${type} deleted successfully`)
+      // Force a page refresh to show updated data
+      window.location.reload()
+    } catch (error) {
+      toast.error(`Failed to delete ${type}`)
+    }
+  }
+
+  const handleLegacyContentSave = async (data: any) => {
+    try {
+      await updateLegacyContent({
+        restaurant_id: selectedRestaurant,
+        ...data
+      })
+      toast.success('Legacy content updated successfully')
+      window.location.reload()
+    } catch (error) {
+      toast.error('Failed to update legacy content')
+    }
+  }
+
+  const handleFileUpload = async (file: File, mediaRole: string): Promise<string> => {
+    setUploading(true)
+    try {
+      const result = await uploadToR2({
+        ownerDoctype: 'Legacy Content',
+        ownerName: selectedRestaurant,
+        mediaRole,
+        file
+      })
+      return result.primary_url
+    } catch (error) {
+      console.error('Upload failed:', error)
+      throw error
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const getChildTableField = (doctype: string) => {
+    const mapping: Record<string, string> = {
+      'Legacy Signature Dish': 'signature_dishes',
+      'Legacy Testimonial': 'testimonials',
+      'Legacy Member': 'members',
+      'Legacy Gallery Image': 'gallery_featured_images',
+      'Legacy Instagram Reel': 'instagram_reels'
+    }
+    return mapping[doctype] || ''
+  }
+
+  const renderSignatureDishesSection = () => (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Star className="h-5 w-5" />
+            Signature Dishes
+            <Badge variant="secondary">{signatureDishes?.length || 0}/3</Badge>
+          </CardTitle>
+          <Button 
+            size="sm" 
+            onClick={() => {
+              setEditingItem({ type: 'Signature Dish', doctype: 'Legacy Signature Dish' })
+              setCurrentSection('Signature Dish')
+              setIsDialogOpen(true)
+            }}
+            disabled={(signatureDishes?.length || 0) >= 3}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Add Signature Dish
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {signatureDishes && signatureDishes.length > 0 ? (
+          <div className="space-y-4">
+            {signatureDishes.map((item: any) => (
+              <div key={item.name} className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <h4 className="font-semibold">{item.dish_name || item.dish}</h4>
+                  <p className="text-sm text-muted-foreground">Order: {item.display_order}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => {
+                    setEditingItem({ ...item, type: 'Signature Dish', doctype: 'Legacy Signature Dish' })
+                    setCurrentSection('Signature Dish')
+                    setIsDialogOpen(true)
+                  }}>
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => handleDelete('Legacy Signature Dish', item.name, 'Signature Dish')}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            No signature dishes yet. Add up to 3 signature dishes from your menu.
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+
+  const renderMembersSection = () => (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Team Members
+            <Badge variant="secondary">{members?.length || 0}/3</Badge>
+          </CardTitle>
+          <Button 
+            size="sm" 
+            onClick={() => {
+              setEditingItem({ type: 'Member', doctype: 'Legacy Member' })
+              setCurrentSection('Member')
+              setIsDialogOpen(true)
+            }}
+            disabled={(members?.length || 0) >= 3}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Add Team Member
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {members && members.length > 0 ? (
+          <div className="space-y-4">
+            {members.map((item: any) => (
+              <div key={item.name} className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  {item.image && (
+                    <div className="h-12 w-12 rounded-full overflow-hidden border">
+                      <img src={item.image} alt={item.member_name} className="h-full w-full object-cover" />
+                    </div>
+                  )}
+                  <div>
+                    <h4 className="font-semibold">{item.member_name}</h4>
+                    <p className="text-sm text-muted-foreground">{item.role}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => {
+                    setEditingItem({ ...item, type: 'Member', doctype: 'Legacy Member' })
+                    setCurrentSection('Member')
+                    setIsDialogOpen(true)
+                  }}>
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => handleDelete('Legacy Member', item.name, 'Member')}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            No team members yet. Add up to 3 team members with photos.
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+
+  const renderGallerySection = () => (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Camera className="h-5 w-5" />
+            Gallery Images
+            <Badge variant="secondary">{galleryImages?.length || 0}</Badge>
+          </CardTitle>
+          <Button size="sm" onClick={() => {
+            setEditingItem({ type: 'Gallery Image', doctype: 'Legacy Gallery Image' })
+            setCurrentSection('Gallery Image')
+            setIsDialogOpen(true)
+          }}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add Gallery Image
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {galleryImages && galleryImages.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {galleryImages.map((item: any) => (
+              <div key={item.name} className="relative group">
+                <div className="aspect-square rounded-lg overflow-hidden border">
+                  <img src={item.image} alt={item.title || 'Gallery image'} className="h-full w-full object-cover" />
+                </div>
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => {
+                    setEditingItem({ ...item, type: 'Gallery Image', doctype: 'Legacy Gallery Image' })
+                    setCurrentSection('Gallery Image')
+                    setIsDialogOpen(true)
+                  }}>
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => handleDelete('Legacy Gallery Image', item.name, 'Gallery Image')}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                {item.title && (
+                  <p className="mt-2 text-sm font-medium truncate">{item.title}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            No gallery images yet. Upload images to showcase your restaurant.
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+
+  const renderForm = () => {
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault()
+      const formData = new FormData(e.target as HTMLFormElement)
+      const data: any = {}
+      
+      try {
+        switch (currentSection) {
+          case 'Signature Dish':
+            data.dish = formData.get('dish')
+            data.display_order = parseInt(formData.get('display_order') as string) || 0
+            break
+          case 'Member':
+            data.member_name = formData.get('member_name')
+            data.role = formData.get('role')
+            data.display_order = parseInt(formData.get('display_order') as string) || 0
+            
+            // Handle member photo upload
+            const memberPhotoFile = (formData.get('member_photo') as File)
+            if (memberPhotoFile && memberPhotoFile.size > 0) {
+              data.image = await handleFileUpload(memberPhotoFile, 'legacy_member_image')
+            } else if (!editingItem?.image) {
+              throw new Error('Member photo is required')
+            }
+            break
+          case 'Gallery Image':
+            data.title = formData.get('title')
+            data.display_order = parseInt(formData.get('display_order') as string) || 0
+            
+            // Handle gallery image upload
+            const galleryFile = (formData.get('gallery_image') as File)
+            if (galleryFile && galleryFile.size > 0) {
+              data.image = await handleFileUpload(galleryFile, 'legacy_gallery_image')
+            } else if (!editingItem?.image) {
+              throw new Error('Gallery image is required')
+            }
+            break
+        }
+        
+        await handleSave(data, currentSection, editingItem.doctype)
+      } catch (error: any) {
+        toast.error(error.message || `Failed to save ${currentSection}`)
+      }
+    }
+
+    if (currentSection === 'Signature Dish') {
+      return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="dish">Select Dish from Menu</Label>
+            <Select name="dish" defaultValue={editingItem?.dish} required>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a dish from your menu" />
+              </SelectTrigger>
+              <SelectContent>
+                {allMenuProducts?.map((product: MenuProduct) => (
+                  <SelectItem key={product.name} value={product.name}>
+                    <div className="flex items-center gap-2">
+                      {product.image && (
+                        <img 
+                          src={product.image} 
+                          alt={product.product_name} 
+                          className="h-4 w-4 rounded object-cover" 
+                        />
+                      )}
+                      <span>{product.product_name}</span>
+                      <span className="text-xs text-muted-foreground ml-2">
+                        ({product.category_name || 'Uncategorised'})
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {allMenuProducts && allMenuProducts.length === 0 && (
+              <p className="text-sm text-muted-foreground mt-2">
+                No menu products found. Please add menu products first.
+              </p>
+            )}
+          </div>
+          <div>
+            <Label htmlFor="display_order">Display Order</Label>
+            <Input type="number" name="display_order" defaultValue={editingItem?.display_order || 0} />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isCreating || isUpdating}>
+              {editingItem?.name ? 'Update' : 'Create'}
+            </Button>
+          </div>
+        </form>
+      )
+    }
+
+    if (currentSection === 'Member') {
+      return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="member_name">Member Name</Label>
+            <Input name="member_name" defaultValue={editingItem?.member_name} required />
+          </div>
+          <div>
+            <Label htmlFor="role">Role</Label>
+            <Input name="role" defaultValue={editingItem?.role} placeholder="e.g. Head Chef, Manager, etc." />
+          </div>
+          <div>
+            <Label htmlFor="member_photo">Member Photo (Required)</Label>
+            <Input
+              type="file"
+              name="member_photo"
+              accept="image/*"
+              required={!editingItem?.image}
+              className="cursor-pointer"
+            />
+            {editingItem?.image && (
+              <div className="mt-2">
+                <p className="text-sm text-muted-foreground mb-2">Current photo:</p>
+                <img src={editingItem.image} alt="Current member photo" className="h-20 w-20 rounded-full object-cover border" />
+              </div>
+            )}
+          </div>
+          <div>
+            <Label htmlFor="display_order">Display Order</Label>
+            <Input type="number" name="display_order" defaultValue={editingItem?.display_order || 0} />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isCreating || isUpdating || uploading}>
+              {uploading ? 'Uploading...' : (editingItem?.name ? 'Update' : 'Create')}
+            </Button>
+          </div>
+        </form>
+      )
+    }
+
+    if (currentSection === 'Gallery Image') {
+      return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="gallery_image">Gallery Image (Required)</Label>
+            <Input
+              type="file"
+              name="gallery_image"
+              accept="image/*"
+              required={!editingItem?.image}
+              className="cursor-pointer"
+            />
+            {editingItem?.image && (
+              <div className="mt-2">
+                <p className="text-sm text-muted-foreground mb-2">Current image:</p>
+                <img src={editingItem.image} alt="Current gallery image" className="h-32 w-full max-w-xs object-cover rounded-lg border" />
+              </div>
+            )}
+          </div>
+          <div>
+            <Label htmlFor="title">Title (Optional)</Label>
+            <Input name="title" defaultValue={editingItem?.title} placeholder="Enter image title" />
+          </div>
+          <div>
+            <Label htmlFor="display_order">Display Order</Label>
+            <Input type="number" name="display_order" defaultValue={editingItem?.display_order || 0} />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isCreating || isUpdating || uploading}>
+              {uploading ? 'Uploading...' : (editingItem?.name ? 'Update' : 'Create')}
+            </Button>
+          </div>
+        </form>
+      )
+    }
+
+    return null
+  }
+
+  if (contentLoading) {
+    return (
+      <div className="text-center py-8">
+        <p>Loading legacy content...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Legacy Content</h1>
+        <p className="text-muted-foreground">Configure your restaurant's story, heritage, and featured content</p>
+      </div>
+
+      {/* Hero Section Configuration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Image className="h-5 w-5" />
+            Hero Section
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={(e) => {
+            e.preventDefault()
+            const formData = new FormData(e.target as HTMLFormElement)
+            const data: any = {
+              hero_media_type: formData.get('hero_media_type'),
+              hero_title: formData.get('hero_title'),
+              opening_text: formData.get('opening_text'),
+              paragraph_1: formData.get('paragraph_1'),
+              paragraph_2: formData.get('paragraph_2')
+            }
+            handleLegacyContentSave(data)
+          }} className="space-y-4">
+            <div>
+              <Label htmlFor="hero_media_type">Hero Media Type</Label>
+              <Select name="hero_media_type" defaultValue={legacyContent?.hero_media_type}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select media type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="image">Image</SelectItem>
+                  <SelectItem value="video">Video</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="hero_title">Hero Title</Label>
+              <Input name="hero_title" defaultValue={legacyContent?.hero_title || ''} placeholder="Enter your restaurant's story title" />
+            </div>
+            <div>
+              <Label htmlFor="opening_text">Opening Text</Label>
+              <Textarea name="opening_text" defaultValue={legacyContent?.opening_text || ''} placeholder="Welcome text for your restaurant" />
+            </div>
+            <div>
+              <Label htmlFor="paragraph_1">First Paragraph</Label>
+              <Textarea name="paragraph_1" defaultValue={legacyContent?.paragraph_1 || ''} placeholder="Tell your restaurant's story" />
+            </div>
+            <div>
+              <Label htmlFor="paragraph_2">Second Paragraph (Optional)</Label>
+              <Textarea name="paragraph_2" defaultValue={legacyContent?.paragraph_2 || ''} placeholder="Continue your story" />
+            </div>
+            <Button type="submit">Save Hero Section</Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6">
+        {renderSignatureDishesSection()}
+        {renderMembersSection()}
+        {renderGallerySection()}
+      </div>
+
+      <div className="flex justify-end">
+        <Button onClick={onComplete} size="lg">
+          Complete Legacy Setup
+        </Button>
+      </div>
+
+      {/* Dialog for forms */}
+      <Dialog open={isDialogOpen} onOpenChange={(open) => {
+        setIsDialogOpen(open)
+        if (!open) {
+          setEditingItem(null)
+          setCurrentSection('')
+        }
+      }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editingItem?.name ? `Edit ${currentSection}` : `Add ${currentSection}`}
+            </DialogTitle>
+          </DialogHeader>
+          {renderForm()}
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}

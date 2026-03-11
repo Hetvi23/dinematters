@@ -8,12 +8,17 @@ import { Trash2, Edit, Eye } from 'lucide-react'
 import { uploadToR2 } from '@/lib/r2Upload'
 
 export default function HomeFeaturesManager() {
-  const { selectedRestaurant, restaurantConfig } = useRestaurant()
+  const { selectedRestaurant, restaurantConfig, isLite } = useRestaurant()
   const [features, setFeatures] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<any | null>(null)
   const [saving, setSaving] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+
+  // Filter features for Lite members - only show Explore Menu and The Place & Legacy
+  const filteredFeatures = isLite ? features.filter(f => 
+    f.id === 'menu' || f.id === 'legacy'
+  ) : features
 
   const fetchFeatures = useCallback(async () => {
     if (!selectedRestaurant) return
@@ -102,24 +107,16 @@ export default function HomeFeaturesManager() {
         
         try {
           // Try CDN upload first
-          console.log('Calling uploadToR2 function...')
           const uploadResult: any = await uploadFile(editing.newImageFile)
-          console.log('Upload result received:', uploadResult)
-          console.log('Upload result type:', typeof uploadResult)
           
           // Add this debug to see if the issue is with the await
-          console.log('Direct await result:', uploadResult)
-          console.log('Direct await result type:', typeof uploadResult)
           
           if (uploadResult && typeof uploadResult === 'object') {
-            console.log('Upload result keys:', Object.keys(uploadResult))
-            console.log('Upload result primary_url:', uploadResult.primary_url)
           }
           
           if (uploadResult && uploadResult.primary_url) {
             imageUrl = uploadResult.primary_url
             docData.image_src = imageUrl
-            console.log('CDN upload successful, URL:', imageUrl)
           } else {
             console.error('CDN upload failed - no primary_url:', uploadResult)
             console.error('Expected primary_url in result but got:', uploadResult)
@@ -140,7 +137,6 @@ export default function HomeFeaturesManager() {
           }
           
           // Fallback to regular Frappe upload
-          console.log('Trying fallback to regular upload...')
           try {
             const formData = new FormData()
             formData.append('file', editing.newImageFile)
@@ -157,16 +153,13 @@ export default function HomeFeaturesManager() {
               }
             })
             
-            console.log('Fallback upload response status:', uploadResponse.status)
             
             if (uploadResponse.ok) {
               const uploadResult = await uploadResponse.json()
-              console.log('Fallback upload result:', uploadResult)
               
               if (uploadResult.message && uploadResult.message.file_url) {
                 imageUrl = uploadResult.message.file_url
                 docData.image_src = imageUrl
-                console.log('Fallback upload successful:', imageUrl)
               } else {
                 console.error('Fallback upload failed - no file URL:', uploadResult)
                 throw new Error('Fallback upload failed: No file URL returned')
@@ -220,7 +213,6 @@ export default function HomeFeaturesManager() {
           
           const syncResult = await syncResponse.json()
           if (syncResult.message?.success) {
-            console.log('Media Assets synced successfully')
           }
         } catch (syncError) {
           console.error('Failed to sync Media Assets:', syncError)
@@ -245,19 +237,35 @@ export default function HomeFeaturesManager() {
 
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-semibold mb-4">Home Features</h2>
+      <h2 className="text-2xl font-semibold mb-4">
+        Home Features 
+        {isLite && <span className="ml-2 text-sm text-muted-foreground">(Lite Plan - Limited Features)</span>}
+      </h2>
       {!selectedRestaurant && <div className="text-sm text-muted-foreground">Select a restaurant first</div>}
-      <div className="flex items-center justify-between mb-4">
+      
+      {isLite && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800">
+            <strong>Lite Plan:</strong> Only "Explore our Menu" and "The Place & Legacy" features are available. 
+            Upgrade to Pro plan to unlock all home features.
+          </p>
+        </div>
+      )}
+      
+      <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-2">
           <Button onClick={() => setViewMode('grid')} variant={viewMode==='grid' ? 'default' : 'ghost'}>Grid</Button>
           <Button onClick={() => setViewMode('list')} variant={viewMode==='list' ? 'default' : 'ghost'}>List</Button>
+        </div>
+        <div className="text-sm text-muted-foreground">
+          {filteredFeatures.length} feature{filteredFeatures.length !== 1 ? 's' : ''} shown
         </div>
       </div>
 
       {loading ? <div>Loading…</div> : (
         viewMode === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {features.map(f => (
+            {filteredFeatures.map(f => (
               <div key={f.id || f.name} className="p-4 bg-card rounded shadow-sm">
                 {f.imageSrc ? <img src={f.imageSrc} alt={f.title} className="h-36 w-full object-cover rounded mb-2" /> : <div className="h-36 w-full bg-muted rounded mb-2 flex items-center justify-center text-xs">No image</div>}
                 <div className="font-semibold">{f.title || f.id}</div>
@@ -265,7 +273,7 @@ export default function HomeFeaturesManager() {
                 <div className="flex gap-2">
                   <Button onClick={() => openEdit(f)}><Edit className="h-4 w-4" /></Button>
                   <a className="inline-flex items-center px-3 py-1 rounded border text-sm" target="_blank" rel="noreferrer" href={`/app/home-feature/${encodeURIComponent(f.name)}`}><Eye className="h-4 w-4" /></a>
-                  <Button variant="destructive" onClick={() => handleDelete(f.name)}><Trash2 className="h-4 w-4" /></Button>
+                  {!isLite && <Button variant="destructive" onClick={() => handleDelete(f.name)}><Trash2 className="h-4 w-4" /></Button>}
                 </div>
               </div>
             ))}
@@ -283,7 +291,7 @@ export default function HomeFeaturesManager() {
                 </tr>
               </thead>
               <tbody>
-                {features.map(f => (
+                {filteredFeatures.map(f => (
                   <tr key={f.id || f.name} className="border-t">
                     <td className="p-2">{f.id}</td>
                     <td className="p-2 font-semibold">{f.title}</td>
@@ -293,7 +301,7 @@ export default function HomeFeaturesManager() {
                       <div className="flex gap-2">
                         <Button onClick={() => openEdit(f)}><Edit className="h-4 w-4" /></Button>
                         <a className="inline-flex items-center px-3 py-1 rounded border text-sm" target="_blank" rel="noreferrer" href={`/app/home-feature/${encodeURIComponent(f.name)}`}><Eye className="h-4 w-4" /></a>
-                        <Button variant="destructive" onClick={() => handleDelete(f.name)}><Trash2 className="h-4 w-4" /></Button>
+                        {!isLite && <Button variant="destructive" onClick={() => handleDelete(f.name)}><Trash2 className="h-4 w-4" /></Button>}
                       </div>
                     </td>
                   </tr>

@@ -47,15 +47,7 @@ export function useDocTypeMeta(doctype: string) {
     meta.fields = []
   }
 
-  // Debug logging
-  if (doctype && !isLoading) {
-    console.log(`[useDocTypeMeta] ${doctype}:`, {
-      hasData: !!data,
-      hasMessage: !!data?.message,
-      fieldsCount: meta?.fields?.length || 0,
-      meta
-    })
-  }
+
 
   return {
     meta: meta || null,

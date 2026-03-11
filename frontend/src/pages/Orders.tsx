@@ -387,7 +387,7 @@ export default function Orders() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-semibold text-foreground tracking-tight">Orders</h2>
           <p className="text-muted-foreground text-sm mt-1">
@@ -497,7 +497,7 @@ export default function Orders() {
             </div>
 
             {/* Second Row for Clear Button */}
-            <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div className="text-sm text-muted-foreground">
                 {hasActiveFilters ? (
                   <>Showing {filteredOrders?.length || 0} of {filteredOrders?.length || 0} orders (filtered by restaurant: {restaurantFilter || 'none'})</>

@@ -233,7 +233,7 @@ export default function PastOrders() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-semibold text-foreground tracking-tight">Past and Billed Orders</h2>
           <p className="text-muted-foreground text-sm mt-1">

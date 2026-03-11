@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useFrappeGetCall, useFrappeGetDoc } from '@/lib/frappe'
 import DynamicForm from '@/components/DynamicForm'
+import LegacyContentStep from '@/components/LegacyContentStep'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -28,6 +29,7 @@ const stepIdToSlug = (stepId: string): string => {
     'categories': 'MenuCategories',
     'products': 'MenuProducts',
     'home_features': 'HomeFeatures',
+    'legacy': 'LegacyContent',
   }
   return slugMap[stepId] || stepId
 }
@@ -39,6 +41,7 @@ const slugToStepId = (slug: string): string => {
     'MenuCategories': 'categories',
     'MenuProducts': 'products',
     'HomeFeatures': 'home_features',
+    'LegacyContent': 'legacy',
   }
   return idMap[slug] || slug
 }
@@ -76,7 +79,7 @@ export default function LiteSetupWizard() {
     const msg = allStepsData.message
     const allSteps: WizardStep[] = Array.isArray(msg) ? msg : (msg.steps && Array.isArray(msg.steps) ? msg.steps : [])
     
-    const liteSafeSteps = ['restaurant', 'config', 'categories', 'products', 'home_features']
+    const liteSafeSteps = ['restaurant', 'config', 'categories', 'products', 'home_features', 'legacy']
     return allSteps.filter(step => liteSafeSteps.includes(step.id))
   })()
 
@@ -217,6 +220,7 @@ export default function LiteSetupWizard() {
         'categories': 'categories',
         'products': 'products',
         'home_features': 'home_features',
+        'legacy': 'legacy',
       }
 
       const completed = new Set<number>()
@@ -305,6 +309,10 @@ export default function LiteSetupWizard() {
       'home_features': [
         ...commonFields,
         // Advanced home features (if any)
+      ],
+      'legacy': [
+        ...commonFields,
+        // Legacy content fields (all safe for Lite)
       ]
     }
 
@@ -435,6 +443,10 @@ export default function LiteSetupWizard() {
               </div>
               <div className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-green-600" />
+                <span className="text-sm">Legacy Content & Story</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-600" />
                 <span className="text-sm">Mobile Friendly</span>
               </div>
             </div>
@@ -478,24 +490,37 @@ export default function LiteSetupWizard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <DynamicForm
-              doctype={currentStepData.doctype}
-              docname={selectedRestaurant}
-              mode="edit"
-              initialData={stepData[currentStepData.id] || {}}
-              readOnlyFields={currentStepData.view_only ? [] : undefined}
-              onChange={setFormHasChanges}
-              showSaveButton={false}
-              hideFields={getLiteHideFields(currentStepData.id)}
-              onSave={(data: any) => {
-                setCompletedSteps(prev => new Set([...prev, currentStep]))
-                setStepData(prev => ({ ...prev, [currentStepData.id]: data }))
-                toast.success(`${currentStepData.title} completed successfully!`)
-                setTimeout(() => {
-                  handleNext()
-                }, 1000)
-              }}
-            />
+            {currentStepData.id === 'legacy' ? (
+              <LegacyContentStep
+                selectedRestaurant={selectedRestaurant}
+                onComplete={() => {
+                  setCompletedSteps(prev => new Set([...prev, currentStep]))
+                  toast.success(`${currentStepData.title} completed successfully!`)
+                  setTimeout(() => {
+                    handleNext()
+                  }, 1000)
+                }}
+              />
+            ) : (
+              <DynamicForm
+                doctype={currentStepData.doctype}
+                docname={selectedRestaurant}
+                mode="edit"
+                initialData={stepData[currentStepData.id] || {}}
+                readOnlyFields={currentStepData.view_only ? [] : undefined}
+                onChange={setFormHasChanges}
+                showSaveButton={false}
+                hideFields={getLiteHideFields(currentStepData.id)}
+                onSave={(data: any) => {
+                  setCompletedSteps(prev => new Set([...prev, currentStep]))
+                  setStepData(prev => ({ ...prev, [currentStepData.id]: data }))
+                  toast.success(`${currentStepData.title} completed successfully!`)
+                  setTimeout(() => {
+                    handleNext()
+                  }, 1000)
+                }}
+              />
+            )}
           </CardContent>
         </Card>
       )}

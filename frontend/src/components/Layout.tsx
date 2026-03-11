@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, Menu, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag } from 'lucide-react'
+import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetCall, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
 import { useState, useEffect, useMemo } from 'react'
@@ -110,9 +110,9 @@ const navigation: NavItem[] = [
     icon: ShoppingCart,
     feature: 'ordering',
     children: [
-      { name: 'Real Time Orders', href: '/orders', icon: ShoppingCart, badgeHref: '/orders' },
-      { name: 'Accept Orders', href: '/accept-orders', icon: CheckCircle2 },
-      { name: 'Past and Billed Orders', href: '/past-orders', icon: Clock },
+      { name: 'Real Time Orders', href: '/orders', icon: ShoppingCart, badgeHref: '/orders', feature: 'ordering' },
+      { name: 'Accept Orders', href: '/accept-orders', icon: CheckCircle2, feature: 'ordering' },
+      { name: 'Past and Billed Orders', href: '/past-orders', icon: Clock, feature: 'ordering' },
     ],
   },
   { type: 'link', name: 'Table Bookings', href: '/bookings', icon: Calendar, feature: 'ordering' },
@@ -981,16 +981,6 @@ export default function Layout({ children }: LayoutProps) {
         {/* Top Header - Analytics Magic Panel - Unified with Sidebar */}
         <header className="sticky top-0 z-30 bg-card border-b border-border shadow-sm">
           <div className="flex items-center h-[3.5rem]">
-            {/* Left: Mobile Menu Only */}
-            <div className="flex items-center flex-shrink-0 lg:hidden pl-4">
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="p-2 -ml-2 rounded-md hover:bg-accent transition-colors"
-              >
-                <Menu className="h-5 w-5 text-muted-foreground" />
-              </button>
-            </div>
-
             {/* Analytics Panel - Full Width from Start */}
             <div className="hidden lg:flex items-center gap-4 flex-1 pl-6 pr-6 flex-nowrap overflow-x-auto h-full">
               {/* Today's Revenue */}
@@ -1131,7 +1121,7 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Page Content */}
         <main className="p-3 sm:p-4 md:p-6 bg-background min-h-[calc(100vh-4.5rem)] overflow-x-hidden">
-          <div className="max-w-full">
+          <div className="max-w-7xl mx-auto">
             <Breadcrumb />
             {children}
           </div>

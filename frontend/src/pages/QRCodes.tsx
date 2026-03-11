@@ -237,7 +237,7 @@ export default function QRCodes() {
       <div className="flex items-center justify-center min-h-[400px]">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">
-            <div className="flex flex-col items-center gap-4 text-center">
+            <div className="flex flex-col items-start gap-4 text-left">
               <AlertCircle className="h-12 w-12 text-muted-foreground" />
               <div>
                 <h3 className="text-lg font-semibold">No Restaurant Selected</h3>
@@ -255,7 +255,7 @@ export default function QRCodes() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Manage QR Codes</h1>
           <p className="text-muted-foreground text-sm mt-1">

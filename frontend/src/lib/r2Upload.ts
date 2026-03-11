@@ -68,7 +68,6 @@ export async function uploadToR2(options: R2UploadOptions): Promise<ConfirmUploa
       throw new Error('Invalid upload session response')
     }
 
-    console.log('CDN Upload - Session created:', session.upload_id)
 
     // Step 2: Direct upload to R2 (presigned PUT)
     const putRes = await fetch(session.upload_url, {
@@ -84,7 +83,6 @@ export async function uploadToR2(options: R2UploadOptions): Promise<ConfirmUploa
       throw new Error(`R2 upload failed: ${putRes.status}`)
     }
 
-    console.log('CDN Upload - File uploaded to R2')
 
     // Step 3: Confirm upload (creates Media Asset + enqueues processing)
     const confirmRes = await fetch('/api/method/dinematters.dinematters.media.api.confirm_upload', {
@@ -111,17 +109,14 @@ export async function uploadToR2(options: R2UploadOptions): Promise<ConfirmUploa
     }
 
     const confirmJson = await confirmRes.json()
-    console.log('CDN Upload - Upload confirmed:', confirmJson)
     
     const result = confirmJson.message
-    console.log('CDN Upload - About to return result:', result)
     
     if (!result || !result.primary_url) {
       console.error('CDN Upload - Invalid confirm response:', confirmJson)
       throw new Error('Invalid confirm upload response')
     }
     
-    console.log('CDN Upload - Returning result with primary_url:', result.primary_url)
     return result
   } catch (error: any) {
     console.error('CDN Upload - Complete error:', error)

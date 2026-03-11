@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import ProtectedRoute from './components/ProtectedRoute'
 import FeatureProtectedRoute from './components/FeatureProtectedRoute'
+import FeatureLocked from './pages/FeatureLocked'
 import SmartSetupWizard from './pages/SmartSetupWizard'
 import SetupWizard from './pages/SetupWizard'
 import LiteSetupWizard from './pages/LiteSetupWizard'
@@ -28,6 +29,8 @@ import CategoryEdit from './pages/CategoryEdit'
 import CategoryNew from './pages/CategoryNew'
 import QRCodes from './pages/QRCodes'
 import HomeFeaturesManager from './pages/HomeFeaturesManager'
+import LegacyContent from './pages/LegacyContent'
+import LegacySignatureDish from './pages/LegacySignatureDish'
 import Payment from './pages/Payment'
 import PaymentStats from './pages/PaymentStats'
 import PaymentSettings from './pages/PaymentSettings'
@@ -49,6 +52,7 @@ function AppContent() {
 					<Route element={<ProtectedRoute />}>
 						<Route path="/" element={<Navigate to="/dashboard" replace />} />
 						<Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+						<Route path="/feature-locked" element={<FeatureLocked />} />
 						<Route path="/setup" element={<Layout><SmartSetupWizard /></Layout>} />
 						<Route path="/setup/:stepId" element={<Layout><SmartSetupWizard /></Layout>} />
 						<Route path="/lite-setup" element={<Layout><LiteSetupWizard /></Layout>} />
@@ -95,6 +99,8 @@ function AppContent() {
 						<Route path="/categories/:categoryId" element={<Layout><CategoryDetail /></Layout>} />
 						<Route path="/qr-codes" element={<Layout><QRCodes /></Layout>} />
 						<Route path="/home-features" element={<Layout><HomeFeaturesManager /></Layout>} />
+						<Route path="/Legacy Content" element={<Layout><LegacyContent /></Layout>} />
+						<Route path="/Legacy Signature Dish" element={<Layout><LegacySignatureDish /></Layout>} />
 						<Route path="/payment-stats" element={<Layout><PaymentStats /></Layout>} />
 						<Route path="/restaurant/:restaurantId/payment" element={<Layout><Payment /></Layout>} />
 						<Route path="/restaurant/:restaurantId/billing" element={<Layout><PaymentSettings /></Layout>} />

@@ -43,7 +43,8 @@ export default function Modules() {
     'Menu Product',
     'Home Feature',
     'QR Code',
-    'Media Library'
+    'Media Library',
+    'Legacy Content'
   ]
   
   // Filter categories for Lite restaurants

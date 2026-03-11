@@ -26,7 +26,7 @@ export default function Products() {
   
   const { data: products, isLoading, mutate } = useFrappeGetDocList('Menu Product', {
     fields: ['name', 'product_name', 'price', 'original_price', 'is_active', 'category', 'category_name', 'main_category', 'product_type', 'description', 'calories', 'is_vegetarian', 'display_order', 'estimated_time', 'serving_size'],
-    filters: selectedRestaurant ? { restaurant: selectedRestaurant } : undefined,
+    filters: selectedRestaurant ? ({ restaurant: selectedRestaurant } as any) : undefined,
     limit: 1000,
     orderBy: { field: sortField, order: sortOrder || 'asc' }
   }, selectedRestaurant ? `products-${selectedRestaurant}` : null)
@@ -250,7 +250,7 @@ export default function Products() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-semibold text-foreground tracking-tight">Products</h2>
           <p className="text-muted-foreground text-sm mt-1">
@@ -267,7 +267,7 @@ export default function Products() {
 
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
               <CardTitle>All Products</CardTitle>
               <CardDescription>
@@ -291,7 +291,7 @@ export default function Products() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading products...</div>
+            <div className="py-8 text-muted-foreground">Loading products...</div>
           ) : filteredProducts && filteredProducts.length > 0 ? (
             <>
               {/* Mobile Card View */}
@@ -418,7 +418,7 @@ export default function Products() {
               </div>
             </>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">No products found</div>
+            <div className="py-8 text-muted-foreground">No products found</div>
           )}
         </CardContent>
       </Card>

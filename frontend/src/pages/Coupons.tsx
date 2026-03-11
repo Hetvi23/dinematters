@@ -145,7 +145,7 @@ export default function Coupons() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold">Manage Offers & Coupons</h1>
           <p className="text-muted-foreground mt-1">Create and manage discount coupons, auto-offers, and combo deals</p>

@@ -69,13 +69,11 @@ def get_legacy_content(restaurant_id):
 			"paragraph2": legacy_doc.paragraph_2 or ""
 		}
 		
-		# Format signature dishes
+		# Format signature dishes - return array of dish IDs for frontend compatibility
 		signature_dishes = []
-		for dish in legacy_doc.signature_dishes:
-			signature_dishes.append({
-				"dishId": dish.dish,
-				"displayOrder": dish.display_order
-			})
+		sorted_dishes = sorted(legacy_doc.signature_dishes, key=lambda x: x.display_order or 0)
+		for dish in sorted_dishes:
+			signature_dishes.append(dish.dish)
 		
 		# Format testimonials
 		testimonials = []

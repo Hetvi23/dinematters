@@ -59,7 +59,6 @@ export default function LiteMediaUpload({
             label: 'Upgrade',
             onClick: () => {
               // TODO: Navigate to upgrade page
-              console.log('Navigate to upgrade')
             }
           }
         })
@@ -77,7 +76,6 @@ export default function LiteMediaUpload({
             label: 'Upgrade to Pro',
             onClick: () => {
               // TODO: Navigate to upgrade page
-              console.log('Navigate to upgrade')
             }
           }
         })
@@ -277,7 +275,6 @@ export default function LiteMediaUpload({
                     className="w-full mt-2 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700"
                     onClick={() => {
                       // TODO: Navigate to upgrade page
-                      console.log('Navigate to upgrade')
                     }}
                   >
                     <ArrowUp className="h-4 w-4 mr-2" />
@@ -318,7 +315,6 @@ export default function LiteMediaUpload({
               className="w-full mt-3"
               onClick={() => {
                 // TODO: Navigate to upgrade page
-                console.log('Navigate to upgrade')
               }}
             >
               Upgrade to Unlock All Features

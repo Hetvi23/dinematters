@@ -1,67 +1,38 @@
-import { useFrappeGetDocList, useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe'
+import { useFrappeGetDocList } from '@/lib/frappe'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ShoppingCart, Package, FolderTree, TrendingUp, Store, Clock, CheckCircle, XCircle, AlertCircle, Link as LinkIcon, QrCode } from 'lucide-react'
+import { ShoppingCart, Package, FolderTree, TrendingUp, Store, Clock, CheckCircle, XCircle, AlertCircle, Link as LinkIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { useRestaurant } from '@/contexts/RestaurantContext'
-import { useState, useEffect } from 'react'
-import { toast } from 'sonner'
 import { useCurrency } from '@/hooks/useCurrency'
 
 export default function Dashboard() {
   const { selectedRestaurant } = useRestaurant()
   const { formatAmount, formatAmountNoDecimals } = useCurrency()
-  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
-  const { call: getQrCodeUrl } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.get_qr_codes_pdf_url')
-  const { call: generateQrCodes } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.generate_qr_codes_pdf')
-  
-  // Fetch restaurant document to check if it has tables
-  const { data: restaurantDoc } = useFrappeGetDoc('Restaurant', selectedRestaurant || '', {
-    enabled: !!selectedRestaurant,
-    fields: ['name', 'tables']
-  })
-  
-  // Load QR code URL for selected restaurant
-  useEffect(() => {
-    if (selectedRestaurant && restaurantDoc?.tables && restaurantDoc.tables > 0) {
-      getQrCodeUrl({ restaurant: selectedRestaurant })
-        .then((response: any) => {
-          if (response?.message) {
-            setQrCodeUrl(response.message)
-          }
-        })
-        .catch(() => {
-          // QR codes not generated yet
-          setQrCodeUrl(null)
-        })
-    } else {
-      setQrCodeUrl(null)
-    }
-  }, [selectedRestaurant, restaurantDoc?.tables, getQrCodeUrl])
   
   // Fetch data filtered by selected restaurant
   const { data: orders, isLoading: ordersLoading } = useFrappeGetDocList('Order', {
     fields: ['name', 'status', 'total', 'creation', 'restaurant', 'table_number'],
-    filters: selectedRestaurant ? { restaurant: selectedRestaurant } : undefined,
+    filters: selectedRestaurant ? ({ restaurant: selectedRestaurant } as any) : undefined,
     limit: 50,
     orderBy: { field: 'creation', order: 'desc' }
   }, selectedRestaurant ? `orders-dashboard-${selectedRestaurant}` : null)
 
   const { data: products, isLoading: productsLoading } = useFrappeGetDocList('Menu Product', {
     fields: ['name', 'product_name', 'price', 'is_active', 'restaurant'],
-    filters: selectedRestaurant ? { restaurant: selectedRestaurant } : undefined,
+    filters: selectedRestaurant ? ({ restaurant: selectedRestaurant } as any) : undefined,
     limit: 100
   }, selectedRestaurant ? `products-dashboard-${selectedRestaurant}` : null)
 
   const { data: categories, isLoading: categoriesLoading } = useFrappeGetDocList('Menu Category', {
     fields: ['name', 'category_name', 'restaurant'],
-    filters: selectedRestaurant ? { restaurant: selectedRestaurant } : undefined,
+    filters: selectedRestaurant ? ({ restaurant: selectedRestaurant } as any) : undefined,
     limit: 100
   }, selectedRestaurant ? `categories-dashboard-${selectedRestaurant}` : null)
 
   const { data: restaurants, isLoading: restaurantsLoading } = useFrappeGetDocList('Restaurant', {
     fields: ['name', 'restaurant_name', 'is_active', 'owner_email', 'city', 'state'],
-    filters: selectedRestaurant ? { name: selectedRestaurant } : undefined,
+    filters: selectedRestaurant ? ({ name: selectedRestaurant } as any) : undefined,
     limit: 100
   }, selectedRestaurant ? `restaurants-dashboard-${selectedRestaurant}` : null)
 
@@ -123,42 +94,9 @@ export default function Dashboard() {
     }
   }
 
-  const handleGenerateQrCodes = async () => {
-    if (!selectedRestaurant) {
-      toast.error('Please select a restaurant first')
-      return
-    }
-    try {
-      const response: any = await generateQrCodes({ restaurant: selectedRestaurant })
-      if (response?.message) {
-        setQrCodeUrl(response.message)
-        toast.success('QR codes PDF generated successfully')
-      }
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to generate QR codes')
-    }
-  }
-
-  const handleViewQrCodes = () => {
-    if (qrCodeUrl) {
-      window.open(qrCodeUrl, '_blank')
-    }
-  }
-
-  const handleDownloadQrCodes = () => {
-    if (qrCodeUrl) {
-      const link = document.createElement('a')
-      link.href = qrCodeUrl
-      link.download = `${selectedRestaurant}_table_qr_codes.pdf`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    }
-  }
-
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-semibold text-foreground tracking-tight">Dashboard</h2>
           <p className="text-muted-foreground text-sm mt-1">
@@ -166,30 +104,6 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {selectedRestaurant && restaurantDoc?.tables && restaurantDoc.tables > 0 && (
-            <>
-              {qrCodeUrl ? (
-                <>
-                  <Button variant="outline" size="sm" onClick={handleViewQrCodes} className="flex-1 sm:flex-initial">
-                    <QrCode className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">View QR Codes</span>
-                    <span className="sm:hidden">QR Codes</span>
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleDownloadQrCodes} className="flex-1 sm:flex-initial">
-                    <QrCode className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Download QR Codes</span>
-                    <span className="sm:hidden">Download</span>
-                  </Button>
-                </>
-              ) : (
-                <Button variant="outline" size="sm" onClick={handleGenerateQrCodes} className="flex-1 sm:flex-initial">
-                  <QrCode className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Generate QR Codes</span>
-                  <span className="sm:hidden">Generate QR</span>
-                </Button>
-              )}
-            </>
-          )}
           <Button variant="outline" size="sm" asChild className="flex-1 sm:flex-initial">
             <Link to="/setup">
               <LinkIcon className="h-4 w-4 mr-2" />
@@ -210,7 +124,7 @@ export default function Dashboard() {
       {/* Primary Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-semibold text-foreground">Restaurants</CardTitle>
             <Store className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -225,7 +139,7 @@ export default function Dashboard() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-semibold text-foreground">Today's Orders</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -240,7 +154,7 @@ export default function Dashboard() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-semibold text-foreground">Total Orders</CardTitle>
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -255,7 +169,7 @@ export default function Dashboard() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-semibold text-foreground">Total Revenue</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -273,7 +187,7 @@ export default function Dashboard() {
       {/* Secondary Stats Grid */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-semibold text-foreground">Menu Products</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -288,7 +202,7 @@ export default function Dashboard() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-semibold text-foreground">Categories</CardTitle>
             <FolderTree className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -303,14 +217,14 @@ export default function Dashboard() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-semibold text-foreground">Order Status</CardTitle>
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               {Object.entries(orderStatusCounts).map(([status, count]) => (
-                <div key={status} className="flex items-center justify-between">
+                <div key={status} className="flex items-start justify-between">
                   <span className="text-sm text-muted-foreground">{status}</span>
                   <span className="text-sm font-semibold text-foreground">{count as number}</span>
                 </div>
@@ -327,7 +241,7 @@ export default function Dashboard() {
         {/* Restaurants List */}
         <Card>
           <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
               <div>
                 <CardTitle>Restaurants</CardTitle>
                 <CardDescription>Your restaurant locations</CardDescription>
@@ -336,13 +250,13 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             {restaurantsLoading ? (
-              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+              <div className="py-8 text-muted-foreground">Loading...</div>
             ) : restaurants && restaurants.length > 0 ? (
               <div className="space-y-3">
                 {restaurants.slice(0, 5).map((restaurant: any) => (
                   <div
                     key={restaurant.name}
-                    className="flex items-center justify-between p-3 rounded-md border border-border"
+                    className="flex items-start justify-between p-3 rounded-md border border-border"
                   >
                     <div className="flex-1">
                       <p className="font-medium text-foreground">{restaurant.restaurant_name || restaurant.name}</p>
@@ -372,7 +286,7 @@ export default function Dashboard() {
                 )}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="py-8 text-muted-foreground">
                 <p>No restaurants found</p>
                 <Button variant="outline" size="sm" className="mt-4" asChild>
                   <Link to="/setup">Create Restaurant</Link>
@@ -385,7 +299,7 @@ export default function Dashboard() {
         {/* Recent Orders */}
         <Card>
           <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
               <div>
                 <CardTitle>Recent Orders</CardTitle>
                 <CardDescription>Latest orders from your restaurants</CardDescription>
@@ -397,16 +311,16 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             {ordersLoading ? (
-              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+              <div className="py-8 text-muted-foreground">Loading...</div>
             ) : recentOrders && recentOrders.length > 0 ? (
               <div className="space-y-3">
                 {recentOrders.map((order: any) => (
                   <Link
                     key={order.name}
                     to={`/orders/${order.name}`}
-                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-md border border-border hover:bg-muted hover:border-border/80 transition-colors"
+                    className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 p-3 rounded-md border border-border hover:bg-muted hover:border-border/80 transition-colors"
                   >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
                       {getStatusIcon(order.status)}
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-foreground truncate">{order.name}</p>
@@ -420,9 +334,9 @@ export default function Dashboard() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between sm:flex-col sm:items-end sm:text-right sm:ml-4 gap-2">
+                    <div className="flex items-start justify-between sm:flex-col sm:items-end sm:text-right sm:ml-4 gap-2">
                       <p className="font-medium text-foreground">{formatAmountNoDecimals(order.total)}</p>
-                      <div className="flex flex-col sm:block items-end sm:items-start gap-1">
+                      <div className="flex flex-col sm:block items-start sm:items-start gap-1">
                       <p className="text-sm text-muted-foreground">
                         {new Date(order.creation).toLocaleDateString()}
                       </p>
@@ -435,7 +349,7 @@ export default function Dashboard() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">No orders found</div>
+              <div className="py-8 text-muted-foreground">No orders found</div>
             )}
           </CardContent>
         </Card>

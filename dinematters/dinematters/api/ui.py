@@ -340,14 +340,6 @@ def get_setup_wizard_steps():
 				'view_only': True,  # Show list instead of form
 			},
 			{
-				'id': 'offers',
-				'title': 'Create Offers',
-				'description': 'Set up special offers and promotions for your restaurant',
-				'doctype': 'Offer',
-				'required': False,
-				'depends_on': 'restaurant',
-			},
-			{
 				'id': 'coupons',
 				'title': 'Create Coupons',
 				'description': 'Set up discount coupons for customers',
@@ -392,6 +384,14 @@ def get_setup_wizard_steps():
 				'title': 'Banquet Booking Setup',
 				'description': 'Set up banquet and large party booking options',
 				'doctype': 'Banquet Booking',
+				'required': False,
+				'depends_on': 'restaurant',
+			},
+			{
+				'id': 'legacy',
+				'title': 'Legacy Content',
+				'description': 'Configure your restaurant story, heritage, testimonials, and gallery',
+				'doctype': 'Legacy Content',
 				'required': False,
 				'depends_on': 'restaurant',
 			},
