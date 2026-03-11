@@ -266,8 +266,8 @@ def get_cart(restaurant_id, session_id=None):
 			"tax": 0,
 			"deliveryFee": 0,
 			"total": subtotal,
-			"currency": currency_info.get("currency", "USD"),
-			"currencySymbol": currency_info.get("symbol", "$"),
+			"currency": currency_info.get("currency", "INR"),
+			"currencySymbol": currency_info.get("symbol", "₹"),
 			"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
 		}
 		

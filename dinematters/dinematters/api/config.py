@@ -56,7 +56,7 @@ def get_restaurant_config(restaurant_id):
 				"logo": restaurant_doc.logo,
 				"hero_video": "",
 				"apple_touch_icon": "",
-				"currency": restaurant_doc.currency or "USD",
+				"currency": restaurant_doc.currency or "INR",
 				"enable_table_booking": 1,
 				"enable_banquet_booking": 1,
 				"enable_events": 1,
@@ -161,8 +161,8 @@ def get_restaurant_config(restaurant_id):
 				}
 			},
 			"pricing": {
-				"currency": currency_info.get("currency", "USD"),
-				"symbol": currency_info.get("symbol", "$"),
+				"currency": currency_info.get("currency", "INR"),
+				"symbol": currency_info.get("symbol", "₹"),
 				"symbolOnRight": currency_info.get("symbolOnRight", False)
 			},
 			"settings": {

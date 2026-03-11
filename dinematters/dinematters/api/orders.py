@@ -415,8 +415,8 @@ def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None):
 					"total": total,
 					"totalPages": total_pages
 				},
-				"currency": currency_info.get("currency", "USD"),
-				"currencySymbol": currency_info.get("symbol", "$"),
+				"currency": currency_info.get("currency", "INR"),
+				"currencySymbol": currency_info.get("symbol", "₹"),
 				"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
 			}
 		}

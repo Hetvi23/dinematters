@@ -108,8 +108,8 @@ def get_products(restaurant_id, category=None, type=None, vegetarian=None, searc
 					"total": total,
 					"totalPages": total_pages
 				},
-				"currency": currency_info.get("currency", "USD"),
-				"currencySymbol": currency_info.get("symbol", "$"),
+				"currency": currency_info.get("currency", "INR"),
+				"currencySymbol": currency_info.get("symbol", "₹"),
 				"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
 			}
 		}
@@ -382,8 +382,8 @@ def get_product(restaurant_id, product_id):
 			"success": True,
 			"data": {
 				"product": formatted_product,
-				"currency": currency_info.get("currency", "USD"),
-				"currencySymbol": currency_info.get("symbol", "$"),
+				"currency": currency_info.get("currency", "INR"),
+				"currencySymbol": currency_info.get("symbol", "₹"),
 				"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
 			}
 		}

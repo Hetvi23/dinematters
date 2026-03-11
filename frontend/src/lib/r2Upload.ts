@@ -36,73 +36,97 @@ export async function uploadToR2(options: R2UploadOptions): Promise<ConfirmUploa
 
   const csrf = (window as any).frappe?.csrf_token || (window as any).csrf_token
 
-  // Step 1: Request upload session
-  const sessionRes = await fetch('/api/method/dinematters.dinematters.media.api.request_upload_session', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Frappe-CSRF-Token': csrf,
-    },
-    body: JSON.stringify({
-      owner_doctype: ownerDoctype,
-      owner_name: ownerName,
-      media_role: mediaRole,
-      filename: file.name,
-      content_type: file.type,
-      size_bytes: file.size,
-    }),
-  })
+  try {
+    // Step 1: Request upload session
+    const sessionRes = await fetch('/api/method/dinematters.dinematters.media.api.request_upload_session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Frappe-CSRF-Token': csrf,
+      },
+      body: JSON.stringify({
+        owner_doctype: ownerDoctype,
+        owner_name: ownerName,
+        media_role: mediaRole,
+        filename: file.name,
+        content_type: file.type,
+        size_bytes: file.size,
+      }),
+    })
 
-  if (!sessionRes.ok) {
-    const error = await sessionRes.json()
-    throw new Error(error.message || 'Failed to request upload session')
+    if (!sessionRes.ok) {
+      const error = await sessionRes.json()
+      console.error('CDN Upload - Session request failed:', error)
+      throw new Error(error.message || 'Failed to request upload session')
+    }
+
+    const sessionJson = await sessionRes.json()
+    const session: UploadSessionResponse = sessionJson.message
+
+    if (!session?.upload_url) {
+      console.error('CDN Upload - Invalid session response:', sessionJson)
+      throw new Error('Invalid upload session response')
+    }
+
+    console.log('CDN Upload - Session created:', session.upload_id)
+
+    // Step 2: Direct upload to R2 (presigned PUT)
+    const putRes = await fetch(session.upload_url, {
+      method: 'PUT',
+      headers: {
+        ...(session.headers || {}),
+      },
+      body: file,
+    })
+
+    if (!putRes.ok) {
+      console.error('CDN Upload - R2 upload failed:', putRes.status, putRes.statusText)
+      throw new Error(`R2 upload failed: ${putRes.status}`)
+    }
+
+    console.log('CDN Upload - File uploaded to R2')
+
+    // Step 3: Confirm upload (creates Media Asset + enqueues processing)
+    const confirmRes = await fetch('/api/method/dinematters.dinematters.media.api.confirm_upload', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Frappe-CSRF-Token': csrf,
+      },
+      body: JSON.stringify({
+        upload_id: session.upload_id,
+        owner_doctype: ownerDoctype,
+        owner_name: ownerName,
+        media_role: mediaRole,
+        alt_text: altText || '',
+        caption: caption || '',
+        display_order: displayOrder || 0,
+      }),
+    })
+
+    if (!confirmRes.ok) {
+      const error = await confirmRes.json()
+      console.error('CDN Upload - Confirm upload failed:', error)
+      throw new Error(error.message || 'Confirm upload failed')
+    }
+
+    const confirmJson = await confirmRes.json()
+    console.log('CDN Upload - Upload confirmed:', confirmJson)
+    
+    const result = confirmJson.message
+    console.log('CDN Upload - About to return result:', result)
+    
+    if (!result || !result.primary_url) {
+      console.error('CDN Upload - Invalid confirm response:', confirmJson)
+      throw new Error('Invalid confirm upload response')
+    }
+    
+    console.log('CDN Upload - Returning result with primary_url:', result.primary_url)
+    return result
+  } catch (error: any) {
+    console.error('CDN Upload - Complete error:', error)
+    throw error
   }
-
-  const sessionJson = await sessionRes.json()
-  const session: UploadSessionResponse = sessionJson.message
-
-  if (!session?.upload_url) {
-    throw new Error('Invalid upload session response')
-  }
-
-  // Step 2: Direct upload to R2 (presigned PUT)
-  const putRes = await fetch(session.upload_url, {
-    method: 'PUT',
-    headers: {
-      ...(session.headers || {}),
-    },
-    body: file,
-  })
-
-  if (!putRes.ok) {
-    throw new Error(`R2 upload failed: ${putRes.status}`)
-  }
-
-  // Step 3: Confirm upload (creates Media Asset + enqueues processing)
-  const confirmRes = await fetch('/api/method/dinematters.dinematters.media.api.confirm_upload', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Frappe-CSRF-Token': csrf,
-    },
-    body: JSON.stringify({
-      upload_id: session.upload_id,
-      owner_doctype: ownerDoctype,
-      owner_name: ownerName,
-      media_role: mediaRole,
-      alt_text: altText || '',
-      caption: caption || '',
-      display_order: displayOrder || 0,
-    }),
-  })
-
-  if (!confirmRes.ok) {
-    const error = await confirmRes.json()
-    throw new Error(error.message || 'Confirm upload failed')
-  }
-
-  const confirmJson = await confirmRes.json()
-  return confirmJson.message
 }
 
 /**

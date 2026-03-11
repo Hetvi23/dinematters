@@ -49,3 +49,105 @@ class HomeFeature(Document):
 					).format(self.feature_id, self.restaurant)
 				)
 
+	def on_update(self):
+		"""Handle image updates and media asset synchronization"""
+		# Always try to update media assets if there's an image
+		if self.image_src:
+			self.update_media_assets()
+			
+		# Log the update for debugging
+		import frappe
+		frappe.logger().info(f"Home Feature {self.name} updated with image_src: {self.image_src}")
+
+	def update_media_assets(self):
+		"""Update Media Assets to point to the latest image"""
+		if not self.image_src:
+			return
+
+		# Get all Media Assets linked to this Home Feature
+		media_assets = frappe.get_all(
+			"Media Asset",
+			filters={
+				"owner_doctype": "Home Feature",
+				"owner_name": self.name,
+				"media_role": "home_feature_image",
+			},
+			fields=["name", "primary_url"]
+		)
+
+		# Update all Media Assets to point to the new image
+		for asset in media_assets:
+			if asset.primary_url != self.image_src:
+				frappe.db.set_value("Media Asset", asset.name, "primary_url", self.image_src)
+				frappe.db.commit()
+
+		# If no Media Assets exist, create one for the new image
+		if not media_assets:
+			try:
+				# Create a new Media Asset record
+				media_asset = frappe.get_doc({
+					"doctype": "Media Asset",
+					"owner_doctype": "Home Feature",
+					"owner_name": self.name,
+					"media_role": "home_feature_image",
+					"primary_url": self.image_src,
+					"status": "ready",
+					"is_active": 1
+				})
+				media_asset.insert(ignore_permissions=True)
+				frappe.db.commit()
+			except Exception as e:
+				# Log error but don't fail the update
+				frappe.log_error(
+					f"Failed to create Media Asset for Home Feature {self.name}: {str(e)}",
+					"Media Asset Creation"
+				)
+
+
+def update_home_feature_from_file(doc, method):
+	"""Update Home Feature when a new file is uploaded"""
+	if doc.attached_to_doctype == "Home Feature" and doc.attached_to_name:
+		try:
+			# Get the Home Feature document
+			home_feature = frappe.get_doc("Home Feature", doc.attached_to_name)
+			
+			# Update the image_src to point to the new file
+			if doc.file_url != home_feature.image_src:
+				home_feature.image_src = doc.file_url
+				home_feature.save(ignore_permissions=True)
+				frappe.db.commit()
+				
+				# Also update Media Assets
+				home_feature.update_media_assets()
+				
+				frappe.logger().info(f"Updated Home Feature {doc.attached_to_name} with new image: {doc.file_url}")
+		except Exception as e:
+			frappe.log_error(
+				f"Failed to update Home Feature from file: {str(e)}",
+				"Home Feature File Update"
+			)
+
+
+@frappe.whitelist()
+def update_media_assets_from_ui(home_feature_name, image_src):
+	"""Update Media Assets from UI upload"""
+	try:
+		home_feature = frappe.get_doc("Home Feature", home_feature_name)
+		
+		# Update the image_src if different
+		if image_src != home_feature.image_src:
+			home_feature.image_src = image_src
+			home_feature.save(ignore_permissions=True)
+			frappe.db.commit()
+		
+		# Update Media Assets
+		home_feature.update_media_assets()
+		
+		return {"success": True, "message": "Media Assets updated successfully"}
+	except Exception as e:
+		frappe.log_error(
+			f"Failed to update Media Assets from UI: {str(e)}",
+			"Media Asset UI Update"
+		)
+		return {"success": False, "message": str(e)}
+

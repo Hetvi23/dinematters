@@ -19,7 +19,7 @@ def get_currency_symbol(currency_code):
 		dict: Dictionary with currency symbol and symbol_on_right flag
 	"""
 	if not currency_code:
-		currency_code = "USD"
+		currency_code = "INR"
 	
 	try:
 		currency_doc = frappe.get_doc("Currency", currency_code)
@@ -58,7 +58,7 @@ def get_restaurant_currency_info(restaurant_id):
 	Returns:
 		dict: Dictionary with currency code and symbol info
 	"""
-	currency_code = "USD"  # Default
+	currency_code = "INR"  # Default
 	
 	try:
 		# Try to get from Restaurant Config first

@@ -84,8 +84,8 @@ def get_restaurant_context(restaurant_id):
 		"country": restaurant_doc.country,
 		"tax_rate": restaurant_doc.tax_rate,
 		"default_delivery_fee": restaurant_doc.default_delivery_fee,
-		"currency": currency_info.get("currency", restaurant_doc.currency or "USD"),
-		"currencySymbol": currency_info.get("symbol", "$"),
+		"currency": currency_info.get("currency", restaurant_doc.currency or "INR"),
+		"currencySymbol": currency_info.get("symbol", "₹"),
 		"currencySymbolOnRight": currency_info.get("symbolOnRight", False),
 		"timezone": restaurant_doc.timezone,
 		"google_map_url": restaurant_doc.google_map_url

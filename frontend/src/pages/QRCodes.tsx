@@ -47,6 +47,7 @@ export default function QRCodes() {
   // API calls
   const { call: generateQrCodes } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.generate_qr_codes_pdf')
   const { call: getQrCodeUrl } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.get_qr_codes_pdf_url')
+  const { call: deleteQrCodes } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.delete_qr_codes_pdf')
   const { updateDoc: updateRestaurant } = useFrappeUpdateDoc()
 
   // Load restaurant data
@@ -71,7 +72,16 @@ export default function QRCodes() {
     try {
       const response: any = await getQrCodeUrl({ restaurant: selectedRestaurant })
       if (response?.message) {
-        setQrCodeUrl(response.message)
+        // Handle both old format (direct URL) and new format (JSON object)
+        let url = null
+        if (typeof response.message === 'string') {
+          // Old format - direct URL
+          url = response.message
+        } else if (response.message.pdf_url) {
+          // New format - JSON object with pdf_url
+          url = response.message.pdf_url
+        }
+        setQrCodeUrl(url)
       } else {
         setQrCodeUrl(null)
       }
@@ -96,14 +106,26 @@ export default function QRCodes() {
     try {
       const response: any = await generateQrCodes({ restaurant: selectedRestaurant })
       if (response?.message) {
-        // Add cache-busting parameter to the URL
-        const url = response.message.includes('?') 
-          ? `${response.message}&_t=${Date.now()}` 
-          : `${response.message}?_t=${Date.now()}`
-        setQrCodeUrl(url)
-        toast.success('QR codes PDF generated successfully!')
-        // Refresh restaurant data to get updated URL
-        await refreshRestaurant()
+        // Handle both old format (direct URL) and new format (JSON object)
+        let url = null
+        if (typeof response.message === 'string') {
+          // Old format - direct URL
+          url = response.message
+        } else if (response.message.pdf_url) {
+          // New format - JSON object with pdf_url
+          url = response.message.pdf_url
+        }
+        
+        if (url) {
+          // Add cache-busting parameter to the URL
+          const finalUrl = url.includes('?') 
+            ? `${url}&_t=${Date.now()}` 
+            : `${url}?_t=${Date.now()}`
+          setQrCodeUrl(finalUrl)
+          toast.success('QR codes PDF generated successfully!')
+          // Refresh restaurant data to get updated URL
+          await refreshRestaurant()
+        }
       }
     } catch (error: any) {
       toast.error(error?.message || 'Failed to generate QR codes')
@@ -183,13 +205,25 @@ export default function QRCodes() {
     setShowDeleteDialog(false)
     setIsDeleting(true)
     try {
-      await updateRestaurant('Restaurant', selectedRestaurant, {
-        qr_codes_pdf_url: null
-      })
+      const response: any = await deleteQrCodes({ restaurant: selectedRestaurant })
       
-      setQrCodeUrl(null)
-      await refreshRestaurant()
-      toast.success('QR codes PDF deleted successfully')
+      // Check if deletion was successful
+      let deleted = false
+      if (response?.message) {
+        if (typeof response.message === 'boolean') {
+          deleted = response.message
+        } else if (response.message.status === 'success') {
+          deleted = true
+        }
+      }
+      
+      if (deleted) {
+        setQrCodeUrl(null)
+        await refreshRestaurant()
+        toast.success('QR codes PDF deleted successfully')
+      } else {
+        toast.error('Failed to delete QR codes PDF')
+      }
     } catch (error: any) {
       toast.error(error?.message || 'Failed to delete QR codes PDF')
     } finally {

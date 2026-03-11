@@ -143,6 +143,12 @@ class Restaurant(Document):
 		if self.owner_email:
 			self.auto_assign_owner()
 		
+		# Auto-create Restaurant Config for new restaurants
+		self.create_restaurant_config()
+		
+		# Auto-create default Home Features for new restaurants
+		self.create_default_home_features()
+		
 		# Generate QR codes if tables field is set
 		if hasattr(self, "_generate_qr_codes") and self._generate_qr_codes:
 			if self.tables and self.tables > 0:
@@ -362,6 +368,13 @@ class Restaurant(Document):
 						f"Error deleting existing QR code file {file_doc.name}: {str(e)}",
 						"QR Code File Deletion",
 					)
+			
+			# Clear the qr_codes_pdf_url field when PDF is deleted
+			try:
+				if frappe.db.has_column("Restaurant", "qr_codes_pdf_url"):
+					self.db_set("qr_codes_pdf_url", "", update_modified=False)
+			except Exception:
+				pass
 
 			import time
 
@@ -413,20 +426,112 @@ class Restaurant(Document):
 	def get_qr_codes_pdf_url(self):
 		"""Get the URL of the QR codes PDF if it exists"""
 		file_name = f"{self.restaurant_id}_table_qr_codes.pdf"
+		
+		# First check if File record exists
 		existing_file = frappe.db.get_value("File", {
 			"file_name": file_name,
 			"attached_to_doctype": "Restaurant",
 			"attached_to_name": self.name
-		}, "file_url")
+		}, ["file_url", "name"], as_dict=True)
 		
-		if existing_file:
-			return existing_file
+		if existing_file and existing_file.file_url:
+			# Verify the file actually exists in storage
+			try:
+				from dinematters.dinematters.media.storage import verify_object_exists
+				import os
+				
+				# If it's a local file, check if it exists
+				if existing_file.file_url.startswith("/files/"):
+					file_path = os.path.join(frappe.get_site_path(), existing_file.file_url[1:])
+					if os.path.exists(file_path):
+						return existing_file.file_url
+					else:
+						# File doesn't exist, delete the File record
+						frappe.delete_doc("File", existing_file.name, ignore_permissions=True, force=True)
+						frappe.db.commit()
+						# Clear the URL field
+						if frappe.db.has_column("Restaurant", "qr_codes_pdf_url"):
+							self.db_set("qr_codes_pdf_url", "", update_modified=False)
+				else:
+					# For CDN files, we assume the URL is valid if File record exists
+					return existing_file.file_url
+			except Exception:
+				pass
 		
+		# Check the qr_codes_pdf_url field as fallback, but validate it
 		doc_url = frappe.db.get_value("Restaurant", self.name, "qr_codes_pdf_url")
 		if doc_url:
-			return doc_url
+			# Verify this URL is still valid by checking if File record exists
+			file_exists = frappe.db.exists("File", {
+				"file_name": file_name,
+				"attached_to_doctype": "Restaurant", 
+				"attached_to_name": self.name
+			})
+			if not file_exists:
+				# Clear the invalid URL
+				if frappe.db.has_column("Restaurant", "qr_codes_pdf_url"):
+					self.db_set("qr_codes_pdf_url", "", update_modified=False)
+				doc_url = None
 		
-		return None
+		return doc_url if doc_url else None
+
+	@frappe.whitelist()
+	def delete_qr_codes_pdf(self):
+		"""Delete the QR codes PDF file"""
+		try:
+			file_name = f"{self.restaurant_id}_table_qr_codes.pdf"
+			
+			# Find and delete all File records
+			existing_files = frappe.get_all(
+				"File",
+				{
+					"file_name": file_name,
+					"attached_to_doctype": "Restaurant",
+					"attached_to_name": self.name,
+				},
+				["name"],
+			)
+			
+			deleted_count = 0
+			for file_doc in existing_files:
+				try:
+					frappe.delete_doc("File", file_doc.name, ignore_permissions=True, force=True)
+					deleted_count += 1
+				except Exception as e:
+					frappe.log_error(
+						f"Error deleting QR code file {file_doc.name}: {str(e)}",
+						"QR Code File Deletion",
+					)
+			
+			# Clear the qr_codes_pdf_url field
+			try:
+				if frappe.db.has_column("Restaurant", "qr_codes_pdf_url"):
+					self.db_set("qr_codes_pdf_url", "", update_modified=False)
+			except Exception:
+				pass
+			
+			frappe.db.commit()
+			
+			if deleted_count > 0:
+				frappe.msgprint(
+					f"✅ QR codes PDF deleted successfully ({deleted_count} file(s) removed)",
+					indicator="green",
+				)
+			else:
+				frappe.msgprint(
+					"No QR codes PDF found to delete",
+					indicator="orange",
+				)
+			
+			return True
+			
+		except Exception as e:
+			frappe.log_error(f"Error deleting QR codes PDF: {str(e)}", "QR Code PDF Deletion")
+			frappe.msgprint(
+				f"Error deleting QR codes PDF: {str(e)}",
+				indicator="red",
+			)
+			return False
 
 	@frappe.whitelist()
 	def get_table_qr_assets(self, force=False):
@@ -438,17 +543,22 @@ class Restaurant(Document):
 			"items": assets,
 		}
 	
-	@frappe.whitelist()
-	def generate_qr_codes_pdf(self):
-		"""Whitelisted method to generate QR codes PDF"""
-		return self.generate_table_qr_codes_pdf()
-
-
 @frappe.whitelist()
 def get_qr_codes_pdf_url(restaurant):
 	"""Get QR codes PDF URL for a restaurant"""
-	restaurant_doc = frappe.get_doc("Restaurant", restaurant)
-	return restaurant_doc.get_qr_codes_pdf_url()
+	try:
+		restaurant_doc = frappe.get_doc("Restaurant", restaurant)
+		pdf_url = restaurant_doc.get_qr_codes_pdf_url()
+		return {
+			"status": "success",
+			"pdf_url": pdf_url
+		}
+	except Exception as e:
+		frappe.log_error(f"Error getting QR codes PDF URL: {str(e)}", "QR Code URL Retrieval")
+		return {
+			"status": "error",
+			"message": str(e)
+		}
 
 
 @frappe.whitelist()
@@ -458,7 +568,175 @@ def get_table_qr_assets(restaurant, force=0):
 
 
 @frappe.whitelist()
+def delete_qr_codes_pdf(restaurant):
+	"""Delete QR codes PDF for a restaurant"""
+	try:
+		restaurant_doc = frappe.get_doc("Restaurant", restaurant)
+		result = restaurant_doc.delete_qr_codes_pdf()
+		return {
+			"status": "success",
+			"message": "QR codes PDF deleted successfully"
+		}
+	except Exception as e:
+		frappe.log_error(f"Error deleting QR codes PDF: {str(e)}", "QR Code Deletion")
+		return {
+			"status": "error",
+			"message": str(e)
+		}
+
+
+@frappe.whitelist()
 def generate_qr_codes_pdf(restaurant):
 	"""Generate QR codes PDF for a restaurant"""
-	restaurant_doc = frappe.get_doc("Restaurant", restaurant)
-	return restaurant_doc.generate_table_qr_codes_pdf()
+	try:
+		restaurant_doc = frappe.get_doc("Restaurant", restaurant)
+		pdf_url = restaurant_doc.generate_table_qr_codes_pdf()
+		return {
+			"status": "success",
+			"message": f"QR codes PDF generated successfully",
+			"pdf_url": pdf_url
+		}
+	except Exception as e:
+		frappe.log_error(f"Error generating QR codes PDF: {str(e)}", "QR Code Generation")
+		return {
+			"status": "error",
+			"message": str(e)
+		}
+
+
+def create_restaurant_config(self):
+	"""Create Restaurant Config record for new restaurant"""
+	try:
+		# Check if Restaurant Config already exists
+		existing_config = frappe.db.exists("Restaurant Config", {"restaurant": self.name})
+		if existing_config:
+			return
+		
+		# Create Restaurant Config with default values
+		config_doc = frappe.get_doc({
+			"doctype": "Restaurant Config",
+			"restaurant": self.name,
+			"restaurant_name": self.restaurant_name,
+			"tagline": "",
+			"subtitle": "",
+			"description": self.description or "",
+			"primary_color": "#DB782F",
+			"default_theme": "light",
+			"logo": self.logo or "",
+			"hero_video": "",
+			"apple_touch_icon": "",
+			"currency": self.currency or "INR",
+			"menu_layout": "2 Columns",
+			# Enable features based on subscription plan
+			"enable_table_booking": 1 if self.plan_type == "PRO" else 0,
+			"enable_banquet_booking": 1 if self.plan_type == "PRO" else 0,
+			"enable_events": 1 if self.plan_type == "PRO" else 0,
+			"enable_offers": 1 if self.plan_type == "PRO" else 0,
+			"enable_coupons": 1 if self.plan_type == "PRO" else 0,
+			"enable_experience_lounge": 1 if self.plan_type == "PRO" else 0,
+			"verify_my_user": 0,
+			"google_review_link": "",
+			"instagram_profile_link": "",
+			"facebook_profile_link": "",
+			"whatsapp_phone_number": self.owner_phone or ""
+		})
+		config_doc.insert(ignore_permissions=True)
+		
+	except Exception as e:
+		frappe.log_error(f"Error creating Restaurant Config for {self.name}: {str(e)}", "Restaurant Config Creation Error")
+
+
+def create_default_home_features(self):
+	"""Create default Home Features for new restaurant"""
+	try:
+		# Check if Home Features already exist
+		existing_features = frappe.get_all("Home Feature", filters={"restaurant": self.name})
+		if existing_features:
+			return
+		
+		# Ensure SVG files exist in File doctype
+		self.ensure_svg_files_exist()
+		
+		# Create default Home Features
+		default_features = [
+			{"feature_id": "menu", "title": "Explore our Menu", "subtitle": "Food, Taste, Love",
+			 "image_src": "/files/explore.svg", "route": "/main-menu", "size": "large", "is_mandatory": 1},
+			{"feature_id": "book-table", "title": "Book your Tables", "subtitle": "& banquets",
+			 "image_src": "/files/book-table.svg", "route": "/book-table", "size": "small", "is_mandatory": 0},
+			{"feature_id": "legacy", "title": "The Place", "subtitle": "& it's legacy",
+			 "image_src": "/files/legacy.svg", "route": "/legacy", "size": "small", "is_mandatory": 1},
+			{"feature_id": "offers-events", "title": "Offers & Events", "subtitle": "Treasure mine.",
+			 "image_src": "/files/events-offers.svg", "route": "/events", "size": "small", "is_mandatory": 0},
+			{"feature_id": "dine-play", "title": "Dine & Play", "subtitle": "Enjoy your bites",
+			 "image_src": "/files/experience-lounge.svg", "route": "/experience-lounge-splash", "size": "small", "is_mandatory": 0}
+		]
+		
+		for idx, feat in enumerate(default_features, 1):
+			# Only enable PRO features for PRO restaurants (menu and legacy are LITE features)
+			is_enabled = feat["is_mandatory"] == 1 or (self.plan_type == "PRO")
+			
+			feat_doc = frappe.get_doc({
+				"doctype": "Home Feature",
+				"restaurant": self.name,
+				"feature_id": feat["feature_id"],
+				"title": feat["title"],
+				"subtitle": feat.get("subtitle", ""),
+				"image_src": feat.get("image_src", ""),
+				"image_alt": feat.get("title", ""),
+				"route": feat.get("route", ""),
+				"size": feat.get("size", "small"),
+				"is_enabled": 1 if is_enabled else 0,
+				"is_mandatory": feat.get("is_mandatory", 0),
+				"display_order": idx
+			})
+			feat_doc.insert(ignore_permissions=True)
+			
+	except Exception as e:
+		frappe.log_error(f"Error creating default Home Features for {self.name}: {str(e)}", "Home Features Creation Error")
+
+
+def ensure_svg_files_exist(self):
+	"""Ensure SVG files exist in File doctype"""
+	import os
+	
+	svg_files = [
+		{"filename": "legacy.svg", "source_path": "./apps/ono-menu/public/images/ui/legacy.svg"},
+		{"filename": "experience-lounge.svg", "source_path": "./apps/ono-menu/public/images/ui/experience-lounge.svg"},
+		{"filename": "events-offers.svg", "source_path": "./apps/ono-menu/public/images/ui/events-offers.svg"},
+		{"filename": "explore.svg", "source_path": "./apps/ono-menu/public/images/ui/explore.svg"},
+		{"filename": "book-table.svg", "source_path": "./apps/ono-menu/public/images/ui/book-table.svg"}
+	]
+	
+	for svg in svg_files:
+		try:
+			# Check if File record already exists
+			existing_file = frappe.db.get_value("File", {"file_name": svg["filename"]})
+			if existing_file:
+				continue
+			
+			# Check if source file exists
+			if not os.path.exists(svg["source_path"]):
+				continue
+			
+			# Copy to public/files if not exists
+			target_path = f"./sites/dine_matters/public/files/{svg['filename']}"
+			if not os.path.exists(target_path):
+				import shutil
+				shutil.copy2(svg["source_path"], target_path)
+			
+			# Read file content
+			with open(svg["source_path"], 'rb') as f:
+				content = f.read()
+			
+			# Create File doc
+			file_doc = frappe.get_doc({
+				"doctype": "File",
+				"file_name": svg["filename"],
+				"file_url": f"/files/{svg['filename']}",
+				"is_private": 0,
+				"content": content
+			})
+			file_doc.insert(ignore_permissions=True)
+			
+		except Exception as e:
+			frappe.log_error(f"Error ensuring SVG file {svg['filename']}: {str(e)}", "SVG File Creation Error")

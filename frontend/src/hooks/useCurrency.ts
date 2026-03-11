@@ -34,7 +34,7 @@ export function useCurrency() {
     fields: ['currency']
   })
 
-  const currencyCode = pricing?.currency || configData?.currency || restaurantData?.currency || 'USD'
+  const currencyCode = pricing?.currency || configData?.currency || restaurantData?.currency || 'INR'
 
   // Fetch Currency doctype only when not using pricing from context
   const { data: currencyDoc } = useFrappeGetDoc('Currency', currencyCode, {

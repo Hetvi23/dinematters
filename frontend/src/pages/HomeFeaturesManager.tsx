@@ -72,7 +72,7 @@ export default function HomeFeaturesManager() {
   const uploadFile = async (file: File) => {
     if (!editing?.name) throw new Error('Missing Home Feature id')
 
-    await uploadToR2({
+    return await uploadToR2({
       ownerDoctype: 'Home Feature',
       ownerName: editing.name,
       mediaRole: 'home_feature_image',
@@ -89,7 +89,99 @@ export default function HomeFeaturesManager() {
         subtitle: editing.subtitle,
       }
 
-      if (!editing.newImageFile) {
+      let imageUrl = editing.imageSrc
+
+      // If there's a new image file, upload it first
+      if (editing.newImageFile) {
+        console.log('Starting CDN upload for file:', editing.newImageFile.name)
+        console.log('File details:', {
+          name: editing.newImageFile.name,
+          size: editing.newImageFile.size,
+          type: editing.newImageFile.type
+        })
+        
+        try {
+          // Try CDN upload first
+          console.log('Calling uploadToR2 function...')
+          const uploadResult: any = await uploadFile(editing.newImageFile)
+          console.log('Upload result received:', uploadResult)
+          console.log('Upload result type:', typeof uploadResult)
+          
+          // Add this debug to see if the issue is with the await
+          console.log('Direct await result:', uploadResult)
+          console.log('Direct await result type:', typeof uploadResult)
+          
+          if (uploadResult && typeof uploadResult === 'object') {
+            console.log('Upload result keys:', Object.keys(uploadResult))
+            console.log('Upload result primary_url:', uploadResult.primary_url)
+          }
+          
+          if (uploadResult && uploadResult.primary_url) {
+            imageUrl = uploadResult.primary_url
+            docData.image_src = imageUrl
+            console.log('CDN upload successful, URL:', imageUrl)
+          } else {
+            console.error('CDN upload failed - no primary_url:', uploadResult)
+            console.error('Expected primary_url in result but got:', uploadResult)
+            throw new Error('Upload failed: No URL returned')
+          }
+        } catch (uploadError: any) {
+          console.error('CDN upload failed:', uploadError)
+          console.error('Upload error details:', {
+            message: uploadError.message,
+            stack: uploadError.stack,
+            name: uploadError.name,
+            toString: uploadError.toString()
+          })
+          
+          // Check if it's a network error
+          if (uploadError.name === 'TypeError' && uploadError.message.includes('fetch')) {
+            console.error('This appears to be a network error - check CORS or connectivity')
+          }
+          
+          // Fallback to regular Frappe upload
+          console.log('Trying fallback to regular upload...')
+          try {
+            const formData = new FormData()
+            formData.append('file', editing.newImageFile)
+            formData.append('doctype', 'Home Feature')
+            formData.append('docname', editing.name)
+            formData.append('fieldname', 'image_src')
+            
+            const csrf = (window as any).frappe?.csrf_token || (window as any).csrf_token
+            const uploadResponse = await fetch('/api/method/upload_file', {
+              method: 'POST',
+              body: formData,
+              headers: {
+                'X-Frappe-CSRF-Token': csrf
+              }
+            })
+            
+            console.log('Fallback upload response status:', uploadResponse.status)
+            
+            if (uploadResponse.ok) {
+              const uploadResult = await uploadResponse.json()
+              console.log('Fallback upload result:', uploadResult)
+              
+              if (uploadResult.message && uploadResult.message.file_url) {
+                imageUrl = uploadResult.message.file_url
+                docData.image_src = imageUrl
+                console.log('Fallback upload successful:', imageUrl)
+              } else {
+                console.error('Fallback upload failed - no file URL:', uploadResult)
+                throw new Error('Fallback upload failed: No file URL returned')
+              }
+            } else {
+              const errorText = await uploadResponse.text()
+              console.error('Fallback upload HTTP error:', errorText)
+              throw new Error('Fallback upload failed: ' + uploadResponse.statusText)
+            }
+          } catch (fallbackError: any) {
+            console.error('Fallback upload also failed:', fallbackError)
+            throw new Error('Failed to upload image: Both CDN and regular upload failed')
+          }
+        }
+      } else if (editing.imageSrc) {
         docData.image_src = editing.imageSrc
       }
 
@@ -107,16 +199,39 @@ export default function HomeFeaturesManager() {
         })
       }).then(resp => resp.json())
 
-      const uploadPromise = editing.newImageFile ? uploadFile(editing.newImageFile) : Promise.resolve()
-
-      const [json] = await Promise.all([updateDocPromise, uploadPromise])
+      const [json] = await Promise.all([updateDocPromise])
 
       if (!json.success && json.error) throw new Error(json.error.message || JSON.stringify(json))
+
+      // After updating the document, also trigger Media Asset sync
+      if (imageUrl && imageUrl !== editing.imageSrc) {
+        try {
+          const syncResponse = await fetch('/api/method/dinematters.dinematters.doctype.home_feature.home_feature.update_media_assets_from_ui', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'X-Frappe-CSRF-Token': csrf
+            },
+            body: JSON.stringify({
+              home_feature_name: editing.name,
+              image_src: imageUrl
+            })
+          })
+          
+          const syncResult = await syncResponse.json()
+          if (syncResult.message?.success) {
+            console.log('Media Assets synced successfully')
+          }
+        } catch (syncError) {
+          console.error('Failed to sync Media Assets:', syncError)
+        }
+      }
 
       setFeatures(prev => prev.map(p => p.name === editing.name ? {
         ...p,
         title: editing.title,
         subtitle: editing.subtitle,
+        imageSrc: imageUrl
       } : p))
       setEditing(null)
       await fetchFeatures()

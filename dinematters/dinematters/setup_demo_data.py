@@ -99,7 +99,7 @@ def create_restaurant():
 			"country": "United States",
 			"tax_rate": 8.5,
 			"default_delivery_fee": 3.5,
-			"currency": "USD",
+			"currency": "INR",
 			"tables": 12,
 			"description": "A modern specialty coffee shop with bowls, sandwiches and desserts.",
 		}
@@ -117,7 +117,7 @@ def create_restaurant():
 				"default_theme": "light",
 				"logo": doc.logo or "",
 				"hero_video": "/assets/dinematters/demo/hero-demo.mp4" if frappe.db.exists("File", {"file_name": "hero-demo.mp4"}) else "",
-				"currency": doc.currency or "USD",
+				"currency": doc.currency or "INR",
 			})
 			rc.insert(ignore_permissions=True)
 			print(f"✅ Created default Restaurant Config for {doc.name}")

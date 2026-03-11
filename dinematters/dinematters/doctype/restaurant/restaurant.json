@@ -222,7 +222,7 @@
    "fieldtype": "Link",
    "label": "Currency",
    "options": "Currency",
-   "default": "USD"
+   "default": "INR"
   },
   {
    "default": "https://demo.dinematters.com/",

@@ -11,8 +11,11 @@ from io import BytesIO
 import frappe
 from frappe.utils import get_url
 
+# Test background image overrides for development (only for testing)
+# In production, use Restaurant Gallery, Media Assets, or Home Feature images
 TEST_BACKGROUND_IMAGE_OVERRIDES = {
 	"unvind": "/home/frappe/frappe-bench/apps/dinematters/image.png",
+	"test": "/home/frappe/frappe-bench/apps/dinematters/image.png",
 }
 
 def normalize_qr_color(color):
@@ -61,6 +64,14 @@ def resolve_qr_branding(restaurant_doc):
 
 	if not logo_url and restaurant_doc.logo:
 		logo_url = get_url(restaurant_doc.logo) if restaurant_doc.logo.startswith("/") else restaurant_doc.logo
+
+	# For LITE users, ALWAYS use Dinematters logo (override any custom logo)
+	if restaurant_doc.plan_type == 'LITE':
+		# Use Dinematters logo for LITE users (uploaded to CDN)
+		logo_url = "/files/dinematters-logoddffe5.svg"
+		# Fallback to local file if CDN file doesn't exist
+		if not frappe.db.exists("File", {"file_url": logo_url}):
+			logo_url = "/dinematters/images/dinematters-logo.svg"
 
 	for media_role in ["restaurant_gallery_image", "restaurant_banner"]:
 		background_image_url = frappe.db.get_value(
@@ -126,7 +137,9 @@ def build_table_qr_url(restaurant_doc, table_number):
 	return f"{base_url.rstrip('/')}/{restaurant_doc.restaurant_id}?table_no={table_number}"
 
 
-def build_table_qr_cache_key(restaurant_doc, table_number, qr_url, branding):
+def build_table_qr_cache_key(restaurant_doc, table_number, qr_url, branding, force=False):
+	import time
+	
 	payload = "|".join(
 		[
 			"v8",
@@ -139,6 +152,11 @@ def build_table_qr_cache_key(restaurant_doc, table_number, qr_url, branding):
 			str(branding.get("background_image_url") or ""),
 		]
 	)
+	
+	# Add timestamp when forcing regeneration to ensure unique cache key
+	if force:
+		payload += f"|{int(time.time())}"
+	
 	return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
@@ -171,12 +189,18 @@ def read_logo_bytes(logo_url):
 				temp_path = temp_file.name
 			try:
 				download_object(object_key, temp_path)
-				with Image.open(temp_path) as img:
-					img = img.convert("RGBA")
-					img.thumbnail((320, 320), Image.Resampling.LANCZOS)
-					buffer = BytesIO()
-					img.save(buffer, format="PNG")
-					return buffer.getvalue()
+				# Check if it's an SVG file
+				if object_key.endswith('.svg') or temp_path.endswith('.svg'):
+					# For SVG files, read directly and convert to PNG using a different approach
+					return convert_svg_to_png(temp_path)
+				else:
+					# For raster images, use PIL
+					with Image.open(temp_path) as img:
+						img = img.convert("RGBA")
+						img.thumbnail((320, 320), Image.Resampling.LANCZOS)
+						buffer = BytesIO()
+						img.save(buffer, format="PNG")
+						return buffer.getvalue()
 			finally:
 				if os.path.exists(temp_path):
 					os.remove(temp_path)
@@ -184,19 +208,84 @@ def read_logo_bytes(logo_url):
 		# Handle local file paths
 		resolved_url = logo_url
 		if resolved_url.startswith("/"):
-			resolved_url = get_url(resolved_url)
+			# For local files, check if they exist and open directly
+			if os.path.exists(resolved_url):
+				# Check if it's an SVG file
+				if resolved_url.endswith('.svg'):
+					# For SVG files, read directly and convert to PNG
+					return convert_svg_to_png(resolved_url)
+				else:
+					# For raster images, use PIL
+					with Image.open(resolved_url) as img:
+						img = img.convert("RGBA")
+						img.thumbnail((320, 320), Image.Resampling.LANCZOS)
+						buffer = BytesIO()
+						img.save(buffer, format="PNG")
+						return buffer.getvalue()
+			else:
+				# Try to get URL if local file doesn't exist
+				resolved_url = get_url(resolved_url)
 
 		# Handle HTTP URLs (for localhost or other accessible URLs)
 		with urllib.request.urlopen(resolved_url, timeout=10) as response:
-			with Image.open(BytesIO(response.read())) as img:
-				img = img.convert("RGBA")
-				img.thumbnail((320, 320), Image.Resampling.LANCZOS)
-				buffer = BytesIO()
-				img.save(buffer, format="PNG")
-				return buffer.getvalue()
+			content = response.read()
+			# Check if it's an SVG file by content type or extension
+			if resolved_url.endswith('.svg') or b'<svg' in content[:100]:
+				# Save SVG to temp file and convert
+				with tempfile.NamedTemporaryFile(delete=False, suffix='.svg') as temp_file:
+					temp_file.write(content)
+					temp_path = temp_file.name
+				try:
+					return convert_svg_to_png(temp_path)
+				finally:
+					if os.path.exists(temp_path):
+						os.remove(temp_path)
+			else:
+				# For raster images, use PIL
+				with Image.open(BytesIO(content)) as img:
+					img = img.convert("RGBA")
+					img.thumbnail((320, 320), Image.Resampling.LANCZOS)
+					buffer = BytesIO()
+					img.save(buffer, format="PNG")
+					return buffer.getvalue()
 	except Exception as e:
 		print(f"Error reading logo {logo_url}: {e}")
 		return None
+
+
+def convert_svg_to_png(svg_path):
+	"""Convert SVG to PNG using cairosvg or fallback method"""
+	try:
+		# Try using cairosvg if available
+		import cairosvg
+		png_bytes = cairosvg.svg2png(url=svg_path, output_width=320, output_height=320)
+		return png_bytes
+	except ImportError:
+		# Fallback: use a simple method to create a placeholder
+		# For now, we'll create a simple colored square as placeholder
+		from PIL import Image, ImageDraw, ImageFont
+		img = Image.new('RGBA', (320, 320), (255, 87, 34, 255))  # Orange background
+		draw = ImageDraw.Draw(img)
+		
+		# Draw a simple "D" for Dinematters
+		try:
+			font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 120)
+		except:
+			font = ImageFont.load_default()
+		
+		draw.text((80, 100), "D", fill=(255, 255, 255, 255), font=font)
+		
+		buffer = BytesIO()
+		img.save(buffer, format="PNG")
+		return buffer.getvalue()
+	except Exception as e:
+		print(f"Error converting SVG to PNG: {e}")
+		# Return a simple placeholder
+		from PIL import Image, ImageDraw
+		img = Image.new('RGBA', (320, 320), (255, 87, 34, 255))
+		buffer = BytesIO()
+		img.save(buffer, format="PNG")
+		return buffer.getvalue()
 
 
 def read_background_image_bytes(image_url, size=(940, 980)):
@@ -205,43 +294,54 @@ def read_background_image_bytes(image_url, size=(940, 980)):
 
 	try:
 		from PIL import Image, ImageEnhance, ImageOps
-		from dinematters.dinematters.media.storage import download_object
-		from dinematters.dinematters.media.config import get_cdn_config
 		
-		# Handle CDN URLs by extracting object key and downloading from R2
-		cdn_config = get_cdn_config()
-		cdn_base = cdn_config["base_url"]
-		if image_url.startswith(cdn_base):
-			# Extract object key from CDN URL
-			object_key = image_url[len(cdn_base):].lstrip('/')
-			# Download from R2 to temp file
-			with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as temp_file:
-				temp_path = temp_file.name
-			try:
-				download_object(object_key, temp_path)
-				with Image.open(temp_path) as img:
+		# Handle local file paths first (before any frappe-dependent operations)
+		if image_url.startswith("/"):
+			# For local files, check if they exist and open directly
+			if os.path.exists(image_url):
+				with Image.open(image_url) as img:
 					img = img.convert("RGB")
 					img = ImageOps.fit(img, size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.78))
 					img = ImageEnhance.Brightness(img).enhance(0.75)
 					buffer = BytesIO()
 					img.save(buffer, format="JPEG", quality=75, optimize=True)
 					return buffer.getvalue()
-			finally:
-				if os.path.exists(temp_path):
-					os.remove(temp_path)
+			else:
+				# Try to get URL if local file doesn't exist
+				image_url = get_url(image_url) if image_url.startswith("/") else image_url
 		
-		# Handle local file paths
-		resolved_url = get_url(image_url) if image_url.startswith("/") else image_url
-		if os.path.exists(resolved_url):
-			with Image.open(resolved_url) as img:
-				img = img.convert("RGB")
-				img = ImageOps.fit(img, size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.78))
-				img = ImageEnhance.Brightness(img).enhance(0.75)
-				buffer = BytesIO()
-				img.save(buffer, format="JPEG", quality=75, optimize=True)
-				return buffer.getvalue()
-
+		# For non-local files or if local file doesn't exist, try CDN/HTTP handling
+		try:
+			from dinematters.dinematters.media.storage import download_object
+			from dinematters.dinematters.media.config import get_cdn_config
+			
+			# Handle CDN URLs by extracting object key and downloading from R2
+			cdn_config = get_cdn_config()
+			cdn_base = cdn_config["base_url"]
+			if image_url.startswith(cdn_base):
+				# Extract object key from CDN URL
+				object_key = image_url[len(cdn_base):].lstrip('/')
+				# Download from R2 to temp file
+				with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as temp_file:
+					temp_path = temp_file.name
+				try:
+					download_object(object_key, temp_path)
+					with Image.open(temp_path) as img:
+						img = img.convert("RGB")
+						img = ImageOps.fit(img, size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.78))
+						img = ImageEnhance.Brightness(img).enhance(0.75)
+						buffer = BytesIO()
+						img.save(buffer, format="JPEG", quality=75, optimize=True)
+						return buffer.getvalue()
+				finally:
+					if os.path.exists(temp_path):
+						os.remove(temp_path)
+		except Exception:
+			# If CDN handling fails, fall back to HTTP
+			pass
+		
 		# Handle HTTP URLs (for localhost or other accessible URLs)
+		resolved_url = get_url(image_url) if image_url.startswith("/") else image_url
 		with urllib.request.urlopen(resolved_url, timeout=10) as response:
 			with Image.open(BytesIO(response.read())) as img:
 				img = img.convert("RGB")
@@ -467,25 +567,24 @@ def ensure_table_qr_assets(restaurant_doc, table_number, force=False, branding=N
 		branding = resolve_qr_branding(restaurant_doc)
 	
 	qr_url = build_table_qr_url(restaurant_doc, table_number)
-	cache_key = build_table_qr_cache_key(restaurant_doc, table_number, qr_url, branding)
+	cache_key = build_table_qr_cache_key(restaurant_doc, table_number, qr_url, branding, force=force)
 	object_keys = build_table_qr_object_keys(restaurant_doc, table_number, cache_key)
 
-	svg_exists = False
-	png_exists = False
+	# Always regenerate when force=True, regardless of whether files exist
 	if not force:
 		svg_exists = verify_object_exists(object_keys["svg"]).get("exists")
 		png_exists = verify_object_exists(object_keys["png"]).get("exists")
 
-	if not force and svg_exists and png_exists:
-		return {
-			"table_number": table_number,
-			"qr_data": qr_url,
-			"cache_key": cache_key,
-			"svg_url": get_cdn_url(object_keys["svg"]),
-			"png_url": get_cdn_url(object_keys["png"]),
-			"svg_object_key": object_keys["svg"],
-			"png_object_key": object_keys["png"],
-		}
+		if svg_exists and png_exists:
+			return {
+				"table_number": table_number,
+				"qr_data": qr_url,
+				"cache_key": cache_key,
+				"svg_url": get_cdn_url(object_keys["svg"]),
+				"png_url": get_cdn_url(object_keys["png"]),
+				"svg_object_key": object_keys["svg"],
+				"png_object_key": object_keys["png"],
+			}
 
 	# Use provided images or download them (for backward compatibility)
 	if logo_bytes is None:

@@ -184,13 +184,11 @@ doc_events = {
 	},
 }
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"File": {
+		"on_update": "dinematters.dinematters.doctype.home_feature.home_feature.update_home_feature_from_file",
+	},
+}
 
 # Scheduled Tasks
 # ---------------
