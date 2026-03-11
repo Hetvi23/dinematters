@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom'
 import { useFrappeGetCall } from '@/lib/frappe'
 import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { usePermissions } from '@/lib/permissions'
+import { useRestaurant } from '@/contexts/RestaurantContext'
 import { 
   Loader2, 
   Building2, 
@@ -16,11 +19,14 @@ import {
   Package,
   Users,
   FileText,
-  BarChart3
+  BarChart3,
+  Crown,
+  Star
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export default function Modules() {
+  const { isLite, isPro } = useRestaurant()
   const { data, isLoading } = useFrappeGetCall<{ message: Record<string, Array<{ name: string; label: string }>> }>(
     'dinematters.dinematters.api.ui.get_all_doctypes',
     {},
@@ -29,9 +35,43 @@ export default function Modules() {
 
   const categories = data?.message || {}
   
+  // Define which modules are safe for Lite restaurants
+  const liteSafeModules = [
+    'Restaurant',
+    'Restaurant Config', 
+    'Menu Category',
+    'Menu Product',
+    'Home Feature',
+    'QR Code',
+    'Media Library'
+  ]
+  
+  // Filter categories for Lite restaurants
+  const filteredCategories = (() => {
+    if (!isLite) return categories
+    
+    const filtered: Record<string, Array<{ name: string; label: string }>> = {}
+    
+    Object.entries(categories).forEach(([category, doctypes]) => {
+      const doctypeArray = Array.isArray(doctypes) ? doctypes : []
+      const filteredDoctypes = doctypeArray.filter(doctype => 
+        liteSafeModules.includes(doctype.name)
+      )
+      
+      if (filteredDoctypes.length > 0) {
+        filtered[category] = filteredDoctypes
+      }
+    })
+    
+    return filtered
+  })()
+  
+  // Use filtered categories for Lite restaurants, regular for Pro
+  const displayCategories = isLite ? filteredCategories : categories
+  
   // Check if we have any categories with items
-  const hasCategories = Object.keys(categories).length > 0 && 
-    Object.values(categories).some((doctypes: any) => Array.isArray(doctypes) && doctypes.length > 0)
+  const hasCategories = Object.keys(displayCategories).length > 0 && 
+    Object.values(displayCategories).some((doctypes: any) => Array.isArray(doctypes) && doctypes.length > 0)
 
   if (isLoading) {
     return (
@@ -103,23 +143,74 @@ export default function Modules() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      {/* Header Section */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-md bg-orange-50 dark:bg-[#ea580c]/20">
-            <Grid3x3 className="h-5 w-5 text-[#ea580c] dark:text-[#ff8c42]" />
+      {/* Header Section with enhanced Pro-level design */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-md bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-500/10 dark:to-red-500/10">
+              <Grid3x3 className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">
+                All Modules
+              </h1>
+              <div className="flex items-center gap-2 mt-1">
+                {isLite && (
+                  <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                    <Star className="h-3 w-3 mr-1" />
+                    Lite Plan
+                  </Badge>
+                )}
+                <span className="text-sm text-muted-foreground">
+                  {Object.keys(displayCategories).reduce((acc, cat) => acc + displayCategories[cat].length, 0)} modules available
+                </span>
+              </div>
+            </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">
-            All Modules
-          </h1>
+          
+          {/* Plan indicator with upgrade CTA */}
+          <div className="flex items-center gap-3">
+            {isLite ? (
+              <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-2">
+                    <Star className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <div className="text-sm">
+                      <div className="font-semibold text-blue-900 dark:text-blue-100">Basic Modules Only</div>
+                      <Button size="sm" variant="outline" className="mt-1 text-xs">
+                        <Crown className="h-3 w-3 mr-1" />
+                        Upgrade for All Features
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                <Crown className="h-3 w-3 mr-1" />
+                Pro Plan - Full Access
+              </Badge>
+            )}
+          </div>
         </div>
-        <p className="text-sm text-muted-foreground pl-11">
-          Access and manage all dinematters modules. Permissions are automatically enforced based on your role.
-        </p>
+        
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">
+            Access and manage all dinematters modules. Permissions are automatically enforced based on your role.
+            {isLite && (
+              <>
+                <br />
+                <span className="text-blue-600 dark:text-blue-400 font-medium">
+                  Upgrade to Pro to unlock advanced features like ordering, analytics, and customer management.
+                </span>
+              </>
+            )}
+          </p>
+        </div>
       </div>
 
       {/* Categories */}
-      {Object.entries(categories).map(([category, doctypes]) => {
+      {Object.entries(displayCategories).map(([category, doctypes]) => {
         const doctypeArray = Array.isArray(doctypes) ? doctypes : []
         if (doctypeArray.length === 0) return null
         

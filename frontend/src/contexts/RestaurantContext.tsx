@@ -15,6 +15,18 @@ interface RestaurantContextType {
   setRestaurantsData: (data: Restaurant[]) => void
   restaurantConfig?: any | null
   setRestaurantConfig?: (cfg: any | null) => void
+  planType: 'LITE' | 'PRO'
+  isPro: boolean
+  isLite: boolean
+  features: {
+    ordering: boolean
+    videoUpload: boolean
+    analytics: boolean
+    aiRecommendations: boolean
+    loyalty: boolean
+    coupons: boolean
+    games: boolean
+  }
 }
 
 const RestaurantContext = createContext<RestaurantContextType | undefined>(undefined)
@@ -128,6 +140,20 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedRestaurant])
 
+  // Extract subscription data from config
+  const planType = restaurantConfig?.subscription?.planType || 'LITE'
+  const isPro = planType === 'PRO'
+  const isLite = planType === 'LITE'
+  const features = restaurantConfig?.subscription?.features || {
+    ordering: false,
+    videoUpload: false,
+    analytics: false,
+    aiRecommendations: false,
+    loyalty: false,
+    coupons: false,
+    games: false,
+  }
+
   return (
     <RestaurantContext.Provider 
       value={{ 
@@ -137,7 +163,11 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
         isLoading,
         setRestaurantsData,
         restaurantConfig,
-        setRestaurantConfig
+        setRestaurantConfig,
+        planType,
+        isPro,
+        isLite,
+        features,
       }}
     >
       {children}

@@ -77,7 +77,23 @@ export default function SetupWizard() {
   const navigate = useNavigate()
   const { stepId: urlStepId } = useParams<{ stepId?: string }>()
   const location = useLocation()
-  const { selectedRestaurant, setSelectedRestaurant, restaurantConfig } = useRestaurant()
+  const { selectedRestaurant, setSelectedRestaurant, restaurantConfig, isLite, isPro } = useRestaurant()
+  
+  // Smart routing: Check if we should show Lite or Pro setup
+  useEffect(() => {
+    // If we have a selected restaurant and it's Lite, redirect to lite setup
+    if (selectedRestaurant && isLite) {
+      const currentPath = location.pathname
+      if (currentPath.startsWith('/setup')) {
+        const stepId = urlStepId || ''
+        if (stepId) {
+          navigate(`/lite-setup/${stepId}`, { replace: true })
+        } else {
+          navigate('/lite-setup', { replace: true })
+        }
+      }
+    }
+  }, [selectedRestaurant, isLite, navigate, location.pathname, urlStepId])
   
   // Get user's restaurants
   const { data: restaurantsData, isLoading: restaurantsLoading } = useFrappeGetCall<{ message: { restaurants: Restaurant[] } }>(

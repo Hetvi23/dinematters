@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useRestaurant } from '@/contexts/RestaurantContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,6 +10,7 @@ import { Trash2, Upload, Image as ImageIcon, Video, Edit2, X, Check } from 'luci
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { uploadToR2, getMediaType } from '@/lib/r2Upload'
+import LiteMediaUpload from './LiteMediaUpload'
 
 interface ProductMediaItem {
   name?: string
@@ -29,12 +31,46 @@ interface ProductMediaTableProps {
 }
 
 export default function ProductMediaTable({ value = [], onChange, required, disabled, productName }: ProductMediaTableProps) {
+  const { isLite } = useRestaurant()
   const [uploading, setUploading] = useState(false)
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [editData, setEditData] = useState<Partial<ProductMediaItem>>({})
   
   // Ensure value is always an array
   const currentValue = Array.isArray(value) ? value : []
+
+  const handleLiteUpload = async (files: File[]) => {
+    if (!productName) {
+      throw new Error('Product must be saved before uploading media')
+    }
+
+    const uploadPromises = files.map(async (file, index) => {
+      const mediaType = getMediaType(file)
+      const mediaRole = mediaType === 'video' ? 'product_video' : 'product_image'
+
+      // Upload to R2
+      const result = await uploadToR2({
+        ownerDoctype: 'Menu Product',
+        ownerName: productName,
+        mediaRole,
+        file,
+        displayOrder: currentValue.length + index + 1,
+      })
+
+      return {
+        media_asset: result.media_id,
+        media_url: result.primary_url || '',
+        media_type: mediaType,
+        display_order: currentValue.length + index + 1,
+        alt_text: '',
+        caption: ''
+      }
+    })
+
+    const uploadedItems = await Promise.all(uploadPromises)
+    const newItems = [...currentValue, ...uploadedItems]
+    onChange?.(newItems)
+  }
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -150,6 +186,7 @@ export default function ProductMediaTable({ value = [], onChange, required, disa
 
   const canAddMore = currentValue.length < 3
   const videoCount = currentValue.filter(item => item.media_type === 'video').length
+  const imageCount = currentValue.filter(item => item.media_type === 'image').length
 
   return (
     <div className="space-y-4">
@@ -163,34 +200,45 @@ export default function ProductMediaTable({ value = [], onChange, required, disa
         </div>
       </div>
 
-      {/* File Upload Input */}
+      {/* File Upload - Lite uses LiteMediaUpload, Pro uses regular upload */}
       {!disabled && canAddMore && (
-        <div className="flex items-center gap-2">
-          <Input
-            type="file"
-            accept="image/*,video/*"
-            multiple={canAddMore}
-            onChange={handleFileSelect}
-            disabled={disabled || uploading || !canAddMore}
-            className="hidden"
-            id="product-media-upload"
-          />
-          <Label
-            htmlFor="product-media-upload"
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 border rounded-md transition-colors",
-              (disabled || uploading || !canAddMore) 
-                ? "opacity-50 cursor-not-allowed" 
-                : "cursor-pointer hover:bg-accent"
-            )}
-          >
-            <Upload className="h-4 w-4" />
-            {uploading ? 'Uploading...' : 'Upload Media'}
-          </Label>
-          {!canAddMore && (
-            <span className="text-sm text-muted-foreground">Maximum 3 media items reached</span>
+        <>
+          {isLite ? (
+            <LiteMediaUpload
+              onUpload={handleLiteUpload}
+              currentImageCount={imageCount}
+              maxImages={200} // Lite plan limit
+              disabled={disabled}
+            />
+          ) : (
+            <div className="flex items-center gap-2">
+              <Input
+                type="file"
+                accept="image/*,video/*"
+                multiple={canAddMore}
+                onChange={handleFileSelect}
+                disabled={disabled || uploading || !canAddMore}
+                className="hidden"
+                id="product-media-upload"
+              />
+              <Label
+                htmlFor="product-media-upload"
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 border rounded-md transition-colors",
+                  (disabled || uploading || !canAddMore) 
+                    ? "opacity-50 cursor-not-allowed" 
+                    : "cursor-pointer hover:bg-accent"
+                )}
+              >
+                <Upload className="h-4 w-4" />
+                {uploading ? 'Uploading...' : 'Upload Media'}
+              </Label>
+              {!canAddMore && (
+                <span className="text-sm text-muted-foreground">Maximum 3 media items reached</span>
+              )}
+            </div>
           )}
-        </div>
+        </>
       )}
 
       {/* Media List */}

@@ -46,6 +46,20 @@
   "razorpay_token_id",
   "mandate_status",
   "billing_status",
+  "section_break_subscription",
+  "plan_type",
+  "plan_activated_on",
+  "column_break_subscription",
+  "plan_changed_by",
+  "plan_change_reason",
+  "section_break_subscription_limits",
+  "max_images_lite",
+  "current_image_count",
+  "column_break_subscription_metrics",
+  "total_orders",
+  "total_revenue",
+  "commission_earned",
+  "plan_change_history",
   "section_break_branding",
    "logo",
   "hero_video",
@@ -384,6 +398,102 @@
    "options": "\nactive\noverdue\nsuspended",
    "default": "active",
    "description": "Subscription billing status for the restaurant"
+  },
+  {
+   "fieldname": "section_break_subscription",
+   "fieldtype": "Section Break",
+   "label": "Subscription Plan"
+  },
+  {
+   "fieldname": "plan_type",
+   "fieldtype": "Select",
+   "label": "Plan Type",
+   "options": "\nLITE\nPRO",
+   "default": "LITE",
+   "in_list_view": 1,
+   "reqd": 1,
+   "description": "Subscription plan tier (LITE: Free with restrictions, PRO: 1.5% commission)"
+  },
+  {
+   "fieldname": "plan_activated_on",
+   "fieldtype": "Datetime",
+   "label": "Plan Activated On",
+   "read_only": 1,
+   "description": "Date and time when current plan was activated"
+  },
+  {
+   "fieldname": "column_break_subscription",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "plan_changed_by",
+   "fieldtype": "Link",
+   "label": "Plan Changed By",
+   "options": "User",
+   "read_only": 1,
+   "description": "User who last changed the subscription plan"
+  },
+  {
+   "fieldname": "plan_change_reason",
+   "fieldtype": "Small Text",
+   "label": "Plan Change Reason",
+   "description": "Reason for plan change (admin use only)"
+  },
+  {
+   "fieldname": "section_break_subscription_limits",
+   "fieldtype": "Section Break",
+   "label": "Subscription Limits & Metrics"
+  },
+  {
+   "fieldname": "max_images_lite",
+   "fieldtype": "Int",
+   "label": "Max Images (Lite)",
+   "default": "200",
+   "description": "Maximum number of images allowed for LITE plan"
+  },
+  {
+   "fieldname": "current_image_count",
+   "fieldtype": "Int",
+   "label": "Current Image Count",
+   "default": "0",
+   "read_only": 1,
+   "description": "Current number of images uploaded"
+  },
+  {
+   "fieldname": "column_break_subscription_metrics",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_orders",
+   "fieldtype": "Int",
+   "label": "Total Orders",
+   "default": "0",
+   "read_only": 1,
+   "description": "Total number of orders processed (PRO tier)"
+  },
+  {
+   "fieldname": "total_revenue",
+   "fieldtype": "Currency",
+   "label": "Total Revenue",
+   "default": "0",
+   "read_only": 1,
+   "description": "Total revenue from orders (PRO tier)"
+  },
+  {
+   "fieldname": "commission_earned",
+   "fieldtype": "Currency",
+   "label": "Commission Earned",
+   "default": "0",
+   "read_only": 1,
+   "description": "Total commission earned by platform (1.5% of revenue)"
+  },
+  {
+   "fieldname": "plan_change_history",
+   "fieldtype": "JSON",
+   "label": "Plan Change History",
+   "read_only": 1,
+   "hidden": 1,
+   "description": "Historical log of plan changes"
   }
  ],
  "index_web_pages_for_search": 1,

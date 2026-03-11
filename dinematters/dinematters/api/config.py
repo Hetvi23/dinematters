@@ -41,9 +41,11 @@ def get_restaurant_config(restaurant_id):
 			as_dict=True
 		)
 		
+		# Get restaurant document for plan_type
+		restaurant_doc = frappe.get_doc("Restaurant", restaurant)
+		
 		# If config doesn't exist, get from Restaurant doctype
 		if not config:
-			restaurant_doc = frappe.get_doc("Restaurant", restaurant)
 			config = {
 				"restaurant_name": restaurant_doc.restaurant_name,
 				"tagline": "",
@@ -177,6 +179,18 @@ def get_restaurant_config(restaurant_id):
 				"instagramProfileLink": config.get("instagram_profile_link", ""),
 				"facebookProfileLink": config.get("facebook_profile_link", ""),
 				"whatsappPhoneNumber": config.get("whatsapp_phone_number", "")
+			},
+			"subscription": {
+				"planType": restaurant_doc.plan_type or "LITE",
+				"features": {
+					"ordering": restaurant_doc.plan_type == "PRO",
+					"videoUpload": restaurant_doc.plan_type == "PRO",
+					"analytics": restaurant_doc.plan_type == "PRO",
+					"aiRecommendations": restaurant_doc.plan_type == "PRO",
+					"loyalty": restaurant_doc.plan_type == "PRO",
+					"coupons": restaurant_doc.plan_type == "PRO",
+					"games": restaurant_doc.plan_type == "PRO"
+				}
 			},
 			# placeholder for feature cards (will be populated below)
 			"homeFeatures": []

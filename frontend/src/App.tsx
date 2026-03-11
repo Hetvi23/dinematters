@@ -7,7 +7,10 @@ import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import ProtectedRoute from './components/ProtectedRoute'
+import FeatureProtectedRoute from './components/FeatureProtectedRoute'
+import SmartSetupWizard from './pages/SmartSetupWizard'
 import SetupWizard from './pages/SetupWizard'
+import LiteSetupWizard from './pages/LiteSetupWizard'
 import Modules from './pages/Modules'
 import ModuleList from './pages/ModuleList'
 import ModuleDetail from './pages/ModuleDetail'
@@ -46,21 +49,42 @@ function AppContent() {
 					<Route element={<ProtectedRoute />}>
 						<Route path="/" element={<Navigate to="/dashboard" replace />} />
 						<Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
-						<Route path="/setup" element={<Layout><SetupWizard /></Layout>} />
-						<Route path="/setup/:stepId" element={<Layout><SetupWizard /></Layout>} />
+						<Route path="/setup" element={<Layout><SmartSetupWizard /></Layout>} />
+						<Route path="/setup/:stepId" element={<Layout><SmartSetupWizard /></Layout>} />
+						<Route path="/lite-setup" element={<Layout><LiteSetupWizard /></Layout>} />
+						<Route path="/lite-setup/:stepId" element={<Layout><LiteSetupWizard /></Layout>} />
 						<Route path="/modules" element={<Layout><Modules /></Layout>} />
 						{/* Redirect Home Feature to dedicated page */}
 						<Route path="/Home Feature" element={<Navigate to="/home-features" replace />} />
 						<Route path="/Home%20Feature" element={<Navigate to="/home-features" replace />} />
 						<Route path="/:doctype" element={<Layout><ModuleList /></Layout>} />
 						<Route path="/:doctype/:docname" element={<Layout><ModuleDetail /></Layout>} />
-						{/* Legacy routes for backward compatibility */}
-						<Route path="/orders" element={<Layout><Orders /></Layout>} />
-						<Route path="/accept-orders" element={<Layout><AcceptOrders /></Layout>} />
-						<Route path="/orders/:orderId" element={<Layout><OrderDetail /></Layout>} />
-						<Route path="/past-orders" element={<Layout><PastOrders /></Layout>} />
-						<Route path="/bookings" element={<Layout><Bookings /></Layout>} />
-						<Route path="/customers" element={<Layout><Customers /></Layout>} />
+						
+						{/* PRO Feature: Ordering - Requires PRO plan */}
+						<Route element={<FeatureProtectedRoute feature="ordering" />}>
+							<Route path="/orders" element={<Layout><Orders /></Layout>} />
+							<Route path="/accept-orders" element={<Layout><AcceptOrders /></Layout>} />
+							<Route path="/orders/:orderId" element={<Layout><OrderDetail /></Layout>} />
+							<Route path="/past-orders" element={<Layout><PastOrders /></Layout>} />
+						</Route>
+
+						{/* PRO Feature: Coupons - Requires PRO plan */}
+						<Route element={<FeatureProtectedRoute feature="coupons" />}>
+							<Route path="/coupons" element={<Layout><Coupons /></Layout>} />
+						</Route>
+
+						{/* PRO Feature: Table Bookings & Customers - Requires PRO plan (ordering feature) */}
+						<Route element={<FeatureProtectedRoute feature="ordering" />}>
+							<Route path="/bookings" element={<Layout><Bookings /></Layout>} />
+							<Route path="/customers" element={<Layout><Customers /></Layout>} />
+						</Route>
+
+						{/* PRO Feature: AI Recommendations - Requires PRO plan */}
+						<Route element={<FeatureProtectedRoute feature="aiRecommendations" />}>
+							<Route path="/recommendations-engine" element={<Layout><RecommendationsEngine /></Layout>} />
+						</Route>
+
+						{/* Free features - Available to all plans */}
 						<Route path="/products" element={<Layout><Products /></Layout>} />
 						<Route path="/products/new" element={<Layout><ProductNew /></Layout>} />
 						<Route path="/products/:productId/edit" element={<Layout><ProductEdit /></Layout>} />
@@ -70,12 +94,10 @@ function AppContent() {
 						<Route path="/categories/:categoryId/edit" element={<Layout><CategoryEdit /></Layout>} />
 						<Route path="/categories/:categoryId" element={<Layout><CategoryDetail /></Layout>} />
 						<Route path="/qr-codes" element={<Layout><QRCodes /></Layout>} />
-						<Route path="/coupons" element={<Layout><Coupons /></Layout>} />
 						<Route path="/home-features" element={<Layout><HomeFeaturesManager /></Layout>} />
 						<Route path="/payment-stats" element={<Layout><PaymentStats /></Layout>} />
 						<Route path="/restaurant/:restaurantId/payment" element={<Layout><Payment /></Layout>} />
 						<Route path="/restaurant/:restaurantId/billing" element={<Layout><PaymentSettings /></Layout>} />
-						<Route path="/recommendations-engine" element={<Layout><RecommendationsEngine /></Layout>} />
 					</Route>
 				</Routes>
 			</BrowserRouter>

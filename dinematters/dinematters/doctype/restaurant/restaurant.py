@@ -31,8 +31,83 @@ class Restaurant(Document):
 		if not self.subdomain and self.restaurant_id:
 			self.subdomain = self.restaurant_id.lower().replace(" ", "-")
 		
+		# Validate plan change (admin-only)
+		self.validate_plan_change()
+		
 		# Note: QR codes are no longer auto-generated on table update
 		# They must be explicitly generated via the generate_qr_codes_pdf method
+	
+	def validate_plan_change(self):
+		"""Validate subscription plan changes - admin only"""
+		if not self.is_new() and self.has_value_changed('plan_type'):
+			# Check if user has permission to change plan
+			if not frappe.has_permission('Restaurant', 'write'):
+				frappe.throw(_('You do not have permission to change subscription plans'))
+			
+			# Only System Manager and specific roles can change plans
+			allowed_roles = ['System Manager', 'Administrator']
+			user_roles = frappe.get_roles(frappe.session.user)
+			
+			if not any(role in allowed_roles for role in user_roles):
+				frappe.throw(
+					_('Only administrators can change subscription plans. Please contact support.'),
+					frappe.PermissionError
+				)
+			
+			# Set plan metadata
+			self.plan_changed_by = frappe.session.user
+			self.plan_activated_on = frappe.utils.now()
+			
+			# Log the change (will be created in on_update)
+			self._plan_changed = True
+	
+	def log_plan_change(self):
+		"""Create audit log for plan changes"""
+		if not hasattr(self, '_plan_changed') or not self._plan_changed:
+			return
+		
+		try:
+			# Get previous plan from database
+			previous_plan = frappe.db.get_value('Restaurant', self.name, 'plan_type')
+			
+			# Create Plan Change Log
+			plan_change_log = frappe.get_doc({
+				'doctype': 'Plan Change Log',
+				'restaurant': self.name,
+				'previous_plan': previous_plan,
+				'new_plan': self.plan_type,
+				'changed_by': frappe.session.user,
+				'changed_on': frappe.utils.now(),
+				'change_reason': self.plan_change_reason or '',
+				'ip_address': frappe.local.request_ip or 'Unknown'
+			})
+			plan_change_log.insert(ignore_permissions=True)
+			
+			# Update plan change history JSON
+			if not self.plan_change_history:
+				self.plan_change_history = []
+			
+			history_entry = {
+				'date': frappe.utils.now(),
+				'from': previous_plan,
+				'to': self.plan_type,
+				'by': frappe.session.user,
+				'reason': self.plan_change_reason or ''
+			}
+			
+			if isinstance(self.plan_change_history, str):
+				import json
+				self.plan_change_history = json.loads(self.plan_change_history)
+			
+			self.plan_change_history.append(history_entry)
+			
+			frappe.msgprint(
+				_('Subscription plan changed from {0} to {1}').format(previous_plan, self.plan_type),
+				indicator='green'
+			)
+			
+		except Exception as e:
+			frappe.log_error(f'Error logging plan change: {str(e)}', 'Plan Change Log Error')
 	
 	def generate_restaurant_id(self):
 		"""Generate unique restaurant_id from restaurant_name"""
@@ -75,6 +150,9 @@ class Restaurant(Document):
 	
 	def on_update(self):
 		"""Called after document is updated"""
+		# Log plan changes
+		self.log_plan_change()
+		
 		# QR codes are no longer auto-generated here
 		# They must be explicitly generated via the generate_qr_codes_pdf method
 		pass

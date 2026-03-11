@@ -87,13 +87,14 @@ function UserProfileDropdown() {
 
 const SIDEBAR_GROUPS_KEY = 'dinematters_sidebar_groups_open'
 
-type NavLink = { type: 'link'; name: string; href: string; icon: React.ComponentType<{ className?: string }>; badgeHref?: string }
+type NavLink = { type: 'link'; name: string; href: string; icon: React.ComponentType<{ className?: string }>; badgeHref?: string; feature?: string }
 type NavGroup = {
   type: 'group'
   id: string
   name: string
   icon: React.ComponentType<{ className?: string }>
-  children: { name: string; href: string; icon?: React.ComponentType<{ className?: string }>; badgeHref?: string }[]
+  children: { name: string; href: string; icon?: React.ComponentType<{ className?: string }>; badgeHref?: string; feature?: string }[]
+  feature?: string
 }
 type NavItem = NavLink | NavGroup
 
@@ -107,14 +108,15 @@ const navigation: NavItem[] = [
     id: 'manage-orders',
     name: 'Manage Orders',
     icon: ShoppingCart,
+    feature: 'ordering',
     children: [
       { name: 'Real Time Orders', href: '/orders', icon: ShoppingCart, badgeHref: '/orders' },
       { name: 'Accept Orders', href: '/accept-orders', icon: CheckCircle2 },
       { name: 'Past and Billed Orders', href: '/past-orders', icon: Clock },
     ],
   },
-  { type: 'link', name: 'Table Bookings', href: '/bookings', icon: Calendar },
-  { type: 'link', name: 'Customers', href: '/customers', icon: Users },
+  { type: 'link', name: 'Table Bookings', href: '/bookings', icon: Calendar, feature: 'ordering' },
+  { type: 'link', name: 'Customers', href: '/customers', icon: Users, feature: 'ordering' },
   {
     type: 'group',
     id: 'manage-product',
@@ -123,10 +125,10 @@ const navigation: NavItem[] = [
     children: [
       { name: 'Products', href: '/products', icon: Package },
       { name: 'Categories', href: '/categories', icon: FolderTree },
-      { name: 'Recommendations Engine', href: '/recommendations-engine', icon: FolderTree },
+      { name: 'Recommendations Engine', href: '/recommendations-engine', icon: FolderTree, feature: 'aiRecommendations' },
     ],
   },
-  { type: 'link', name: 'Manage Offers & Coupons', href: '/coupons', icon: Tag },
+  { type: 'link', name: 'Manage Offers & Coupons', href: '/coupons', icon: Tag, feature: 'coupons' },
   { type: 'link', name: 'Manage QR Codes', href: '/qr-codes', icon: QrCode },
 ]
 
@@ -141,7 +143,7 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
-  const { selectedRestaurant, setSelectedRestaurant, setRestaurantsData } = useRestaurant()
+  const { selectedRestaurant, setSelectedRestaurant, setRestaurantsData, isPro, features } = useRestaurant()
   const { formatAmountNoDecimals } = useCurrency()
   const [sidebarOpen, setSidebarOpen] = useState(false) // Mobile sidebar
   const [sidebarExpanded, setSidebarExpanded] = useState(true) // Desktop sidebar expanded/collapsed
@@ -615,19 +617,34 @@ export default function Layout({ children }: LayoutProps) {
                 const isActive = location.pathname === item.href ||
                   (item.href !== '/dashboard' && location.pathname.startsWith(item.href))
                 const showBadge = item.badgeHref === '/orders' && pendingOrders > 0
+                const isLocked = item.feature && !isPro && !(features as any)[item.feature]
 
                 return (
                   <Link
                     key={item.name}
                     to={item.href}
-                    onClick={() => setSidebarOpen(false)}
+                    onClick={(e) => {
+                      if (isLocked) {
+                        e.preventDefault()
+                        toast.error(`${item.name} requires PRO plan`, {
+                          description: 'Upgrade to PRO to unlock this feature',
+                          action: {
+                            label: 'Upgrade',
+                            onClick: () => navigate('/upgrade')
+                          }
+                        })
+                      } else {
+                        setSidebarOpen(false)
+                      }
+                    }}
                     className={cn(
                       "relative flex items-center rounded-md text-sm font-normal transition-all group",
                       showExpanded ? "gap-3 px-3 py-2" : "justify-center px-2 py-2",
                       "hover:bg-sidebar-accent active:bg-sidebar-accent/80",
                       isActive
                         ? "bg-primary/10 text-primary font-medium dark:bg-primary/20"
-                        : "text-sidebar-foreground hover:text-sidebar-foreground"
+                        : "text-sidebar-foreground hover:text-sidebar-foreground",
+                      isLocked && "opacity-60"
                     )}
                     title={!showExpanded ? item.name : undefined}
                   >
@@ -641,7 +658,10 @@ export default function Layout({ children }: LayoutProps) {
                     {showExpanded && (
                       <>
                         <span className="flex-1">{item.name}</span>
-                        {showBadge && (
+                        {isLocked && (
+                          <Lock className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />
+                        )}
+                        {!isLocked && showBadge && (
                           <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
                             {pendingOrders > 9 ? '9+' : pendingOrders}
                           </span>
@@ -651,6 +671,7 @@ export default function Layout({ children }: LayoutProps) {
                     {!showExpanded && (
                       <span className="absolute left-full ml-2 px-2 py-1 rounded-md bg-foreground text-background text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 shadow-lg">
                         {item.name}
+                        {isLocked && ' 🔒'}
                         {showBadge && ` (${pendingOrders} pending)`}
                       </span>
                     )}
@@ -666,6 +687,7 @@ export default function Layout({ children }: LayoutProps) {
                 (c) => location.pathname === c.href || (c.href !== '/dashboard' && location.pathname.startsWith(c.href))
               )
               const showBadge = group.children.some((c) => c.badgeHref === '/orders') && pendingOrders > 0
+              const isGroupLocked = group.feature && !isPro && !(features as any)[group.feature]
 
               // Collapsed sidebar: show dropdown menu with child links
               if (!showExpanded) {
@@ -691,16 +713,27 @@ export default function Layout({ children }: LayoutProps) {
                       {group.children.map((child) => {
                         const ChildIcon = child.icon || group.icon
                         const isChildActive = location.pathname === child.href || (child.href !== '/' && location.pathname.startsWith(child.href + '/'))
+                        const isChildLocked = child.feature && !isPro && !(features as any)[child.feature]
                         return (
                           <DropdownMenuItem key={child.href} asChild>
                             <Link
                               to={child.href}
-                              onClick={() => setSidebarOpen(false)}
-                              className={cn("flex items-center gap-2 cursor-pointer", isChildActive && "bg-primary/10 text-primary")}
+                              onClick={(e) => {
+                                if (isChildLocked) {
+                                  e.preventDefault()
+                                  toast.error(`${child.name} requires PRO plan`, {
+                                    description: 'Upgrade to PRO to unlock this feature'
+                                  })
+                                } else {
+                                  setSidebarOpen(false)
+                                }
+                              }}
+                              className={cn("flex items-center gap-2 cursor-pointer", isChildActive && "bg-primary/10 text-primary", isChildLocked && "opacity-60")}
                             >
                               <ChildIcon className="h-4 w-4" />
                               {child.name}
-                              {child.badgeHref === '/orders' && pendingOrders > 0 && (
+                              {isChildLocked && <Lock className="h-3 w-3 text-orange-500 ml-auto" />}
+                              {!isChildLocked && child.badgeHref === '/orders' && pendingOrders > 0 && (
                                 <span className="ml-auto bg-destructive text-white text-xs px-1.5 rounded-full">
                                   {pendingOrders > 9 ? '9+' : pendingOrders}
                                 </span>
@@ -725,7 +758,8 @@ export default function Layout({ children }: LayoutProps) {
                       "hover:bg-sidebar-accent active:bg-sidebar-accent/80",
                       (hasActiveChild || isExpanded)
                         ? "text-sidebar-foreground hover:text-sidebar-foreground"
-                        : "text-sidebar-foreground hover:text-sidebar-foreground"
+                        : "text-sidebar-foreground hover:text-sidebar-foreground",
+                      isGroupLocked && "opacity-60"
                     )}
                     title={!showExpanded ? group.name : undefined}
                   >
@@ -739,7 +773,10 @@ export default function Layout({ children }: LayoutProps) {
                     {showExpanded && (
                       <>
                         <span className="flex-1 text-left">{group.name}</span>
-                        {showBadge && (
+                        {isGroupLocked && (
+                          <Lock className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />
+                        )}
+                        {!isGroupLocked && showBadge && (
                           <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
                             {pendingOrders > 9 ? '9+' : pendingOrders}
                           </span>
@@ -754,6 +791,7 @@ export default function Layout({ children }: LayoutProps) {
                     {!showExpanded && (
                       <span className="absolute left-full ml-2 px-2 py-1 rounded-md bg-foreground text-background text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 shadow-lg">
                         {group.name}
+                        {isGroupLocked && ' 🔒'}
                         {showBadge && ` (${pendingOrders} pending)`}
                       </span>
                     )}
@@ -765,17 +803,28 @@ export default function Layout({ children }: LayoutProps) {
                         const isChildActive = location.pathname === child.href ||
                           (child.href !== '/dashboard' && location.pathname.startsWith(child.href))
                         const showChildBadge = child.badgeHref === '/orders' && pendingOrders > 0
+                        const isChildLocked = child.feature && !isPro && !(features as any)[child.feature]
                         return (
                           <Link
                             key={child.href}
                             to={child.href}
-                            onClick={() => setSidebarOpen(false)}
+                            onClick={(e) => {
+                              if (isChildLocked) {
+                                e.preventDefault()
+                                toast.error(`${child.name} requires PRO plan`, {
+                                  description: 'Upgrade to PRO to unlock this feature'
+                                })
+                              } else {
+                                setSidebarOpen(false)
+                              }
+                            }}
                             className={cn(
                               "relative flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-all group",
                               "hover:bg-sidebar-accent",
                               isChildActive
                                 ? "bg-primary/10 text-primary font-medium dark:bg-primary/20"
-                                : "text-muted-foreground hover:text-sidebar-foreground"
+                                : "text-muted-foreground hover:text-sidebar-foreground",
+                              isChildLocked && "opacity-60"
                             )}
                           >
                             {isChildActive && (
@@ -783,7 +832,8 @@ export default function Layout({ children }: LayoutProps) {
                             )}
                             <ChildIcon className="h-3.5 w-3.5 flex-shrink-0" />
                             <span className="flex-1 truncate">{child.name}</span>
-                            {showChildBadge && (
+                            {isChildLocked && <Lock className="h-3 w-3 text-orange-500 flex-shrink-0" />}
+                            {!isChildLocked && showChildBadge && (
                               <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
                                 {pendingOrders > 9 ? '9+' : pendingOrders}
                               </span>
