@@ -48,25 +48,38 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [restaurantConfig, setRestaurantConfig] = useState<any | null>(null)
 
+  // Set a timeout to prevent infinite loading state
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 3000) // 3 second timeout
+
+    return () => clearTimeout(timer)
+  }, [])
+
   // Load restaurants (this will be set by Layout component)
   const setRestaurantsData = (data: Restaurant[]) => {
     setRestaurants(data)
     setIsLoading(false)
     
     // Check current state and localStorage to determine if we need to set a default
-    setSelectedRestaurantState(current => {
-      if (!current && data.length > 0) {
-        const saved = localStorage.getItem(STORAGE_KEY)
-        if (saved && data.find(r => r.name === saved || r.restaurant_id === saved)) {
-          return saved
-        } else {
-          const firstRestaurant = data[0]
-          localStorage.setItem(STORAGE_KEY, firstRestaurant.name)
-          return firstRestaurant.name
-        }
+    const currentSelected = selectedRestaurant
+    if (!currentSelected && data.length > 0) {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      let newSelectedRestaurant: string | null = null
+      
+      if (saved && data.find(r => r.name === saved || r.restaurant_id === saved)) {
+        newSelectedRestaurant = saved
+      } else {
+        const firstRestaurant = data[0]
+        newSelectedRestaurant = firstRestaurant.name
+        localStorage.setItem(STORAGE_KEY, firstRestaurant.name)
       }
-      return current
-    })
+      
+      if (newSelectedRestaurant) {
+        setSelectedRestaurantState(newSelectedRestaurant)
+      }
+    }
   }
 
   const setSelectedRestaurant = (restaurantId: string | null) => {
@@ -93,24 +106,34 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
         setRestaurantConfig(null)
         return
       }
+      
       try {
         const resp = await fetch(
           `/api/method/dinematters.dinematters.api.config.get_restaurant_config?restaurant_id=${encodeURIComponent(selectedRestaurant)}`,
           { cache: 'no-store' }
         )
         const json = await resp.json()
+        
         // Frappe wraps returned value in message sometimes; handle both shapes
         const payload = json?.message ?? json
         if (payload?.success) {
-          setRestaurantConfig(payload.data || null)
+          const configData = payload.data || null
+          setRestaurantConfig(configData)
+          // Set loading to false when config is loaded
+          setIsLoading(false)
         } else if (payload?.data) {
           setRestaurantConfig(payload.data)
+          // Set loading to false when config is loaded
+          setIsLoading(false)
         } else {
           setRestaurantConfig(null)
+          // Still set loading to false to prevent infinite loading
+          setIsLoading(false)
         }
       } catch (e) {
-        console.error('Failed to fetch restaurant config:', e)
         setRestaurantConfig(null)
+        // Still set loading to false to prevent infinite loading
+        setIsLoading(false)
       }
     }
 

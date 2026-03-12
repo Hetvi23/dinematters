@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag } from 'lucide-react'
+import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetCall, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
 import { useState, useEffect, useMemo } from 'react'
@@ -87,14 +87,15 @@ function UserProfileDropdown() {
 
 const SIDEBAR_GROUPS_KEY = 'dinematters_sidebar_groups_open'
 
-type NavLink = { type: 'link'; name: string; href: string; icon: React.ComponentType<{ className?: string }>; badgeHref?: string; feature?: string }
+type NavLink = { type: 'link'; name: string; href: string; icon: React.ComponentType<{ className?: string }>; badgeHref?: string; feature?: string; adminOnly?: boolean }
 type NavGroup = {
   type: 'group'
   id: string
   name: string
   icon: React.ComponentType<{ className?: string }>
-  children: { name: string; href: string; icon?: React.ComponentType<{ className?: string }>; badgeHref?: string; feature?: string }[]
+  children: { name: string; href: string; icon?: React.ComponentType<{ className?: string }>; badgeHref?: string; feature?: string; adminOnly?: boolean }[]
   feature?: string
+  adminOnly?: boolean
 }
 type NavItem = NavLink | NavGroup
 
@@ -130,6 +131,8 @@ const navigation: NavItem[] = [
   },
   { type: 'link', name: 'Manage Offers & Coupons', href: '/coupons', icon: Tag, feature: 'coupons' },
   { type: 'link', name: 'Manage QR Codes', href: '/qr-codes', icon: QrCode },
+  // Admin-only link - will be filtered by admin check in render
+  { type: 'link', name: 'Restaurant Management', href: '/admin/restaurants', icon: Shield, adminOnly: true },
 ]
 
 interface Restaurant {
@@ -140,6 +143,7 @@ interface Restaurant {
 }
 
 export default function Layout({ children }: LayoutProps) {
+  const { currentUser } = useFrappeAuth()
   const location = useLocation()
   const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
@@ -151,6 +155,9 @@ export default function Layout({ children }: LayoutProps) {
   const [hoverDisabled, setHoverDisabled] = useState(false) // Temporarily disable hover after toggle
   const [selectOpen, setSelectOpen] = useState(false) // Track if restaurant select is open
   const [lockAnimating, setLockAnimating] = useState(false) // Track lock animation state
+
+  // Admin access state - using exact same pattern as TestApiCalls.tsx
+  const [isAdmin, setIsAdmin] = useState(false)
 
   // Expanded nav groups (persisted in localStorage)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
@@ -195,8 +202,7 @@ export default function Layout({ children }: LayoutProps) {
       }
     })
   }, [location.pathname])
-  
-  // Modal state for creating new restaurant
+
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newRestaurantData, setNewRestaurantData] = useState({
     restaurant_name: '',
@@ -209,6 +215,7 @@ export default function Layout({ children }: LayoutProps) {
   // API call for creating restaurant
   const { call: createRestaurant } = useFrappePostCall('frappe.client.insert')
   const { call: generateQrCodes } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.generate_qr_codes_pdf')
+  const { call: checkAdminAccess } = useFrappePostCall('dinematters.dinematters.api.admin.check_admin_access')
 
   // Fetch user's restaurants
   const { data: restaurantsData } = useFrappeGetCall<{ message: { restaurants: Restaurant[] } }>(
@@ -221,10 +228,24 @@ export default function Layout({ children }: LayoutProps) {
 
   // Update context with restaurants data
   useEffect(() => {
-    if (restaurants.length > 0) {
-      setRestaurantsData(restaurants)
-    }
+    // Always update context to stop loading, even if restaurants array is empty
+    setRestaurantsData(restaurants)
   }, [restaurants, setRestaurantsData])
+
+  // Simple admin check - using same pattern as working TestApiCalls.tsx
+  useEffect(() => {
+    console.log('Current user from useFrappeAuth:', currentUser)
+    
+    // Simple check: if user is Administrator, set admin to true
+    // This follows the same pattern as TestApiCalls.tsx which works
+    if (currentUser === 'Administrator') {
+      setIsAdmin(true)
+      console.log('Admin access granted for Administrator')
+    } else {
+      setIsAdmin(false)
+      console.log('Admin access denied for user:', currentUser)
+    }
+  }, [currentUser])
 
   // Handle restaurant change
   const handleRestaurantChange = (restaurantId: string) => {
@@ -611,7 +632,25 @@ export default function Layout({ children }: LayoutProps) {
 
           {/* Navigation */}
           <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto">
-            {navigation.map((item) => {
+            {(() => {
+              console.log('Rendering navigation, isAdmin:', isAdmin)
+              const filteredNav = navigation.filter(item => {
+                // Filter out admin-only items if user is not admin
+                if (item.adminOnly && !isAdmin) {
+                  console.log('Filtering out admin-only item:', item.name)
+                  return false
+                }
+                // For groups, also filter children
+                if (item.type === 'group') {
+                  const filteredChildren = item.children.filter(child => !child.adminOnly || isAdmin)
+                  return filteredChildren.length > 0
+                }
+                return true
+              })
+              console.log('Filtered navigation items:', filteredNav.map(item => item.name))
+              return filteredNav
+            })()
+              .map((item) => {
               if (item.type === 'link') {
                 const Icon = item.icon
                 const isActive = location.pathname === item.href ||
@@ -683,10 +722,11 @@ export default function Layout({ children }: LayoutProps) {
               const group = item
               const Icon = group.icon
               const isExpanded = expandedGroups.has(group.id)
-              const hasActiveChild = group.children.some(
+              const filteredChildren = group.children.filter(child => !child.adminOnly || isAdmin)
+              const hasActiveChild = filteredChildren.some(
                 (c) => location.pathname === c.href || (c.href !== '/dashboard' && location.pathname.startsWith(c.href))
               )
-              const showBadge = group.children.some((c) => c.badgeHref === '/orders') && pendingOrders > 0
+              const showBadge = filteredChildren.some((c) => c.badgeHref === '/orders') && pendingOrders > 0
               const isGroupLocked = group.feature && !isPro && !(features as any)[group.feature]
 
               // Collapsed sidebar: show dropdown menu with child links
@@ -710,7 +750,9 @@ export default function Layout({ children }: LayoutProps) {
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent side="right" align="start" className="min-w-[180px]" sideOffset={8}>
-                      {group.children.map((child) => {
+                      {group.children
+                        .filter(child => !child.adminOnly || isAdmin)
+                        .map((child) => {
                         const ChildIcon = child.icon || group.icon
                         const isChildActive = location.pathname === child.href || (child.href !== '/' && location.pathname.startsWith(child.href + '/'))
                         const isChildLocked = child.feature && !isPro && !(features as any)[child.feature]
@@ -798,7 +840,9 @@ export default function Layout({ children }: LayoutProps) {
                   </button>
                   {showExpanded && isExpanded && (
                     <div className="ml-4 pl-2 border-l border-sidebar-border space-y-0.5">
-                      {group.children.map((child) => {
+                      {group.children
+                        .filter(child => !child.adminOnly || isAdmin)
+                        .map((child) => {
                         const ChildIcon = child.icon || group.icon
                         const isChildActive = location.pathname === child.href ||
                           (child.href !== '/dashboard' && location.pathname.startsWith(child.href))

@@ -26,38 +26,38 @@ export default function LegacyContentPage() {
 
   // Get child table data
   const { data: signatureDishes } = useFrappeGetDocList('Legacy Signature Dish', {
-    filters: { parent: selectedRestaurant },
+    filters: [['parent', '=', selectedRestaurant]],
     fields: ['name', 'dish', 'display_order', 'dish_name'],
     orderBy: { field: 'display_order', order: 'asc' }
   })
 
   const { data: testimonials } = useFrappeGetDocList('Legacy Testimonial', {
-    filters: { parent: selectedRestaurant },
+    filters: [['parent', '=', selectedRestaurant]],
     fields: ['name', 'customer_name', 'rating', 'text', 'location', 'avatar', 'display_order'],
     orderBy: { field: 'display_order', order: 'asc' }
   })
 
   const { data: members } = useFrappeGetDocList('Legacy Member', {
-    filters: { parent: selectedRestaurant },
+    filters: [['parent', '=', selectedRestaurant]],
     fields: ['name', 'member_name', 'role', 'image', 'display_order'],
     orderBy: { field: 'display_order', order: 'asc' }
   })
 
   const { data: galleryImages } = useFrappeGetDocList('Legacy Gallery Image', {
-    filters: { parent: selectedRestaurant },
+    filters: [['parent', '=', selectedRestaurant]],
     fields: ['name', 'image', 'title', 'display_order'],
     orderBy: { field: 'display_order', order: 'asc' }
   })
 
   const { data: instagramReels } = useFrappeGetDocList('Legacy Instagram Reel', {
-    filters: { parent: selectedRestaurant },
+    filters: [['parent', '=', selectedRestaurant]],
     fields: ['name', 'reel_link', 'title', 'display_order'],
     orderBy: { field: 'display_order', order: 'asc' }
   })
 
   // Get menu products for signature dishes selection
   const { data: menuProducts } = useFrappeGetDocList('Menu Product', {
-    filters: { restaurant: selectedRestaurant },
+    filters: [['restaurant', '=', selectedRestaurant]],
     fields: ['name', 'product_name', 'image']
   })
 
@@ -146,7 +146,7 @@ export default function LegacyContentPage() {
       <CardContent>
         {data.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            No {title.toLowerCase()} yet. Click "Add {type}" to get started.
+            No {title.toLowerCase()} yet. Click `Add {type}` to get started.
           </div>
         ) : (
           <div className="space-y-4">
@@ -173,11 +173,13 @@ export default function LegacyContentPage() {
           data.rating = parseInt(formData.get('rating') as string) || 5
           data.text = formData.get('text')
           data.location = formData.get('location')
+          data.avatar = formData.get('avatar')
           data.display_order = parseInt(formData.get('display_order') as string) || 0
           break
         case 'Member':
           data.member_name = formData.get('member_name')
           data.role = formData.get('role')
+          data.image = formData.get('image')
           data.display_order = parseInt(formData.get('display_order') as string) || 0
           break
         case 'Gallery Image':
@@ -251,6 +253,10 @@ export default function LegacyContentPage() {
               <Input name="location" defaultValue={editingData?.location} />
             </div>
             <div>
+              <Label htmlFor="avatar">Avatar URL (Optional)</Label>
+              <Input name="avatar" defaultValue={editingData?.avatar} />
+            </div>
+            <div>
               <Label htmlFor="display_order">Display Order</Label>
               <Input type="number" name="display_order" defaultValue={editingData?.display_order || 0} />
             </div>
@@ -266,6 +272,10 @@ export default function LegacyContentPage() {
             <div>
               <Label htmlFor="role">Role</Label>
               <Input name="role" defaultValue={editingData?.role} />
+            </div>
+            <div>
+              <Label htmlFor="image">Image URL (Optional)</Label>
+              <Input name="image" defaultValue={editingData?.image} />
             </div>
             <div>
               <Label htmlFor="display_order">Display Order</Label>

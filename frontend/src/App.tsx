@@ -10,7 +10,6 @@ import ProtectedRoute from './components/ProtectedRoute'
 import FeatureProtectedRoute from './components/FeatureProtectedRoute'
 import FeatureLocked from './pages/FeatureLocked'
 import SmartSetupWizard from './pages/SmartSetupWizard'
-import SetupWizard from './pages/SetupWizard'
 import LiteSetupWizard from './pages/LiteSetupWizard'
 import Modules from './pages/Modules'
 import ModuleList from './pages/ModuleList'
@@ -18,6 +17,7 @@ import ModuleDetail from './pages/ModuleDetail'
 import Orders from './pages/Orders'
 import AcceptOrders from './pages/AcceptOrders'
 import PastOrders from './pages/PastOrders'
+import PastOrdersDebug from './pages/PastOrdersDebug'
 import Products from './pages/Products'
 import Categories from './pages/Categories'
 import OrderDetail from './pages/OrderDetail'
@@ -38,6 +38,7 @@ import RecommendationsEngine from './pages/RecommendationsEngine'
 import Customers from './pages/Customers'
 import Bookings from './pages/Bookings'
 import Coupons from './pages/Coupons'
+import AdminRestaurantManagement from './pages/AdminRestaurantManagement'
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -64,12 +65,16 @@ function AppContent() {
 						<Route path="/:doctype" element={<Layout><ModuleList /></Layout>} />
 						<Route path="/:doctype/:docname" element={<Layout><ModuleDetail /></Layout>} />
 						
+						{/* Admin Route - Restaurant Management */}
+						<Route path="/admin/restaurants" element={<Layout><AdminRestaurantManagement /></Layout>} />
+						
 						{/* PRO Feature: Ordering - Requires PRO plan */}
 						<Route element={<FeatureProtectedRoute feature="ordering" />}>
 							<Route path="/orders" element={<Layout><Orders /></Layout>} />
 							<Route path="/accept-orders" element={<Layout><AcceptOrders /></Layout>} />
 							<Route path="/orders/:orderId" element={<Layout><OrderDetail /></Layout>} />
 							<Route path="/past-orders" element={<Layout><PastOrders /></Layout>} />
+							<Route path="/past-orders-debug" element={<Layout><PastOrdersDebug /></Layout>} />
 						</Route>
 
 						{/* PRO Feature: Coupons - Requires PRO plan */}

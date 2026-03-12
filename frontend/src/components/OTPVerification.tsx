@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useFrappePostCall } from 'frappe-react-sdk'
+import { useFrappePostCall } from '@/lib/frappe'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'

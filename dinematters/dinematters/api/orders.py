@@ -343,7 +343,7 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 
 
 @frappe.whitelist(allow_guest=True)
-def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None):
+def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None, admin_mode=False, date_from=None, date_to=None, search_query=None):
 	"""
 	GET /api/v1/orders
 	Get user's orders for restaurant
@@ -359,12 +359,53 @@ def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None):
 		
 		# Build filters
 		filters = {"restaurant": restaurant}
-		if user:
-			filters["customer"] = user
-		elif session_id:
-			# For guest users, we might need to track by session or phone/email
-			# For now, return empty if no user
-			pass
+		
+		# Exclude tokenization orders
+		filters["is_tokenization"] = ["!=", 1]
+		
+		# In admin mode, don't filter by customer
+		if not admin_mode:
+			if user:
+				filters["customer"] = user
+			elif session_id:
+				# For guest users, we might need to track by session or phone/email
+				# For now, return empty if no user
+				pass
+		else:
+			# Admin mode - add additional filters
+			if date_from:
+				filters["creation"] = [">=", date_from]
+			if date_to:
+				if "creation" in filters:
+					filters["creation"][1] = "<="
+					filters["creation"].append(date_to)
+				else:
+					filters["creation"] = ["<=", date_to]
+			
+			# Search query filter for admin mode
+			if search_query:
+				# Add OR condition for search
+				search_filters = {
+					"restaurant": restaurant,
+					"is_tokenization": ["!=", 1],
+					"or": [
+						{"order_number": ["like", f"%{search_query}%"]},
+						{"customer": ["like", f"%{search_query}%"]},
+						{"customer_phone": ["like", f"%{search_query}%"]},
+						{"coupon": ["like", f"%{search_query}%"]}
+					]
+				}
+				if status and status != 'all':
+					search_filters["status"] = status
+				if date_from:
+					search_filters["creation"] = [">=", date_from]
+				if date_to:
+					if "creation" in search_filters:
+						search_filters["creation"][1] = "<="
+						search_filters["creation"].append(date_to)
+					else:
+						search_filters["creation"] = ["<=", date_to]
+				filters = search_filters
 		
 		if status:
 			filters["status"] = status
@@ -375,28 +416,65 @@ def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None):
 		start = (page - 1) * limit
 		
 		# Get orders
-		orders = frappe.get_all(
-			"Order",
-			fields=[
-				"order_id as id",
-				"order_number",
-				"status",
-				"total",
-				"creation as createdAt",
-				"estimated_delivery as estimatedDelivery"
-			],
-			filters=filters,
-			limit_start=start,
-			limit_page_length=limit,
-			order_by="creation desc"
-		)
+		if admin_mode:
+			# Admin mode - get more fields
+			orders = frappe.get_all(
+				"Order",
+				fields=[
+					"name",
+					"order_number",
+					"status",
+					"total",
+					"creation",
+					"modified",
+					"customer",
+					"customer_name",
+					"customer_phone",
+					"table_number",
+					"coupon",
+					"payment_method",
+					"estimated_delivery",
+					"restaurant"
+				],
+				filters=filters,
+				limit_start=start,
+				limit_page_length=limit,
+				order_by="creation desc"
+			)
+		else:
+			# Customer mode - limited fields
+			orders = frappe.get_all(
+				"Order",
+				fields=[
+					"order_id as id",
+					"order_number",
+					"status",
+					"total",
+					"creation as createdAt",
+					"estimated_delivery as estimatedDelivery"
+				],
+				filters=filters,
+				limit_start=start,
+				limit_page_length=limit,
+				order_by="creation desc"
+			)
 		
 		# Format dates
 		for order in orders:
-			if order.get("createdAt"):
-				order["createdAt"] = get_datetime_str(order["createdAt"])
-			if order.get("estimatedDelivery"):
-				order["estimatedDelivery"] = get_datetime_str(order["estimatedDelivery"])
+			if admin_mode:
+				# Admin mode - format creation and modified dates
+				if order.get("creation"):
+					order["creation"] = get_datetime_str(order["creation"])
+				if order.get("modified"):
+					order["modified"] = get_datetime_str(order["modified"])
+				if order.get("estimated_delivery"):
+					order["estimated_delivery"] = get_datetime_str(order["estimated_delivery"])
+			else:
+				# Customer mode - format with field names
+				if order.get("createdAt"):
+					order["createdAt"] = get_datetime_str(order["createdAt"])
+				if order.get("estimatedDelivery"):
+					order["estimatedDelivery"] = get_datetime_str(order["estimatedDelivery"])
 		
 		# Get total count
 		total = frappe.db.count("Order", filters=filters)
@@ -926,5 +1004,127 @@ def update_order_feedback(order_id, customer_rating=None, customer_feedback=None
 		return {"success": True, "message": "Feedback updated"}
 	except Exception as e:
 		frappe.log_error(f"update_order_feedback error: {e}", "Order_Feedback")
+		return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist()
+def get_admin_orders(restaurant_id, status=None, page=1, limit=20, date_from=None, date_to=None, search_query=None):
+	"""
+	GET /api/method/dinematters.dinematters.api.orders.get_admin_orders
+	Get ALL orders for a restaurant (admin view)
+	Requires restaurant permissions
+	"""
+	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
+		# Build filters - no customer filter for admin view
+		filters = {"restaurant": restaurant}
+		
+		# Exclude tokenization orders from admin view
+		filters["is_tokenization"] = ["!=", 1]
+		
+		if status and status != 'all':
+			filters["status"] = status
+		
+		# Date filters
+		if date_from:
+			filters["creation"] = [">=", date_from]
+		if date_to:
+			if "creation" in filters:
+				filters["creation"][1] = "<="
+				filters["creation"].append(date_to)
+			else:
+				filters["creation"] = ["<=", date_to]
+		
+		# Search query filter
+		if search_query:
+			# Add OR condition for search
+			search_filters = {
+				"restaurant": restaurant,
+				"is_tokenization": ["!=", 1],
+				"or": [
+					{"order_number": ["like", f"%{search_query}%"]},
+					{"customer": ["like", f"%{search_query}%"]},
+					{"customer_phone": ["like", f"%{search_query}%"]},
+					{"coupon": ["like", f"%{search_query}%"]}
+				]
+			}
+			if status and status != 'all':
+				search_filters["status"] = status
+			if date_from:
+				search_filters["creation"] = [">=", date_from]
+			if date_to:
+				if "creation" in search_filters:
+					search_filters["creation"][1] = "<="
+					search_filters["creation"].append(date_to)
+				else:
+					search_filters["creation"] = ["<=", date_to]
+			filters = search_filters
+		
+		# Pagination
+		page = cint(page) or 1
+		limit = cint(limit) or 20
+		start = (page - 1) * limit
+		
+		# Get orders with more fields for admin view
+		orders = frappe.get_all(
+			"Order",
+			fields=[
+				"name",
+				"order_number",
+				"status",
+				"total",
+				"creation",
+				"modified",
+				"customer",
+				"customer_name",
+				"customer_phone",
+				"table_number",
+				"coupon",
+				"payment_method",
+				"delivery_type",
+				"estimated_delivery",
+				"restaurant"
+			],
+			filters=filters,
+			limit_start=start,
+			limit_page_length=limit,
+			order_by="creation desc"
+		)
+		
+		# Format dates
+		for order in orders:
+			if order.get("creation"):
+				order["creation"] = get_datetime_str(order["creation"])
+			if order.get("modified"):
+				order["modified"] = get_datetime_str(order["modified"])
+			if order.get("estimated_delivery"):
+				order["estimated_delivery"] = get_datetime_str(order["estimated_delivery"])
+		
+		# Get total count
+		total = frappe.db.count("Order", filters=filters)
+		total_pages = (total + limit - 1) // limit if limit > 0 else 1
+		
+		# Get currency info for restaurant
+		currency_info = get_restaurant_currency_info(restaurant)
+		
+		return {
+			"success": True,
+			"data": {
+				"orders": orders,
+				"pagination": {
+					"page": page,
+					"limit": limit,
+					"total": total,
+					"totalPages": total_pages
+				},
+				"currency": currency_info.get("currency", "INR"),
+				"currencySymbol": currency_info.get("symbol", "₹"),
+				"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
+			}
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in get_admin_orders: {str(e)}")
 		return {"success": False, "error": str(e)}
 

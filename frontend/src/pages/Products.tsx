@@ -257,12 +257,14 @@ export default function Products() {
             View and manage menu products (filtered by your restaurant permissions)
           </p>
         </div>
-        <Button asChild className="w-full sm:w-auto">
-          <Link to="/products/new">
-            <Plus className="h-4 w-4" />
-            Add Product
-          </Link>
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 sm:w-auto">
+          <Button asChild className="w-full sm:w-auto">
+            <Link to="/products/new">
+              <Plus className="h-4 w-4" />
+              Add Product
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Card>

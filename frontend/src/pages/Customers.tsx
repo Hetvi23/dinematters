@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useFrappeGetCall, useFrappePostCall } from '@/lib/frappe'
 import { useRestaurant } from '@/contexts/RestaurantContext'
@@ -76,7 +76,7 @@ export default function Customers() {
   const [page, setPage] = useState(1)
   const pageSize = 20
 
-  const { data, isLoading } = useFrappeGetCall<CustomersResponse>(
+  const { data, isLoading, error } = useFrappeGetCall<CustomersResponse>(
     'dinematters.dinematters.api.customers.get_restaurant_customers',
     selectedRestaurant
       ? { restaurant_id: selectedRestaurant, search: search || undefined, page, page_size: pageSize }
@@ -84,15 +84,41 @@ export default function Customers() {
     selectedRestaurant ? `restaurant-customers-${selectedRestaurant}-${search}-${page}` : null
   )
 
+  // More robust data extraction with error handling
+  const customers: RestaurantCustomer[] = useMemo(() => {
+    try {
+      if (!data) return []
+      
+      // Handle different response structures
+      if (data?.message?.data?.customers) {
+        return Array.isArray(data.message.data.customers) ? data.message.data.customers : []
+      }
+      if (data?.message && typeof data.message === 'object' && 'customers' in data.message) {
+        return Array.isArray((data.message as any).customers) ? (data.message as any).customers : []
+      }
+      if (data && typeof data === 'object' && 'customers' in data) {
+        return Array.isArray((data as any).customers) ? (data as any).customers : []
+      }
+      if (Array.isArray(data)) {
+        return data
+      }
+      
+      console.warn('Unexpected customers data structure:', data)
+      return []
+    } catch (err) {
+      console.error('Error processing customers data:', err)
+      return []
+    }
+  }, [data])
+
+  const isAdmin = data?.message?.data?.isAdmin ?? false
+  const totalCount = data?.message?.data?.totalCount ?? customers.length
+  const success = data?.message?.success ?? true
+  const totalPages = Math.ceil(totalCount / pageSize) || 1
+
   const { call: getCustomerProfile } = useFrappePostCall(
     'dinematters.dinematters.api.customers.get_customer_profile'
   )
-
-  const customers: RestaurantCustomer[] = data?.message?.data?.customers ?? []
-  const isAdmin = data?.message?.data?.isAdmin ?? false
-  const totalCount = data?.message?.data?.totalCount ?? 0
-  const success = data?.message?.success ?? false
-  const totalPages = Math.ceil(totalCount / pageSize) || 1
 
   const handleViewFullProfile = async (customerId: string) => {
     setProfileCustomerId(customerId)
@@ -137,11 +163,25 @@ export default function Customers() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Customers</h1>
-        <p className="text-muted-foreground mt-1">
-          Customers who have placed orders or bookings at this restaurant
-        </p>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Customers</h1>
+          <p className="text-muted-foreground mt-1">
+            Customers who have placed orders or bookings at this restaurant
+          </p>
+        </div>
+        <div className="relative max-w-sm w-full sm:w-auto">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by name or phone..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
+            className="pl-9"
+          />
+        </div>
       </div>
 
       <Card>
@@ -153,23 +193,23 @@ export default function Customers() {
           <CardDescription>
             Name, phone, verification status. Expand to view order history and feedback.
           </CardDescription>
-          <div className="relative mt-4 max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by name or phone..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value)
-                setPage(1)
-              }}
-              className="pl-9"
-            />
-          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : error ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">Unable to load customers. Please try again.</p>
+              <p className="text-sm text-red-500 mt-2">Error: {error.message || 'Unknown error occurred'}</p>
+              <Button 
+                onClick={() => window.location.reload()} 
+                variant="outline" 
+                className="mt-4"
+              >
+                Retry
+              </Button>
             </div>
           ) : !success ? (
             <p className="text-muted-foreground text-center py-8">

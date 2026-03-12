@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { useFrappeGetDocList, useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe'
+import { useState, useMemo, useEffect } from 'react'
+import { useFrappePostCall } from '@/lib/frappe'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -19,6 +19,8 @@ import { toast } from 'sonner'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 
 export default function PastOrders() {
+  console.log('🚀 PastOrders Component - START')
+  
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   
@@ -30,48 +32,67 @@ export default function PastOrders() {
   const [dateTo, setDateTo] = useState('')
   const [showFilters, setShowFilters] = useState(false)
   const [showBilledOrders, setShowBilledOrders] = useState(false)
+  const [orders, setOrders] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
 
-  const { selectedRestaurant } = useRestaurant()
+  const { selectedRestaurant, isLoading: contextLoading, isPro, restaurantConfig } = useRestaurant()
   
-  // Get the restaurant identifier to use for filtering
-  const restaurantFilter = selectedRestaurant
-  
-  // Fetch restaurant data to get tables count
-  const { data: restaurantDoc } = useFrappeGetDoc('Restaurant', selectedRestaurant || '', {
-    enabled: !!selectedRestaurant,
-    fields: ['name', 'tables']
+  console.log('📊 PastOrders Initial State:', {
+    selectedRestaurant,
+    isLoading: contextLoading,
+    isPro,
+    planType: restaurantConfig?.subscription?.planType,
+    searchQuery,
+    statusFilter,
+    tableFilter,
+    dateFrom,
+    dateTo
   })
   
-  // Generate table options based on restaurant tables count
-  const tableOptions = useMemo(() => {
-    const maxTables = Number(restaurantDoc?.tables ?? 0)
-    const options: number[] = []
-    if (maxTables > 0) {
-      for (let i = 1; i <= maxTables; i++) {
-        options.push(i)
-      }
-    }
-    return options
-  }, [restaurantDoc?.tables])
-  
-  // Build filters - always filter by restaurant if one is selected
-  // Exclude tokenization orders from Past Orders view
-  const filters = restaurantFilter ? { restaurant: restaurantFilter, "is_tokenization": ["!=", 1] } as any : {}
-  
-  // Fetch all orders for the restaurant
-  const { data: orders, isLoading, mutate } = useFrappeGetDocList(
-    'Order',
-    {
-      fields: ['name', 'order_number', 'status', 'table_number', 'coupon', 'total', 'creation', 'restaurant'],
-      filters: filters,
-      orderBy: { field: 'creation', order: 'desc' },
-      limit: 1000 // Get all orders
-    },
-    restaurantFilter ? `past-orders-${restaurantFilter}` : null
-  )
-
+  // API calls
+  const { call: getAdminOrders } = useFrappePostCall('dinematters.dinematters.api.orders.get_orders')
   const { call: updateOrderStatus } = useFrappePostCall('dinematters.dinematters.api.order_status.update_status')
   const { call: updateTableNumber } = useFrappePostCall('dinematters.dinematters.api.order_status.update_table_number')
+
+  // Load orders when filters change
+  useEffect(() => {
+    if (selectedRestaurant) {
+      loadOrders()
+    }
+  }, [selectedRestaurant, statusFilter, dateFrom, dateTo, searchQuery])
+
+  const loadOrders = async () => {
+    if (!selectedRestaurant) return
+    
+    try {
+      setLoading(true)
+      const response = await getAdminOrders({
+        restaurant_id: selectedRestaurant,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
+        search_query: searchQuery || undefined,
+        limit: 1000,
+        admin_mode: true  // Enable admin mode to get all orders
+      })
+      
+      console.log('[PastOrders] API Response:', response)
+      
+      const data = response?.message?.data || response?.data
+      
+      if (data?.orders) {
+        setOrders(data.orders)
+      } else {
+        setOrders([])
+      }
+    } catch (error) {
+      console.error('[PastOrders] Failed to load orders:', error)
+      toast.error('Failed to load orders')
+      setOrders([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Normalize status value (handle legacy "in_billing" format)
   const normalizeStatus = (status: string): string => {
@@ -106,7 +127,7 @@ export default function PastOrders() {
       toast.success(`Order status updated to ${statusLabels[normalizedStatus] || normalizedStatus}`)
       
       // Refresh orders list
-      mutate()
+      await loadOrders()
     } catch (error: any) {
       console.error('Failed to update order status:', error)
       toast.error(error?.message || 'Failed to update order status')
@@ -123,7 +144,7 @@ export default function PastOrders() {
       toast.success(`Table updated to Table ${tableNumber}`)
       
       // Refresh orders list
-      mutate()
+      await loadOrders()
     } catch (error: any) {
       console.error('Failed to update table number:', error)
       toast.error(error?.message || 'Failed to update table number')
@@ -137,8 +158,8 @@ export default function PastOrders() {
 
   // Get unique table numbers for filter
   const uniqueTables = useMemo(() => {
-    if (!orders || !Array.isArray(orders) || !restaurantFilter) return []
-    const restaurantOrders = orders.filter((order: any) => order.restaurant === restaurantFilter)
+    if (!orders || !Array.isArray(orders) || !selectedRestaurant) return []
+    const restaurantOrders = orders.filter((order: any) => order.restaurant === selectedRestaurant)
     if (!restaurantOrders || restaurantOrders.length === 0) return []
     const tables = new Set<number>()
     restaurantOrders.forEach((order: any) => {
@@ -147,7 +168,7 @@ export default function PastOrders() {
       }
     })
     return Array.from(tables).sort((a, b) => a - b)
-  }, [orders, restaurantFilter])
+  }, [orders, selectedRestaurant])
 
   // Filter orders
   const filteredOrders = useMemo(() => {
@@ -157,79 +178,19 @@ export default function PastOrders() {
 
     // First filter by restaurant
     let filtered = orders.filter((order: any) => {
-      if (!restaurantFilter) return false
-      return order.restaurant === restaurantFilter
+      if (!selectedRestaurant) return false
+      return order.restaurant === selectedRestaurant
     })
 
-    // Apply "Show Billed Orders" filter - show only today's billed orders
-    if (showBilledOrders) {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const tomorrow = new Date(today)
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      
-      filtered = filtered.filter((order: any) => {
-        // Filter by billed status
-        const normalized = normalizeStatus(order.status || 'confirmed')
-        if (normalized !== 'billed') return false
-        
-        // Filter by today's date
-        if (!order.creation) return false
-        const orderDate = new Date(order.creation)
-        orderDate.setHours(0, 0, 0, 0)
-        return orderDate >= today && orderDate < tomorrow
-      })
-    }
-
-    // Apply search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter((order: any) => {
-        const orderNumber = (order.order_number || order.name || '').toLowerCase()
-        return orderNumber.includes(query)
-      })
-    }
-
-    // Apply status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((order: any) => {
-        const normalized = normalizeStatus(order.status || 'confirmed')
-        return normalized === statusFilter
-      })
-    }
-
-    // Apply table filter
+    // Apply additional filters if needed
     if (tableFilter !== 'all') {
-      const tableNum = parseInt(tableFilter, 10)
-      filtered = filtered.filter((order: any) => {
-        return (order.table_number ?? 0) === tableNum
-      })
-    }
-
-    // Apply date filters
-    if (dateFrom) {
-      const fromDate = new Date(dateFrom)
-      fromDate.setHours(0, 0, 0, 0)
-      filtered = filtered.filter((order: any) => {
-        if (!order.creation) return false
-        const orderDate = new Date(order.creation)
-        orderDate.setHours(0, 0, 0, 0)
-        return orderDate >= fromDate
-      })
-    }
-
-    if (dateTo) {
-      const toDate = new Date(dateTo)
-      toDate.setHours(23, 59, 59, 999)
-      filtered = filtered.filter((order: any) => {
-        if (!order.creation) return false
-        const orderDate = new Date(order.creation)
-        return orderDate <= toDate
-      })
+      filtered = filtered.filter((order: any) => 
+        order.table_number?.toString() === tableFilter
+      )
     }
 
     return filtered
-  }, [orders, restaurantFilter, showBilledOrders, searchQuery, statusFilter, tableFilter, dateFrom, dateTo]) || []
+  }, [orders, selectedRestaurant, tableFilter]) || []
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -365,15 +326,15 @@ export default function PastOrders() {
       {/* Orders List */}
       <Card>
         <CardContent className="pt-6">
-          {isLoading ? (
+          {loading ? (
             <div className="text-center py-8 text-muted-foreground">Loading orders...</div>
-          ) : !restaurantFilter ? (
+          ) : !selectedRestaurant ? (
             <div className="text-center py-12 text-muted-foreground">
               <p className="text-sm">Please select a restaurant from the dropdown above to view orders</p>
             </div>
           ) : !filteredOrders || filteredOrders?.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              <p className="text-sm">No orders found for restaurant: {restaurantFilter}</p>
+              <p className="text-sm">No orders found for restaurant: {selectedRestaurant}</p>
             </div>
           ) : (
             <>
@@ -425,31 +386,11 @@ export default function PastOrders() {
                       </Select>
                     </div>
                     <div className="flex items-center gap-3 mb-3 flex-wrap">
-                      {tableOptions.length > 0 ? (
-                        <Select
-                          value={typeof order.table_number === 'number' && order.table_number > 0 ? order.table_number.toString() : ''}
-                          onValueChange={(value) => {
-                            const parsed = parseInt(value, 10)
-                            const tableNum = Number.isNaN(parsed) ? 1 : parsed
-                            handleTableNumberChange(order.name, tableNum)
-                          }}
-                        >
-                          <SelectTrigger className="h-7 px-2 text-xs font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a] w-auto min-w-[90px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {tableOptions.map((tableNum) => (
-                              <SelectItem key={tableNum} value={tableNum.toString()}>
-                                Table {tableNum}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : typeof order.table_number === 'number' && order.table_number > 0 ? (
+                      {order.table_number && (
                         <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a]">
                           Table {order.table_number}
                         </span>
-                      ) : null}
+                      )}
                       {order.coupon && (
                         <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-[#dff6dd] dark:bg-[#1b5e20] text-[#107c10] dark:text-[#81c784] border border-[#92c5f7] dark:border-[#4caf50]">
                           {order.coupon}
@@ -520,27 +461,7 @@ export default function PastOrders() {
                           </Select>
                         </TableCell>
                         <TableCell>
-                          {tableOptions.length > 0 ? (
-                            <Select
-                              value={typeof order.table_number === 'number' && order.table_number > 0 ? order.table_number.toString() : ''}
-                              onValueChange={(value) => {
-                                const parsed = parseInt(value, 10)
-                                const tableNum = Number.isNaN(parsed) ? 1 : parsed
-                                handleTableNumberChange(order.name, tableNum)
-                              }}
-                            >
-                              <SelectTrigger className="h-7 px-2 text-xs font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a] w-auto min-w-[100px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {tableOptions.map((tableNum) => (
-                                  <SelectItem key={tableNum} value={tableNum.toString()}>
-                                    Table {tableNum}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : typeof order.table_number === 'number' && order.table_number > 0 ? (
+                          {order.table_number ? (
                             <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-[#e8d5ff] dark:bg-[#4a148c] text-[#8764b8] dark:text-[#ba68c8] border border-[#d4b9e8] dark:border-[#6a1b9a]">
                               Table {order.table_number}
                             </span>

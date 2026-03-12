@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useFrappeGetDocList, useFrappePostCall, useFrappeUpdateDoc, useFrappeDeleteDoc } from '@/lib/frappe'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -212,32 +212,43 @@ export default function Coupons() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div>
+              <CardTitle>All Coupons</CardTitle>
+              <CardDescription>
+                Manage your discount coupons and offers
+                {filteredCoupons.length !== coupons?.length && (
+                  <span className="ml-2">
+                    (Showing {filteredCoupons.length} of {coupons?.length || 0})
+                  </span>
+                )}
+              </CardDescription>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <Input
                 placeholder="Search coupons..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full sm:w-[200px]"
               />
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Coupons</SelectItem>
+                  <SelectItem value="active">Active Only</SelectItem>
+                  <SelectItem value="inactive">Inactive Only</SelectItem>
+                  <SelectItem value="coupon">Coupon Codes</SelectItem>
+                  <SelectItem value="auto">Auto Offers</SelectItem>
+                  <SelectItem value="combo">Combo Deals</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-full md:w-[200px]">
-                <SelectValue placeholder="Filter by type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Coupons</SelectItem>
-                <SelectItem value="active">Active Only</SelectItem>
-                <SelectItem value="inactive">Inactive Only</SelectItem>
-                <SelectItem value="coupon">Coupon Codes</SelectItem>
-                <SelectItem value="auto">Auto Offers</SelectItem>
-                <SelectItem value="combo">Combo Deals</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
-        </CardContent>
-      </Card>
-
+        </CardHeader>
+        <CardContent>
       {/* Coupons List */}
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">Loading coupons...</div>
@@ -329,6 +340,8 @@ export default function Coupons() {
           ))}
         </div>
       )}
+        </CardContent>
+      </Card>
 
       {/* Create/Edit Dialog */}
       <CouponDialog

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useFrappeGetCall, useFrappePostCall, useFrappeGetDocList } from 'frappe-react-sdk'
+import { useFrappeGetCall, useFrappePostCall, useFrappeGetDocList } from '@/lib/frappe'
 import { useRestaurant } from '../contexts/RestaurantContext'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'

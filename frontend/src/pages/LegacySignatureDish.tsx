@@ -18,14 +18,14 @@ export default function LegacySignatureDishPage() {
 
   // Get signature dishes data
   const { data: signatureDishes } = useFrappeGetDocList('Legacy Signature Dish', {
-    filters: { parent: selectedRestaurant },
+    filters: [['parent', '=', selectedRestaurant]],
     fields: ['name', 'dish', 'display_order', 'dish_name'],
     orderBy: { field: 'display_order', order: 'asc' }
   })
 
   // Get menu products for signature dishes selection
   const { data: menuProducts } = useFrappeGetDocList('Menu Product', {
-    filters: { restaurant: selectedRestaurant },
+    filters: [['restaurant', '=', selectedRestaurant]],
     fields: ['name', 'product_name', 'image']
   })
 

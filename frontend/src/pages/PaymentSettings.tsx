@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useFrappePostCall } from 'frappe-react-sdk'
+import { useFrappePostCall } from '@/lib/frappe'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { toast } from 'sonner'

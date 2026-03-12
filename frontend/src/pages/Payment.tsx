@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { useFrappeGetDoc, useFrappePostCall } from 'frappe-react-sdk';
+import { useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe';
 import Layout from '../components/Layout';
 import RazorpayCheckout from '../components/RazorpayCheckout';
 import { OTPVerification } from '../components/OTPVerification';

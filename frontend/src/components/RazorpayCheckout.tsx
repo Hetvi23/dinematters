@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useFrappePostCall } from 'frappe-react-sdk';
+import { useFrappePostCall } from '@/lib/frappe';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Loader2, CreditCard, CheckCircle, XCircle } from 'lucide-react';

@@ -105,10 +105,10 @@ def create_table_booking(restaurant_id, number_of_diners, date, time_slot, custo
 
 
 @frappe.whitelist(allow_guest=True)
-def get_table_bookings(restaurant_id, status=None, date_from=None, date_to=None, page=1, limit=20, session_id=None):
+def get_table_bookings(restaurant_id, status=None, date_from=None, date_to=None, page=1, limit=20, session_id=None, admin_mode=False):
 	"""
 	GET /api/method/dinematters.dinematters.api.bookings.get_table_bookings
-	Get user's table bookings
+	Get user's table bookings or all bookings in admin mode
 	"""
 	try:
 		# Validate restaurant (allow guest access for public bookings)
@@ -121,21 +121,24 @@ def get_table_bookings(restaurant_id, status=None, date_from=None, date_to=None,
 		
 		# Build filters
 		filters = {"restaurant": restaurant}
-		if user:
-			filters["user"] = user
-		elif session_id:
-			filters["session_id"] = session_id
+		
+		# In admin mode, don't filter by user - get all bookings
+		if not admin_mode:
+			if user:
+				filters["user"] = user
+			elif session_id:
+				filters["session_id"] = session_id
 		
 		if status:
 			filters["status"] = status
 		
-		if date_from:
+		# Handle date filtering properly
+		if date_from and date_to:
+			filters["date"] = ["between", date_from, date_to]
+		elif date_from:
 			filters["date"] = [">=", date_from]
-		if date_to:
-			if "date" in filters and isinstance(filters["date"], list):
-				filters["date"].append(["<=", date_to])
-			else:
-				filters["date"] = ["<=", date_to]
+		elif date_to:
+			filters["date"] = ["<=", date_to]
 		
 		# Pagination
 		page = int(page) or 1
@@ -143,17 +146,31 @@ def get_table_bookings(restaurant_id, status=None, date_from=None, date_to=None,
 		start = (page - 1) * limit
 		
 		# Get bookings
+		fields = [
+			"name as id",
+			"booking_number",
+			"number_of_diners",
+			"date",
+			"time_slot",
+			"status",
+			"creation"
+		]
+		
+		# Add customer fields in admin mode
+		if admin_mode:
+			fields.extend([
+				"customer_name",
+				"customer_phone", 
+				"customer_email",
+				"notes",
+				"confirmed_at",
+				"rejected_at",
+				"rejection_reason"
+			])
+		
 		bookings = frappe.get_all(
 			"Table Booking",
-			fields=[
-				"name as id",
-				"booking_number",
-				"number_of_diners",
-				"date",
-				"time_slot",
-				"status",
-				"creation"
-			],
+			fields=fields,
 			filters=filters,
 			limit_start=start,
 			limit_page_length=limit,
@@ -163,7 +180,7 @@ def get_table_bookings(restaurant_id, status=None, date_from=None, date_to=None,
 		# Format bookings
 		formatted_bookings = []
 		for booking in bookings:
-			formatted_bookings.append({
+			booking_data = {
 				"id": str(booking["id"]),
 				"bookingNumber": booking["booking_number"],
 				"numberOfDiners": booking["number_of_diners"],
@@ -171,7 +188,21 @@ def get_table_bookings(restaurant_id, status=None, date_from=None, date_to=None,
 				"timeSlot": booking["time_slot"],
 				"status": booking["status"],
 				"createdAt": get_datetime_str(booking["creation"])
-			})
+			}
+			
+			# Add customer fields in admin mode
+			if admin_mode:
+				booking_data.update({
+					"customerName": booking.get("customer_name"),
+					"customerPhone": booking.get("customer_phone"),
+					"customerEmail": booking.get("customer_email"),
+					"notes": booking.get("notes"),
+					"confirmedAt": get_datetime_str(booking.get("confirmed_at")) if booking.get("confirmed_at") else None,
+					"rejectedAt": get_datetime_str(booking.get("rejected_at")) if booking.get("rejected_at") else None,
+					"rejectionReason": booking.get("rejection_reason")
+				})
+			
+			formatted_bookings.append(booking_data)
 		
 		# Get total count
 		total = frappe.db.count("Table Booking", filters=filters)

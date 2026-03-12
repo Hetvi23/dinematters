@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useFrappePostCall } from 'frappe-react-sdk';
+import { useFrappePostCall } from '@/lib/frappe';
 import { useRestaurant } from '../contexts/RestaurantContext';
 import Layout from '../components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';

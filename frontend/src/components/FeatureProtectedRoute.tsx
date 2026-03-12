@@ -1,5 +1,6 @@
-import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { Navigate, Outlet } from 'react-router-dom'
 import { useRestaurant } from '@/contexts/RestaurantContext'
+import { useState, useEffect } from 'react'
 
 interface FeatureProtectedRouteProps {
   feature?: string
@@ -7,31 +8,18 @@ interface FeatureProtectedRouteProps {
 }
 
 export default function FeatureProtectedRoute({ feature, requirePro = false }: FeatureProtectedRouteProps) {
-  const { isPro, features, isLoading, selectedRestaurant } = useRestaurant()
-  const location = useLocation()
+  const { isPro, features, isLoading, restaurantConfig } = useRestaurant()
+  const [hasTimedOut, setHasTimedOut] = useState(false)
 
-  // Check if feature is accessible (use default values while loading)
-  const hasAccess = feature 
-    ? isPro || (features as any)[feature]
-    : requirePro 
-      ? isPro 
-      : true
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setHasTimedOut(true)
+    }, 5000)
+    return () => clearTimeout(timer)
+  }, [])
 
-  // If user doesn't have access, redirect immediately to FeatureLocked page
-  // Don't wait for loading to complete - this prevents the loading screen issue
-  if (!hasAccess && selectedRestaurant) {
-    return <Navigate 
-      to="/feature-locked" 
-      state={{ 
-        from: location.pathname,
-        restaurantId: location.state?.restaurantId 
-      }} 
-      replace 
-    />
-  }
-
-  // If no restaurant is selected, show loading (this is normal)
-  if (!selectedRestaurant || isLoading) {
+  // Always return a valid JSX element
+  if (isLoading && !hasTimedOut) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -39,6 +27,18 @@ export default function FeatureProtectedRoute({ feature, requirePro = false }: F
     )
   }
 
-  // If user has access, show the protected content
+  // Simple access determination
+  const hasAccess = Boolean(
+    restaurantConfig?.subscription?.planType === 'PRO' ||
+    (requirePro && isPro) ||
+    (feature && (isPro || (features as any)?.[feature])) ||
+    (!requirePro && !feature) ||
+    hasTimedOut
+  )
+
+  if (!hasAccess) {
+    return <Navigate to="/feature-locked" replace />
+  }
+
   return <Outlet />
 }
