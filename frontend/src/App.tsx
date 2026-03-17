@@ -17,7 +17,6 @@ import ModuleDetail from './pages/ModuleDetail'
 import Orders from './pages/Orders'
 import AcceptOrders from './pages/AcceptOrders'
 import PastOrders from './pages/PastOrders'
-import PastOrdersDebug from './pages/PastOrdersDebug'
 import Products from './pages/Products'
 import Categories from './pages/Categories'
 import OrderDetail from './pages/OrderDetail'
@@ -64,17 +63,16 @@ function AppContent() {
 						<Route path="/Home%20Feature" element={<Navigate to="/home-features" replace />} />
 						<Route path="/:doctype" element={<Layout><ModuleList /></Layout>} />
 						<Route path="/:doctype/:docname" element={<Layout><ModuleDetail /></Layout>} />
-						
+
 						{/* Admin Route - Restaurant Management */}
 						<Route path="/admin/restaurants" element={<Layout><AdminRestaurantManagement /></Layout>} />
-						
+
 						{/* PRO Feature: Ordering - Requires PRO plan */}
 						<Route element={<FeatureProtectedRoute feature="ordering" />}>
 							<Route path="/orders" element={<Layout><Orders /></Layout>} />
 							<Route path="/accept-orders" element={<Layout><AcceptOrders /></Layout>} />
 							<Route path="/orders/:orderId" element={<Layout><OrderDetail /></Layout>} />
 							<Route path="/past-orders" element={<Layout><PastOrders /></Layout>} />
-							<Route path="/past-orders-debug" element={<Layout><PastOrdersDebug /></Layout>} />
 						</Route>
 
 						{/* PRO Feature: Coupons - Requires PRO plan */}
