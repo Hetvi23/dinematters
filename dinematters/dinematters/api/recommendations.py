@@ -4,8 +4,8 @@ from typing import Dict, List
 import frappe
 import requests
 from frappe import _
-from frappe.utils import get_url
 
+from dinematters.dinematters.media.utils import get_media_asset_data
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
 
 
@@ -279,7 +279,7 @@ def get_recommendations_tree(restaurant_id: str):
 	if product_names:
 		media_rows = frappe.get_all(
 			"Product Media",
-			fields=["parent", "media_url"],
+			fields=["name", "parent", "media_url", "media_type"],
 			filters={
 				"parent": ["in", product_names],
 				"parenttype": "Menu Product",
@@ -292,10 +292,16 @@ def get_recommendations_tree(restaurant_id: str):
 			parent = row.parent
 			if parent in image_by_parent:
 				continue  # keep first image only
-			media_url = row.media_url
+			if (row.media_type or "image") != "image":
+				continue
+			media_asset_data = get_media_asset_data(
+				"Product Media",
+				row.name,
+				f"product_{row.media_type or 'image'}",
+				row.media_url,
+			)
+			media_url = media_asset_data.get("url")
 			if media_url and isinstance(media_url, str):
-				if media_url.startswith("/files/"):
-					media_url = get_url(media_url)
 				image_by_parent[parent] = media_url
 
 	# Map product_id -> image url for lookup by recommendation items

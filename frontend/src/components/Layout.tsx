@@ -1210,7 +1210,7 @@ export default function Layout({ children }: LayoutProps) {
                       : 'bg-primary/10 border-primary/30 text-primary dark:bg-primary/20 dark:border-primary/40'
                 )}
               >
-                <Coins className="h-3.5 w-3.5" />
+                <Coins className="h-4.5 w-4.5" />
                 <span className="tabular-nums">{aiCredits}</span>
                 <span className="opacity-60 text-[10px] font-normal">credits</span>
               </button>
