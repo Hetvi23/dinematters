@@ -36,7 +36,7 @@
   "tables",
   "recommendation_run",
   "qr_codes_pdf_url",
- "section_break_razorpay",
+  "section_break_razorpay",
   "razorpay_account_id",
   "razorpay_kyc_status",
   "column_break_razorpay",
@@ -60,8 +60,13 @@
   "total_revenue",
   "commission_earned",
   "plan_change_history",
+  "section_break_ai_credits",
+  "ai_credits",
+  "total_ai_generations",
+  "column_break_ai_credits",
+  "total_ai_cost",
   "section_break_branding",
-   "logo",
+  "logo",
   "hero_video",
   "section_break_metadata",
   "description",
@@ -327,8 +332,7 @@
    "label": "Monthly Minimum Fee",
    "default": "999",
    "description": "Minimum monthly platform fee (default: ₹999)"
-  }
-  ,
+  },
   {
    "fieldname": "razorpay_customer_id",
    "fieldtype": "Data",
@@ -494,6 +498,40 @@
    "read_only": 1,
    "hidden": 1,
    "description": "Historical log of plan changes"
+  },
+  {
+   "fieldname": "section_break_ai_credits",
+   "fieldtype": "Section Break",
+   "label": "AI Credit Wallet"
+  },
+  {
+   "fieldname": "ai_credits",
+   "fieldtype": "Int",
+   "label": "AI Credits Balance",
+   "default": "0",
+   "read_only": 1,
+   "in_list_view": 0,
+   "description": "Current AI credit balance. 1 credit = ₹2. Each image enhancement costs 5 credits."
+  },
+  {
+   "fieldname": "total_ai_generations",
+   "fieldtype": "Int",
+   "label": "Total AI Generations",
+   "default": "0",
+   "read_only": 1,
+   "description": "Total number of AI image generations performed."
+  },
+  {
+   "fieldname": "column_break_ai_credits",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_ai_cost",
+   "fieldtype": "Float",
+   "label": "Total AI Cost (₹)",
+   "default": "0",
+   "read_only": 1,
+   "description": "Total INR value of AI credits consumed."
   }
  ],
  "index_web_pages_for_search": 1,
@@ -538,5 +576,3 @@
  "states": [],
  "track_changes": 1
 }
-
-

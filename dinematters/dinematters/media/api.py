@@ -217,6 +217,7 @@ def confirm_upload(upload_id, owner_doctype, owner_name, media_role, alt_text=No
 	cdn_url = get_cdn_url(upload_session.object_key)
 	
 	return {
+		"name": media_asset.name,
 		"media_id": media_asset.media_id,
 		"status": media_asset.status,
 		"primary_url": cdn_url,

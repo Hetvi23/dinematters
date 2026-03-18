@@ -58,7 +58,7 @@ export default function ProductMediaTable({ value = [], onChange, required, disa
       })
 
       return {
-        media_asset: result.media_id,
+        media_asset: result.name,
         media_url: result.primary_url || '',
         media_type: mediaType,
         display_order: currentValue.length + index + 1,
@@ -118,7 +118,7 @@ export default function ProductMediaTable({ value = [], onChange, required, disa
         })
 
         return {
-          media_asset: result.media_id,
+          media_asset: result.name,
           media_url: result.primary_url || '',
           media_type: mediaType,
           display_order: currentValue.length + index + 1,

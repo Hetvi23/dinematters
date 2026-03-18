@@ -52,7 +52,7 @@ def create_document(doctype, doc_data):
 			}
 		}
 	except Exception as e:
-		frappe.log_error(f"Error creating {doctype}: {str(e)}")
+		frappe.log_error(str(e), title=f"Create Error: {doctype}")
 		return {
 			'success': False,
 			'error': {
@@ -107,7 +107,7 @@ def update_document(doctype, name, doc_data):
 			'name': doc.name
 		}
 	except frappe.ValidationError as e:
-		frappe.log_error(f"Validation error updating {doctype} {name}: {str(e)}")
+		frappe.log_error(str(e), title=f"Update Validation: {doctype}")
 		return {
 			'success': False,
 			'error': {
@@ -125,7 +125,7 @@ def update_document(doctype, name, doc_data):
 			}
 		}
 	except Exception as e:
-		frappe.log_error(f"Error updating {doctype} {name}: {str(e)}")
+		frappe.log_error(str(e), title=f"Update Error: {doctype}")
 		return {
 			'success': False,
 			'error': {

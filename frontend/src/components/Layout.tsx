@@ -1,7 +1,8 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield } from 'lucide-react'
+import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, Coins, Crown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetCall, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
+import { AiRechargeModal } from '@/components/AiRechargeModal'
 import { useState, useEffect, useMemo } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -126,6 +127,7 @@ const navigation: NavItem[] = [
     children: [
       { name: 'Products', href: '/products', icon: Package },
       { name: 'Categories', href: '/categories', icon: FolderTree },
+      { name: 'AI Image Gallery', href: '/ai-enhancements', icon: Sparkles },
       { name: 'Recommendations Engine', href: '/recommendations-engine', icon: FolderTree, feature: 'aiRecommendations' },
     ],
   },
@@ -156,8 +158,32 @@ export default function Layout({ children }: LayoutProps) {
   const [selectOpen, setSelectOpen] = useState(false) // Track if restaurant select is open
   const [lockAnimating, setLockAnimating] = useState(false) // Track lock animation state
 
+  // AI Credits in top bar
+  const [aiCredits, setAiCredits] = useState<number | null>(null)
+  const [showTopBarRecharge, setShowTopBarRecharge] = useState(false)
+  const { call: getAiBillingInfo } = useFrappePostCall('dinematters.dinematters.api.ai_billing.get_ai_billing_info')
+
   // Admin access state - using exact same pattern as TestApiCalls.tsx
   const [isAdmin, setIsAdmin] = useState(false)
+
+  // Fetch AI credits for top bar — refresh whenever restaurant changes
+  useEffect(() => {
+    if (!selectedRestaurant) return
+    getAiBillingInfo({ restaurant: selectedRestaurant })
+      .then((res) => { if (res?.message) setAiCredits(res.message.ai_credits ?? 0) })
+      .catch(() => { })
+  }, [selectedRestaurant])
+
+  // Sync credits when updated from other components
+  useEffect(() => {
+    const handleCreditsUpdate = (e: any) => {
+      if (typeof e.detail?.balance === 'number') {
+        setAiCredits(e.detail.balance)
+      }
+    }
+    window.addEventListener('ai-credits-updated', handleCreditsUpdate)
+    return () => window.removeEventListener('ai-credits-updated', handleCreditsUpdate)
+  }, [])
 
   // Expanded nav groups (persisted in localStorage)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
@@ -176,7 +202,7 @@ export default function Layout({ children }: LayoutProps) {
       else next.add(groupId)
       try {
         localStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify([...next]))
-      } catch {}
+      } catch { }
       return next
     })
   }
@@ -195,7 +221,7 @@ export default function Layout({ children }: LayoutProps) {
             const next = new Set(prev).add(item.id)
             try {
               localStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify([...next]))
-            } catch {}
+            } catch { }
             return next
           })
         }
@@ -211,11 +237,10 @@ export default function Layout({ children }: LayoutProps) {
     tables: ''
   })
   const [isCreating, setIsCreating] = useState(false)
-  
+
   // API call for creating restaurant
   const { call: createRestaurant } = useFrappePostCall('frappe.client.insert')
   const { call: generateQrCodes } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.generate_qr_codes_pdf')
-  const { call: checkAdminAccess } = useFrappePostCall('dinematters.dinematters.api.admin.check_admin_access')
 
   // Fetch user's restaurants
   const { data: restaurantsData } = useFrappeGetCall<{ message: { restaurants: Restaurant[] } }>(
@@ -224,18 +249,20 @@ export default function Layout({ children }: LayoutProps) {
     'user-restaurants'
   )
 
-  const restaurants = restaurantsData?.message?.restaurants || []
+  const restaurants = useMemo(() => restaurantsData?.message?.restaurants || [], [restaurantsData])
 
   // Update context with restaurants data
   useEffect(() => {
     // Always update context to stop loading, even if restaurants array is empty
-    setRestaurantsData(restaurants)
-  }, [restaurants, setRestaurantsData])
+    if (restaurantsData) {
+      setRestaurantsData(restaurants)
+    }
+  }, [restaurants, setRestaurantsData, restaurantsData])
 
   // Simple admin check - using same pattern as working TestApiCalls.tsx
   useEffect(() => {
     console.log('Current user from useFrappeAuth:', currentUser)
-    
+
     // Simple check: if user is Administrator, set admin to true
     // This follows the same pattern as TestApiCalls.tsx which works
     if (currentUser === 'Administrator') {
@@ -260,7 +287,7 @@ export default function Layout({ children }: LayoutProps) {
       })
       return
     }
-    
+
     setSelectedRestaurant(restaurantId)
     // Dispatch custom event to notify other components
     window.dispatchEvent(new CustomEvent('restaurant-selected'))
@@ -284,7 +311,7 @@ export default function Layout({ children }: LayoutProps) {
     try {
       // Parse tables as integer, default to 0 if empty
       const tablesCount = newRestaurantData.tables ? parseInt(newRestaurantData.tables, 10) : 0
-      
+
       // Create restaurant document
       const result = await createRestaurant({
         doc: {
@@ -301,7 +328,7 @@ export default function Layout({ children }: LayoutProps) {
         const createdRestaurant = result.message
         const restaurantName = createdRestaurant.restaurant_name || createdRestaurant.name
         const restaurantDocName = createdRestaurant.name || createdRestaurant.restaurant_id
-        
+
         // Generate QR codes if tables are specified
         if (tablesCount > 0) {
           try {
@@ -316,19 +343,19 @@ export default function Layout({ children }: LayoutProps) {
         } else {
           toast.success('Restaurant created successfully!')
         }
-        
+
         // Create URL-friendly restaurant name
         const urlFriendlyName = restaurantName.toLowerCase().replace(/\s+/g, '-')
-        
+
         // Close modal
         setShowCreateModal(false)
         setNewRestaurantData({ restaurant_name: '', owner_email: '', owner_phone: '', tables: '' })
-        
+
         // Set the selected restaurant
         setSelectedRestaurant(restaurantDocName)
         // Dispatch custom event to notify other components
         window.dispatchEvent(new CustomEvent('restaurant-selected'))
-        
+
         // Navigate to the new restaurant's setup wizard
         setTimeout(() => {
           navigate(`/setup/${encodeURIComponent(urlFriendlyName)}`, { replace: true })
@@ -428,8 +455,8 @@ export default function Layout({ children }: LayoutProps) {
     }).length
 
     // Calculate changes
-    const revenueChange = yesterdayRevenue > 0 
-      ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100 
+    const revenueChange = yesterdayRevenue > 0
+      ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100
       : (todayRevenue > 0 ? 100 : 0)
     const ordersChange = yesterdayOrdersCount > 0
       ? ((todayOrdersCount - yesterdayOrdersCount) / yesterdayOrdersCount) * 100
@@ -462,7 +489,7 @@ export default function Layout({ children }: LayoutProps) {
     setTimeout(() => {
       setLockAnimating(false)
     }, 300)
-    
+
     setSidebarExpanded(!sidebarExpanded)
     // Disable hover temporarily to prevent immediate re-expansion
     setHoverDisabled(true)
@@ -476,7 +503,7 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       {/* Sidebar - Toggleable with Hover */}
-      <aside 
+      <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 bg-sidebar border-r border-sidebar-border transform transition-all duration-200 ease-in-out shadow-sm",
           // Mobile: slide in/out
@@ -518,16 +545,28 @@ export default function Layout({ children }: LayoutProps) {
                       <SelectTrigger className="h-auto py-1.5 px-2 border-0 bg-transparent hover:bg-sidebar-accent shadow-none focus:ring-0 focus:ring-offset-0 w-full justify-between data-[state=open]:bg-sidebar-accent [&>svg:last-child]:hidden">
                         <div className="flex items-center min-w-0 flex-1 max-w-[calc(100%-2rem)]">
                           <div className="min-w-0 flex-1 overflow-hidden">
-                            <SelectValue className="text-sm font-semibold text-sidebar-foreground block">
-                            <span className="inline-block truncate max-w-full whitespace-nowrap overflow-hidden text-ellipsis">
-                                {restaurantDoc?.restaurant_name || currentRestaurant?.restaurant_name || restaurants[0]?.restaurant_name || 'Select Restaurant'}
-                              </span>
-                            </SelectValue>
+                             <SelectValue className="text-sm font-semibold text-sidebar-foreground block">
+                               <div className="flex items-center gap-1.5 min-w-0">
+                                 <span className="inline-block truncate whitespace-nowrap overflow-hidden text-ellipsis">
+                                   {restaurantDoc?.restaurant_name || currentRestaurant?.restaurant_name || restaurants[0]?.restaurant_name || 'Select Restaurant'}
+                                 </span>
+                                 {isPro ? (
+                                   <span className="inline-flex items-center px-1.5 py-0 text-[9px] font-bold bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-sm rounded-full flex-shrink-0">
+                                     <Crown className="h-2.5 w-2.5 mr-1" />
+                                     PRO
+                                   </span>
+                                 ) : (
+                                   <span className="inline-flex items-center px-1.5 py-0 text-[9px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 rounded-full flex-shrink-0">
+                                     LITE
+                                   </span>
+                                 )}
+                               </div>
+                             </SelectValue>
                           </div>
                         </div>
                         <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2 opacity-70" />
                       </SelectTrigger>
-                      <SelectContent 
+                      <SelectContent
                         className="min-w-[240px] z-[60]"
                         onCloseAutoFocus={() => {
                           // When dropdown closes, allow sidebar to collapse if needed
@@ -571,8 +610,8 @@ export default function Layout({ children }: LayoutProps) {
                       "hidden lg:flex items-center justify-center p-1.5 rounded-md transition-all duration-300",
                       "hover:bg-sidebar-accent active:scale-90",
                       "relative overflow-visible",
-                      sidebarExpanded 
-                        ? "text-primary hover:text-primary/80" 
+                      sidebarExpanded
+                        ? "text-primary hover:text-primary/80"
                         : "text-muted-foreground hover:text-sidebar-foreground"
                     )}
                     title={sidebarExpanded ? "Unlock sidebar (allow auto-collapse)" : "Lock sidebar (keep expanded)"}
@@ -609,8 +648,8 @@ export default function Layout({ children }: LayoutProps) {
                     "hidden lg:flex items-center justify-center p-1.5 rounded transition-all duration-300",
                     "hover:bg-sidebar-accent active:scale-90",
                     "relative overflow-visible",
-                    sidebarExpanded 
-                      ? "text-primary hover:text-primary/80" 
+                    sidebarExpanded
+                      ? "text-primary hover:text-primary/80"
                       : "text-muted-foreground hover:text-sidebar-foreground"
                   )}
                   title={sidebarExpanded ? "Unlock sidebar" : "Lock sidebar"}
@@ -651,247 +690,247 @@ export default function Layout({ children }: LayoutProps) {
               return filteredNav
             })()
               .map((item) => {
-              if (item.type === 'link') {
-                const Icon = item.icon
-                const isActive = location.pathname === item.href ||
-                  (item.href !== '/dashboard' && location.pathname.startsWith(item.href))
-                const showBadge = item.badgeHref === '/orders' && pendingOrders > 0
-                const isLocked = item.feature && !isPro && !(features as any)[item.feature]
+                if (item.type === 'link') {
+                  const Icon = item.icon
+                  const isActive = location.pathname === item.href ||
+                    (item.href !== '/dashboard' && location.pathname.startsWith(item.href))
+                  const showBadge = item.badgeHref === '/orders' && pendingOrders > 0
+                  const isLocked = item.feature && !isPro && !(features as any)[item.feature]
+
+                  return (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      onClick={(e) => {
+                        if (isLocked) {
+                          e.preventDefault()
+                          toast.error(`${item.name} requires PRO plan`, {
+                            description: 'Upgrade to PRO to unlock this feature',
+                            action: {
+                              label: 'Upgrade',
+                              onClick: () => navigate('/upgrade')
+                            }
+                          })
+                        } else {
+                          setSidebarOpen(false)
+                        }
+                      }}
+                      className={cn(
+                        "relative flex items-center rounded-md text-sm font-normal transition-all group",
+                        showExpanded ? "gap-3 px-3 py-2" : "justify-center px-2 py-2",
+                        "hover:bg-sidebar-accent active:bg-sidebar-accent/80",
+                        isActive
+                          ? "bg-primary/10 text-primary font-medium dark:bg-primary/20"
+                          : "text-sidebar-foreground hover:text-sidebar-foreground",
+                        isLocked && "opacity-60"
+                      )}
+                      title={!showExpanded ? item.name : undefined}
+                    >
+                      {isActive && (
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r" />
+                      )}
+                      <Icon className={cn(
+                        "h-4 w-4 flex-shrink-0",
+                        isActive ? "text-primary" : "text-muted-foreground"
+                      )} />
+                      {showExpanded && (
+                        <>
+                          <span className="flex-1">{item.name}</span>
+                          {isLocked && (
+                            <Lock className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />
+                          )}
+                          {!isLocked && showBadge && (
+                            <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
+                              {pendingOrders > 9 ? '9+' : pendingOrders}
+                            </span>
+                          )}
+                        </>
+                      )}
+                      {!showExpanded && (
+                        <span className="absolute left-full ml-2 px-2 py-1 rounded-md bg-foreground text-background text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 shadow-lg">
+                          {item.name}
+                          {isLocked && ' 🔒'}
+                          {showBadge && ` (${pendingOrders} pending)`}
+                        </span>
+                      )}
+                    </Link>
+                  )
+                }
+
+                // Group (dropdown)
+                const group = item
+                const Icon = group.icon
+                const isExpanded = expandedGroups.has(group.id)
+                const filteredChildren = group.children.filter(child => !child.adminOnly || isAdmin)
+                const hasActiveChild = filteredChildren.some(
+                  (c) => location.pathname === c.href || (c.href !== '/dashboard' && location.pathname.startsWith(c.href))
+                )
+                const showBadge = filteredChildren.some((c) => c.badgeHref === '/orders') && pendingOrders > 0
+                const isGroupLocked = group.feature && !isPro && !(features as any)[group.feature]
+
+                // Collapsed sidebar: show dropdown menu with child links
+                if (!showExpanded) {
+                  return (
+                    <DropdownMenu key={group.id}>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className={cn(
+                            "relative flex items-center justify-center w-full rounded-md p-2 transition-all",
+                            "hover:bg-sidebar-accent",
+                            hasActiveChild ? "text-primary" : "text-muted-foreground hover:text-sidebar-foreground"
+                          )}
+                          title={group.name}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {showBadge && (
+                            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" />
+                          )}
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent side="right" align="start" className="min-w-[180px]" sideOffset={8}>
+                        {group.children
+                          .filter(child => !child.adminOnly || isAdmin)
+                          .map((child) => {
+                            const ChildIcon = child.icon || group.icon
+                            const isChildActive = location.pathname === child.href || (child.href !== '/' && location.pathname.startsWith(child.href + '/'))
+                            const isChildLocked = child.feature && !isPro && !(features as any)[child.feature]
+                            return (
+                              <DropdownMenuItem key={child.href} asChild>
+                                <Link
+                                  to={child.href}
+                                  onClick={(e) => {
+                                    if (isChildLocked) {
+                                      e.preventDefault()
+                                      toast.error(`${child.name} requires PRO plan`, {
+                                        description: 'Upgrade to PRO to unlock this feature'
+                                      })
+                                    } else {
+                                      setSidebarOpen(false)
+                                    }
+                                  }}
+                                  className={cn("flex items-center gap-2 cursor-pointer", isChildActive && "bg-primary/10 text-primary", isChildLocked && "opacity-60")}
+                                >
+                                  <ChildIcon className="h-4 w-4" />
+                                  {child.name}
+                                  {isChildLocked && <Lock className="h-3 w-3 text-orange-500 ml-auto" />}
+                                  {!isChildLocked && child.badgeHref === '/orders' && pendingOrders > 0 && (
+                                    <span className="ml-auto bg-destructive text-white text-xs px-1.5 rounded-full">
+                                      {pendingOrders > 9 ? '9+' : pendingOrders}
+                                    </span>
+                                  )}
+                                </Link>
+                              </DropdownMenuItem>
+                            )
+                          })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )
+                }
 
                 return (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    onClick={(e) => {
-                      if (isLocked) {
-                        e.preventDefault()
-                        toast.error(`${item.name} requires PRO plan`, {
-                          description: 'Upgrade to PRO to unlock this feature',
-                          action: {
-                            label: 'Upgrade',
-                            onClick: () => navigate('/upgrade')
-                          }
-                        })
-                      } else {
-                        setSidebarOpen(false)
-                      }
-                    }}
-                    className={cn(
-                      "relative flex items-center rounded-md text-sm font-normal transition-all group",
-                      showExpanded ? "gap-3 px-3 py-2" : "justify-center px-2 py-2",
-                      "hover:bg-sidebar-accent active:bg-sidebar-accent/80",
-                      isActive
-                        ? "bg-primary/10 text-primary font-medium dark:bg-primary/20"
-                        : "text-sidebar-foreground hover:text-sidebar-foreground",
-                      isLocked && "opacity-60"
+                  <div key={group.id} className="space-y-0.5">
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(group.id)}
+                      className={cn(
+                        "relative flex items-center rounded-md text-sm font-normal transition-all group w-full",
+                        showExpanded ? "gap-3 px-3 py-2" : "justify-center px-2 py-2",
+                        "hover:bg-sidebar-accent active:bg-sidebar-accent/80",
+                        (hasActiveChild || isExpanded)
+                          ? "text-sidebar-foreground hover:text-sidebar-foreground"
+                          : "text-sidebar-foreground hover:text-sidebar-foreground",
+                        isGroupLocked && "opacity-60"
+                      )}
+                      title={!showExpanded ? group.name : undefined}
+                    >
+                      {hasActiveChild && !isExpanded && (
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r" />
+                      )}
+                      <Icon className={cn(
+                        "h-4 w-4 flex-shrink-0",
+                        hasActiveChild ? "text-primary" : "text-muted-foreground"
+                      )} />
+                      {showExpanded && (
+                        <>
+                          <span className="flex-1 text-left">{group.name}</span>
+                          {isGroupLocked && (
+                            <Lock className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />
+                          )}
+                          {!isGroupLocked && showBadge && (
+                            <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
+                              {pendingOrders > 9 ? '9+' : pendingOrders}
+                            </span>
+                          )}
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          )}
+                        </>
+                      )}
+                      {!showExpanded && (
+                        <span className="absolute left-full ml-2 px-2 py-1 rounded-md bg-foreground text-background text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 shadow-lg">
+                          {group.name}
+                          {isGroupLocked && ' 🔒'}
+                          {showBadge && ` (${pendingOrders} pending)`}
+                        </span>
+                      )}
+                    </button>
+                    {showExpanded && isExpanded && (
+                      <div className="ml-4 pl-2 border-l border-sidebar-border space-y-0.5">
+                        {group.children
+                          .filter(child => !child.adminOnly || isAdmin)
+                          .map((child) => {
+                            const ChildIcon = child.icon || group.icon
+                            const isChildActive = location.pathname === child.href ||
+                              (child.href !== '/dashboard' && location.pathname.startsWith(child.href))
+                            const showChildBadge = child.badgeHref === '/orders' && pendingOrders > 0
+                            const isChildLocked = child.feature && !isPro && !(features as any)[child.feature]
+                            return (
+                              <Link
+                                key={child.href}
+                                to={child.href}
+                                onClick={(e) => {
+                                  if (isChildLocked) {
+                                    e.preventDefault()
+                                    toast.error(`${child.name} requires PRO plan`, {
+                                      description: 'Upgrade to PRO to unlock this feature'
+                                    })
+                                  } else {
+                                    setSidebarOpen(false)
+                                  }
+                                }}
+                                className={cn(
+                                  "relative flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-all group",
+                                  "hover:bg-sidebar-accent",
+                                  isChildActive
+                                    ? "bg-primary/10 text-primary font-medium dark:bg-primary/20"
+                                    : "text-muted-foreground hover:text-sidebar-foreground",
+                                  isChildLocked && "opacity-60"
+                                )}
+                              >
+                                {isChildActive && (
+                                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r -ml-2" />
+                                )}
+                                <ChildIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                                <span className="flex-1 truncate">{child.name}</span>
+                                {isChildLocked && <Lock className="h-3 w-3 text-orange-500 flex-shrink-0" />}
+                                {!isChildLocked && showChildBadge && (
+                                  <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
+                                    {pendingOrders > 9 ? '9+' : pendingOrders}
+                                  </span>
+                                )}
+                              </Link>
+                            )
+                          })}
+                      </div>
                     )}
-                    title={!showExpanded ? item.name : undefined}
-                  >
-                    {isActive && (
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r" />
-                    )}
-                    <Icon className={cn(
-                      "h-4 w-4 flex-shrink-0",
-                      isActive ? "text-primary" : "text-muted-foreground"
-                    )} />
-                    {showExpanded && (
-                      <>
-                        <span className="flex-1">{item.name}</span>
-                        {isLocked && (
-                          <Lock className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />
-                        )}
-                        {!isLocked && showBadge && (
-                          <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
-                            {pendingOrders > 9 ? '9+' : pendingOrders}
-                          </span>
-                        )}
-                      </>
-                    )}
-                    {!showExpanded && (
-                      <span className="absolute left-full ml-2 px-2 py-1 rounded-md bg-foreground text-background text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 shadow-lg">
-                        {item.name}
-                        {isLocked && ' 🔒'}
-                        {showBadge && ` (${pendingOrders} pending)`}
-                      </span>
-                    )}
-                  </Link>
+                  </div>
                 )
-              }
-
-              // Group (dropdown)
-              const group = item
-              const Icon = group.icon
-              const isExpanded = expandedGroups.has(group.id)
-              const filteredChildren = group.children.filter(child => !child.adminOnly || isAdmin)
-              const hasActiveChild = filteredChildren.some(
-                (c) => location.pathname === c.href || (c.href !== '/dashboard' && location.pathname.startsWith(c.href))
-              )
-              const showBadge = filteredChildren.some((c) => c.badgeHref === '/orders') && pendingOrders > 0
-              const isGroupLocked = group.feature && !isPro && !(features as any)[group.feature]
-
-              // Collapsed sidebar: show dropdown menu with child links
-              if (!showExpanded) {
-                return (
-                  <DropdownMenu key={group.id}>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className={cn(
-                          "relative flex items-center justify-center w-full rounded-md p-2 transition-all",
-                          "hover:bg-sidebar-accent",
-                          hasActiveChild ? "text-primary" : "text-muted-foreground hover:text-sidebar-foreground"
-                        )}
-                        title={group.name}
-                      >
-                        <Icon className="h-4 w-4" />
-                        {showBadge && (
-                          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" />
-                        )}
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent side="right" align="start" className="min-w-[180px]" sideOffset={8}>
-                      {group.children
-                        .filter(child => !child.adminOnly || isAdmin)
-                        .map((child) => {
-                        const ChildIcon = child.icon || group.icon
-                        const isChildActive = location.pathname === child.href || (child.href !== '/' && location.pathname.startsWith(child.href + '/'))
-                        const isChildLocked = child.feature && !isPro && !(features as any)[child.feature]
-                        return (
-                          <DropdownMenuItem key={child.href} asChild>
-                            <Link
-                              to={child.href}
-                              onClick={(e) => {
-                                if (isChildLocked) {
-                                  e.preventDefault()
-                                  toast.error(`${child.name} requires PRO plan`, {
-                                    description: 'Upgrade to PRO to unlock this feature'
-                                  })
-                                } else {
-                                  setSidebarOpen(false)
-                                }
-                              }}
-                              className={cn("flex items-center gap-2 cursor-pointer", isChildActive && "bg-primary/10 text-primary", isChildLocked && "opacity-60")}
-                            >
-                              <ChildIcon className="h-4 w-4" />
-                              {child.name}
-                              {isChildLocked && <Lock className="h-3 w-3 text-orange-500 ml-auto" />}
-                              {!isChildLocked && child.badgeHref === '/orders' && pendingOrders > 0 && (
-                                <span className="ml-auto bg-destructive text-white text-xs px-1.5 rounded-full">
-                                  {pendingOrders > 9 ? '9+' : pendingOrders}
-                                </span>
-                              )}
-                            </Link>
-                          </DropdownMenuItem>
-                        )
-                      })}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )
-              }
-
-              return (
-                <div key={group.id} className="space-y-0.5">
-                  <button
-                    type="button"
-                    onClick={() => toggleGroup(group.id)}
-                    className={cn(
-                      "relative flex items-center rounded-md text-sm font-normal transition-all group w-full",
-                      showExpanded ? "gap-3 px-3 py-2" : "justify-center px-2 py-2",
-                      "hover:bg-sidebar-accent active:bg-sidebar-accent/80",
-                      (hasActiveChild || isExpanded)
-                        ? "text-sidebar-foreground hover:text-sidebar-foreground"
-                        : "text-sidebar-foreground hover:text-sidebar-foreground",
-                      isGroupLocked && "opacity-60"
-                    )}
-                    title={!showExpanded ? group.name : undefined}
-                  >
-                    {hasActiveChild && !isExpanded && (
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r" />
-                    )}
-                    <Icon className={cn(
-                      "h-4 w-4 flex-shrink-0",
-                      hasActiveChild ? "text-primary" : "text-muted-foreground"
-                    )} />
-                    {showExpanded && (
-                      <>
-                        <span className="flex-1 text-left">{group.name}</span>
-                        {isGroupLocked && (
-                          <Lock className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />
-                        )}
-                        {!isGroupLocked && showBadge && (
-                          <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
-                            {pendingOrders > 9 ? '9+' : pendingOrders}
-                          </span>
-                        )}
-                        {isExpanded ? (
-                          <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        )}
-                      </>
-                    )}
-                    {!showExpanded && (
-                      <span className="absolute left-full ml-2 px-2 py-1 rounded-md bg-foreground text-background text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 shadow-lg">
-                        {group.name}
-                        {isGroupLocked && ' 🔒'}
-                        {showBadge && ` (${pendingOrders} pending)`}
-                      </span>
-                    )}
-                  </button>
-                  {showExpanded && isExpanded && (
-                    <div className="ml-4 pl-2 border-l border-sidebar-border space-y-0.5">
-                      {group.children
-                        .filter(child => !child.adminOnly || isAdmin)
-                        .map((child) => {
-                        const ChildIcon = child.icon || group.icon
-                        const isChildActive = location.pathname === child.href ||
-                          (child.href !== '/dashboard' && location.pathname.startsWith(child.href))
-                        const showChildBadge = child.badgeHref === '/orders' && pendingOrders > 0
-                        const isChildLocked = child.feature && !isPro && !(features as any)[child.feature]
-                        return (
-                          <Link
-                            key={child.href}
-                            to={child.href}
-                            onClick={(e) => {
-                              if (isChildLocked) {
-                                e.preventDefault()
-                                toast.error(`${child.name} requires PRO plan`, {
-                                  description: 'Upgrade to PRO to unlock this feature'
-                                })
-                              } else {
-                                setSidebarOpen(false)
-                              }
-                            }}
-                            className={cn(
-                              "relative flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-all group",
-                              "hover:bg-sidebar-accent",
-                              isChildActive
-                                ? "bg-primary/10 text-primary font-medium dark:bg-primary/20"
-                                : "text-muted-foreground hover:text-sidebar-foreground",
-                              isChildLocked && "opacity-60"
-                            )}
-                          >
-                            {isChildActive && (
-                              <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r -ml-2" />
-                            )}
-                            <ChildIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                            <span className="flex-1 truncate">{child.name}</span>
-                            {isChildLocked && <Lock className="h-3 w-3 text-orange-500 flex-shrink-0" />}
-                            {!isChildLocked && showChildBadge && (
-                              <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
-                                {pendingOrders > 9 ? '9+' : pendingOrders}
-                              </span>
-                            )}
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+              })}
           </nav>
-          
+
           {/* Footer with Watch Preview, Theme Toggle and Tagline */}
           <div className="px-4 py-3 border-t border-sidebar-border bg-card space-y-2">
             {/* Watch Preview - always visible in sidebar on all pages */}
@@ -933,8 +972,8 @@ export default function Layout({ children }: LayoutProps) {
                     "relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ease-in-out",
                     "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card",
                     "hover:scale-105 active:scale-95",
-                    theme === 'dark' 
-                      ? "bg-primary shadow-md shadow-primary/30" 
+                    theme === 'dark'
+                      ? "bg-primary shadow-md shadow-primary/30"
                       : "bg-muted-foreground/30 hover:bg-muted-foreground/40"
                   )}
                   title={theme === 'light' ? "Switch to dark mode" : "Switch to light mode"}
@@ -982,8 +1021,8 @@ export default function Layout({ children }: LayoutProps) {
                     "relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ease-in-out",
                     "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-sidebar",
                     "hover:scale-105 active:scale-95",
-                    theme === 'dark' 
-                      ? "bg-primary shadow-md shadow-primary/30" 
+                    theme === 'dark'
+                      ? "bg-primary shadow-md shadow-primary/30"
                       : "bg-muted-foreground/30 hover:bg-muted-foreground/40"
                   )}
                   title={theme === 'light' ? "Switch to dark mode" : "Switch to light mode"}
@@ -1037,22 +1076,22 @@ export default function Layout({ children }: LayoutProps) {
                 {analytics.revenueChange !== 0 && (
                   <div className={cn(
                     "flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-md ml-1",
-                    analytics.revenueChange > 0 
-                      ? "text-[#107c10] bg-[#dff6dd] dark:text-[#81c784] dark:bg-[#1b5e20]" 
+                    analytics.revenueChange > 0
+                      ? "text-[#107c10] bg-[#dff6dd] dark:text-[#81c784] dark:bg-[#1b5e20]"
                       : "text-[#d13438] bg-[#fde7e9] dark:text-white dark:bg-[#b71c1c]"
                   )}>
                     {analytics.revenueChange > 0 ? (
                       <TrendingUp className={cn(
                         "h-2.5 w-2.5",
-                        analytics.revenueChange > 0 
-                          ? "text-[#107c10] dark:text-[#81c784]" 
+                        analytics.revenueChange > 0
+                          ? "text-[#107c10] dark:text-[#81c784]"
                           : "text-[#d13438] dark:text-white"
                       )} />
                     ) : (
                       <TrendingDown className={cn(
                         "h-2.5 w-2.5",
-                        analytics.revenueChange > 0 
-                          ? "text-[#107c10] dark:text-[#81c784]" 
+                        analytics.revenueChange > 0
+                          ? "text-[#107c10] dark:text-[#81c784]"
                           : "text-[#d13438] dark:text-white"
                       )} />
                     )}
@@ -1071,22 +1110,22 @@ export default function Layout({ children }: LayoutProps) {
                 {analytics.ordersChange !== 0 && (
                   <div className={cn(
                     "flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-md ml-1",
-                    analytics.ordersChange > 0 
-                      ? "text-[#107c10] bg-[#dff6dd] dark:text-[#81c784] dark:bg-[#1b5e20]" 
+                    analytics.ordersChange > 0
+                      ? "text-[#107c10] bg-[#dff6dd] dark:text-[#81c784] dark:bg-[#1b5e20]"
                       : "text-[#d13438] bg-[#fde7e9] dark:text-white dark:bg-[#b71c1c]"
                   )}>
                     {analytics.ordersChange > 0 ? (
                       <TrendingUp className={cn(
                         "h-2.5 w-2.5",
-                        analytics.ordersChange > 0 
-                          ? "text-[#107c10] dark:text-[#81c784]" 
+                        analytics.ordersChange > 0
+                          ? "text-[#107c10] dark:text-[#81c784]"
                           : "text-[#d13438] dark:text-white"
                       )} />
                     ) : (
                       <TrendingDown className={cn(
                         "h-2.5 w-2.5",
-                        analytics.ordersChange > 0 
-                          ? "text-[#107c10] dark:text-[#81c784]" 
+                        analytics.ordersChange > 0
+                          ? "text-[#107c10] dark:text-[#81c784]"
                           : "text-[#d13438] dark:text-white"
                       )} />
                     )}
@@ -1155,6 +1194,27 @@ export default function Layout({ children }: LayoutProps) {
                 )}
               </div>
             </div>
+
+            {/* AI Credits Chip — always visible beside user avatar */}
+            {aiCredits !== null && selectedRestaurant && (
+              <button
+                type="button"
+                onClick={() => setShowTopBarRecharge(true)}
+                title={`AI Credits: ${aiCredits} — click to recharge`}
+                className={cn(
+                  'hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xs font-semibold transition-all hover:scale-105 active:scale-95 flex-shrink-0',
+                  aiCredits < 5
+                    ? 'bg-red-50 border-red-300 text-red-600 dark:bg-red-950/20 dark:border-red-700 dark:text-red-400'
+                    : aiCredits < 10
+                      ? 'bg-amber-50 border-amber-300 text-amber-600 dark:bg-amber-950/20 dark:border-amber-700 dark:text-amber-400'
+                      : 'bg-primary/10 border-primary/30 text-primary dark:bg-primary/20 dark:border-primary/40'
+                )}
+              >
+                <Coins className="h-3.5 w-3.5" />
+                <span className="tabular-nums">{aiCredits}</span>
+                <span className="opacity-60 text-[10px] font-normal">credits</span>
+              </button>
+            )}
 
             {/* User Profile Dropdown */}
             <div className="flex items-center pl-2 pr-4 lg:pr-6 flex-shrink-0">
@@ -1267,6 +1327,20 @@ export default function Layout({ children }: LayoutProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AI Credits Recharge Modal — triggered from top bar chip */}
+      {selectedRestaurant && (
+        <AiRechargeModal
+          open={showTopBarRecharge}
+          onClose={() => setShowTopBarRecharge(false)}
+          restaurant={selectedRestaurant}
+          currentBalance={aiCredits ?? 0}
+          onSuccess={() => {
+            // Balance is already updated via 'ai-credits-updated' event in AiRechargeModal
+            setShowTopBarRecharge(false)
+          }}
+        />
+      )}
     </div>
   )
 }

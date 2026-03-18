@@ -38,6 +38,8 @@ import Customers from './pages/Customers'
 import Bookings from './pages/Bookings'
 import Coupons from './pages/Coupons'
 import AdminRestaurantManagement from './pages/AdminRestaurantManagement'
+import AIEnhancementPage from './pages/AIEnhancementPage'
+import AIGalleryPage from './pages/AIGalleryPage'
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -102,6 +104,8 @@ function AppContent() {
 						<Route path="/categories/:categoryId" element={<Layout><CategoryDetail /></Layout>} />
 						<Route path="/qr-codes" element={<Layout><QRCodes /></Layout>} />
 						<Route path="/home-features" element={<Layout><HomeFeaturesManager /></Layout>} />
+						<Route path="/ai-enhancements" element={<Layout><AIEnhancementPage /></Layout>} />
+						<Route path="/ai-gallery" element={<Layout><AIGalleryPage /></Layout>} />
 						<Route path="/Legacy Content" element={<Layout><LegacyContent /></Layout>} />
 						<Route path="/Legacy Signature Dish" element={<Layout><LegacySignatureDish /></Layout>} />
 						<Route path="/payment-stats" element={<Layout><PaymentStats /></Layout>} />

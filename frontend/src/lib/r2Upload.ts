@@ -12,6 +12,7 @@ interface UploadSessionResponse {
 }
 
 interface ConfirmUploadResponse {
+  name: string
   media_id: string
   status: string
   primary_url: string

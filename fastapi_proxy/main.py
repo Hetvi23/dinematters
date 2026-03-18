@@ -40,7 +40,8 @@ from routes import (
 	restaurant_routes,
 	frappe_routes,
 	resource_routes,
-	media_routes
+	media_routes,
+	ai_routes
 )
 
 # Setup logging
@@ -132,6 +133,7 @@ app.include_router(restaurant_routes.router, prefix="/api/method", tags=["Restau
 app.include_router(frappe_routes.router, prefix="/api/method", tags=["Frappe Client"])
 app.include_router(resource_routes.router, prefix="/api/resource", tags=["Resource API"])
 app.include_router(media_routes.router, prefix="/api/media", tags=["Media Management"])
+app.include_router(ai_routes.router, prefix="/api/ai", tags=["AI Media Management"])
 
 
 # Debug: Catch-all route to see what paths are being requested
