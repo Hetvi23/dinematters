@@ -31,7 +31,6 @@ import HomeFeaturesManager from './pages/HomeFeaturesManager'
 import LegacyContent from './pages/LegacyContent'
 import LegacySignatureDish from './pages/LegacySignatureDish'
 import Payment from './pages/Payment'
-import PaymentStats from './pages/PaymentStats'
 import PaymentSettings from './pages/PaymentSettings'
 import RecommendationsEngine from './pages/RecommendationsEngine'
 import Customers from './pages/Customers'
@@ -42,6 +41,7 @@ import AIEnhancementPage from './pages/AIEnhancementPage'
 import AIGalleryPage from './pages/AIGalleryPage'
 import AIMenuThemeBackgroundPage from './pages/AIMenuThemeBackgroundPage'
 import AIMenuThemeHistoryPage from './pages/AIMenuThemeHistoryPage'
+import AutopaySetupPage from './pages/AutopaySetupPage'
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -108,9 +108,10 @@ function AppContent() {
 						<Route path="/ai-gallery" element={<Layout><AIGalleryPage /></Layout>} />
 						<Route path="/ai-menu-theme-background" element={<Layout><AIMenuThemeBackgroundPage /></Layout>} />
 						<Route path="/ai-menu-theme-history" element={<Layout><AIMenuThemeHistoryPage /></Layout>} />
+						<Route path="/billing" element={<Layout><PaymentSettings /></Layout>} />
+						<Route path="/autopay-setup" element={<Layout><AutopaySetupPage /></Layout>} />
 						<Route path="/Legacy Content" element={<Layout><LegacyContent /></Layout>} />
 						<Route path="/Legacy Signature Dish" element={<Layout><LegacySignatureDish /></Layout>} />
-						<Route path="/payment-stats" element={<Layout><PaymentStats /></Layout>} />
 						<Route path="/restaurant/:restaurantId/payment" element={<Layout><Payment /></Layout>} />
 						<Route path="/restaurant/:restaurantId/billing" element={<Layout><PaymentSettings /></Layout>} />
 						<Route path="/:doctype" element={<Layout><ModuleList /></Layout>} />

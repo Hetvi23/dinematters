@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, Coins, Crown } from 'lucide-react'
+import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, Coins, Crown, CreditCard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetCall, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
 import { AiRechargeModal } from '@/components/AiRechargeModal'
@@ -106,6 +106,7 @@ const navigation: NavItem[] = [
   { type: 'link', name: 'Home Features', href: '/home-features', icon: Grid3x3 },
   { type: 'link', name: 'All Modules', href: '/modules', icon: Grid3x3 },
   { type: 'link', name: 'AI Menu Background', href: '/ai-menu-theme-background', icon: Sparkles },
+  { type: 'link', name: 'Customer pay & Usage', href: '/billing', icon: CreditCard },
   {
     type: 'group',
     id: 'manage-orders',
@@ -939,8 +940,7 @@ export default function Layout({ children }: LayoutProps) {
                     window.open(url, '_blank', 'noopener,noreferrer')
                   }}
                   className={cn(
-                    "w-full gap-2 border-primary/70 bg-primary/10 hover:bg-primary/20 hover:border-primary shadow-sm shadow-primary/30",
-                    theme === 'dark' ? "text-white" : "text-primary",
+                    "w-full gap-2",
                     !showExpanded && "w-10 px-0 justify-center"
                   )}
                 >
@@ -951,6 +951,20 @@ export default function Layout({ children }: LayoutProps) {
                       <ExternalLink className="h-3 w-3 flex-shrink-0" />
                     </>
                   )}
+                </Button>
+              </div>
+            )}
+            {showExpanded ? (
+              <div className="flex">
+                <Button variant="outline" size="sm" onClick={() => navigate('/autopay-setup')} className="w-full gap-2">
+                  <CreditCard className="h-3.5 w-3.5" />
+                  Billing & Autopay
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => navigate('/autopay-setup')} className="w-10 h-10 p-0" title="Billing & Autopay">
+                  <CreditCard className="h-4 w-4" />
                 </Button>
               </div>
             )}
@@ -999,10 +1013,7 @@ export default function Layout({ children }: LayoutProps) {
                       const url = baseUrl.replace(/\/$/, '') + '/' + previewPath
                       window.open(url, '_blank', 'noopener,noreferrer')
                     }}
-                    className={cn(
-                      "w-10 h-10 p-0 border-primary/70 bg-primary/10 hover:bg-primary/20 hover:border-primary shadow-sm shadow-primary/30",
-                      theme === 'dark' ? "text-white" : "text-primary",
-                    )}
+                    className="w-10 h-10 p-0"
                     title="Watch preview"
                   >
                     <Eye className="h-4 w-4" />

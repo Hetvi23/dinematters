@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Input } from '@/components/ui/input'
-import loginImage from '/images/login-dinematters.png'
+import loginImage from '/images/login-dinematters.webp'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 
@@ -50,6 +50,10 @@ export default function Login() {
         <img
           src={loginImage}
           alt="Dinematters"
+          width={1080}
+          height={1080}
+          fetchPriority="high"
+          decoding="async"
           className="absolute inset-0 h-full w-full object-cover"
         />
       </div>

@@ -23,11 +23,11 @@ import {
   Loader2,
   Eye,
   Image as ImageIcon,
-  RefreshCw,
   CheckCircle2,
   AlertTriangle,
   Download,
   Grid3x3,
+  Power,
 } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -328,10 +328,43 @@ export default function AIMenuThemeBackgroundPage() {
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <Button variant={isBackgroundEnabled ? 'default' : 'outline'} onClick={handleToggleBackground} disabled={isTogglingEnabled || isBusy} className="gap-2">
-            {isTogglingEnabled ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Menu BG {isBackgroundEnabled ? 'ON' : 'OFF'}
-          </Button>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isBackgroundEnabled}
+            aria-label="Toggle menu background"
+            onClick={handleToggleBackground}
+            disabled={isTogglingEnabled || isBusy}
+            className={`group inline-flex items-center gap-3 rounded-2xl border px-3 py-2 shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:opacity-60 ${
+              isBackgroundEnabled
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300'
+                : 'border-border bg-background text-muted-foreground hover:bg-accent/50'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span
+                className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors duration-200 ${
+                  isBackgroundEnabled ? 'bg-emerald-500' : 'bg-muted-foreground/25'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transition-transform duration-200 ${
+                    isBackgroundEnabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </span>
+              <div className="text-left leading-tight">
+                <p className="text-sm font-semibold text-foreground">Menu Background</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  {isBackgroundEnabled ? 'Enabled' : 'Disabled'}
+                </p>
+              </div>
+            </div>
+            <span className="flex items-center gap-1 rounded-full bg-white/70 px-2 py-1 text-xs font-medium shadow-sm dark:bg-black/20">
+              {isTogglingEnabled ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Power className="h-3.5 w-3.5" />}
+              {isBackgroundEnabled ? 'On' : 'Off'}
+            </span>
+          </button>
           <Link to="/ai-menu-theme-history">
             <Button variant="outline" className="gap-2">
               <Grid3x3 className="h-4 w-4" />
@@ -339,10 +372,6 @@ export default function AIMenuThemeBackgroundPage() {
             </Button>
           </Link>
           <Badge variant="outline" className={statusTone}>{status?.status || 'Idle'}</Badge>
-          <Button variant="outline" onClick={fetchStatus} disabled={isBusy} className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </Button>
         </div>
       </div>
 
