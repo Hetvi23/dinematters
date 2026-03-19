@@ -105,6 +105,7 @@ const navigation: NavItem[] = [
   { type: 'link', name: 'Setup Wizard', href: '/setup', icon: Sparkles },
   { type: 'link', name: 'Home Features', href: '/home-features', icon: Grid3x3 },
   { type: 'link', name: 'All Modules', href: '/modules', icon: Grid3x3 },
+  { type: 'link', name: 'AI Menu Background', href: '/ai-menu-theme-background', icon: Sparkles },
   {
     type: 'group',
     id: 'manage-orders',
@@ -671,24 +672,17 @@ export default function Layout({ children }: LayoutProps) {
 
           {/* Navigation */}
           <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto">
-            {(() => {
-              console.log('Rendering navigation, isAdmin:', isAdmin)
-              const filteredNav = navigation.filter(item => {
-                // Filter out admin-only items if user is not admin
+            {navigation
+              .filter((item) => {
                 if (item.adminOnly && !isAdmin) {
-                  console.log('Filtering out admin-only item:', item.name)
                   return false
                 }
-                // For groups, also filter children
                 if (item.type === 'group') {
-                  const filteredChildren = item.children.filter(child => !child.adminOnly || isAdmin)
+                  const filteredChildren = item.children.filter((child) => !child.adminOnly || isAdmin)
                   return filteredChildren.length > 0
                 }
                 return true
               })
-              console.log('Filtered navigation items:', filteredNav.map(item => item.name))
-              return filteredNav
-            })()
               .map((item) => {
                 if (item.type === 'link') {
                   const Icon = item.icon

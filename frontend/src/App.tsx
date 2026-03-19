@@ -40,6 +40,8 @@ import Coupons from './pages/Coupons'
 import AdminRestaurantManagement from './pages/AdminRestaurantManagement'
 import AIEnhancementPage from './pages/AIEnhancementPage'
 import AIGalleryPage from './pages/AIGalleryPage'
+import AIMenuThemeBackgroundPage from './pages/AIMenuThemeBackgroundPage'
+import AIMenuThemeHistoryPage from './pages/AIMenuThemeHistoryPage'
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -63,8 +65,6 @@ function AppContent() {
 						{/* Redirect Home Feature to dedicated page */}
 						<Route path="/Home Feature" element={<Navigate to="/home-features" replace />} />
 						<Route path="/Home%20Feature" element={<Navigate to="/home-features" replace />} />
-						<Route path="/:doctype" element={<Layout><ModuleList /></Layout>} />
-						<Route path="/:doctype/:docname" element={<Layout><ModuleDetail /></Layout>} />
 
 						{/* Admin Route - Restaurant Management */}
 						<Route path="/admin/restaurants" element={<Layout><AdminRestaurantManagement /></Layout>} />
@@ -106,11 +106,15 @@ function AppContent() {
 						<Route path="/home-features" element={<Layout><HomeFeaturesManager /></Layout>} />
 						<Route path="/ai-enhancements" element={<Layout><AIEnhancementPage /></Layout>} />
 						<Route path="/ai-gallery" element={<Layout><AIGalleryPage /></Layout>} />
+						<Route path="/ai-menu-theme-background" element={<Layout><AIMenuThemeBackgroundPage /></Layout>} />
+						<Route path="/ai-menu-theme-history" element={<Layout><AIMenuThemeHistoryPage /></Layout>} />
 						<Route path="/Legacy Content" element={<Layout><LegacyContent /></Layout>} />
 						<Route path="/Legacy Signature Dish" element={<Layout><LegacySignatureDish /></Layout>} />
 						<Route path="/payment-stats" element={<Layout><PaymentStats /></Layout>} />
 						<Route path="/restaurant/:restaurantId/payment" element={<Layout><Payment /></Layout>} />
 						<Route path="/restaurant/:restaurantId/billing" element={<Layout><PaymentSettings /></Layout>} />
+						<Route path="/:doctype" element={<Layout><ModuleList /></Layout>} />
+						<Route path="/:doctype/:docname" element={<Layout><ModuleDetail /></Layout>} />
 					</Route>
 				</Routes>
 			</BrowserRouter>

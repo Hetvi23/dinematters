@@ -20,6 +20,15 @@
   "logo",
   "hero_video",
   "apple_touch_icon",
+  "section_break_ai_theme_background",
+  "menu_theme_background_enabled",
+  "menu_theme_generation_status",
+  "menu_theme_background_active",
+  "column_break_ai_theme_background",
+  "menu_theme_background_preview",
+  "menu_theme_background_sources",
+  "menu_theme_background_history",
+  "menu_theme_last_error",
   "section_break_color_palette",
   "color_palette_violet",
   "color_palette_indigo",
@@ -113,6 +122,60 @@
    "fieldname": "apple_touch_icon",
    "fieldtype": "Attach Image",
    "label": "Apple Touch Icon"
+  },
+  {
+   "fieldname": "section_break_ai_theme_background",
+   "fieldtype": "Section Break",
+   "label": "AI Theme Background"
+  },
+  {
+   "default": "1",
+   "fieldname": "menu_theme_background_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Theme Background"
+  },
+  {
+   "default": "Idle",
+   "fieldname": "menu_theme_generation_status",
+   "fieldtype": "Select",
+   "label": "Theme Generation Status",
+   "options": "Idle\nPending\nProcessing\nCompleted\nFailed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "menu_theme_background_active",
+   "fieldtype": "Attach Image",
+   "label": "Active Theme Background"
+  },
+  {
+   "fieldname": "column_break_ai_theme_background",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "menu_theme_background_preview",
+   "fieldtype": "Attach Image",
+   "label": "Latest Theme Background Preview",
+   "read_only": 1
+  },
+  {
+   "fieldname": "menu_theme_background_sources",
+   "fieldtype": "JSON",
+   "label": "Theme Background Sources",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "menu_theme_background_history",
+   "fieldtype": "JSON",
+   "label": "Theme Background History",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "menu_theme_last_error",
+   "fieldtype": "Small Text",
+   "label": "Theme Background Error",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_color_palette",

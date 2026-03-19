@@ -35,7 +35,8 @@ def get_restaurant_config(restaurant_id):
 			["restaurant_name", "tagline", "subtitle", "description", "primary_color", "default_theme",
 			 "logo", "hero_video", "apple_touch_icon", "color_palette_violet", "color_palette_indigo",
 			 "color_palette_blue", "color_palette_green", "color_palette_yellow", "color_palette_orange",
-			 "color_palette_red", "currency", "menu_layout", "enable_table_booking", "enable_banquet_booking",
+			 "color_palette_red", "menu_theme_background_active", "menu_theme_background_preview", "menu_theme_background_history", "currency", "menu_layout", "enable_table_booking", "enable_banquet_booking",
+			 "menu_theme_background_enabled",
 			 "enable_events", "enable_offers", "enable_coupons", "enable_experience_lounge", "verify_my_user",
 			 "google_review_link", "instagram_profile_link", "facebook_profile_link", "whatsapp_phone_number"],
 			as_dict=True
@@ -56,6 +57,10 @@ def get_restaurant_config(restaurant_id):
 				"logo": restaurant_doc.logo,
 				"hero_video": "",
 				"apple_touch_icon": "",
+				"menu_theme_background_active": "",
+				"menu_theme_background_preview": "",
+				"menu_theme_background_history": [],
+				"menu_theme_background_enabled": 1,
 				"currency": restaurant_doc.currency or "INR",
 				"enable_table_booking": 1,
 				"enable_banquet_booking": 1,
@@ -130,6 +135,7 @@ def get_restaurant_config(restaurant_id):
 		
 		# Get currency info with symbol
 		currency_info = get_restaurant_currency_info(restaurant)
+		menu_theme_background_enabled = bool(config.get("menu_theme_background_enabled", 1))
 		
 		# Include restaurant basic info and location (google map URL from restaurant context)
 		response_data = {
@@ -150,6 +156,10 @@ def get_restaurant_config(restaurant_id):
 				"heroVideo": hero_video or config.get("hero_video", ""),
 				"appleTouchIcon": apple_touch_icon,
 				"appleTouchIconVariants": icon_variants,
+				"menuThemeBackgroundEnabled": menu_theme_background_enabled,
+				"menuThemeBackground": config.get("menu_theme_background_active", "") if menu_theme_background_enabled else "",
+				"menuThemeBackgroundPreview": config.get("menu_theme_background_preview", "") if menu_theme_background_enabled else "",
+				"menuThemeBackgroundHistory": config.get("menu_theme_background_history", []) if menu_theme_background_enabled else [],
 				"colorPalette": color_palette if color_palette else {
 					"violet": "#A992B2",
 					"indigo": "#8892B0",

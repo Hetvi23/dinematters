@@ -5,7 +5,155 @@ import base64
 import os
 import uuid
 import random
+from PIL import Image, ImageFilter, ImageOps
 from dinematters.dinematters.media.storage import upload_object, get_cdn_url, generate_object_key
+
+MENU_THEME_CREDITS = 15
+MENU_THEME_OUTPUT_SIZE = (1080, 1920)
+
+
+def _get_restaurant_config_name(restaurant):
+    config_name = frappe.db.get_value("Restaurant Config", {"restaurant": restaurant}, "name")
+    if config_name:
+        return config_name
+
+    restaurant_name = frappe.db.get_value("Restaurant", restaurant, "restaurant_name") or restaurant
+    config_doc = frappe.get_doc({
+        "doctype": "Restaurant Config",
+        "restaurant": restaurant,
+        "restaurant_name": restaurant_name,
+        "primary_color": "#DB782F",
+        "default_theme": "light",
+        "currency": frappe.db.get_value("Restaurant", restaurant, "currency") or "INR",
+        "menu_layout": "2 Columns",
+    })
+    config_doc.insert(ignore_permissions=True)
+    frappe.db.commit()
+    return config_doc.name
+
+
+def _coerce_json_list(value):
+    if not value:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, list) else []
+        except Exception:
+            return []
+    return []
+
+
+def _to_json_string(value):
+    return json.dumps(value or [])
+
+
+def _update_theme_history(config_name, image_url, source_images, activate=False):
+    config_doc = frappe.get_doc("Restaurant Config", config_name)
+    history = _coerce_json_list(config_doc.menu_theme_background_history)
+    entry = {
+        "id": frappe.generate_hash(length=10),
+        "image_url": image_url,
+        "source_images": source_images,
+        "created_on": frappe.utils.now(),
+        "active": bool(activate),
+    }
+
+    for item in history:
+        item["active"] = False
+    history.insert(0, entry)
+    config_doc.db_set("menu_theme_background_history", _to_json_string(history), update_modified=False)
+    if activate:
+        config_doc.db_set("menu_theme_background_active", image_url, update_modified=False)
+    return entry
+
+
+def _build_theme_generation_prompt(restaurant_name, source_count):
+    return (
+        f"You are designing a premium decorative mobile menu background for the restaurant '{restaurant_name}'. "
+        f"Analyze the attached {source_count} menu page image(s) and grab exact visuals, graphics, and decorative materials available in menu"
+        "Ignore ALL text, menu items, prices, descriptions, menu grids, and layout structures from the uploaded menu pages. "
+
+        "Generate a NEW background wallpaper image specifically designed for a mobile digital menu interface. "
+
+        "VISUAL COMPOSITION: "
+        "Leave the central 70% of the image mostly empty with very light graphics only. "
+        "Place graphical visual elements only along the bottom or edges top. "
+        "Use exact similar graphics (not words, or restaurant name or heading etc) and visual available in menu and inspired by the menu theme and maybe items. "
+
+        "STYLE: "
+        "Avoid too bright saturated colors that would reduce text readability. "
+
+        "STRICTLY DO NOT INCLUDE: "
+        "Any graphics having words, text, letters, words, menu items, numbers, prices, labels, typography, menu cards, menu grids, food collages, or screenshots. "
+        "No visible menus, no product listings, no watermarks. "
+
+        "OUTPUT: "
+        "restaurant-themed background optimized for mobile app menu UI overlays."
+    )
+
+
+def generate_menu_theme_background_gemini(image_paths, restaurant_name):
+    gemini_key = frappe.conf.get("gemini_api_key")
+    if not gemini_key:
+        frappe.throw("Gemini API key required for generation")
+
+    prompt = _build_theme_generation_prompt(restaurant_name, len(image_paths))
+    parts = [{"text": prompt}]
+
+    for image_path in image_paths:
+        with open(image_path, "rb") as f:
+            img_data = f.read()
+        ext = os.path.splitext(image_path)[1].lower()
+        mime_type = "image/png" if ext == ".png" else "image/jpeg"
+        parts.append({
+            "inline_data": {
+                "mime_type": mime_type,
+                "data": base64.b64encode(img_data).decode("utf-8")
+            }
+        })
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key={gemini_key}"
+    payload = {"contents": [{"parts": parts}]}
+
+    response = requests.post(url, json=payload)
+    response.raise_for_status()
+    res_json = response.json()
+
+    if 'candidates' in res_json and res_json['candidates']:
+        for part in res_json['candidates'][0]['content']['parts']:
+            if 'inlineData' in part:
+                temp_output = f"/tmp/{uuid.uuid4().hex}.png"
+                with open(temp_output, "wb") as f:
+                    f.write(base64.b64decode(part['inlineData']['data']))
+                return temp_output
+
+    frappe.throw("Gemini failed to generate a menu theme background image.")
+
+
+def normalize_menu_theme_background_image(source_path, target_size=MENU_THEME_OUTPUT_SIZE):
+    target_width, target_height = target_size
+    temp_output = f"/tmp/{uuid.uuid4().hex}.jpg"
+
+    with Image.open(source_path) as image:
+        image = ImageOps.exif_transpose(image)
+        image = image.convert("RGB")
+
+        background = ImageOps.fit(image, target_size, method=Image.Resampling.LANCZOS)
+        background = background.filter(ImageFilter.GaussianBlur(radius=18))
+        fitted = ImageOps.contain(image, target_size, method=Image.Resampling.LANCZOS)
+        canvas = Image.new("RGB", target_size)
+        canvas.paste(background, (0, 0))
+
+        offset_x = (target_width - fitted.width) // 2
+        offset_y = (target_height - fitted.height) // 2
+        canvas.paste(fitted, (offset_x, offset_y))
+        canvas.save(temp_output, format="JPEG", quality=92, optimize=True)
+
+    return temp_output
+
 
 def get_random_reference_image():
     """Selects a random image from the internal reference_images directory."""
@@ -20,6 +168,7 @@ def get_random_reference_image():
     # Absolute fallback to public images if internal is somehow missing
     images_folder = frappe.get_app_path("dinematters", "public", "dinematters", "images")
     return os.path.join(images_folder, "login-dinematters.png")
+
 
 @frappe.whitelist(allow_guest=False)
 def upload_base64_image(filename, filedata):
@@ -39,6 +188,7 @@ def upload_base64_image(filename, filedata):
     frappe.db.commit()
     
     return {"file_url": file_doc.file_url}
+
 
 @frappe.whitelist(allow_guest=False)
 def enqueue_enhancement(restaurant, owner_doctype, owner_name, original_image_url=None, mode="enhance", include_branding=False):
@@ -98,6 +248,7 @@ def enqueue_enhancement(restaurant, owner_doctype, owner_name, original_image_ur
 
     return {"generation_id": doc.name}
 
+
 @frappe.whitelist(allow_guest=False)
 def get_enhancement_status(generation_id):
     """Returns the status and output of a generation."""
@@ -110,6 +261,7 @@ def get_enhancement_status(generation_id):
         "enhanced_image_url": doc.enhanced_image_url,
         "error_message": doc.error_message
     }
+
 
 @frappe.whitelist(allow_guest=False)
 def get_generative_gallery(restaurant, limit=50):
@@ -124,6 +276,7 @@ def get_generative_gallery(restaurant, limit=50):
         limit=limit
     )
     return generations
+
 
 @frappe.whitelist(allow_guest=False)
 def download_proxy(file_url, filename=None):
@@ -143,6 +296,7 @@ def download_proxy(file_url, filename=None):
     frappe.response.filename = filename
     frappe.response.filecontent = response.content
     frappe.response.type = "download"
+
 
 @frappe.whitelist(allow_guest=False)
 def apply_to_product(generation_id, replace_index=None):
@@ -184,6 +338,7 @@ def apply_to_product(generation_id, replace_index=None):
     frappe.db.commit()
     return {"success": True}
 
+
 def download_image(url):
     temp_path = f"/tmp/{uuid.uuid4().hex}.jpg"
     
@@ -203,6 +358,7 @@ def download_image(url):
         for chunk in response.iter_content(chunk_size=8192):
             f.write(chunk)
     return temp_path
+
 
 def generate_image_gemini(image_path, dish_name, dish_description, dish_category=None, include_branding=False, restaurant_name=None):
     """Uses Gemini 2.5 Flash Image for native image-to-image enhancement."""
@@ -268,6 +424,7 @@ def generate_image_gemini(image_path, dish_name, dish_description, dish_category
                 return temp_output
                 
     frappe.throw("Gemini failed to generate an image in the response.")
+
 
 def generate_image_gemini_from_product(dish_name, dish_description, dish_category=None, include_branding=False, restaurant_name=None):
     """Generates a NEW food photo from scratch using only product info + reference image."""
@@ -409,3 +566,190 @@ def process_ai_image_enhancement(generation_name, mode="enhance", include_brandi
             os.remove(temp_input_path)
         if temp_output_path and os.path.exists(temp_output_path):
             os.remove(temp_output_path)
+
+
+@frappe.whitelist(allow_guest=False)
+def generate_menu_theme_background(restaurant, source_images, activate=1):
+    from dinematters.dinematters.api.ai_billing import deduct_credits_for_enhancement
+
+    if isinstance(source_images, str):
+        source_images = json.loads(source_images) if source_images else []
+
+    if not isinstance(source_images, list):
+        frappe.throw("source_images must be a list of uploaded image URLs.")
+
+    source_images = [img for img in source_images if img]
+    if len(source_images) < 1 or len(source_images) > 3:
+        frappe.throw("Please upload between 1 and 3 menu images.")
+
+    balance = frappe.db.get_value("Restaurant", restaurant, "ai_credits") or 0
+    if balance < MENU_THEME_CREDITS:
+        frappe.throw(
+            f"Insufficient AI credits. You need {MENU_THEME_CREDITS} credits but only have {balance}. Please recharge your AI credit wallet.",
+            frappe.ValidationError,
+        )
+
+    config_name = _get_restaurant_config_name(restaurant)
+    config_doc = frappe.get_doc("Restaurant Config", config_name)
+    config_doc.db_set("menu_theme_generation_status", "Pending", update_modified=False)
+    config_doc.db_set("menu_theme_background_preview", "", update_modified=False)
+    config_doc.db_set("menu_theme_background_sources", _to_json_string(source_images), update_modified=False)
+    config_doc.db_set("menu_theme_last_error", "", update_modified=False)
+    frappe.db.commit()
+
+    try:
+        deduct_credits_for_enhancement(restaurant=restaurant, generation_id=config_name, credits=MENU_THEME_CREDITS)
+    except Exception as e:
+        config_doc.db_set("menu_theme_generation_status", "Failed", update_modified=False)
+        config_doc.db_set("menu_theme_last_error", str(e), update_modified=False)
+        frappe.db.commit()
+        raise
+
+    frappe.enqueue(
+        "dinematters.dinematters.api.ai_media.process_menu_theme_background_generation",
+        queue="default",
+        timeout=600,
+        restaurant=restaurant,
+        config_name=config_name,
+        source_images=source_images,
+        activate=frappe.utils.cint(activate),
+        credits_to_refund=MENU_THEME_CREDITS,
+    )
+
+    return {
+        "success": True,
+        "config_name": config_name,
+        "status": "Pending",
+    }
+
+
+@frappe.whitelist(allow_guest=False)
+def get_menu_theme_background_status(restaurant):
+    config_name = _get_restaurant_config_name(restaurant)
+    config_doc = frappe.get_doc("Restaurant Config", config_name)
+    return {
+        "success": True,
+        "enabled": bool(config_doc.menu_theme_background_enabled),
+        "status": config_doc.menu_theme_generation_status or "Idle",
+        "active_image": config_doc.menu_theme_background_active,
+        "preview_image": config_doc.menu_theme_background_preview,
+        "source_images": _coerce_json_list(config_doc.menu_theme_background_sources),
+        "history": _coerce_json_list(config_doc.menu_theme_background_history),
+        "error_message": config_doc.menu_theme_last_error,
+    }
+
+
+@frappe.whitelist(allow_guest=False)
+def set_menu_theme_background_enabled(restaurant, enabled):
+    config_name = _get_restaurant_config_name(restaurant)
+    config_doc = frappe.get_doc("Restaurant Config", config_name)
+    enabled_value = 1 if frappe.utils.cint(enabled) else 0
+    config_doc.db_set("menu_theme_background_enabled", enabled_value, update_modified=False)
+    frappe.db.commit()
+    return {
+        "success": True,
+        "enabled": bool(enabled_value),
+    }
+
+
+@frappe.whitelist(allow_guest=False)
+def activate_menu_theme_background(restaurant, image_url):
+    if not image_url:
+        frappe.throw("image_url is required")
+
+    config_name = _get_restaurant_config_name(restaurant)
+    config_doc = frappe.get_doc("Restaurant Config", config_name)
+    history = _coerce_json_list(config_doc.menu_theme_background_history)
+    found = False
+    for item in history:
+        item["active"] = item.get("image_url") == image_url
+        if item["active"]:
+            found = True
+
+    if not found:
+        history.insert(0, {
+            "id": frappe.generate_hash(length=10),
+            "image_url": image_url,
+            "source_images": _coerce_json_list(config_doc.menu_theme_background_sources),
+            "created_on": frappe.utils.now(),
+            "active": True,
+        })
+
+    config_doc.db_set("menu_theme_background_active", image_url, update_modified=False)
+    config_doc.db_set("menu_theme_background_history", _to_json_string(history), update_modified=False)
+    frappe.db.commit()
+    return {"success": True, "active_image": image_url}
+
+
+def process_menu_theme_background_generation(restaurant, config_name, source_images, activate=1, credits_to_refund=0):
+    from dinematters.dinematters.api.ai_billing import refund_credits_for_failed_enhancement
+
+    config_doc = frappe.get_doc("Restaurant Config", config_name)
+    config_doc.db_set("menu_theme_generation_status", "Processing", update_modified=False)
+    config_doc.db_set("menu_theme_last_error", "", update_modified=False)
+    frappe.db.commit()
+
+    temp_input_paths = []
+    temp_output_path = None
+    normalized_output_path = None
+
+    try:
+        restaurant_name = frappe.db.get_value("Restaurant", restaurant, "restaurant_name") or restaurant
+        for image_url in source_images:
+            temp_input_paths.append(download_image(image_url))
+
+        temp_output_path = generate_menu_theme_background_gemini(temp_input_paths, restaurant_name)
+        normalized_output_path = normalize_menu_theme_background_image(temp_output_path)
+
+        uid = frappe.generate_hash(length=8)
+        object_key = generate_object_key(
+            restaurant_id=restaurant,
+            owner_doctype="Restaurant Config",
+            owner_name=config_name,
+            media_role="restaurant_config_logo",
+            media_id=uid,
+            filename="menu-theme-background.jpg",
+            variant="lg"
+        )
+
+        r2_cdn_url = upload_object(normalized_output_path, object_key, content_type="image/jpeg")
+
+        config_doc.db_set("menu_theme_background_preview", r2_cdn_url, update_modified=False)
+        _update_theme_history(config_name, r2_cdn_url, source_images, activate=bool(frappe.utils.cint(activate)))
+        config_doc.db_set("menu_theme_generation_status", "Completed", update_modified=False)
+        config_doc.db_set("menu_theme_last_error", "", update_modified=False)
+        frappe.db.commit()
+
+    except Exception as e:
+        config_doc.db_set("menu_theme_generation_status", "Failed", update_modified=False)
+        config_doc.db_set("menu_theme_last_error", str(e), update_modified=False)
+        frappe.db.commit()
+        frappe.log_error(f"Menu Theme Background Generation Failed: {str(e)}", "AI Menu Theme Background")
+
+        if credits_to_refund > 0:
+            try:
+                refund_credits_for_failed_enhancement(
+                    restaurant=restaurant,
+                    generation_id=config_name,
+                    credits=credits_to_refund
+                )
+            except Exception as refund_err:
+                frappe.log_error(f"Credit Refund Failed for menu theme {config_name}: {str(refund_err)}", "AI Billing Refund")
+
+    finally:
+        for temp_input_path in temp_input_paths:
+            try:
+                if temp_input_path and os.path.exists(temp_input_path):
+                    os.remove(temp_input_path)
+            except Exception:
+                pass
+        try:
+            if temp_output_path and os.path.exists(temp_output_path):
+                os.remove(temp_output_path)
+        except Exception:
+            pass
+        try:
+            if normalized_output_path and os.path.exists(normalized_output_path):
+                os.remove(normalized_output_path)
+        except Exception:
+            pass
