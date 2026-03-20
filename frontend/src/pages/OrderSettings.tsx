@@ -47,7 +47,7 @@ export default function OrderSettings() {
     
     setSaving(true)
     try {
-      const response = await updateSettings({
+      const response: any = await updateSettings({
         restaurant_id: selectedRestaurant,
         settings: {
           enable_takeaway: settings.enable_takeaway,
@@ -58,12 +58,13 @@ export default function OrderSettings() {
           default_delivery_fee: settings.default_delivery_fee
         }
       })
-      
-      if (response?.success) {
+
+      const body = response?.message ?? response
+      if (body?.success) {
         await mutate()
         toast.success('Order settings saved successfully')
       } else {
-        throw new Error(response?.error?.message || 'Failed to save settings')
+        throw new Error(body?.error?.message || 'Failed to save settings')
       }
     } catch (error: any) {
       console.error('Failed to save settings:', error)

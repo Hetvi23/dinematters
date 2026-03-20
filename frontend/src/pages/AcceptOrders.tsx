@@ -335,11 +335,16 @@ export default function AcceptOrders() {
     const orderId = active.id as string
 
     try {
-      await updateOrderStatus({ order_id: orderId, status: ACCEPTED_STATUS })
-      toast.success('Order accepted — pushed to KOT')
-      mutate()
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : 'Failed to accept order'
+      const response: any = await updateOrderStatus({ order_id: orderId, status: ACCEPTED_STATUS })
+      const body = response?.message ?? response
+      if (body?.success) {
+        toast.success('Order accepted — pushed to KOT')
+        mutate()
+      } else {
+        throw new Error(body?.error?.message || 'Failed to accept order')
+      }
+    } catch (error: any) {
+      const msg = error?.message || 'Failed to accept order'
       console.error('Failed to accept order:', error)
       toast.error(msg)
       mutate()
@@ -353,11 +358,16 @@ export default function AcceptOrders() {
 
   const handleAccept = async (orderId: string) => {
     try {
-      await updateOrderStatus({ order_id: orderId, status: ACCEPTED_STATUS })
-      toast.success('Order accepted — pushed to KOT')
-      mutate()
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : 'Failed to accept order'
+      const response: any = await updateOrderStatus({ order_id: orderId, status: ACCEPTED_STATUS })
+      const body = response?.message ?? response
+      if (body?.success) {
+        toast.success('Order accepted — pushed to KOT')
+        mutate()
+      } else {
+        throw new Error(body?.error?.message || 'Failed to accept order')
+      }
+    } catch (error: any) {
+      const msg = error?.message || 'Failed to accept order'
       console.error('Failed to accept order:', error)
       toast.error(msg)
       mutate()
@@ -375,11 +385,16 @@ export default function AcceptOrders() {
       })
       if (!ok) return
 
-      await updateOrderStatus({ order_id: orderId, status: REJECTED_STATUS })
-      toast.success('Order cancelled')
-      mutate()
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : 'Failed to cancel order'
+      const response: any = await updateOrderStatus({ order_id: orderId, status: REJECTED_STATUS })
+      const body = response?.message ?? response
+      if (body?.success) {
+        toast.success('Order cancelled')
+        mutate()
+      } else {
+        throw new Error(body?.error?.message || 'Failed to cancel order')
+      }
+    } catch (error: any) {
+      const msg = error?.message || 'Failed to cancel order'
       console.error('Failed to cancel order:', error)
       toast.error(msg)
       mutate()
