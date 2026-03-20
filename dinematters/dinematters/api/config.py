@@ -568,3 +568,66 @@ def get_filters(restaurant_id):
 		}
 
 
+
+@frappe.whitelist()
+def update_order_settings(restaurant_id, settings):
+	"""
+	POST /api/method/dinematters.dinematters.api.config.update_order_settings
+	Update multiple order-related settings in a single transaction
+	"""
+	try:
+		# Validate restaurant access
+		restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user)
+		
+		# Parse settings if string
+		if isinstance(settings, str):
+			settings = json.loads(settings)
+		
+		# Get restaurant document
+		restaurant_doc = frappe.get_doc("Restaurant", restaurant)
+		
+		# Update fields
+		updated_fields = []
+		allowed_fields = [
+			"enable_takeaway", 
+			"enable_delivery", 
+			"default_packaging_fee", 
+			"minimum_order_value", 
+			"estimated_prep_time", 
+			"default_delivery_fee"
+		]
+		
+		for field in allowed_fields:
+			if field in settings:
+				value = settings[field]
+				# Ensure correct type for Check fields
+				if field in ["enable_takeaway", "enable_delivery"]:
+					value = 1 if value else 0
+				# Ensure correct type for Numeric fields
+				elif field in ["default_packaging_fee", "minimum_order_value", "default_delivery_fee"]:
+					value = flt(value)
+				elif field == "estimated_prep_time":
+					value = cint(value)
+					
+				restaurant_doc.set(field, value)
+				updated_fields.append(field)
+		
+		if updated_fields:
+			restaurant_doc.save(ignore_permissions=True)
+		
+		return {
+			"success": True,
+			"message": _("Order settings updated successfully"),
+			"data": {
+				"updated_fields": updated_fields
+			}
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in update_order_settings: {str(e)}")
+		return {
+			"success": False,
+			"error": {
+				"code": "SETTINGS_UPDATE_ERROR",
+				"message": str(e)
+			}
+		}

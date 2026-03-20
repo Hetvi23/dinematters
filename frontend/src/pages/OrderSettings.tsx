@@ -40,37 +40,34 @@ export default function OrderSettings() {
     }
   }, [restaurantDoc])
 
-  const { call: saveDoc } = useFrappePostCall<{ success: boolean, data: any }>('frappe.client.set_value')
+  const { call: updateSettings } = useFrappePostCall<{ success: boolean, data: any }>('dinematters.dinematters.api.config.update_order_settings')
 
   const handleSave = async () => {
     if (!selectedRestaurant) return
     
     setSaving(true)
     try {
-      // Need to save multiple fields, so we do it in one call if possible or multiple
-      const fields = {
-        enable_takeaway: settings.enable_takeaway,
-        enable_delivery: settings.enable_delivery,
-        default_packaging_fee: settings.default_packaging_fee,
-        minimum_order_value: settings.minimum_order_value,
-        estimated_prep_time: settings.estimated_prep_time,
-        default_delivery_fee: settings.default_delivery_fee
-      }
+      const response = await updateSettings({
+        restaurant_id: selectedRestaurant,
+        settings: {
+          enable_takeaway: settings.enable_takeaway,
+          enable_delivery: settings.enable_delivery,
+          default_packaging_fee: settings.default_packaging_fee,
+          minimum_order_value: settings.minimum_order_value,
+          estimated_prep_time: settings.estimated_prep_time,
+          default_delivery_fee: settings.default_delivery_fee
+        }
+      })
       
-      for (const [fieldname, value] of Object.entries(fields)) {
-          await saveDoc({
-            doctype: 'Restaurant',
-            name: selectedRestaurant,
-            fieldname: fieldname,
-            value: value
-          })
+      if (response?.success) {
+        await mutate()
+        toast.success('Order settings saved successfully')
+      } else {
+        throw new Error(response?.error?.message || 'Failed to save settings')
       }
-      
-      await mutate()
-      toast.success('Order settings saved successfully')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save settings:', error)
-      toast.error('Failed to save settings')
+      toast.error(error.message || 'Failed to save settings')
     } finally {
       setSaving(false)
     }
