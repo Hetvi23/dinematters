@@ -174,7 +174,11 @@ has_permission = {
 
 doc_events = {
 	"Order": {
-		"after_insert": "dinematters.dinematters.api.customers.update_customer_last_visited",
+		"after_insert": [
+			"dinematters.dinematters.api.customers.update_customer_last_visited",
+			"dinematters.dinematters.api.realtime.notify_order_update"
+		],
+		"on_update": "dinematters.dinematters.api.realtime.notify_order_update",
 	},
 	"Table Booking": {
 		"after_insert": "dinematters.dinematters.api.customers.update_customer_last_visited",
@@ -182,9 +186,14 @@ doc_events = {
 	"Banquet Booking": {
 		"after_insert": "dinematters.dinematters.api.customers.update_customer_last_visited",
 	},
-}
-
-doc_events = {
+	"Menu Product": {
+		"on_update": "dinematters.dinematters.api.realtime.notify_product_update",
+	},
+	"Cart Entry": {
+		"after_insert": "dinematters.dinematters.api.realtime.notify_cart_update",
+		"on_update": "dinematters.dinematters.api.realtime.notify_cart_update",
+		"on_trash": "dinematters.dinematters.api.realtime.notify_cart_update",
+	},
 	"File": {
 		"on_update": "dinematters.dinematters.doctype.home_feature.home_feature.update_home_feature_from_file",
 	},
