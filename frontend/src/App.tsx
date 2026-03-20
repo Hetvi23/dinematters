@@ -32,6 +32,7 @@ import LegacyContent from './pages/LegacyContent'
 import LegacySignatureDish from './pages/LegacySignatureDish'
 import Payment from './pages/Payment'
 import PaymentSettings from './pages/PaymentSettings'
+import OrderSettings from './pages/OrderSettings'
 import RecommendationsEngine from './pages/RecommendationsEngine'
 import Customers from './pages/Customers'
 import Bookings from './pages/Bookings'
@@ -88,6 +89,13 @@ function AppContent() {
 							<Route path="/customers" element={<Layout><Customers /></Layout>} />
 						</Route>
 
+						{/* PRO Feature: Frontend ordering controls & billing - Requires PRO plan (ordering feature) */}
+						<Route element={<FeatureProtectedRoute feature="ordering" />}>
+							<Route path="/frontend-ordering" element={<Layout><OrderSettings /></Layout>} />
+							<Route path="/order-settings" element={<Layout><OrderSettings /></Layout>} />
+							<Route path="/billing" element={<Layout><PaymentSettings /></Layout>} />
+						</Route>
+
 						{/* PRO Feature: AI Recommendations - Requires PRO plan */}
 						<Route element={<FeatureProtectedRoute feature="aiRecommendations" />}>
 							<Route path="/recommendations-engine" element={<Layout><RecommendationsEngine /></Layout>} />
@@ -108,7 +116,6 @@ function AppContent() {
 						<Route path="/ai-gallery" element={<Layout><AIGalleryPage /></Layout>} />
 						<Route path="/ai-menu-theme-background" element={<Layout><AIMenuThemeBackgroundPage /></Layout>} />
 						<Route path="/ai-menu-theme-history" element={<Layout><AIMenuThemeHistoryPage /></Layout>} />
-						<Route path="/billing" element={<Layout><PaymentSettings /></Layout>} />
 						<Route path="/autopay-setup" element={<Layout><AutopaySetupPage /></Layout>} />
 						<Route path="/Legacy Content" element={<Layout><LegacyContent /></Layout>} />
 						<Route path="/Legacy Signature Dish" element={<Layout><LegacySignatureDish /></Layout>} />

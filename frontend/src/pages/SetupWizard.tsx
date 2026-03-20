@@ -1181,7 +1181,39 @@ export default function SetupWizard() {
                   skipLoadingState={true}
                   doctype={currentStepData.doctype}
                   hideFields={currentStepData.id === 'restaurant' 
-                    ? ['restaurant_id', 'company', 'subdomain'] 
+                    ? [
+                        'restaurant_id',
+                        'company',
+                        'subdomain',
+                        'plan_type',
+                        'plan_activated_on',
+                        'plan_changed_by',
+                        'plan_change_reason',
+                        'platform_fee_percent',
+                        'monthly_minimum_fee',
+                        'monthly_minimum',
+                        'billing_status',
+                        'mandate_status',
+                        'onboarding_date',
+                        'recommendation_run_count',
+                        'recommendation_run',
+                        'razorpay_account_id',
+                        'razorpay_kyc_status',
+                        'razorpay_customer_id',
+                        'razorpay_token_id',
+                        'razorpay_merchant_key_id',
+                        'razorpay_keys_updated_at',
+                        'razorpay_keys_updated_by',
+                        'max_images_lite',
+                        'current_image_count',
+                        'total_orders',
+                        'total_revenue',
+                        'commission_earned',
+                        'ai_credits_balance',
+                        'ai_credits',
+                        'total_ai_generations',
+                        'total_ai_cost',
+                      ] 
                     : currentStepData.id === 'config'
                     ? ['restaurant_name', 'description', 'currency', 'primary_color']
                     : undefined}

@@ -29,6 +29,11 @@
   "section_break_settings",
   "tax_rate",
   "default_delivery_fee",
+  "enable_takeaway",
+  "enable_delivery",
+  "default_packaging_fee",
+  "minimum_order_value",
+  "estimated_prep_time",
   "column_break_settings",
   "timezone",
   "currency",
@@ -213,6 +218,36 @@
    "description": "Standard delivery charge for orders"
   },
   {
+   "fieldname": "enable_takeaway",
+   "fieldtype": "Check",
+   "label": "Enable Takeaway",
+   "default": "1"
+  },
+  {
+   "fieldname": "enable_delivery",
+   "fieldtype": "Check",
+   "label": "Enable Delivery",
+   "default": "0"
+  },
+  {
+   "fieldname": "default_packaging_fee",
+   "fieldtype": "Currency",
+   "label": "Default Packaging Fee",
+   "default": "0"
+  },
+  {
+   "fieldname": "minimum_order_value",
+   "fieldtype": "Currency",
+   "label": "Minimum Order Value for Delivery",
+   "default": "0"
+  },
+  {
+   "fieldname": "estimated_prep_time",
+   "fieldtype": "Int",
+   "label": "Estimated Preparation Time (mins)",
+   "default": "30"
+  },
+  {
    "fieldname": "column_break_settings",
    "fieldtype": "Column Break"
   },
@@ -331,7 +366,7 @@
    "fieldtype": "Currency",
    "label": "Monthly Minimum Fee",
    "default": "999",
-   "description": "Minimum monthly platform fee (default: ₹999)"
+   "description": "Minimum monthly platform fee (default: \u20b9999)"
   },
   {
    "fieldname": "razorpay_customer_id",
@@ -511,7 +546,7 @@
    "default": "0",
    "read_only": 1,
    "in_list_view": 0,
-   "description": "Current AI credit balance. 1 credit = ₹2. Each image enhancement costs 5 credits."
+   "description": "Current AI credit balance. 1 credit = \u20b92. Each image enhancement costs 5 credits."
   },
   {
    "fieldname": "total_ai_generations",
@@ -528,7 +563,7 @@
   {
    "fieldname": "total_ai_cost",
    "fieldtype": "Float",
-   "label": "Total AI Cost (₹)",
+   "label": "Total AI Cost (\u20b9)",
    "default": "0",
    "read_only": 1,
    "description": "Total INR value of AI credits consumed."

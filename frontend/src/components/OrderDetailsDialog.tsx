@@ -90,6 +90,46 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                 {order.status}
               </span>
             </div>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Order Info</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <p className="text-muted-foreground">Order Type</p>
+                  <p className="font-medium capitalize">{(order.order_type || 'dine_in').replace('_', ' ')}</p>
+                </div>
+                {order.table_number ? (
+                  <div className="flex justify-between">
+                    <p className="text-muted-foreground">Table</p>
+                    <p className="font-medium">Table {order.table_number}</p>
+                  </div>
+                ) : null}
+                {order.pickup_time ? (
+                  <div className="flex justify-between">
+                    <p className="text-muted-foreground">Pickup Time</p>
+                    <p className="font-medium">{new Date(order.pickup_time).toLocaleString()}</p>
+                  </div>
+                ) : null}
+                {order.estimated_delivery ? (
+                  <div className="flex justify-between">
+                    <p className="text-muted-foreground">ETA</p>
+                    <p className="font-medium">{new Date(order.estimated_delivery).toLocaleString()}</p>
+                  </div>
+                ) : null}
+                {(order.delivery_address || order.delivery_city || order.delivery_instructions) ? (
+                  <div className="pt-2 border-t border-border space-y-1">
+                    <p className="text-muted-foreground">Delivery Details</p>
+                    {order.delivery_address ? <p>{order.delivery_address}</p> : null}
+                    {order.delivery_landmark ? <p className="text-muted-foreground">Landmark: {order.delivery_landmark}</p> : null}
+                    {order.delivery_city ? <p className="text-muted-foreground">City: {order.delivery_city}</p> : null}
+                    {order.delivery_instructions ? <p className="text-muted-foreground">Instructions: {order.delivery_instructions}</p> : null}
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+
             {/* Order Items with Customizations */}
             {order.order_items && order.order_items.length > 0 && (
               <Card>
@@ -162,6 +202,12 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                   <div className="flex justify-between text-sm">
                     <p className="text-muted-foreground">Delivery Fee</p>
                     <p className="font-medium">{formatAmount(order.delivery_fee)}</p>
+                  </div>
+                )}
+                {order.packaging_fee && order.packaging_fee > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <p className="text-muted-foreground">Packaging Fee</p>
+                    <p className="font-medium">{formatAmount(order.packaging_fee)}</p>
                   </div>
                 )}
                 {(order.coupon || coupon) && (

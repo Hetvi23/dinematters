@@ -25,6 +25,7 @@ interface Order {
   total: number
   creation: string
   table_number?: number
+  order_type?: 'dine_in' | 'takeaway' | 'delivery' | string
   restaurant?: string
   customer_name?: string
   customer_phone?: string
@@ -100,6 +101,13 @@ function DraggableOrderCard({
   
   // Show billed button only for orders in In Billing status
   const showBilledButton = normalizedStatus === 'In Billing'
+  const orderTypeLabel = (order.order_type || 'dine_in').replace('_', ' ')
+  const orderTypeBadgeClass =
+    order.order_type === 'delivery'
+      ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800'
+      : order.order_type === 'takeaway'
+      ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800'
+      : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800'
 
   return (
     <Card
@@ -149,6 +157,15 @@ function DraggableOrderCard({
               Table {order.table_number}
             </span>
           ) : null}
+        </div>
+
+        <div className="mb-2">
+          <span className={cn(
+            'inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold capitalize',
+            orderTypeBadgeClass
+          )}>
+            {orderTypeLabel}
+          </span>
         </div>
         
         {/* Customer Info - Single Row */}

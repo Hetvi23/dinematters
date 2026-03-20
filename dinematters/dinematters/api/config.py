@@ -8,7 +8,7 @@ All endpoints require restaurant_id for SaaS multi-tenancy
 
 import frappe
 from frappe import _
-from frappe.utils import get_url
+from frappe.utils import get_url, flt, cint
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api, get_restaurant_context
 from dinematters.dinematters.media.utils import get_media_asset_data
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
@@ -182,7 +182,16 @@ def get_restaurant_config(restaurant_id):
 				"enableEvents": bool(config.get("enable_events")),
 				"enableOffers": bool(config.get("enable_offers")),
 				"enableCoupons": bool(config.get("enable_coupons")),
-				"enableExperienceLounge": bool(config.get("enable_experience_lounge"))
+				"enableExperienceLounge": bool(config.get("enable_experience_lounge")),
+				"verifyMyUser": bool(config.get("verify_my_user")),
+				"defaultDeliveryFee": flt(restaurant_doc.get("default_delivery_fee", 0)),
+				"order_settings": {
+					"enable_takeaway": bool(restaurant_doc.get("enable_takeaway", 1)),
+					"enable_delivery": bool(restaurant_doc.get("enable_delivery", 0)),
+					"default_packaging_fee": flt(restaurant_doc.get("default_packaging_fee", 0)),
+					"minimum_order_value": flt(restaurant_doc.get("minimum_order_value", 0)),
+					"estimated_prep_time": cint(restaurant_doc.get("estimated_prep_time", 30) or 30)
+				}
 			},
 			"socialMedia": {
 				"googleReviewLink": config.get("google_review_link", ""),

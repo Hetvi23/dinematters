@@ -8,7 +8,7 @@ Matches format from BACKEND_API_DOCUMENTATION.md
 
 import frappe
 from frappe import _
-from frappe.utils import flt, now_datetime, get_datetime_str, add_to_date
+from frappe.utils import flt, cint, now_datetime, get_datetime_str, add_to_date
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api, validate_product_belongs_to_restaurant
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 from dinematters.dinematters.utils.customer_helpers import (
@@ -52,7 +52,7 @@ def load_customization_options(product_doc):
 			question.options.append(option_obj)
 
 @frappe.whitelist(allow_guest=True)
-def create_order(restaurant_id, items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None, table_number=None, coupon_code=None, payment_method=None):
+def create_order(restaurant_id, items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None, table_number=None, coupon_code=None, payment_method=None, order_type=None, packaging_fee=None, pickup_time=None):
 	"""
 	POST /api/v1/orders
 	Place a new order
@@ -65,6 +65,7 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 	try:
 		# Validate restaurant
 		restaurant = validate_restaurant_for_api(restaurant_id)
+		restaurant_doc = frappe.get_doc("Restaurant", restaurant)
 		
 		# Parse JSON strings if needed
 		if isinstance(items, str):
@@ -76,6 +77,54 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 		if isinstance(delivery_info, str):
 			delivery_info = json.loads(delivery_info) if delivery_info else {}
 		customer_info = customer_info or {}
+		delivery_info = delivery_info or {}
+		order_type = (order_type or "dine_in").strip().lower()
+		if order_type not in ("dine_in", "takeaway", "delivery"):
+			return {
+				"success": False,
+				"error": {
+					"code": "VALIDATION_ERROR",
+					"message": "Invalid order type"
+				}
+			}
+
+		if order_type == "takeaway" and not restaurant_doc.get("enable_takeaway"):
+			return {
+				"success": False,
+				"error": {
+					"code": "ORDER_TYPE_DISABLED",
+					"message": "Takeaway is not enabled for this restaurant"
+				}
+			}
+
+		if order_type == "delivery" and not restaurant_doc.get("enable_delivery"):
+			return {
+				"success": False,
+				"error": {
+					"code": "ORDER_TYPE_DISABLED",
+					"message": "Delivery is not enabled for this restaurant"
+				}
+			}
+
+		if order_type in ("takeaway", "delivery"):
+			if not customer_info.get("name") or not customer_info.get("phone"):
+				return {
+					"success": False,
+					"error": {
+						"code": "VALIDATION_ERROR",
+						"message": "Customer name and phone are required for takeaway and delivery orders"
+					}
+				}
+
+		if order_type == "delivery":
+			if not delivery_info.get("address"):
+				return {
+					"success": False,
+					"error": {
+						"code": "VALIDATION_ERROR",
+						"message": "Delivery address is required for delivery orders"
+					}
+				}
 		
 		# OTP gate: require verified phone when verify_my_user is on
 		phone = customer_info.get("phone")
@@ -180,7 +229,19 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 		
 		# Calculate tax and delivery fee (can be configured)
 		tax = calculate_tax(subtotal)
-		delivery_fee = flt(delivery_info.get("deliveryFee", 0)) if delivery_info else 0
+		delivery_fee = flt(delivery_info.get("deliveryFee", 0)) if order_type == "delivery" else 0
+		packaging_fee = flt(packaging_fee or 0)
+
+		if order_type == "delivery":
+			minimum_order_value = flt(restaurant_doc.get("minimum_order_value", 0))
+			if minimum_order_value and subtotal < minimum_order_value:
+				return {
+					"success": False,
+					"error": {
+						"code": "MINIMUM_ORDER_NOT_MET",
+						"message": f"Minimum order value for delivery is {minimum_order_value}"
+					}
+				}
 		
 		# Apply coupon discount if provided, or detect auto-offers
 		coupon_discount = 0
@@ -238,11 +299,11 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 				frappe.log_error(f"Auto-offer detection error: {str(e)}")
 				# Continue without auto-offer if detection fails
 		
-		total = subtotal - discount + tax + delivery_fee
+		total = subtotal - discount + tax + delivery_fee + packaging_fee
 		
 		# Parse table_number from QR code if provided
 		parsed_table_number = None
-		if table_number:
+		if order_type == "dine_in" and table_number:
 			from dinematters.dinematters.api.cart import parse_table_number_from_qr
 			parsed_table_number = parse_table_number_from_qr(table_number, restaurant_id)
 		
@@ -260,6 +321,15 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 				order_payment_method = "pay_online"
 				initial_status = "confirmed"
 		
+		estimated_minutes = cint(restaurant_doc.get("estimated_prep_time", 30) or 30)
+		estimated_delivery = add_to_date(now_datetime(), minutes=estimated_minutes)
+		pickup_datetime = None
+		if pickup_time:
+			try:
+				pickup_datetime = datetime.fromisoformat(str(pickup_time))
+			except Exception:
+				pickup_datetime = None
+
 		# Create order document
 		order_doc = frappe.get_doc({
 			"doctype": "Order",
@@ -274,6 +344,8 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 			"subtotal": subtotal,
 			"discount": discount,
 			"tax": tax,
+			"order_type": order_type,
+			"packaging_fee": packaging_fee,
 			"delivery_fee": delivery_fee,
 			"total": total,
 			"coupon": applied_coupon,
@@ -283,11 +355,14 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 			"payment_method": order_payment_method,
 			"table_number": parsed_table_number,
 			"delivery_address": delivery_info.get("address") if delivery_info else None,
+			"delivery_landmark": delivery_info.get("landmark") if delivery_info else None,
 			"delivery_city": delivery_info.get("city") if delivery_info else None,
 			"delivery_state": delivery_info.get("state") if delivery_info else None,
 			"delivery_zip_code": delivery_info.get("zipCode") if delivery_info else None,
+			"delivery_location_pin": delivery_info.get("locationPin") if delivery_info else None,
 			"delivery_instructions": delivery_info.get("instructions") if delivery_info else None,
-			"estimated_delivery": add_to_date(now_datetime(), minutes=30)  # Default 30 minutes
+			"pickup_time": pickup_datetime,
+			"estimated_delivery": estimated_delivery
 		})
 		
 		# Add order items
@@ -789,21 +864,24 @@ def format_order(order_doc):
 	
 	# Recalculate tax and total based on corrected subtotal
 	recalculated_tax = calculate_tax(recalculated_subtotal)
-	recalculated_total = recalculated_subtotal - flt(order_doc.discount) + recalculated_tax + flt(order_doc.delivery_fee)
+	recalculated_total = recalculated_subtotal - flt(order_doc.discount) + recalculated_tax + flt(order_doc.delivery_fee) + flt(getattr(order_doc, "packaging_fee", 0) or 0)
 	
 	order_data = {
 		"id": order_doc.order_id,
 		"orderNumber": order_doc.order_number,
 		"items": items,
+		"orderType": getattr(order_doc, "order_type", None) or "dine_in",
 		"subtotal": recalculated_subtotal,
 		"discount": flt(order_doc.discount),
 		"tax": recalculated_tax,
+		"packagingFee": flt(getattr(order_doc, "packaging_fee", 0) or 0),
 		"deliveryFee": flt(order_doc.delivery_fee),
 		"total": recalculated_total,
 		"cookingRequests": cooking_requests,
 		"status": order_doc.status,
 		"createdAt": get_datetime_str(order_doc.creation),
 		"estimatedDelivery": get_datetime_str(order_doc.estimated_delivery) if order_doc.estimated_delivery else None,
+		"pickupTime": get_datetime_str(getattr(order_doc, "pickup_time", None)) if getattr(order_doc, "pickup_time", None) else None,
 		"currency": currency_info.get("currency", "USD"),
 		"currencySymbol": currency_info.get("symbol", "$"),
 		"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
@@ -825,9 +903,11 @@ def format_order(order_doc):
 	if order_doc.delivery_address:
 		order_data["deliveryInfo"] = {
 			"address": order_doc.delivery_address,
+			"landmark": getattr(order_doc, "delivery_landmark", None),
 			"city": order_doc.delivery_city,
 			"state": order_doc.delivery_state,
 			"zipCode": order_doc.delivery_zip_code,
+			"locationPin": getattr(order_doc, "delivery_location_pin", None),
 			"instructions": order_doc.delivery_instructions
 		}
 	

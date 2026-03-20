@@ -25,6 +25,19 @@ type ViewType = 'kanban' | 'list'
 
 export default function Orders() {
   const { formatAmountNoDecimals } = useCurrency()
+
+  const getOrderTypeBadgeClass = (orderType?: string) => {
+    if (orderType === 'delivery') {
+      return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800'
+    }
+    if (orderType === 'takeaway') {
+      return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800'
+    }
+    return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800'
+  }
+
+  const getOrderTypeLabel = (orderType?: string) => (orderType || 'dine_in').replace('_', ' ')
+
   // Load view preference from localStorage, default to 'list' on mobile, 'kanban' on desktop
   const [viewType, setViewType] = useState<ViewType>(() => {
     // Check if mobile (screen width < 768px)
@@ -115,7 +128,7 @@ export default function Orders() {
   const { data: orders, isLoading, mutate } = useFrappeGetDocList(
     'Order',
     {
-      fields: ['name', 'order_number', 'status', 'total', 'creation', 'restaurant', 'table_number', 'coupon', 'customer_name', 'customer_phone', 'payment_method', 'payment_status', 'subtotal', 'discount', 'tax', 'delivery_fee'],
+      fields: ['name', 'order_number', 'status', 'total', 'creation', 'restaurant', 'table_number', 'order_type', 'coupon', 'customer_name', 'customer_phone', 'payment_method', 'payment_status', 'subtotal', 'discount', 'tax', 'delivery_fee', 'packaging_fee'],
       filters: restaurantFilter ? ([
         ['restaurant', '=', restaurantFilter],
         ['status', '!=', 'pending_verification'],
@@ -622,6 +635,12 @@ export default function Orders() {
                         </Select>
                       </div>
                       <div className="flex items-center gap-3 mb-3 flex-wrap">
+                        <span className={cn(
+                          'inline-flex items-center rounded-md border px-2 py-1 text-xs font-medium capitalize',
+                          getOrderTypeBadgeClass(order.order_type)
+                        )}>
+                          {getOrderTypeLabel(order.order_type)}
+                        </span>
                         {tableOptions.length > 0 ? (
                           <Select
                             value={typeof order.table_number === 'number' && order.table_number > 0 ? order.table_number.toString() : ''}
@@ -673,6 +692,7 @@ export default function Orders() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Order Number</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Table</TableHead>
                     <TableHead>Coupon</TableHead>
@@ -685,6 +705,14 @@ export default function Orders() {
                   {filteredOrders?.map((order: any) => (
                     <TableRow key={order.name}>
                       <TableCell className="font-medium">{order.order_number || order.name}</TableCell>
+                      <TableCell>
+                        <span className={cn(
+                          'inline-flex items-center rounded-md border px-2 py-1 text-xs font-medium capitalize',
+                          getOrderTypeBadgeClass(order.order_type)
+                        )}>
+                          {getOrderTypeLabel(order.order_type)}
+                        </span>
+                      </TableCell>
                       <TableCell>
                             <Select
                               value={normalizeStatus(order.status || 'confirmed')}

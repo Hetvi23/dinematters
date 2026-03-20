@@ -18,7 +18,10 @@ import {
   ArrowRight,
   Zap,
   Activity,
-  Info
+  Info,
+  Link as LinkIcon,
+  Fingerprint,
+  CircleDashed,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, endOfMonth, parseISO } from 'date-fns'
@@ -31,6 +34,11 @@ interface PaymentStats {
   monthly_minimum: number
   minimum_due: number
   razorpay_customer_id?: string | null
+  razorpay_token_id?: string | null
+  mandate_status?: string | null
+  masked_customer_id?: string | null
+  masked_token_id?: string | null
+  merchant_key_configured?: boolean
   billing_status?: string | null
 }
 
@@ -38,6 +46,13 @@ const statusToneMap: Record<string, string> = {
   active: 'bg-green-500/10 text-green-700 border-green-200',
   paid: 'bg-green-500/10 text-green-700 border-green-200',
   overdue: 'bg-red-500/10 text-red-700 border-red-200',
+  pending: 'bg-amber-500/10 text-amber-700 border-amber-200',
+}
+
+const mandateToneMap: Record<string, string> = {
+  active: 'bg-green-500/10 text-green-700 border-green-200',
+  inactive: 'bg-muted text-muted-foreground border-border',
+  failed: 'bg-red-500/10 text-red-700 border-red-200',
   pending: 'bg-amber-500/10 text-amber-700 border-amber-200',
 }
 
@@ -174,6 +189,8 @@ export default function AutopaySetupPage() {
   const billingStatus = stats?.billing_status || 'pending'
   const statusTone = statusToneMap[billingStatus] || 'bg-muted text-muted-foreground border-border'
   const autopayEnabled = Boolean(stats?.razorpay_customer_id)
+  const mandateStatus = stats?.mandate_status || (autopayEnabled ? 'active' : 'inactive')
+  const mandateTone = mandateToneMap[mandateStatus] || 'bg-muted text-muted-foreground border-border'
   const currentMonthLabel = stats?.current_month || '—'
   const ordersCount = stats?.total_orders ?? 0
   const totalRevenue = (stats?.total_revenue ?? 0).toFixed(2)
@@ -333,6 +350,56 @@ export default function AutopaySetupPage() {
                 </p>
               </div>
             </div>
+
+            {autopayEnabled && (
+              <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Linked Mandate Details</p>
+                    <p className="text-xs text-muted-foreground">Safe masked details from your Razorpay autopay linkage.</p>
+                  </div>
+                  <Badge variant="outline" className={mandateTone}>{mandateStatus}</Badge>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-lg border bg-background/70 px-3 py-3">
+                    <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground font-bold">
+                      <LinkIcon className="h-3.5 w-3.5" />
+                      Razorpay Customer
+                    </div>
+                    <p className="mt-2 text-sm font-semibold text-foreground">{stats?.masked_customer_id || 'Linked'}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">Customer reference stored for recurring billing.</p>
+                  </div>
+
+                  <div className="rounded-lg border bg-background/70 px-3 py-3">
+                    <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground font-bold">
+                      <Fingerprint className="h-3.5 w-3.5" />
+                      Token Reference
+                    </div>
+                    <p className="mt-2 text-sm font-semibold text-foreground">{stats?.masked_token_id || 'Available after mandate capture'}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">Masked token identifier used for secure recurring debit.</p>
+                  </div>
+
+                  <div className="rounded-lg border bg-background/70 px-3 py-3">
+                    <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground font-bold">
+                      <CircleDashed className="h-3.5 w-3.5" />
+                      Mandate Status
+                    </div>
+                    <p className="mt-2 text-sm font-semibold capitalize text-foreground">{mandateStatus}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">Current authorization state received from saved billing records.</p>
+                  </div>
+
+                  <div className="rounded-lg border bg-background/70 px-3 py-3">
+                    <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground font-bold">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      Merchant Integration
+                    </div>
+                    <p className="mt-2 text-sm font-semibold text-foreground">{stats?.merchant_key_configured ? 'Configured' : 'Using default billing integration'}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">No raw card or bank account values are stored or displayed here.</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="pt-4 border-t border-border flex items-center justify-between">
               <p className="text-xs text-muted-foreground">Clicking setup will open Razorpay checkout.</p>

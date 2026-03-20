@@ -115,6 +115,10 @@ export default function OrderDetail() {
               <p className="text-sm text-muted-foreground">Restaurant</p>
               <p className="font-medium">{order.restaurant || 'N/A'}</p>
             </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Order Type</p>
+              <p className="font-medium capitalize">{((order.order_type || 'dine_in') as string).replace('_', ' ')}</p>
+            </div>
             {tableOptions.length > 0 ? (
               <div>
                 <p className="text-sm text-muted-foreground">Table Number</p>
@@ -150,6 +154,25 @@ export default function OrderDetail() {
               <p className="text-sm text-muted-foreground">Created</p>
               <p>{order.creation ? new Date(order.creation).toLocaleString() : 'N/A'}</p>
             </div>
+            {(order.pickup_time || order.estimated_delivery) && (
+              <div>
+                <p className="text-sm text-muted-foreground">Timing</p>
+                <p>
+                  {order.pickup_time
+                    ? `Pickup: ${new Date(order.pickup_time).toLocaleString()}`
+                    : `ETA: ${new Date(order.estimated_delivery).toLocaleString()}`}
+                </p>
+              </div>
+            )}
+            {(order.delivery_address || order.delivery_city || order.delivery_instructions) && (
+              <div>
+                <p className="text-sm text-muted-foreground">Delivery Details</p>
+                {order.delivery_address ? <p>{order.delivery_address}</p> : null}
+                {order.delivery_landmark ? <p className="text-sm text-muted-foreground">Landmark: {order.delivery_landmark}</p> : null}
+                {order.delivery_city ? <p className="text-sm text-muted-foreground">City: {order.delivery_city}</p> : null}
+                {order.delivery_instructions ? <p className="text-sm text-muted-foreground">Instructions: {order.delivery_instructions}</p> : null}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -178,6 +201,12 @@ export default function OrderDetail() {
               <div className="flex justify-between">
                 <p className="text-muted-foreground">Delivery Fee</p>
                 <p className="font-medium">{formatAmount(order.delivery_fee)}</p>
+              </div>
+            )}
+            {order.packaging_fee && order.packaging_fee > 0 && (
+              <div className="flex justify-between">
+                <p className="text-muted-foreground">Packaging Fee</p>
+                <p className="font-medium">{formatAmount(order.packaging_fee)}</p>
               </div>
             )}
             <div className="flex justify-between border-t pt-4">

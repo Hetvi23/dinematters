@@ -236,6 +236,14 @@ def get_restaurant_payment_stats(restaurant_id):
 		# Validate restaurant (returns restaurant doc name), then fetch doc
 		_restaurant_name = validate_restaurant_for_api(restaurant_id)
 		restaurant = frappe.get_doc("Restaurant", _restaurant_name)
+
+		def mask_identifier(value):
+			if not value:
+				return None
+			value = str(value)
+			if len(value) <= 8:
+				return value[:2] + "****" + value[-2:]
+			return value[:4] + "****" + value[-4:]
 		
 		# Get current month stats
 		from datetime import datetime
@@ -274,6 +282,10 @@ def get_restaurant_payment_stats(restaurant_id):
 				"monthly_minimum": monthly_minimum,
 				"minimum_due": minimum_due,
 				"razorpay_customer_id": restaurant.razorpay_customer_id,
+				"razorpay_token_id": restaurant.razorpay_token_id,
+				"mandate_status": restaurant.mandate_status,
+				"masked_customer_id": mask_identifier(restaurant.razorpay_customer_id),
+				"masked_token_id": mask_identifier(restaurant.razorpay_token_id),
 				"billing_status": restaurant.billing_status,
 				"razorpay_keys_updated_at": getattr(restaurant, "razorpay_keys_updated_at", None),
 				"razorpay_keys_updated_by": getattr(restaurant, "razorpay_keys_updated_by", None),

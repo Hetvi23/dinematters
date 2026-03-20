@@ -103,10 +103,19 @@ type NavItem = NavLink | NavGroup
 const navigation: NavItem[] = [
   { type: 'link', name: 'Dashboard', href: '/dashboard', icon: Home },
   { type: 'link', name: 'Setup Wizard', href: '/setup', icon: Sparkles },
-  { type: 'link', name: 'Home Features', href: '/home-features', icon: Grid3x3 },
+  {
+    type: 'group',
+    id: 'dinematters-frontend',
+    name: 'Dinematters View',
+    icon: Store,
+    children: [
+      { name: 'Home Features', href: '/home-features', icon: Grid3x3 },
+      { name: 'Order settings', href: '/frontend-ordering', icon: Package, feature: 'ordering' },
+      { name: 'AI Menu Background', href: '/ai-menu-theme-background', icon: Sparkles },
+    ],
+  },
   { type: 'link', name: 'All Modules', href: '/modules', icon: Grid3x3 },
-  { type: 'link', name: 'AI Menu Background', href: '/ai-menu-theme-background', icon: Sparkles },
-  { type: 'link', name: 'Customer pay & Usage', href: '/billing', icon: CreditCard },
+  { type: 'link', name: 'Customer pay & Usage', href: '/billing', icon: CreditCard, feature: 'ordering' },
   {
     type: 'group',
     id: 'manage-orders',
@@ -115,7 +124,7 @@ const navigation: NavItem[] = [
     feature: 'ordering',
     children: [
       { name: 'Real Time Orders', href: '/orders', icon: ShoppingCart, badgeHref: '/orders', feature: 'ordering' },
-      { name: 'Accept Orders', href: '/accept-orders', icon: CheckCircle2, feature: 'ordering' },
+      { name: 'Accept Orders', href: '/accept-orders', icon: CheckCircle2, badgeHref: '/accept-orders', feature: 'ordering' },
       { name: 'Past and Billed Orders', href: '/past-orders', icon: Clock, feature: 'ordering' },
     ],
   },
@@ -480,6 +489,23 @@ export default function Layout({ children }: LayoutProps) {
 
   // Get pending orders count for badge
   const pendingOrders = analytics.pendingOrders
+  const acceptPendingOrders = useMemo(() => {
+    if (!orders || orders.length === 0) return 0
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    return orders.filter((order: any) => {
+      if (!order?.creation) return false
+      const createdAt = new Date(order.creation)
+      if (Number.isNaN(createdAt.getTime()) || createdAt < today) return false
+
+      const status = String(order.status || '').trim().toLowerCase()
+      const paymentMethod = String(order.payment_method || '').trim().toLowerCase()
+
+      return status === 'pending_verification' && paymentMethod === 'pay_at_counter'
+    }).length
+  }, [orders])
 
   // Determine if sidebar should show expanded content (either expanded state or hovered, but not if hover is disabled)
   const showExpanded = sidebarExpanded || (sidebarHovered && !hoverDisabled)
@@ -689,7 +715,12 @@ export default function Layout({ children }: LayoutProps) {
                   const Icon = item.icon
                   const isActive = location.pathname === item.href ||
                     (item.href !== '/dashboard' && location.pathname.startsWith(item.href))
-                  const showBadge = item.badgeHref === '/orders' && pendingOrders > 0
+                  const badgeCount = item.badgeHref === '/orders'
+                    ? pendingOrders
+                    : item.badgeHref === '/accept-orders'
+                    ? acceptPendingOrders
+                    : 0
+                  const showBadge = badgeCount > 0
                   const isLocked = item.feature && !isPro && !(features as any)[item.feature]
 
                   return (
@@ -736,7 +767,7 @@ export default function Layout({ children }: LayoutProps) {
                           )}
                           {!isLocked && showBadge && (
                             <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
-                              {pendingOrders > 9 ? '9+' : pendingOrders}
+                              {badgeCount > 9 ? '9+' : badgeCount}
                             </span>
                           )}
                         </>
@@ -745,7 +776,7 @@ export default function Layout({ children }: LayoutProps) {
                         <span className="absolute left-full ml-2 px-2 py-1 rounded-md bg-foreground text-background text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 shadow-lg">
                           {item.name}
                           {isLocked && ' 🔒'}
-                          {showBadge && ` (${pendingOrders} pending)`}
+                          {showBadge && ` (${badgeCount} pending)`}
                         </span>
                       )}
                     </Link>
@@ -760,7 +791,12 @@ export default function Layout({ children }: LayoutProps) {
                 const hasActiveChild = filteredChildren.some(
                   (c) => location.pathname === c.href || (c.href !== '/dashboard' && location.pathname.startsWith(c.href))
                 )
-                const showBadge = filteredChildren.some((c) => c.badgeHref === '/orders') && pendingOrders > 0
+                const groupBadgeCount = filteredChildren.reduce((sum, child) => {
+                  if (child.badgeHref === '/orders') return sum + pendingOrders
+                  if (child.badgeHref === '/accept-orders') return sum + acceptPendingOrders
+                  return sum
+                }, 0)
+                const showBadge = groupBadgeCount > 0
                 const isGroupLocked = group.feature && !isPro && !(features as any)[group.feature]
 
                 // Collapsed sidebar: show dropdown menu with child links
@@ -814,6 +850,11 @@ export default function Layout({ children }: LayoutProps) {
                                       {pendingOrders > 9 ? '9+' : pendingOrders}
                                     </span>
                                   )}
+                                  {!isChildLocked && child.badgeHref === '/accept-orders' && acceptPendingOrders > 0 && (
+                                    <span className="ml-auto bg-destructive text-white text-xs px-1.5 rounded-full">
+                                      {acceptPendingOrders > 9 ? '9+' : acceptPendingOrders}
+                                    </span>
+                                  )}
                                 </Link>
                               </DropdownMenuItem>
                             )
@@ -854,7 +895,7 @@ export default function Layout({ children }: LayoutProps) {
                           )}
                           {!isGroupLocked && showBadge && (
                             <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
-                              {pendingOrders > 9 ? '9+' : pendingOrders}
+                              {groupBadgeCount > 9 ? '9+' : groupBadgeCount}
                             </span>
                           )}
                           {isExpanded ? (
@@ -868,7 +909,7 @@ export default function Layout({ children }: LayoutProps) {
                         <span className="absolute left-full ml-2 px-2 py-1 rounded-md bg-foreground text-background text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 shadow-lg">
                           {group.name}
                           {isGroupLocked && ' 🔒'}
-                          {showBadge && ` (${pendingOrders} pending)`}
+                          {showBadge && ` (${groupBadgeCount} pending)`}
                         </span>
                       )}
                     </button>
@@ -880,7 +921,12 @@ export default function Layout({ children }: LayoutProps) {
                             const ChildIcon = child.icon || group.icon
                             const isChildActive = location.pathname === child.href ||
                               (child.href !== '/dashboard' && location.pathname.startsWith(child.href))
-                            const showChildBadge = child.badgeHref === '/orders' && pendingOrders > 0
+                            const childBadgeCount = child.badgeHref === '/orders'
+                              ? pendingOrders
+                              : child.badgeHref === '/accept-orders'
+                              ? acceptPendingOrders
+                              : 0
+                            const showChildBadge = childBadgeCount > 0
                             const isChildLocked = child.feature && !isPro && !(features as any)[child.feature]
                             return (
                               <Link
@@ -905,15 +951,12 @@ export default function Layout({ children }: LayoutProps) {
                                   isChildLocked && "opacity-60"
                                 )}
                               >
-                                {isChildActive && (
-                                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r -ml-2" />
-                                )}
-                                <ChildIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                                <span className="flex-1 truncate">{child.name}</span>
-                                {isChildLocked && <Lock className="h-3 w-3 text-orange-500 flex-shrink-0" />}
+                                <ChildIcon className="h-4 w-4 flex-shrink-0" />
+                                <span className="flex-1">{child.name}</span>
+                                {isChildLocked && <Lock className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />}
                                 {!isChildLocked && showChildBadge && (
                                   <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
-                                    {pendingOrders > 9 ? '9+' : pendingOrders}
+                                    {childBadgeCount > 9 ? '9+' : childBadgeCount}
                                   </span>
                                 )}
                               </Link>
