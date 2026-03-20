@@ -57,10 +57,88 @@ def get_categories(restaurant_id):
 			}
 			
 			# Use centralized media fetcher for CDN URLs and blur placeholders
+			# Use centralized media fetcher for CDN URLs and blur placeholders
 			if cat.get("category_image"):
 				format_media_field(category_data, "category_image", "Menu Category", cat.get("name"), "category_image", "image")
+			else:
+				# Fallback: Use image from first active product in this category for this restaurant
+				first_product_media = frappe.db.get_value(
+					"Product Media",
+					{
+						"parenttype": "Menu Product",
+						"media_type": "image",
+						"parent": ["in", frappe.get_all(
+							"Menu Product", 
+							filters={"category_name": cat["name"], "is_active": 1, "restaurant": restaurant}, 
+							pluck="name"
+						)]
+					},
+					["name", "parent", "media_url"],
+					order_by="idx asc",
+					as_dict=True
+				)
+				if first_product_media:
+					# Temporarily put the media URL in the dict so format_media_field can pick it up as fallback_url
+					category_data["category_image"] = first_product_media["media_url"]
+					format_media_field(
+						category_data, 
+						"category_image", 
+						"Product Media", 
+						first_product_media["name"], 
+						"product_image", 
+						"image"
+					)
+				else:
+					# Final fallback: use a generic icon path
+					category_data["image"] = "/images/icons/burger.png"
 			
 			formatted_categories.append(category_data)
+		
+		# Add virtual categories if products exist
+		# Top Picks
+		top_picks_count = frappe.db.count("Menu Product", filters={"product_type": "Popular", "is_active": 1, "restaurant": restaurant})
+		if top_picks_count > 0:
+			top_picks = {
+				"id": "top-picks",
+				"name": "Top Picks",
+				"displayName": "Top Picks",
+				"description": "Our most popular dishes",
+				"isSpecial": True,
+				"productCount": top_picks_count
+			}
+			# Fallback to first product image for Top Picks
+			first_tp_media = frappe.db.get_value(
+				"Product Media",
+				{
+					"parenttype": "Menu Product",
+					"media_type": "image",
+					"parent": ["in", frappe.get_all("Menu Product", filters={"product_type": "Popular", "is_active": 1, "restaurant": restaurant}, pluck="name")]
+				},
+				["name", "media_url"],
+				order_by="idx asc",
+				as_dict=True
+			)
+			if first_tp_media:
+				top_picks["category_image"] = first_tp_media["media_url"]
+				format_media_field(top_picks, "category_image", "Product Media", first_tp_media["name"], "product_image", "image")
+			else:
+				top_picks["image"] = "/images/icons/burger.png"
+			
+			formatted_categories.insert(0, top_picks)
+			
+		# Chef Special
+		chef_special_count = frappe.db.count("Menu Product", filters={"product_type": "Chef Special", "is_active": 1, "restaurant": restaurant})
+		if chef_special_count > 0:
+			chef_special = {
+				"id": "chef-special",
+				"name": "Chef Special",
+				"displayName": "Chef Special",
+				"description": "Chef's signature dish",
+				"isSpecial": True,
+				"productCount": chef_special_count,
+				"image": "/animations/Chef.gif"
+			}
+			formatted_categories.insert(1 if top_picks_count > 0 else 0, chef_special)
 		
 		return {
 			"success": True,
