@@ -623,11 +623,25 @@ def update_order_settings(restaurant_id, settings):
 			}
 		}
 	except Exception as e:
-		frappe.log_error(f"Error in update_order_settings: {str(e)}")
+		import traceback
+		error_trace = traceback.format_exc()
+		frappe.log_error(f"Error in update_order_settings for restaurant {restaurant_id}: {error_trace}", "Order Settings Update Error")
+		
+		# Extract a clean error message if possible
+		error_msg = str(e)
+		if not error_msg:
+			if isinstance(e, frappe.MandatoryError):
+				error_msg = _("Missing mandatory fields")
+			elif isinstance(e, frappe.ValidationError):
+				error_msg = _("Validation failed")
+			else:
+				error_msg = _("An unexpected error occurred while saving settings")
+		
 		return {
 			"success": False,
 			"error": {
 				"code": "SETTINGS_UPDATE_ERROR",
-				"message": str(e)
+				"message": error_msg,
+				"details": error_trace if frappe.conf.developer_mode else None
 			}
 		}

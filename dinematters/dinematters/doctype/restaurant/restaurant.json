@@ -410,12 +410,6 @@
    "hidden": 1
   },
   {
-   "fieldname": "razorpay_account_id",
-   "fieldtype": "Data",
-   "label": "Razorpay Account ID",
-   "description": "Merchant Razorpay Account ID (used to map incoming webhook.account_id to this restaurant)."
-  },
-  {
    "fieldname": "razorpay_token_id",
    "fieldtype": "Data",
    "label": "Razorpay Token ID",
