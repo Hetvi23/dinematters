@@ -311,12 +311,17 @@ def get_home_features(restaurant_id):
 			)
 		
 		# Format features with Media Asset data
-		from dinematters.dinematters.media.utils import format_media_field
+		from dinematters.dinematters.media.utils import format_media_field, get_media_assets_batch
+		
+		# Batch fetch all media assets for these features
+		feature_names = [f.get("name") for f in features if f.get("name")]
+		media_batch = get_media_assets_batch("Home Feature", feature_names, ["home_feature_image"])
 		
 		formatted_features = []
 		for feature in features:
+			feature_name = feature.get("name")
 			feature_data = {
-				"name": feature.get("name"),
+				"name": feature_name,
 				"id": feature["id"],
 				"title": feature["title"],
 				"subtitle": feature.get("subtitle", ""),
@@ -329,13 +334,34 @@ def get_home_features(restaurant_id):
 				"displayOrder": feature.get("display_order", 0)
 			}
 			
-			# Use centralized media formatter for CDN URLs, blur placeholders, and variants
-			format_media_field(feature_data, "image_src", "Home Feature", feature.get("name"), "home_feature_image", "imageSrc")
+			# Check if we have batched media data
+			media_data = media_batch.get((feature_name, "home_feature_image"))
+			if media_data:
+				# Apply batched data
+				output_key = "imageSrc"
+				feature_data[output_key] = media_data["url"]
+				if media_data.get("blur_placeholder"):
+					feature_data[f"{output_key}BlurPlaceholder"] = media_data["blur_placeholder"]
+				if media_data.get("variants"):
+					feature_data[f"{output_key}Variants"] = media_data["variants"]
+				if media_data.get("srcset"):
+					feature_data[f"{output_key}Srcset"] = media_data["srcset"]
+			else:
+				# Fallback to single-call formatter (legacy/safety)
+				format_media_field(feature_data, "image_src", "Home Feature", feature_name, "home_feature_image", "imageSrc")
 			
 			# Remove raw image_src field
 			feature_data.pop("image_src", None)
 			
 			formatted_features.append(feature_data)
+
+		# Filter features based on subscription plan
+		plan_type = frappe.db.get_value("Restaurant", restaurant, "plan_type") or "LITE"
+		if plan_type == "LITE":
+			# Lite restaurants only show: menu, legacy
+			# Restricted features: book-table, offers-events, dine-play
+			restricted_ids = ["book-table", "offers-events", "dine-play"]
+			formatted_features = [f for f in formatted_features if f["id"] not in restricted_ids]
 
 		# De-duplicate by feature id so each restaurant has at most one
 		# card per logical home feature (menu, book-table, etc.).

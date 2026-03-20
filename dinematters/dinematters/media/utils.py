@@ -170,3 +170,96 @@ def format_media_field(data_dict, field_name, owner_doctype, owner_name, media_r
 	# Srcset for responsive images
 	if media_data.get("srcset"):
 		data_dict[f"{output_key}Srcset"] = media_data["srcset"]
+
+
+def get_media_assets_batch(owner_doctype, owner_names, media_roles):
+	"""
+	Batch fetch Media Assets and their Variants for multiple owners/roles.
+	Reduces DB roundtrips significantly for lists.
+	
+	Args:
+		owner_doctype: str
+		owner_names: list of str
+		media_roles: list of str
+		
+	Returns:
+		dict: Mapping of (owner_name, media_role) -> media_data_dict
+	"""
+	if not owner_names or not media_roles:
+		return {}
+	
+	# 1. Fetch all matching Media Assets in one query
+	assets = frappe.get_all(
+		"Media Asset",
+		filters={
+			"owner_doctype": owner_doctype,
+			"owner_name": ["in", owner_names],
+			"media_role": ["in", media_roles],
+			"status": "ready"
+		},
+		fields=["name", "owner_name", "media_role", "primary_url", "blur_placeholder", "media_kind"]
+	)
+	
+	if not assets:
+		return {}
+	
+	asset_names = [a["name"] for a in assets]
+	
+	# 2. Fetch all Variants for these assets in one query
+	variants = frappe.get_all(
+		"Media Variant",
+		filters={"parent": ["in", asset_names]},
+		fields=["parent", "variant_name", "file_url as url", "width", "height"],
+		order_by="width asc"
+	)
+	
+	# Group variants by asset name
+	variants_by_asset = {}
+	for v in variants:
+		parent = v.pop("parent")
+		if parent not in variants_by_asset:
+			variants_by_asset[parent] = []
+		variants_by_asset[parent].append(v)
+	
+	# 3. Process and format results
+	results = {}
+	for asset in assets:
+		asset_name = asset["name"]
+		key = (asset["owner_name"], asset["media_role"])
+		
+		media_data = {
+			"url": asset["primary_url"],
+			"blur_placeholder": asset.get("blur_placeholder"),
+			"media_id": asset["name"],
+			"variants": {},
+			"srcset": None
+		}
+		
+		# Process variants if image
+		if asset.get("media_kind") == "image" and asset_name in variants_by_asset:
+			asset_variants = variants_by_asset[asset_name]
+			variants_dict = {}
+			srcset_parts = []
+			
+			for v in asset_variants:
+				v_name = v.get("variant_name", "")
+				canonical_name = normalize_variant_name(v_name)
+				variant_payload = {
+					"url": v["url"],
+					"width": v.get("width"),
+					"height": v.get("height")
+				}
+				variants_dict[canonical_name] = variant_payload
+				if v_name and v_name != canonical_name:
+					variants_dict[v_name] = variant_payload
+				
+				if v.get("width"):
+					srcset_parts.append(f"{v['url']} {v['width']}w")
+			
+			media_data["variants"] = variants_dict
+			if srcset_parts:
+				media_data["srcset"] = ", ".join(srcset_parts)
+		
+		results[key] = media_data
+		
+	return results
