@@ -13,6 +13,7 @@ from dinematters.dinematters.utils.customer_helpers import normalize_phone, get_
 from dinematters.dinematters.utils.otp_service import (
 	send_otp_via_sms,
 	send_otp_via_whatsapp,
+	send_otp_via_msg91_whatsapp,
 	OTP_LENGTH,
 	OTP_EXPIRY_MINUTES,
 	OTP_RESEND_COOLDOWN,
@@ -21,10 +22,10 @@ from dinematters.dinematters.utils.otp_service import (
 
 
 @frappe.whitelist(allow_guest=True)
-def send_otp(restaurant_id, phone, purpose="verification", restaurant_name=None):
+def send_otp(restaurant_id, phone, purpose="verification", restaurant_name=None, channel=None):
 	"""
-	Send OTP: SMS first, WhatsApp fallback on failure.
-	Returns: { success, token, expires_in, channel } or { success, skip_verification } or { success, already_verified }
+	Send OTP: MSG91 WhatsApp first, fallback to Fast2SMS SMS.
+	Returns: { success, token, expires_in, channel }
 	"""
 	try:
 		config = frappe.db.get_value("Restaurant Config", {"restaurant": restaurant_id}, "verify_my_user")
@@ -48,23 +49,34 @@ def send_otp(restaurant_id, phone, purpose="verification", restaurant_name=None)
 		if frappe.cache().get_value(cooldown_key):
 			return {"success": False, "error": "COOLDOWN", "message": "Wait 30 seconds before resending."}
 
-		# API key (use get_password — get_single_value returns masked "********" for Password fields)
-		api_key = frappe.get_single("Dinematters Settings").get_password("fast2sms_api_key")
-		if not api_key:
-			return {"success": False, "error": "OTP_SERVICE_NOT_CONFIGURED", "message": "OTP service not configured"}
-
+		settings = frappe.get_single("Dinematters Settings")
 		otp = "".join(random.choices(string.digits, k=OTP_LENGTH))
+		used_channel = None
 
-		# Try SMS first (restaurant_name from frontend for dynamic message)
-		sms_ok = send_otp_via_sms(api_key, normalized, otp, restaurant_name=restaurant_name or restaurant_id)
-		channel = "sms"
+		# 1. Try MSG91 WhatsApp if primary or channel='whatsapp'
+		if channel != "sms":
+			msg91_key = settings.get_password("msg91_auth_key")
+			msg91_template = settings.msg91_whatsapp_template_id
+			if msg91_key and msg91_template:
+				if send_otp_via_msg91_whatsapp(msg91_key, normalized, otp, msg91_template):
+					used_channel = "whatsapp"
 
-		if not sms_ok:
-			channel = "whatsapp"
-			whatsapp_ok = send_otp_via_whatsapp(api_key, phone, otp)
-			if not whatsapp_ok:
-				_create_otp_log(restaurant_id, phone, "whatsapp", 0, purpose, "Both SMS and WhatsApp failed")
-				return {"success": False, "error": "OTP_SEND_FAILED", "message": "Failed to send OTP"}
+		# 2. Fallback to Fast2SMS (SMS) if WhatsApp failed or channel='sms'
+		if not used_channel:
+			api_key = settings.get_password("fast2sms_api_key")
+			if not api_key:
+				return {"success": False, "error": "OTP_SERVICE_NOT_CONFIGURED", "message": "OTP service not configured"}
+			
+			if send_otp_via_sms(api_key, normalized, otp, restaurant_name=restaurant_name or restaurant_id):
+				used_channel = "sms"
+			else:
+				# 3. Final fallback: WhatsApp via Fast2SMS (if configured)
+				if send_otp_via_whatsapp(api_key, phone, otp):
+					used_channel = "whatsapp"
+
+		if not used_channel:
+			_create_otp_log(restaurant_id, phone, channel or "whatsapp", 0, purpose, "All channels failed")
+			return {"success": False, "error": "OTP_SEND_FAILED", "message": "Failed to send OTP"}
 
 		# Store OTP in cache
 		token = frappe.generate_hash(length=32)
@@ -78,15 +90,18 @@ def send_otp(restaurant_id, phone, purpose="verification", restaurant_name=None)
 		frappe.cache().set_value(rate_key, count + 1, expires_in_sec=3600)
 		frappe.cache().set_value(cooldown_key, "1", expires_in_sec=OTP_RESEND_COOLDOWN)
 
-		_create_otp_log(restaurant_id, phone, channel, 0, purpose, None)
+		_create_otp_log(restaurant_id, phone, used_channel, 0, purpose, None)
 
 		return {
 			"success": True,
 			"token": token,
 			"expires_in": OTP_EXPIRY_MINUTES * 60,
-			"channel": channel,
+			"channel": used_channel,
 			"message": "OTP sent successfully"
 		}
+	except Exception as e:
+		frappe.log_error(f"send_otp error: {e}", "OTP_Send_Error")
+		return {"success": False, "error": "INTERNAL_ERROR", "message": str(e)}
 	except Exception as e:
 		frappe.log_error(f"send_otp error: {e}", "OTP_Send_Error")
 		return {"success": False, "error": "INTERNAL_ERROR", "message": str(e)}

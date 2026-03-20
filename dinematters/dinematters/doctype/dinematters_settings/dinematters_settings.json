@@ -4,7 +4,7 @@
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
- "field_order": [
+  "field_order": [
   "section_otp",
   "fast2sms_api_key",
   "fast2sms_sender_id",
@@ -12,7 +12,10 @@
   "otp_expiry_minutes",
   "column_break_otp",
   "whatsapp_phone_number_id",
-  "whatsapp_otp_template_name"
+  "whatsapp_otp_template_name",
+  "section_msg91",
+  "msg91_auth_key",
+  "msg91_whatsapp_template_id"
  ],
  "fields": [
   {
@@ -59,6 +62,23 @@
    "fieldtype": "Data",
    "label": "WhatsApp OTP Template Name",
    "description": "Meta-approved OTP template name"
+  },
+  {
+   "fieldname": "section_msg91",
+   "fieldtype": "Section Break",
+   "label": "OTP Verification (MSG91 WhatsApp)"
+  },
+  {
+   "fieldname": "msg91_auth_key",
+   "fieldtype": "Password",
+   "label": "MSG91 Auth Key",
+   "description": "Auth key from MSG91 dashboard"
+  },
+  {
+   "fieldname": "msg91_whatsapp_template_id",
+   "fieldtype": "Data",
+   "label": "MSG91 WhatsApp Template ID",
+   "description": "Approved template ID for WhatsApp authentication"
   }
  ],
  "index_web_pages_for_search": 1,

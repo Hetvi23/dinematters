@@ -88,3 +88,32 @@ def send_otp_via_whatsapp(api_key: str, phone: str, otp: str) -> bool:
 	except Exception as e:
 		frappe.log_error(f"Fast2SMS WhatsApp failed: {e}", "OTP_WhatsApp_Failed")
 		return False
+
+
+def send_otp_via_msg91_whatsapp(auth_key: str, mobile: str, otp: str, template_id: str) -> bool:
+	"""Send OTP via MSG91 WhatsApp. Returns True if successful."""
+	try:
+		if not auth_key or not template_id:
+			return False
+
+		# MSG91 v5 OTP API: mobile should include country code without '+'
+		to = re.sub(r"\D", "", str(mobile))
+		if len(to) == 10:
+			to = "91" + to
+
+		url = "https://api.msg91.com/api/v5/otp"
+		params = {
+			"template_id": template_id,
+			"mobile": to,
+			"authkey": auth_key,
+			"otp": otp
+		}
+
+		# Some MSG91 templates might require variables_values instead of direct otp
+		# but for Authentication templates, 'otp' param is standard.
+		resp = requests.get(url, params=params, timeout=10)
+		data = resp.json() if resp.text else {}
+		return resp.status_code == 200 and data.get("type") == "success"
+	except Exception as e:
+		frappe.log_error(f"MSG91 WhatsApp failed: {e}", "OTP_MSG91_Failed")
+		return False

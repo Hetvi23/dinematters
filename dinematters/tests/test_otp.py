@@ -50,3 +50,19 @@ class TestOTP(FrappeTestCase):
 		cust2 = get_or_create_customer(phone, "Updated Name", "updated@example.com")
 		self.assertEqual(cust2.name, cust.name)
 		self.assertEqual(cust2.customer_name, "Updated Name")
+
+	def test_msg91_whatsapp_mock(self):
+		from dinematters.dinematters.utils.otp_service import send_otp_via_msg91_whatsapp
+		from unittest.mock import patch
+
+		with patch("requests.get") as mock_get:
+			mock_get.return_value.status_code = 200
+			mock_get.return_value.text = '{"type":"success"}'
+			mock_get.return_value.json.return_value = {"type": "success"}
+
+			success = send_otp_via_msg91_whatsapp("test_key", "9876543210", "1234", "test_template")
+			self.assertTrue(success)
+			self.assertTrue(mock_get.called)
+			args, kwargs = mock_get.call_args
+			self.assertEqual(kwargs["params"]["otp"], "1234")
+			self.assertEqual(kwargs["params"]["mobile"], "919876543210")
