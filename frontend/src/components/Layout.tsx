@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, Coins, Crown, CreditCard } from 'lucide-react'
+import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, Coins, Crown, CreditCard, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetCall, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
 import { AiRechargeModal } from '@/components/AiRechargeModal'
@@ -130,6 +130,17 @@ const navigation: NavItem[] = [
   },
   { type: 'link', name: 'Table Bookings', href: '/bookings', icon: Calendar, feature: 'ordering' },
   { type: 'link', name: 'Customers', href: '/customers', icon: Users, feature: 'ordering' },
+  {
+    type: 'group',
+    id: 'loyalty-growth',
+    name: 'Loyalty & Growth',
+    icon: Coins,
+    feature: 'ordering',
+    children: [
+      { name: 'Loyalty Settings', href: '/loyalty-settings', icon: Settings, feature: 'ordering' },
+      { name: 'Customer Insights', href: '/loyalty-insights', icon: Users, feature: 'ordering' },
+    ],
+  },
   {
     type: 'group',
     id: 'manage-product',

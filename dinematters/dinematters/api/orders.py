@@ -52,7 +52,7 @@ def load_customization_options(product_doc):
 			question.options.append(option_obj)
 
 @frappe.whitelist(allow_guest=True)
-def create_order(restaurant_id, items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None, table_number=None, coupon_code=None, payment_method=None, order_type=None, packaging_fee=None, pickup_time=None):
+def create_order(restaurant_id, items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None, table_number=None, coupon_code=None, payment_method=None, order_type=None, packaging_fee=None, pickup_time=None, loyalty_coins_redeemed=0, referral_id=None):
 	"""
 	POST /api/v1/orders
 	Place a new order
@@ -299,6 +299,34 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 				frappe.log_error(f"Auto-offer detection error: {str(e)}")
 				# Continue without auto-offer if detection fails
 		
+		# Apply loyalty points redemption if provided
+		loyalty_discount = 0
+		loyalty_coins = cint(loyalty_coins_redeemed)
+		if loyalty_coins > 0 and platform_customer:
+			try:
+				from dinematters.dinematters.api.loyalty import get_loyalty_summary
+				loyalty_summary = get_loyalty_summary(restaurant_id, phone)
+				if loyalty_summary.get("success"):
+					balance = loyalty_summary["data"]["balance"]
+					if loyalty_coins > balance:
+						loyalty_coins = balance
+					
+					loyalty_prog = frappe.get_doc("Restaurant Loyalty Config", {"restaurant": restaurant, "is_active": 1})
+					if loyalty_prog:
+						loyalty_discount = flt(loyalty_coins * (loyalty_prog.coin_value_in_inr or 1))
+						# Ensure discount doesn't exceed 30% of billing amount
+						billing_amount = max(0, subtotal - discount)
+						max_loyalty_discount = billing_amount * 0.3
+						if loyalty_discount > max_loyalty_discount:
+							loyalty_discount = max_loyalty_discount
+							loyalty_coins = cint(loyalty_discount / (loyalty_prog.coin_value_in_inr or 1))
+						
+						discount += loyalty_discount
+			except Exception as e:
+				frappe.log_error(f"Loyalty redemption error: {str(e)}")
+				loyalty_coins = 0
+				loyalty_discount = 0
+
 		total = subtotal - discount + tax + delivery_fee + packaging_fee
 		
 		# Parse table_number from QR code if provided
@@ -362,7 +390,10 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 			"delivery_location_pin": delivery_info.get("locationPin") if delivery_info else None,
 			"delivery_instructions": delivery_info.get("instructions") if delivery_info else None,
 			"pickup_time": pickup_datetime,
-			"estimated_delivery": estimated_delivery
+			"estimated_delivery": estimated_delivery,
+			"loyalty_coins_redeemed": loyalty_coins,
+			"loyalty_discount": loyalty_discount,
+			"referral_link": frappe.db.get_value("Referral Link", {"identifier": referral_id}, "name") if referral_id else None
 		})
 		
 		# Add order items
@@ -392,6 +423,66 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 			except Exception as e:
 				frappe.log_error(f"Error tracking coupon usage: {str(e)}")
 				# Don't fail order if usage tracking fails
+		
+		# Process Loyalty Earning and Referral Rewards
+		try:
+			loyalty_prog = frappe.get_doc("Restaurant Loyalty Config", {"restaurant": restaurant, "is_active": 1})
+			if loyalty_prog and platform_customer:
+				from dinematters.dinematters.api.loyalty import credit_loyalty_points
+				
+				# 1. Earn points on current order
+				coins_earned = cint((subtotal - discount) * loyalty_prog.points_per_inr)
+				if coins_earned > 0:
+					credit_loyalty_points(
+						customer=platform_customer,
+						restaurant=restaurant,
+						coins=coins_earned,
+						reason="Order",
+						ref_doctype="Order",
+						ref_name=order_doc.name
+					)
+					frappe.db.set_value("Order", order_doc.name, "coins_earned", coins_earned)
+				
+				# 2. Handle Referral Conversion Reward
+				if order_doc.referral_link:
+					# Check if this is the customer's first order at this restaurant
+					order_count = frappe.db.count("Order", {"platform_customer": platform_customer, "restaurant": restaurant, "name": ["!=", order_doc.name]})
+					if order_count == 0:
+						ref_link = frappe.get_doc("Referral Link", order_doc.referral_link)
+						
+						# Reward Referrer
+						credit_loyalty_points(
+							customer=ref_link.referrer,
+							restaurant=restaurant,
+							coins=loyalty_prog.referral_order_reward_coins,
+							reason="Referral Order",
+							ref_doctype="Order",
+							ref_name=order_doc.name
+						)
+						
+						credit_loyalty_points(
+							customer=platform_customer,
+							restaurant=restaurant,
+							coins=loyalty_prog.new_user_welcome_reward_coins,
+							reason="Welcome Bonus",
+							ref_doctype="Order",
+							ref_name=order_doc.name
+						)
+				
+				# 3. Deduct points if redeemed
+				if loyalty_coins > 0:
+					credit_loyalty_points(
+						customer=platform_customer,
+						restaurant=restaurant,
+						coins=loyalty_coins,
+						reason="Redemption",
+						ref_doctype="Order",
+						ref_name=order_doc.name,
+						transaction_type="Redeem"
+					)
+			frappe.db.commit()
+		except Exception as e:
+			frappe.log_error(f"Error in loyalty earning/referral logic: {str(e)}")
 		
 		# Format response
 		formatted_order = format_order(order_doc)
@@ -443,9 +534,19 @@ def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None, ad
 			if user:
 				filters["customer"] = user
 			elif session_id:
-				# For guest users, we might need to track by session or phone/email
-				# For now, return empty if no user
-				pass
+				# For guest users, track by session ID
+				filters["session_id"] = session_id
+			else:
+				# If no user and no session_id provided, return empty list for security
+				return {
+					"success": True,
+					"data": {
+						"orders": [],
+						"pagination": {"page": page, "limit": limit, "total": 0, "totalPages": 0},
+						"currency": "INR",
+						"currencySymbol": "₹"
+					}
+				}
 		else:
 			# Admin mode - add additional filters
 			if date_from:

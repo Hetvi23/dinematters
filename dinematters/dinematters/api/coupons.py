@@ -408,21 +408,11 @@ def get_applicable_offers(restaurant_id, cart_items, cart_total, customer_id=Non
 			is_eligible = True
 			ineligibility_reasons = []
 			
-			# Check date validity
+			# Skip if not within validity dates
 			if offer.valid_from and getdate(offer.valid_from) > getdate(today_date):
-				is_eligible = False
-				ineligibility_reasons.append({
-					"code": "NOT_STARTED",
-					"message": f"Offer starts on {offer.valid_from}",
-					"type": "date"
-				})
+				continue # Not valid yet
 			if offer.valid_until and getdate(offer.valid_until) < getdate(today_date):
-				is_eligible = False
-				ineligibility_reasons.append({
-					"code": "EXPIRED",
-					"message": f"Offer expired on {offer.valid_until}",
-					"type": "date"
-				})
+				continue # Expired
 			
 			# Check day of week
 			if offer.valid_days_of_week:

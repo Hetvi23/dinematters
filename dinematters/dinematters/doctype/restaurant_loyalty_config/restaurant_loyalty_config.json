@@ -1,0 +1,179 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "hash",
+ "creation": "2026-03-20 19:30:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "program_name",
+  "restaurant",
+  "is_active",
+  "section_break_earning",
+  "points_per_inr",
+  "coin_value_in_inr",
+  "min_redemption_threshold",
+  "min_billing_for_redemption",
+  "column_break_referral",
+  "share_reward_coins",
+  "min_unique_opens_for_reward",
+  "coins_per_unique_open",
+  "max_opens_rewarded_per_share",
+  "section_break_conversion",
+  "referral_order_reward_coins",
+  "new_user_welcome_reward_coins",
+  "column_break_welcome",
+  "welcome_coupon_discount"
+ ],
+ "fields": [
+  {
+   "fieldname": "program_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Program Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "restaurant",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Restaurant",
+   "options": "Restaurant",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Is Active"
+  },
+  {
+   "fieldname": "section_break_earning",
+   "fieldtype": "Section Break",
+   "label": "Earning & Redemption"
+  },
+  {
+   "default": "1",
+   "description": "How many coins are earned per 1 \u20b9 spent",
+   "fieldname": "points_per_inr",
+   "fieldtype": "Float",
+   "label": "Coins per \u20b9"
+  },
+  {
+   "default": "1",
+   "description": "Value of 1 coin in \u20b9 during redemption",
+   "fieldname": "coin_value_in_inr",
+   "fieldtype": "Float",
+   "label": "Coin Value in \u20b9"
+  },
+  {
+   "default": "0",
+   "fieldname": "min_redemption_threshold",
+   "fieldtype": "Int",
+   "label": "Min Redemption Threshold (Coins)"
+  },
+  {
+   "default": "0",
+   "fieldname": "min_billing_for_redemption",
+   "fieldtype": "Float",
+   "label": "Min Billing for Redemption (\u20b9)"
+  },
+  {
+   "fieldname": "column_break_referral",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "20",
+   "description": "Coins rewarded to referrer for sharing",
+   "fieldname": "share_reward_coins",
+   "fieldtype": "Int",
+   "label": "Share Reward Coins"
+  },
+  {
+   "default": "2",
+   "description": "Minimum unique opens required to trigger share reward",
+   "fieldname": "min_unique_opens_for_reward",
+   "fieldtype": "Int",
+   "label": "Min Unique Opens"
+  },
+  {
+   "default": "2",
+   "description": "Coins rewarded for each unique open after the initial threshold",
+   "fieldname": "coins_per_unique_open",
+   "fieldtype": "Int",
+   "label": "Coins per Unique Open"
+  },
+  {
+   "default": "5",
+   "description": "Maximum opens per share that generate rewards",
+   "fieldname": "max_opens_rewarded_per_share",
+   "fieldtype": "Int",
+   "label": "Max Opens Rewarded"
+  },
+  {
+   "fieldname": "section_break_conversion",
+   "fieldtype": "Section Break",
+   "label": "Conversion Rewards"
+  },
+  {
+   "default": "100",
+   "description": "Coins rewarded to referrer when friend matches first order",
+   "fieldname": "referral_order_reward_coins",
+   "fieldtype": "Int",
+   "label": "Referral Order Reward Coins"
+  },
+  {
+   "default": "50",
+   "description": "Coins rewarded to new user on signup via referral",
+   "fieldname": "new_user_welcome_reward_coins",
+   "fieldtype": "Int",
+   "label": "New User Welcome Coins"
+  },
+  {
+   "fieldname": "column_break_welcome",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Instant discount amount (\u20b9) for new users via referral",
+   "fieldname": "welcome_coupon_discount",
+   "fieldtype": "Float",
+   "label": "Welcome Coupon Discount (\u20b9)"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-20 19:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Dinematters",
+ "name": "Restaurant Loyalty Config",
+ "naming_rule": "By field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Restaurant Admin",
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

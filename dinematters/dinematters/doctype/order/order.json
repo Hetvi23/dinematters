@@ -30,6 +30,10 @@
   "packaging_fee",
   "total",
   "coupon",
+  "loyalty_coins_redeemed",
+  "loyalty_discount",
+  "coins_earned",
+  "referral_link",
   "section_break_status",
   "status",
   "column_break_status",
@@ -176,6 +180,30 @@
    "fieldtype": "Link",
    "label": "Coupon",
    "options": "Coupon"
+  },
+  {
+   "default": "0",
+   "fieldname": "loyalty_coins_redeemed",
+   "fieldtype": "Int",
+   "label": "Loyalty Coins Redeemed"
+  },
+  {
+   "default": "0",
+   "fieldname": "loyalty_discount",
+   "fieldtype": "Currency",
+   "label": "Loyalty Discount"
+  },
+  {
+   "default": "0",
+   "fieldname": "coins_earned",
+   "fieldtype": "Int",
+   "label": "Coins Earned"
+  },
+  {
+   "fieldname": "referral_link",
+   "fieldtype": "Link",
+   "label": "Referral Link",
+   "options": "Referral Link"
   },
   {
    "default": "0",

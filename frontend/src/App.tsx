@@ -43,6 +43,8 @@ import AIGalleryPage from './pages/AIGalleryPage'
 import AIMenuThemeBackgroundPage from './pages/AIMenuThemeBackgroundPage'
 import AIMenuThemeHistoryPage from './pages/AIMenuThemeHistoryPage'
 import AutopaySetupPage from './pages/AutopaySetupPage'
+import LoyaltySettings from './pages/LoyaltySettings'
+import CustomerInsights from './pages/CustomerInsights'
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -87,6 +89,8 @@ function AppContent() {
 						<Route element={<FeatureProtectedRoute feature="ordering" />}>
 							<Route path="/bookings" element={<Layout><Bookings /></Layout>} />
 							<Route path="/customers" element={<Layout><Customers /></Layout>} />
+							<Route path="/loyalty-settings" element={<Layout><LoyaltySettings /></Layout>} />
+							<Route path="/loyalty-insights" element={<Layout><CustomerInsights /></Layout>} />
 						</Route>
 
 						{/* PRO Feature: Frontend ordering controls & billing - Requires PRO plan (ordering feature) */}

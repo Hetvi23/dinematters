@@ -14,6 +14,7 @@
   "subdomain",
   "slug",
   "is_active",
+  "enable_loyalty",
   "section_break_owner",
   "owner_email",
   "owner_phone",
@@ -129,6 +130,12 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Is Active"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_loyalty",
+   "fieldtype": "Check",
+   "label": "Enable Loyalty"
   },
   {
    "fieldname": "section_break_owner",

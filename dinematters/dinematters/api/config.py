@@ -38,6 +38,7 @@ def get_restaurant_config(restaurant_id):
 			 "color_palette_red", "menu_theme_background_active", "menu_theme_background_preview", "menu_theme_background_history", "currency", "menu_layout", "enable_table_booking", "enable_banquet_booking",
 			 "menu_theme_background_enabled",
 			 "enable_events", "enable_offers", "enable_coupons", "enable_experience_lounge", "verify_my_user",
+			 "enable_loyalty",
 			 "google_review_link", "instagram_profile_link", "facebook_profile_link", "whatsapp_phone_number"],
 			as_dict=True
 		)
@@ -184,6 +185,7 @@ def get_restaurant_config(restaurant_id):
 				"enableCoupons": bool(config.get("enable_coupons")),
 				"enableExperienceLounge": bool(config.get("enable_experience_lounge")),
 				"verifyMyUser": bool(config.get("verify_my_user")),
+				"enableLoyalty": bool(restaurant_doc.get("enable_loyalty")),
 				"defaultDeliveryFee": flt(restaurant_doc.get("default_delivery_fee", 0)),
 				"order_settings": {
 					"enable_takeaway": bool(restaurant_doc.get("enable_takeaway", 1)),
