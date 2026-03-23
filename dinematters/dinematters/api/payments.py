@@ -6,9 +6,12 @@ import frappe
 import razorpay
 import json
 import math
+from datetime import datetime
 from frappe import _
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
 from dinematters.dinematters.utils.customer_helpers import require_verified_phone, get_or_create_customer
+
+
 
 
 def get_razorpay_client(restaurant_id=None):
@@ -52,11 +55,27 @@ def create_linked_account(*args, **kwargs):
 
 
 @frappe.whitelist(allow_guest=True)
-def create_payment_order(restaurant_id, order_items, total_amount, customer_name=None, customer_email=None, customer_phone=None, table_number=None):
-	"""Create a Razorpay order for customer payment (SaaS model: no Route/transfers)."""
+def create_payment_order(restaurant_id, order_items, total_amount, subtotal=None, packaging_fee=0, delivery_fee=0, customer_name=None, customer_email=None, customer_phone=None, table_number=None, existing_order_id=None, idempotency_key=None, order_type=None, coupon_code=None, loyalty_coins_redeemed=0, delivery_info=None, pickup_time=None):
+	"""Create or update a Razorpay order for customer payment (SaaS model: no Route/transfers)."""
 	try:
 		_restaurant_name = validate_restaurant_for_api(restaurant_id)
 		restaurant = frappe.get_doc("Restaurant", _restaurant_name)
+
+		# Parse delivery info if string
+		if isinstance(delivery_info, str):
+			delivery_info = json.loads(delivery_info)
+		delivery_info = delivery_info or {}
+
+		# Convert pickup_time to datetime if provided
+		pickup_datetime = None
+		if pickup_time:
+			try:
+				if isinstance(pickup_time, str):
+					pickup_datetime = datetime.fromisoformat(pickup_time.replace('Z', '+00:00'))
+				else:
+					pickup_datetime = pickup_time
+			except Exception:
+				pickup_datetime = None
 
 		# OTP gate: require verified phone when verify_my_user is on
 		if customer_phone:
@@ -81,51 +100,174 @@ def create_payment_order(restaurant_id, order_items, total_amount, customer_name
 		platform_fee_percent = restaurant.platform_fee_percent or 1.5
 		platform_fee_paise = int(math.floor(total_amount_paise * platform_fee_percent / 100))
 
-		# Create order in ERPNext first
-		order_doc = frappe.get_doc({
-			"doctype": "Order",
-			"restaurant": restaurant_id,
-			"order_id": frappe.generate_hash(length=10),
-			"order_number": frappe.generate_hash(length=8),
+		# Create or Update order in ERPNext
+		order_doc = None
+		
+		# Enterprise Idempotency: Check if an order with this idempotency_key already exists
+		if idempotency_key:
+			existing_name = frappe.db.get_value("Order", {"idempotency_key": idempotency_key}, "name")
+			if existing_name:
+				existing_order_id = existing_name
+
+		if existing_order_id:
+			try:
+				order_doc = frappe.get_doc("Order", existing_order_id)
+				# Only reuse if it's still pending payment and belongs to the same restaurant
+				if order_doc.payment_status != "pending" or order_doc.restaurant != restaurant_id:
+					order_doc = None
+			except frappe.DoesNotExistError:
+				order_doc = None
+
+		if not order_doc:
+			order_doc = frappe.new_doc("Order")
+			order_id = frappe.generate_hash(length=10)
+			# Generate a human-readable order number
+			from dinematters.dinematters.api.orders import generate_order_number
+			order_number = generate_order_number()
+			order_doc.update({
+				"order_id": order_id,
+				"order_number": order_number,
+				"restaurant": restaurant_id,
+			})
+
+		# Update basic info
+		order_doc.update({
 			"customer_name": customer_name,
 			"customer_email": customer_email,
 			"customer_phone": customer_phone,
 			"platform_customer": platform_customer,
 			"table_number": table_number,
-			"subtotal": total_amount,
-			"total": total_amount,
+			"order_type": order_type,
+			"subtotal": total_amount, # This is the subtotal before discounts
 			"status": "confirmed",
 			"payment_status": "pending",
 			"payment_method": "online",
 			"platform_fee_amount": platform_fee_paise,
-			"order_items": []
+			"idempotency_key": idempotency_key,
+			"delivery_address": delivery_info.get("address"),
+			"delivery_landmark": delivery_info.get("landmark"),
+			"delivery_city": delivery_info.get("city"),
+			"delivery_state": delivery_info.get("state"),
+			"delivery_zip_code": delivery_info.get("zipCode") or delivery_info.get("zip_code"),
+			"delivery_instructions": delivery_info.get("instructions"),
+			"pickup_time": pickup_datetime,
+			"packaging_fee": float(packaging_fee or 0),
+			"delivery_fee": float(delivery_fee or 0)
 		})
+
+		# total_amount from frontend is the final payable total
+		# subtotal from frontend is the original total before discounts
+		# If subtotal isn't provided (legacy frontend), fall back to total_amount
+		# total_amount from frontend is the final payable total
+		# subtotal from frontend is the original total before discounts
+		# If subtotal isn't provided (legacy frontend), fall back to total_amount
+		orig_subtotal = float(subtotal) if subtotal is not None else float(total_amount)
+		pkg_fee = float(packaging_fee or 0)
+		del_fee = float(delivery_fee or 0)
+		
+		# total_discount_frontend is the difference between (subtotal + fees) and the final total_amount
+		total_discount_frontend = max(0, (orig_subtotal + pkg_fee + del_fee) - float(total_amount))
+		
+		applied_coupon = coupon_code
+		redeemed_coins = int(loyalty_coins_redeemed or 0)
+		loyalty_discount = 0
+		coupon_discount_value = 0
+
+		# 1. Handle Loyalty
+		if redeemed_coins > 0 and platform_customer:
+			try:
+				from dinematters.dinematters.utils.loyalty import get_loyalty_balance, is_loyalty_enabled
+				if is_loyalty_enabled(_restaurant_name):
+					balance = get_loyalty_balance(platform_customer, _restaurant_name)
+					if redeemed_coins > balance:
+						redeemed_coins = balance
+					
+					loyalty_configs = frappe.get_all("Restaurant Loyalty Config", 
+						filters={"restaurant": _restaurant_name, "is_active": 1}, 
+						fields=["name", "coin_value_in_inr"],
+						limit=1)
+					
+					if loyalty_configs:
+						loyalty_prog = frappe.get_doc("Restaurant Loyalty Config", loyalty_configs[0].name)
+						loyalty_discount = float(redeemed_coins * (loyalty_prog.coin_value_in_inr or 1))
+						# Cap at 30% of subtotal
+						max_ld = orig_subtotal * 0.3
+						if loyalty_discount > max_ld:
+							loyalty_discount = max_ld
+							redeemed_coins = int(loyalty_discount / (loyalty_prog.coin_value_in_inr or 1))
+				else:
+					redeemed_coins = 0
+					loyalty_discount = 0
+			except Exception as e:
+				frappe.log_error(f"Payment loyalty validation failed: {str(e)}", "Loyalty Error")
+				redeemed_coins = 0
+				loyalty_discount = 0
+
+		# 2. Handle Coupon
+		if coupon_code:
+			try:
+				from dinematters.dinematters.api.coupons import validate_coupon
+				cart_items_val = [{"dishId": i.get("product_id") or i.get("dishId")} for i in order_items]
+				coupon_res = validate_coupon(restaurant_id, coupon_code, orig_subtotal, customer_id=platform_customer, cart_items=json.dumps(cart_items_val))
+				if coupon_res.get("success"):
+					cdata = coupon_res.get("data", {}).get("coupon", {})
+					applied_coupon = cdata.get("id")
+					coupon_discount_value = float(cdata.get("discountAmount") or 0)
+			except Exception as e:
+				frappe.log_error(f"Payment coupon validation failed: {str(e)}")
+
+		# Final discount calculation
+		calculated_total_discount = loyalty_discount + coupon_discount_value
+		final_discount = max(total_discount_frontend, calculated_total_discount)
+
+		# Update totals and discount fields
+		order_doc.update({
+			"coupon": applied_coupon,
+			"loyalty_coins_redeemed": redeemed_coins,
+			"loyalty_discount": loyalty_discount,
+			"discount": final_discount,
+			"subtotal": orig_subtotal,
+			"total": float(total_amount)
+		})
+
+
+		# Clear and Add order items
+		order_doc.set("order_items", [])
 
 		# Add order items
 		for item in order_items:
+			# Support both 'product_id' and 'dishId' (frontend consistency)
+			product_id = item.get("product_id") or item.get("dishId")
+			if not product_id:
+				continue
+
+				
+			rate = float(item.get("rate") or item.get("unit_price") or 0)
+			quantity = float(item.get("quantity") or 1)
+			amount = float(item.get("amount") or item.get("total_price") or (rate * quantity))
+			
 			order_doc.append("order_items", {
-				"product": item.get("product_id"),
-				"quantity": item.get("quantity", 1),
-				"unit_price": float(item.get("rate", 0)),
-				"original_price": float(item.get("rate", 0)),
-				"total_price": float(item.get("amount", 0))
+				"product": product_id,
+				"quantity": quantity,
+				"unit_price": rate,
+				"original_price": rate,
+				"total_price": amount
 			})
 
-		# When called from guest/frontend (no session), allow creating order without permissions.
-		try:
-			if frappe.session.user == "Guest":
-				order_doc.insert(ignore_permissions=True)
-			else:
-				order_doc.insert()
-		except Exception:
-			# fallback to ignore_permissions
+		# Save order
+		if order_doc.is_new():
 			order_doc.insert(ignore_permissions=True)
+		else:
+			order_doc.save(ignore_permissions=True)
 
+		# Calculate Razorpay amount from final order total (in paise)
+		final_total_paise = int(float(order_doc.total) * 100)
+		
 		# Create Razorpay order (standard, no transfers)
 		# Prefer restaurant-specific merchant keys if configured (so customers pay the merchant)
 		client = get_razorpay_client(restaurant_id)
 		razorpay_order_data = {
-			"amount": total_amount_paise,
+			"amount": final_total_paise,
 			"currency": "INR",
 			"payment_capture": 1,
 			"notes": {
@@ -139,7 +281,7 @@ def create_payment_order(restaurant_id, order_items, total_amount, customer_name
 
 		# Update order with Razorpay order ID
 		order_doc.razorpay_order_id = razorpay_order["id"]
-		order_doc.save()
+		order_doc.save(ignore_permissions=True)
 
 		# Get public key for frontend.
 		# If restaurant provided merchant keys, return merchant key_id so frontend Checkout uses merchant credentials.
@@ -205,13 +347,33 @@ def verify_payment(razorpay_order_id, razorpay_payment_id, razorpay_signature):
 		if order:
 			# Update payment details (webhook will be authoritative)
 			try:
+				order.payment_status = "completed"
+				if order.status == "pending_verification":
+					order.status = "confirmed"
 				order.razorpay_payment_id = razorpay_payment_id
 				order.transaction_id = razorpay_payment_id
 				order.save(ignore_permissions=True)
-			except Exception:
-				frappe.db.set_value("Order", order.name, "razorpay_payment_id", razorpay_payment_id)
-				frappe.db.set_value("Order", order.name, "transaction_id", razorpay_payment_id)
+				
+				# Process Loyalty and Coupons (since payment is now verified)
+				process_loyalty_and_coupons(order)
+				
+			except Exception as e:
+				frappe.log_error(f"Error updating order after verification: {str(e)}")
+				frappe.db.set_value("Order", order.name, {
+					"payment_status": "completed",
+					"razorpay_payment_id": razorpay_payment_id,
+					"transaction_id": razorpay_payment_id
+				})
+				if frappe.db.get_value("Order", order.name, "status") == "pending_verification":
+					frappe.db.set_value("Order", order.name, "status", "confirmed")
 				frappe.db.commit()
+				
+				# Try processing loyalty even if doc save failed (using db values)
+				try:
+					order_doc = frappe.get_doc("Order", order.name)
+					process_loyalty_and_coupons(order_doc)
+				except Exception:
+					pass
 
 		return {
 			"success": True,
@@ -229,6 +391,107 @@ def verify_payment(razorpay_order_id, razorpay_payment_id, razorpay_signature):
 		}
 
 
+def process_loyalty_and_coupons(order):
+	"""Process loyalty point deductions/earnings and coupon usage after payment success.
+	Idempotent: checks existing Restaurant Loyalty Entry records to prevent double-processing.
+	Each step (deduct / earn / coupon) is isolated so a failure in one does not block the others.
+	"""
+	from dinematters.dinematters.utils.loyalty import redeem_loyalty_coins, earn_loyalty_coins
+
+	restaurant_id = order.restaurant
+	platform_customer = order.platform_customer
+
+	if not platform_customer:
+		frappe.log_error(
+			f"process_loyalty_and_coupons: no platform_customer on order {order.name}",
+			"Loyalty Debug"
+		)
+		return
+
+	# ── 1. Deduct Redeemed Coins ────────────────────────────────────────────────
+	try:
+		coins_to_redeem = int(order.loyalty_coins_redeemed or 0)
+		if coins_to_redeem > 0:
+			# Idempotency: skip if a Redeem entry already exists for this order
+			already_redeemed = frappe.db.exists("Restaurant Loyalty Entry", {
+				"customer": platform_customer,
+				"restaurant": restaurant_id,
+				"reference_doctype": "Order",
+				"reference_name": order.name,
+				"transaction_type": "Redeem"
+			})
+			if already_redeemed:
+				frappe.log_error(
+					f"Loyalty deduction already done for order {order.name}, skipping.",
+					"Loyalty Debug"
+				)
+			else:
+				result = redeem_loyalty_coins(
+					customer=platform_customer,
+					restaurant=restaurant_id,
+					coins=coins_to_redeem,
+					reason="Redemption",
+					ref_doctype="Order",
+					ref_name=order.name
+				)
+				frappe.db.commit()
+				frappe.log_error(
+					f"Loyalty REDEEMED {coins_to_redeem} coins for order {order.name}, entry={result.name if result else None}",
+					"Loyalty Debug"
+				)
+	except Exception as e:
+		frappe.log_error(
+			f"Loyalty deduction failed for order {order.name}: {str(e)}",
+			"Loyalty Deduction Error"
+		)
+
+	# ── 2. Earn Coins on Final Paid Amount ──────────────────────────────────────
+	try:
+		# Idempotency: skip if an Earn entry already exists for this order
+		already_earned = frappe.db.exists("Restaurant Loyalty Entry", {
+			"customer": platform_customer,
+			"restaurant": restaurant_id,
+			"reference_doctype": "Order",
+			"reference_name": order.name,
+			"transaction_type": "Earn"
+		})
+		if not already_earned:
+			earn_loyalty_coins(
+				customer=platform_customer,
+				restaurant=restaurant_id,
+				amount_paid=order.total,
+				reason="Order",
+				ref_doctype="Order",
+				ref_name=order.name
+			)
+			frappe.db.commit()
+	except Exception as e:
+		frappe.log_error(
+			f"Loyalty earning failed for order {order.name}: {str(e)}",
+			"Loyalty Earning Error"
+		)
+
+	# ── 3. Track Coupon Usage ───────────────────────────────────────────────────
+	if order.coupon:
+		try:
+			if not frappe.db.exists("Coupon Usage", {"order": order.name, "coupon": order.coupon}):
+				usage_doc = frappe.get_doc({
+					"doctype": "Coupon Usage",
+					"coupon": order.coupon,
+					"customer": platform_customer,
+					"order": order.name,
+					"restaurant": restaurant_id,
+					"discount_amount": order.discount
+				})
+				usage_doc.insert(ignore_permissions=True)
+				frappe.db.set_value("Coupon", order.coupon, "usage_count",
+					int(frappe.db.get_value("Coupon", order.coupon, "usage_count") or 0) + 1)
+				frappe.db.commit()
+		except Exception as e:
+			frappe.log_error(f"Coupon usage tracking failed for order {order.name}: {str(e)}")
+
+
+
 @frappe.whitelist(allow_guest=True)
 def get_restaurant_payment_stats(restaurant_id):
 	"""Get payment statistics for a restaurant"""
@@ -237,13 +500,13 @@ def get_restaurant_payment_stats(restaurant_id):
 		_restaurant_name = validate_restaurant_for_api(restaurant_id)
 		restaurant = frappe.get_doc("Restaurant", _restaurant_name)
 
-		def mask_identifier(value):
+		def mask_identifier(value, prefix_len=4):
 			if not value:
 				return None
 			value = str(value)
 			if len(value) <= 8:
 				return value[:2] + "****" + value[-2:]
-			return value[:4] + "****" + value[-4:]
+			return value[:prefix_len] + "********" + value[-4:]
 		
 		# Get current month stats
 		from datetime import datetime
@@ -253,15 +516,15 @@ def get_restaurant_payment_stats(restaurant_id):
 		orders = frappe.db.sql("""
 			SELECT 
 				COUNT(*) as total_orders,
-				SUM(total) as total_revenue,
-				SUM(platform_fee_amount) as total_platform_fee
+				COALESCE(SUM(total), 0) as total_revenue,
+				COALESCE(SUM(platform_fee_amount), 0) as total_platform_fee
 			FROM `tabOrder`
 			WHERE restaurant = %s 
 			AND payment_status = 'completed'
 			AND DATE_FORMAT(creation, '%%Y-%%m') = %s
 		""", (restaurant_id, current_month), as_dict=True)
 		
-		stats = orders[0] if orders else {
+		stats = orders[0] if (orders and orders[0]) else {
 			"total_orders": 0,
 			"total_revenue": 0,
 			"total_platform_fee": 0
@@ -286,6 +549,7 @@ def get_restaurant_payment_stats(restaurant_id):
 				"mandate_status": restaurant.mandate_status,
 				"masked_customer_id": mask_identifier(restaurant.razorpay_customer_id),
 				"masked_token_id": mask_identifier(restaurant.razorpay_token_id),
+				"masked_key_id": mask_identifier(restaurant.razorpay_merchant_key_id, prefix_len=8),
 				"billing_status": restaurant.billing_status,
 				"razorpay_keys_updated_at": getattr(restaurant, "razorpay_keys_updated_at", None),
 				"razorpay_keys_updated_by": getattr(restaurant, "razorpay_keys_updated_by", None),
@@ -336,7 +600,7 @@ def create_razorpay_customer_and_token(restaurant_id, customer_name, customer_em
 		return {"success": False, "error": str(e)}
 
 @frappe.whitelist()
-def set_restaurant_razorpay_keys(restaurant_id, key_id, key_secret):
+def set_restaurant_razorpay_keys(restaurant_id, key_id, key_secret, webhook_secret=None):
 	"""Set per-restaurant Razorpay merchant credentials. Admin-only."""
 	try:
 		# Only allow System Managers
@@ -349,7 +613,6 @@ def set_restaurant_razorpay_keys(restaurant_id, key_id, key_secret):
 		restaurant.razorpay_merchant_key_id = key_id
 		restaurant.razorpay_merchant_key_secret = key_secret
 		# optional webhook secret
-		webhook_secret = frappe.local.form_dict.get('webhook_secret') if hasattr(frappe.local, 'form_dict') else None
 		if webhook_secret:
 			restaurant.razorpay_webhook_secret = webhook_secret
 		# Audit: record who updated keys and when
@@ -567,4 +830,68 @@ def charge_monthly_bill(ledger_name):
 			frappe.db.commit()
 		except Exception:
 			pass
+		return {"success": False, "error": str(e)}
+@frappe.whitelist()
+def get_razorpay_payments(restaurant_id, from_date=None, to_date=None, count=10, skip=0):
+	"""Fetch transactions directly from Razorpay for a restaurant."""
+	try:
+		validate_restaurant_for_api(restaurant_id)
+		client = get_razorpay_client(restaurant_id)
+		
+		params = {
+			"count": count,
+			"skip": skip
+		}
+		
+		if from_date:
+			# from_date is expected as YYYY-MM-DD
+			from datetime import datetime
+			dt = datetime.strptime(from_date, "%Y-%m-%d")
+			params["from"] = int(dt.timestamp())
+			
+		if to_date:
+			from datetime import datetime
+			dt = datetime.strptime(to_date, "%Y-%m-%d")
+			# include the whole day
+			params["to"] = int(dt.timestamp()) + 86399
+			
+		payments = client.payment.all(params)
+		return {
+			"success": True,
+			"data": payments
+		}
+	except Exception as e:
+		frappe.log_error(f"Failed to fetch Razorpay payments: {str(e)}", "razorpay.get_payments")
+		return {"success": False, "error": str(e)}
+
+@frappe.whitelist()
+def initiate_razorpay_refund(restaurant_id, payment_id, amount=None, reason=None):
+	"""Initiate a refund for a Razorpay payment."""
+	try:
+		validate_restaurant_for_api(restaurant_id)
+		client = get_razorpay_client(restaurant_id)
+		
+		params = {}
+		if amount:
+			# amount in rupees, convert to paise
+			params["amount"] = int(float(amount) * 100)
+		
+		if reason:
+			params["notes"] = {"reason": reason}
+			if reason.lower() in ["duplicate", "fraud", "requested_by_customer"]:
+				params["speed"] = "normal"
+				
+		refund = client.payment.refund(payment_id, params)
+		
+		# Log refund in Order if found
+		order_name = frappe.db.get_value("Order", {"razorpay_payment_id": payment_id}, "name")
+		if order_name:
+			frappe.get_doc("Order", order_name).add_comment("Info", text=f"Refund of ₹{amount if amount else 'full'} initiated via Razorpay. Refund ID: {refund.get('id')}")
+			
+		return {
+			"success": True,
+			"data": refund
+		}
+	except Exception as e:
+		frappe.log_error(f"Failed to initiate Razorpay refund: {str(e)}", "razorpay.initiate_refund")
 		return {"success": False, "error": str(e)}

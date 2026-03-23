@@ -2,13 +2,14 @@ import { useState, useEffect, useRef } from 'react'
 import { useDocTypeMeta, DocTypeField } from '@/lib/doctype'
 import { usePermissions } from '@/lib/permissions'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ColorPaletteSelector } from '@/components/ui/color-palette-selector'
+import { CityStateSelector } from '@/components/ui/CityStateSelector'
 import { DatePicker } from '@/components/ui/date-picker'
 import { useFrappeGetDoc, useFrappePostCall, useFrappeGetDocList } from '@/lib/frappe'
 import { useRestaurant } from '@/contexts/RestaurantContext'
@@ -37,10 +38,18 @@ interface DynamicFormProps {
   skipLoadingState?: boolean // Skip showing loading spinner (useful when parent handles loading via page reload)
 }
 
-export default function DynamicForm({ 
-  doctype, 
-  docname, 
-  onSave, 
+// Character limits for specific doctype fields to ensure UI consistency
+const CHARACTER_LIMITS: Record<string, Record<string, number>> = {
+  'Restaurant Config': {
+    'tagline': 70,
+    'subtitle': 100,
+  }
+}
+
+export default function DynamicForm({
+  doctype,
+  docname,
+  onSave,
   onCancel,
   mode = 'create',
   initialData = {},
@@ -48,22 +57,13 @@ export default function DynamicForm({
   onChange,
   hideFields = [],
   readOnlyFields = [],
-  showSaveButton = true,
   triggerSave,
   skipLoadingState = false
 }: DynamicFormProps) {
-  // Debug: Log component render
-  console.log(`[DynamicForm] ${doctype} - Component render:`, {
-    doctype,
-    docname,
-    mode,
-    initialData,
-    readOnlyFields
-  })
-  
+
   const { meta, isLoading: metaLoading, error: metaError } = useDocTypeMeta(doctype)
   const { permissions, isLoading: permLoading } = usePermissions(doctype)
-  
+
   const hookEnabled = !!docname && mode !== 'create'
   const { data: docData, isLoading: docLoading, error: docError, mutate: refreshDoc } = useFrappeGetDoc(doctype, docname || '', {
     enabled: hookEnabled,
@@ -165,7 +165,7 @@ export default function DynamicForm({
         primary_color: docData.primary_color,
         formDataInitialized
       })
-      
+
       // Load existing document data from backend - this is the source of truth for most fields
       const cleanDocData = { ...docData }
       // Remove metadata fields that shouldn't be compared
@@ -174,12 +174,12 @@ export default function DynamicForm({
       delete cleanDocData.modified
       delete cleanDocData.modified_by
       delete cleanDocData.owner
-      
+
       // For edit mode, backend data (docData) is the source of truth for most fields
       // Start with ALL backend data (tagline, theme, colors, etc.)
       // Also initialize all fields from meta with their defaults if they're not in docData
       const mergedData = { ...cleanDocData }
-      
+
       // If meta is available, ensure all fields are initialized (even if NULL in backend)
       // This handles cases where the API only returns non-NULL fields
       if (meta && meta.fields) {
@@ -194,7 +194,7 @@ export default function DynamicForm({
           }
         })
       }
-      
+
       // Override read-only fields with initialData values (e.g., restaurant from context)
       // This ensures restaurant field ALWAYS comes from context (top-left dropdown), not backend
       // Use initialData prop directly to ensure we have the latest value
@@ -205,7 +205,7 @@ export default function DynamicForm({
           mergedData[fieldname] = initialDataRef.current[fieldname]
         }
       })
-      
+
       // Special handling for restaurant field to avoid currency codes from being stored
       const restaurantFromInitial = initialData.restaurant || initialDataRef.current.restaurant
       if (restaurantFromInitial && typeof restaurantFromInitial === 'string') {
@@ -215,7 +215,7 @@ export default function DynamicForm({
           mergedData.restaurant = restaurantFromInitial
         }
       }
-      
+
       console.log(`[DynamicForm] ${doctype} - Setting formData with mergedData:`, {
         mergedDataKeys: Object.keys(mergedData),
         tagline: mergedData.tagline,
@@ -224,7 +224,7 @@ export default function DynamicForm({
         primary_color: mergedData.primary_color,
         restaurant: mergedData.restaurant
       })
-      
+
       setFormData(mergedData)
       originalDataRef.current = { ...mergedData } // Store original data for comparison
       setFormDataInitialized(true)
@@ -268,7 +268,7 @@ export default function DynamicForm({
     setFormData({})
     originalDataRef.current = {}
   }, [docname, mode])
-  
+
   // Update initialDataRef when initialData changes (separate effect to avoid resetting form)
   useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
@@ -341,22 +341,22 @@ export default function DynamicForm({
   // Check for changes and notify parent
   useEffect(() => {
     if (!onChange) return
-    
+
     if (!formDataInitialized) {
       // If not initialized yet, notify that there are no changes
       onChange(false)
       return
     }
-    
+
     const hasChanges = (() => {
       const original = originalDataRef.current
       const current = formData
-      
+
       // If both are empty, no changes
       if (Object.keys(original).length === 0 && Object.keys(current).length === 0) {
         return false
       }
-      
+
       // If original is empty and current has data, check if it's meaningful data
       if (Object.keys(original).length === 0) {
         // For new forms, only consider it changed if user has actually entered data
@@ -369,20 +369,20 @@ export default function DynamicForm({
         })
         return hasData && hasUserDataRef.current
       }
-      
+
       // Compare all keys
       const allKeys = new Set([...Object.keys(original), ...Object.keys(current)])
-      
+
       for (const key of allKeys) {
         const origValue = original[key]
         const currValue = current[key]
-        
+
         // Skip comparison for undefined/null/empty differences that don't matter
-        if ((origValue === undefined || origValue === null || origValue === '') && 
-            (currValue === undefined || currValue === null || currValue === '')) {
+        if ((origValue === undefined || origValue === null || origValue === '') &&
+          (currValue === undefined || currValue === null || currValue === '')) {
           continue
         }
-        
+
         // Deep comparison for arrays and objects
         if (Array.isArray(origValue) && Array.isArray(currValue)) {
           if (JSON.stringify(origValue) !== JSON.stringify(currValue)) {
@@ -396,24 +396,24 @@ export default function DynamicForm({
           return true
         }
       }
-      
+
       return false
     })()
-    
+
     onChange(hasChanges)
   }, [formData, formDataInitialized, onChange])
 
   const isLoading = metaLoading || permLoading || (docLoading && mode !== 'create')
 
   // Determine actual mode based on permissions
-  const actualMode = mode === 'create' 
+  const actualMode = mode === 'create'
     ? (permissions.create ? 'create' : 'view')
     : mode === 'edit'
-    ? (permissions.write ? 'edit' : 'view')
-    : 'view'
+      ? (permissions.write ? 'edit' : 'view')
+      : 'view'
 
-  const canSave = (actualMode === 'create' && permissions.create) || 
-                  (actualMode === 'edit' && permissions.write)
+  const canSave = (actualMode === 'create' && permissions.create) ||
+    (actualMode === 'edit' && permissions.write)
 
   const handleFieldChange = (fieldname: string, value: any) => {
     hasUserDataRef.current = true // Mark that user has entered data
@@ -430,7 +430,7 @@ export default function DynamicForm({
 
   const validateForm = (): { isValid: boolean; errors: string[] } => {
     const errors: string[] = []
-    
+
     if (!meta) {
       return { isValid: false, errors: ['Form metadata not loaded'] }
     }
@@ -439,14 +439,14 @@ export default function DynamicForm({
     meta.fields.forEach(field => {
       if (field.required && !field.hidden) {
         const value = formData[field.fieldname]
-        
+
         // Special handling for Table fields
         if (field.fieldtype === 'Table') {
           if (!value || !Array.isArray(value) || value.length === 0) {
             errors.push(`${field.label} is required`)
           }
-        } else if (value === undefined || value === null || value === '' || 
-            (Array.isArray(value) && value.length === 0)) {
+        } else if (value === undefined || value === null || value === '' ||
+          (Array.isArray(value) && value.length === 0)) {
           errors.push(`${field.label} is required`)
         }
       }
@@ -481,7 +481,7 @@ export default function DynamicForm({
       if (actualMode === 'create') {
         // frappe.client.insert expects doc parameter
         const docData: Record<string, any> = { doctype }
-        
+
         // Add all form fields, but skip empty strings for optional fields
         Object.keys(formData).forEach(key => {
           const value = formData[key]
@@ -493,7 +493,7 @@ export default function DynamicForm({
             }
           }
         })
-        
+
         result = await insertDoc({
           doctype,
           doc_data: docData
@@ -509,7 +509,7 @@ export default function DynamicForm({
             updates[key] = newValue
           }
         })
-        
+
         if (Object.keys(updates).length > 0) {
           result = await updateDoc({
             doctype,
@@ -520,7 +520,7 @@ export default function DynamicForm({
           result = { success: true, message: docData }
         }
       }
-      
+
       clearInterval(progressInterval)
       setProgress(100)
 
@@ -530,18 +530,18 @@ export default function DynamicForm({
         console.error('Invalid data returned from save:', result)
         throw new Error(errorMsg)
       }
-      
+
       // Extract the created/updated document from response
       // The API returns { success: true, message: doc.as_dict(), name: doc.name }
       const savedDoc = result?.message || result
-      
+
       // Ensure we have a valid document
       if (!savedDoc || (typeof savedDoc === 'object' && Object.keys(savedDoc).length === 0)) {
         throw new Error('No data returned from save operation')
       }
-      
+
       toast.success(`${doctype} ${actualMode === 'create' ? 'created' : 'updated'} successfully`)
-      
+
       if (onSave) {
         onSave(savedDoc)
       }
@@ -553,10 +553,10 @@ export default function DynamicForm({
     } catch (error: any) {
       setSaving(false)
       setProgress(0)
-      
+
       // Extract error message from response
       let errorMessage = `Failed to ${actualMode === 'create' ? 'create' : 'update'} ${doctype}`
-      
+
       if (error?.message) {
         errorMessage = error.message
       } else if (error?.error?.message) {
@@ -568,7 +568,7 @@ export default function DynamicForm({
       } else if (error?.response?.data?.message) {
         errorMessage = error.response.data.message
       }
-      
+
       toast.error(errorMessage, {
         duration: 5000,
       })
@@ -579,10 +579,10 @@ export default function DynamicForm({
   // Helper function to enhance description with example values
   const getEnhancedDescription = (field: DocTypeField, doctype: string): string => {
     if (!field.description) return ''
-    
+
     const fieldname = field.fieldname.toLowerCase()
     const fieldLabel = field.label.toLowerCase()
-    
+
     // Restaurant doctype specific examples
     if (doctype === 'Restaurant') {
       const examples: Record<string, string> = {
@@ -604,7 +604,7 @@ export default function DynamicForm({
       }
       return field.description + (examples[fieldname] || '')
     }
-    
+
     // Restaurant Config doctype specific examples
     if (doctype === 'Restaurant Config') {
       const examples: Record<string, string> = {
@@ -617,7 +617,7 @@ export default function DynamicForm({
       }
       return field.description + (examples[fieldname] || '')
     }
-    
+
     // Generic examples based on field type and name
     if (fieldname.includes('email') || fieldLabel.includes('email')) {
       return field.description + ' (e.g., owner@restaurant.com)'
@@ -655,7 +655,7 @@ export default function DynamicForm({
     if (fieldname.includes('table')) {
       return field.description + ' (e.g., 20)'
     }
-    
+
     return field.description
   }
 
@@ -664,15 +664,15 @@ export default function DynamicForm({
     if (actualMode === 'view' && field.read_only) return null
 
     const value = formData[field.fieldname] ?? field.default ?? ''
-    
+
     // Make certain fields read-only after creation (restaurant owner perspective)
     let isReadOnly = field.read_only || actualMode === 'view'
-    
+
     // Check if field is in readOnlyFields prop
     if (readOnlyFields.includes(field.fieldname)) {
       isReadOnly = true
     }
-    
+
     // For Restaurant doctype, make IDs and base_url read-only after creation
     if (doctype === 'Restaurant' && mode === 'edit' && docname) {
       const lockedFields = ['restaurant_id', 'slug', 'subdomain', 'base_url']
@@ -680,7 +680,7 @@ export default function DynamicForm({
         isReadOnly = true
       }
     }
-    
+
     // Always make base_url read-only regardless of doctype or mode
     if (field.fieldname === 'base_url') {
       isReadOnly = true
@@ -717,7 +717,38 @@ export default function DynamicForm({
           // Hide all other color palette fields - we only use one field to store the selected color
           return null
         }
-        
+
+        // Special handling for City & State in Restaurant doctype
+        if (doctype === 'Restaurant' && field.fieldname === 'city') {
+          return (
+            <div key={field.fieldname} className="space-y-2">
+              <Label htmlFor={field.fieldname}>
+                City
+                {field.required && <span className="text-destructive">*</span>}
+              </Label>
+              <CityStateSelector
+                cityValue={formData.city}
+                stateValue={formData.state}
+                onChange={(city, state, lat, lng) => {
+                  handleFieldChange('city', city)
+                  handleFieldChange('state', state)
+                  if (lat) handleFieldChange('city_latitude', parseFloat(lat))
+                  if (lng) handleFieldChange('city_longitude', parseFloat(lng))
+                }}
+                disabled={isReadOnly}
+              />
+              {field.description && (
+                <p className="text-xs text-muted-foreground">{getEnhancedDescription(field, doctype)}</p>
+              )}
+            </div>
+          )
+        }
+
+        if (doctype === 'Restaurant' && field.fieldname === 'state') {
+          // State is handled by the City selector
+          return null
+        }
+
         // Special handling for hero_video - render as file upload instead of URL input
         if (field.fieldname === 'hero_video') {
           return (
@@ -750,7 +781,7 @@ export default function DynamicForm({
 
                       const uploadedUrl = result.primary_url || ''
                       handleFieldChange(field.fieldname, uploadedUrl)
-                      
+
                       // Auto-save the field to database immediately
                       console.log('[DynamicForm] Auto-saving video upload:', { doctype, docname, field: field.fieldname, uploadedUrl })
                       if (docname && uploadedUrl) {
@@ -797,22 +828,46 @@ export default function DynamicForm({
             </div>
           )
         }
-        
+
+        const limit = (doctype && CHARACTER_LIMITS[doctype]) ? CHARACTER_LIMITS[doctype][field.fieldname] : undefined
+
         return (
           <div key={field.fieldname} className="space-y-2">
-            <Label htmlFor={field.fieldname}>
-              {field.label}
-              {field.required && <span className="text-destructive">*</span>}
-            </Label>
+            <div className="flex justify-between items-center">
+              <Label htmlFor={field.fieldname}>
+                {field.label}
+                {field.required && <span className="text-destructive">*</span>}
+              </Label>
+              {limit && (
+                <span className={cn(
+                  "text-[10px] font-medium px-1.5 py-0.5 rounded-full transition-colors",
+                  value.length >= limit
+                    ? "bg-destructive text-white"
+                    : value.length > limit * 0.8
+                      ? "bg-amber-100 text-amber-700"
+                      : "bg-muted text-muted-foreground"
+                )}>
+                  {value.length}/{limit}
+                </span>
+              )}
+            </div>
             <Input
               id={field.fieldname}
               value={value}
               onChange={(e) => handleFieldChange(field.fieldname, e.target.value)}
               readOnly={isReadOnly}
               required={field.required}
+              maxLength={limit}
             />
             {field.description && (
-              <p className="text-xs text-muted-foreground">{getEnhancedDescription(field, doctype)}</p>
+              <p className="text-xs text-muted-foreground space-y-1">
+                <span className="block">{getEnhancedDescription(field, doctype)}</span>
+                {limit && value.length >= limit && (
+                  <span className="block text-destructive font-medium">
+                    Maximum limit reached. Keep it short to ensure it fits in 2 lines.
+                  </span>
+                )}
+              </p>
             )}
           </div>
         )
@@ -848,7 +903,7 @@ export default function DynamicForm({
             value={value}
           />
         }
-        
+
         return <LinkField
           key={field.fieldname}
           field={field}
@@ -925,15 +980,15 @@ export default function DynamicForm({
         return (
           <DatePicker
             key={field.fieldname}
-              id={field.fieldname}
+            id={field.fieldname}
             value={value || ''}
             onChange={(dateValue) => handleFieldChange(field.fieldname, dateValue)}
             placeholder="Select a date"
-              required={field.required}
+            required={field.required}
             readOnly={isReadOnly}
             label={field.label}
             description={field.description ? getEnhancedDescription(field, doctype) : undefined}
-            />
+          />
         )
 
       case 'Time':
@@ -994,8 +1049,8 @@ export default function DynamicForm({
               <div className="space-y-2">
                 <div className="flex items-center gap-3 p-3 border rounded-md bg-muted/30">
                   {(field.fieldtype === 'Attach Image' || (field.fieldtype === 'Attach' && field.fieldname?.includes('image'))) && (
-                    <img 
-                      src={value.startsWith('http') ? value : `/${value}`} 
+                    <img
+                      src={value.startsWith('http') ? value : `/${value}`}
                       alt={field.label}
                       className="h-16 w-16 object-cover rounded border bg-white"
                       onError={(e) => {
@@ -1023,9 +1078,9 @@ export default function DynamicForm({
                   <Input
                     type="file"
                     accept={
-                      field.fieldtype === 'Attach Image' || 
-                      (field.fieldtype === 'Attach' && (field.fieldname?.includes('image') || field.label?.toLowerCase().includes('image')))
-                        ? 'image/*' 
+                      field.fieldtype === 'Attach Image' ||
+                        (field.fieldtype === 'Attach' && (field.fieldname?.includes('image') || field.label?.toLowerCase().includes('image')))
+                        ? 'image/*'
                         : undefined
                     }
                     onChange={async (e) => {
@@ -1039,8 +1094,8 @@ export default function DynamicForm({
 
                       try {
                         const mediaRole = field.fieldname === 'logo' ? 'restaurant_config_logo' :
-                                         field.fieldname === 'apple_touch_icon' ? 'apple_touch_icon' :
-                                         `${doctype.toLowerCase().replace(' ', '_')}_${field.fieldname}`
+                          field.fieldname === 'apple_touch_icon' ? 'apple_touch_icon' :
+                            `${doctype.toLowerCase().replace(' ', '_')}_${field.fieldname}`
 
                         const result = await uploadToR2({
                           ownerDoctype: doctype,
@@ -1051,7 +1106,7 @@ export default function DynamicForm({
 
                         const uploadedUrl = result.primary_url || ''
                         handleFieldChange(field.fieldname, uploadedUrl)
-                        
+
                         // Auto-save the field to database immediately
                         console.log('[DynamicForm] Auto-saving file upload:', { doctype, docname, field: field.fieldname, uploadedUrl })
                         if (docname && uploadedUrl) {
@@ -1090,9 +1145,9 @@ export default function DynamicForm({
                 id={field.fieldname}
                 type="file"
                 accept={
-                  field.fieldtype === 'Attach Image' || 
-                  (field.fieldtype === 'Attach' && (field.fieldname?.includes('image') || field.label?.toLowerCase().includes('image')))
-                    ? 'image/*' 
+                  field.fieldtype === 'Attach Image' ||
+                    (field.fieldtype === 'Attach' && (field.fieldname?.includes('image') || field.label?.toLowerCase().includes('image')))
+                    ? 'image/*'
                     : undefined
                 }
                 onChange={async (e) => {
@@ -1106,8 +1161,8 @@ export default function DynamicForm({
 
                   try {
                     const mediaRole = field.fieldname === 'logo' ? 'restaurant_config_logo' :
-                                     field.fieldname === 'apple_touch_icon' ? 'apple_touch_icon' :
-                                     `${doctype.toLowerCase().replace(' ', '_')}_${field.fieldname}`
+                      field.fieldname === 'apple_touch_icon' ? 'apple_touch_icon' :
+                        `${doctype.toLowerCase().replace(' ', '_')}_${field.fieldname}`
 
                     const result = await uploadToR2({
                       ownerDoctype: doctype,
@@ -1118,7 +1173,7 @@ export default function DynamicForm({
 
                     const uploadedUrl = result.primary_url || ''
                     handleFieldChange(field.fieldname, uploadedUrl)
-                    
+
                     // Auto-save the field to database immediately
                     console.log('[DynamicForm] Auto-saving file upload:', { doctype, docname, field: field.fieldname, uploadedUrl })
                     if (docname && uploadedUrl) {
@@ -1297,13 +1352,13 @@ export default function DynamicForm({
   // Group fields by sections - parse section breaks to create sections
   const sections: Array<{ label?: string, fields: DocTypeField[] }> = []
   let currentSection: { label?: string, fields: DocTypeField[] } = { fields: [] }
-  
+
   if (meta?.fields) {
     for (const field of meta.fields) {
       if (field.hidden || hideFields.includes(field.fieldname)) {
         continue
       }
-      
+
       if (field.fieldtype === 'Section Break') {
         // Save current section if it has fields
         if (currentSection.fields.length > 0) {
@@ -1324,11 +1379,11 @@ export default function DynamicForm({
       sections.push(currentSection)
     }
   }
-  
+
   // If no sections were created, create a default section with all visible fields
   if (sections.length === 0 && meta?.fields) {
-    const visibleFields = meta.fields.filter(f => 
-      !f.hidden && 
+    const visibleFields = meta.fields.filter(f =>
+      !f.hidden &&
       !hideFields.includes(f.fieldname) &&
       f.fieldtype !== 'Column Break' &&
       f.fieldtype !== 'Section Break'
@@ -1354,8 +1409,8 @@ export default function DynamicForm({
       {actualMode !== 'view' && requiredFieldsCount > 0 && (
         <div className={cn(
           "p-4 rounded-md border",
-          allRequiredFieldsFilled 
-            ? "bg-green-50 border-green-200" 
+          allRequiredFieldsFilled
+            ? "bg-green-50 border-green-200"
             : "bg-amber-50 border-amber-200"
         )}>
           <div className="flex items-center gap-2">
@@ -1386,7 +1441,7 @@ export default function DynamicForm({
             <span>{progress}%</span>
           </div>
           <div className="h-2 bg-blue-100 rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full bg-blue-600 transition-all duration-300 rounded-full"
               style={{ width: `${progress}%` }}
             />
@@ -1398,7 +1453,7 @@ export default function DynamicForm({
       {sections.length === 0 ? (
         <div className="text-center text-muted-foreground py-8">
           <p>No fields available for this form.</p>
-              <p className="text-xs mt-2">Total fields: {meta?.fields?.length || 0}, Hidden: {meta?.fields?.filter((f: DocTypeField) => f.hidden).length || 0}</p>
+          <p className="text-xs mt-2">Total fields: {meta?.fields?.length || 0}, Hidden: {meta?.fields?.filter((f: DocTypeField) => f.hidden).length || 0}</p>
         </div>
       ) : (
         sections.map((section, sectionIndex) => (
@@ -1411,8 +1466,8 @@ export default function DynamicForm({
             <div className={cn(
               "grid gap-6",
               // For table fields (like customization_questions, product_media), use full width
-              section.fields.some(f => f.fieldtype === 'Table') 
-                ? "grid-cols-1" 
+              section.fields.some(f => f.fieldtype === 'Table')
+                ? "grid-cols-1"
                 : "md:grid-cols-2"
             )}>
               {section.fields.map(field => {
@@ -1435,17 +1490,17 @@ export default function DynamicForm({
           </Button>
         )}
         {canSave && (
-          <Button 
-            onClick={handleSave} 
+          <Button
+            onClick={handleSave}
             disabled={
-              saving || 
+              saving ||
               !allRequiredFieldsFilled ||
               sections.flatMap(s => s.fields).length === 0
             }
             size="lg"
             className="min-w-[120px]"
             title={
-              !allRequiredFieldsFilled 
+              !allRequiredFieldsFilled
                 ? `Please fill in all ${requiredFieldsCount - filledRequiredFields} required field(s)`
                 : undefined
             }
@@ -1466,10 +1521,10 @@ export default function DynamicForm({
 }
 
 // Link Field Read-Only Component - Shows linked record as read-only text
-function LinkFieldReadOnly({ 
-  field, 
+function LinkFieldReadOnly({
+  field,
   value
-}: { 
+}: {
   field: DocTypeField
   value: any
 }) {
@@ -1483,7 +1538,7 @@ function LinkFieldReadOnly({
   const { data: selectedRestaurantDoc } = useFrappeGetDoc('Restaurant', selectedRestaurantKey || '', {
     enabled: !!selectedRestaurantKey && linkedDoctype === 'Restaurant'
   })
-  
+
   const getDisplayValue = () => {
     // If we have a valid linked record with a friendly name, use it
     if (linkedRecord) {
@@ -1523,7 +1578,7 @@ function LinkFieldReadOnly({
       </div>
     )
   }
-  
+
   return (
     <div className="space-y-2">
       <Label htmlFor={field.fieldname}>
@@ -1532,7 +1587,7 @@ function LinkFieldReadOnly({
       </Label>
       <Input
         id={field.fieldname}
-        value={(function() {
+        value={(function () {
           const raw = getDisplayValue()
           const looksLikeCurrency = typeof raw === 'string' && /^[A-Z]{3}$/.test(raw)
           if (linkedDoctype === 'Restaurant' && looksLikeCurrency) {
@@ -1553,19 +1608,19 @@ function LinkFieldReadOnly({
 }
 
 // Link Field Component - Fetches and displays linked doctype records
-function LinkField({ 
-  field, 
-  value, 
-  onChange, 
-  isReadOnly 
-}: { 
+function LinkField({
+  field,
+  value,
+  onChange,
+  isReadOnly
+}: {
   field: DocTypeField
   value: any
   onChange: (value: string) => void
   isReadOnly: boolean
 }) {
   const linkedDoctype = field.options || ''
-  
+
   // Determine which fields to fetch based on common doctype patterns
   const getFieldsForDoctype = (doctype: string) => {
     switch (doctype) {
@@ -1576,9 +1631,9 @@ function LinkField({
         return ['name']
     }
   }
-  
+
   const fields = getFieldsForDoctype(linkedDoctype)
-  
+
   // Fetch linked records
   const { data: linkedRecords, isLoading } = useFrappeGetDocList(
     linkedDoctype,
@@ -1589,7 +1644,7 @@ function LinkField({
     },
     linkedDoctype ? `link-${linkedDoctype}` : null
   )
-  
+
   // Get display value for selected record
   const getDisplayValue = (record: any) => {
     if (!record) return ''
@@ -1600,11 +1655,11 @@ function LinkField({
     // Fallback to name or first available field
     return record[fields[1]] || record.name || ''
   }
-  
+
   // Get selected record
   const selectedRecord = linkedRecords?.find((r: any) => r.name === value)
   const displayValue = selectedRecord ? getDisplayValue(selectedRecord) : value
-  
+
   if (isLoading) {
     return (
       <div key={field.fieldname} className="space-y-2">
@@ -1619,7 +1674,7 @@ function LinkField({
       </div>
     )
   }
-  
+
   return (
     <div key={field.fieldname} className="space-y-2">
       <Label htmlFor={field.fieldname}>

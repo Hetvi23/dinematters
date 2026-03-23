@@ -501,9 +501,21 @@ export default function AIMenuThemeBackgroundPage() {
 
         <div className="space-y-6">
           <Card className="shadow-xs border-muted/60">
-            <CardHeader>
-              <CardTitle>2. Preview & Activate</CardTitle>
-              <CardDescription>Review the latest generated background and apply it to the customer menu.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <div className="space-y-1">
+                <CardTitle>2. Preview & Activate</CardTitle>
+                <CardDescription>Review the latest generated background and apply it to the customer menu.</CardDescription>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                disabled={!(previewOutput || activeImage)} 
+                onClick={() => handleDownload(previewOutput || activeImage, 'menu-theme-background.png')} 
+                className="gap-2 shrink-0"
+              >
+                <Download className="h-4 w-4" />
+                Download
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="mx-auto w-full max-w-[280px] rounded-xl overflow-hidden border bg-muted/10 aspect-[9/16] relative">
@@ -550,10 +562,6 @@ export default function AIMenuThemeBackgroundPage() {
                 <Button variant="outline" disabled={!previewOutput && !activeImage} onClick={() => { setPreviewImage(previewOutput || activeImage); setShowPreviewModal(true) }} className="gap-2">
                   <Eye className="h-4 w-4" />
                   Preview Fullscreen
-                </Button>
-                <Button variant="outline" disabled={!(previewOutput || activeImage)} onClick={() => handleDownload(previewOutput || activeImage, 'menu-theme-background.png')} className="gap-2">
-                  <Download className="h-4 w-4" />
-                  Download
                 </Button>
                 <Button disabled={!isBackgroundEnabled || !previewOutput || isActivating} onClick={() => handleActivate(previewOutput)} className="gap-2">
                   {isActivating ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}

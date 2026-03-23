@@ -26,6 +26,8 @@
   "state",
   "column_break_address",
   "zip_code",
+  "city_latitude",
+  "city_longitude",
   "country",
   "section_break_settings",
   "tax_rate",
@@ -198,6 +200,20 @@
    "fieldname": "zip_code",
    "fieldtype": "Data",
    "label": "Zip Code"
+  },
+  {
+   "fieldname": "city_latitude",
+   "fieldtype": "Float",
+   "label": "City Latitude",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "city_longitude",
+   "fieldtype": "Float",
+   "label": "City Longitude",
+   "read_only": 1,
+   "hidden": 1
   },
   {
    "fieldname": "country",

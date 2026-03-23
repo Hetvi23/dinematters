@@ -1,4 +1,6 @@
 import { useFrappeGetDoc } from '@/lib/frappe'
+import { usePrint } from '@/hooks/usePrint'
+import { useRestaurant } from '@/contexts/RestaurantContext'
 import {
   Dialog,
   DialogContent,
@@ -32,6 +34,8 @@ interface OrderDetailsDialogProps {
 export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetailsDialogProps) {
   const { formatAmount, formatAmountNoDecimals } = useCurrency()
   const [copied, setCopied] = useState(false)
+  const { print } = usePrint()
+  const { restaurantConfig } = useRestaurant()
   
   const { data: order, isLoading } = useFrappeGetDoc('Order', orderId || '', {
     fields: ['*'],
@@ -142,8 +146,14 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                     <span className="text-[10px] font-black uppercase tracking-tighter text-muted-foreground">Order Type</span>
                   </div>
                   <p className="text-sm font-bold capitalize">{(order.order_type || 'dine_in').replace('_', ' ')}</p>
-                  {order.table_number && (
+                  {order.order_type === 'dine_in' && (order.table_number !== undefined && order.table_number !== null) && (
                     <p className="text-xs text-muted-foreground mt-1 font-mono bg-gray-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded inline-block">Table No. {order.table_number}</p>
+                  )}
+                  {order.order_type === 'takeaway' && (
+                    <p className="text-[10px] text-muted-foreground mt-1 font-bold uppercase tracking-tighter bg-blue-50 dark:bg-blue-900/20 text-blue-600 px-1.5 py-0.5 rounded inline-block">Self Pickup</p>
+                  )}
+                  {order.order_type === 'delivery' && (
+                    <p className="text-[10px] text-muted-foreground mt-1 font-bold uppercase tracking-tighter bg-orange-50 dark:bg-orange-900/20 text-orange-600 px-1.5 py-0.5 rounded inline-block">Doorstep Delivery</p>
                   )}
                 </div>
 
@@ -192,13 +202,10 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                       <MapPin className="w-5 h-5 text-muted-foreground" />
                     </div>
                     <div className="flex-1 space-y-1">
-                      <p className="text-sm font-medium leading-relaxed">{order.delivery_address}</p>
-                      {order.delivery_landmark && (
-                        <p className="text-xs text-muted-foreground italic">Landmark: {order.delivery_landmark}</p>
-                      )}
+                      <p className="text-sm font-medium leading-relaxed">{[order.delivery_address, order.delivery_landmark, order.delivery_city, order.delivery_zip_code].filter(Boolean).join(', ')}</p>
                       {order.delivery_instructions && (
                         <div className="mt-3 p-3 rounded-xl bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-800/50">
-                          <p className="text-[10px] font-black uppercase text-orange-600 mb-1">Kitchen / Driver Notes</p>
+                          <p className="text-[10px] font-black uppercase text-orange-600 mb-1">Delivery Instructions</p>
                           <p className="text-xs italic text-orange-900 dark:text-orange-200">{order.delivery_instructions}</p>
                         </div>
                       )}
@@ -303,35 +310,50 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                 {/* Final Breakdown */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center text-sm px-1">
-                    <span className="text-muted-foreground font-medium">Cart Subtotal</span>
+                    <span className="text-muted-foreground font-medium">Sub Total</span>
                     <span className="font-bold text-foreground">{formatAmount(order.subtotal)}</span>
                   </div>
-                  
+
+                  {order.loyalty_discount > 0 && (
+                    <div className="flex justify-between items-center text-sm px-1 italic">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-1 h-3 bg-green-500 rounded-full" />
+                        <span className="text-green-600 font-bold">Loyalty Discount ({order.loyalty_coins_redeemed} Coins)</span>
+                      </div>
+                      <span className="font-black text-green-600">-{formatAmount(order.loyalty_discount)}</span>
+                    </div>
+                  )}
+
+                  {(order.discount - (order.loyalty_discount || 0)) > 0 && (
+                    <div className="flex justify-between items-center text-sm px-1 italic">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-1 h-3 bg-green-500 rounded-full" />
+                        <span className="text-green-600 font-bold">Coupon Savings</span>
+                      </div>
+                      <span className="font-black text-green-600">-{formatAmount(order.discount - (order.loyalty_discount || 0))}</span>
+                    </div>
+                  )}
+
+                  <div className="border-t border-slate-100 dark:border-zinc-800/50 my-2" />
+
                   {order.packaging_fee > 0 && (
                     <div className="flex justify-between items-center text-sm px-1">
-                      <span className="text-muted-foreground font-medium">Packaging Charges</span>
+                      <span className="text-muted-foreground font-medium">Packaging Charge</span>
                       <span className="font-bold text-foreground">{formatAmount(order.packaging_fee)}</span>
                     </div>
                   )}
 
                   {order.delivery_fee > 0 && (
                     <div className="flex justify-between items-center text-sm px-1">
-                      <span className="text-muted-foreground font-medium">Home Delivery Fee</span>
+                      <span className="text-muted-foreground font-medium">Delivery Charge</span>
                       <span className="font-bold text-foreground">{formatAmount(order.delivery_fee)}</span>
                     </div>
                   )}
 
                   {order.tax > 0 && (
                     <div className="flex justify-between items-center text-sm px-1">
-                      <span className="text-muted-foreground font-medium">Taxes & GST (18%)</span>
+                      <span className="text-muted-foreground font-medium">Taxes (18%)</span>
                       <span className="font-bold text-foreground">{formatAmount(order.tax)}</span>
-                    </div>
-                  )}
-
-                  {order.discount > 0 && (
-                    <div className="flex justify-between items-center text-sm px-1">
-                      <span className="text-green-600 font-bold">Total Savings</span>
-                      <span className="font-black text-green-600">-{formatAmount(order.discount)}</span>
                     </div>
                   )}
 
@@ -346,19 +368,43 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                       </h4>
                     </div>
                   </div>
+
+                  {order.coins_earned > 0 && (
+                    <div className="mt-6 pt-4 border-t border-dashed border-slate-200 dark:border-zinc-800 flex justify-between items-center px-1">
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-orange-600 tracking-widest mb-0.5">Loyalty Points Earning</p>
+                        <p className="text-[10px] text-muted-foreground font-bold italic">Order Earning</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-lg font-black text-orange-600">+{order.coins_earned}</span>
+                        <span className="text-[10px] font-bold text-orange-600/70 ml-1 uppercase">Coins</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
             
             {/* Action Bar */}
             <div className="p-4 border-t bg-white dark:bg-zinc-900 flex justify-end gap-3 sticky bottom-0">
-               <button 
+                <button 
                   onClick={() => onOpenChange(false)}
                   className="px-6 py-2.5 rounded-xl font-bold text-sm bg-gray-100 dark:bg-zinc-800 text-foreground hover:bg-gray-200 dark:hover:bg-zinc-700 transition-all border-b-4 border-gray-200 dark:border-zinc-700 active:border-b-0 active:translate-y-1"
                 >
                   Close Window
                 </button>
-                {/* Potential room for "Print Receipt" button */}
+                <button 
+                  onClick={() => print(order, { type: 'KOT' })}
+                  className="px-6 py-2.5 rounded-xl font-black text-[10px] uppercase bg-purple-100 text-purple-700 hover:bg-purple-200 border-b-4 border-purple-200 active:border-b-0 active:translate-y-1"
+                >
+                  Print KOT
+                </button>
+                <button 
+                  onClick={() => print(order, { type: 'RECEIPT', restaurant: restaurantConfig?.restaurant })}
+                  className="px-6 py-2.5 rounded-xl font-black text-[10px] uppercase bg-zinc-900 text-white hover:bg-black border-b-4 border-zinc-950 active:border-b-0 active:translate-y-1"
+                >
+                  Print Receipt
+                </button>
             </div>
           </div>
         ) : (

@@ -304,24 +304,22 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 		loyalty_coins = cint(loyalty_coins_redeemed)
 		if loyalty_coins > 0 and platform_customer:
 			try:
-				from dinematters.dinematters.api.loyalty import get_loyalty_summary
-				loyalty_summary = get_loyalty_summary(restaurant_id, phone)
-				if loyalty_summary.get("success"):
-					balance = loyalty_summary["data"]["balance"]
-					if loyalty_coins > balance:
-						loyalty_coins = balance
+				from dinematters.dinematters.utils.loyalty import get_loyalty_balance
+				balance = get_loyalty_balance(platform_customer, restaurant)
+				if loyalty_coins > balance:
+					loyalty_coins = balance
+				
+				loyalty_prog = frappe.get_doc("Restaurant Loyalty Config", {"restaurant": restaurant, "is_active": 1})
+				if loyalty_prog:
+					loyalty_discount = flt(loyalty_coins * (loyalty_prog.coin_value_in_inr or 1))
+					# Ensure discount doesn't exceed 30% of billing amount
+					billing_amount = max(0, subtotal - discount)
+					max_loyalty_discount = billing_amount * 0.3
+					if loyalty_discount > max_loyalty_discount:
+						loyalty_discount = max_loyalty_discount
+						loyalty_coins = cint(loyalty_discount / (loyalty_prog.coin_value_in_inr or 1))
 					
-					loyalty_prog = frappe.get_doc("Restaurant Loyalty Config", {"restaurant": restaurant, "is_active": 1})
-					if loyalty_prog:
-						loyalty_discount = flt(loyalty_coins * (loyalty_prog.coin_value_in_inr or 1))
-						# Ensure discount doesn't exceed 30% of billing amount
-						billing_amount = max(0, subtotal - discount)
-						max_loyalty_discount = billing_amount * 0.3
-						if loyalty_discount > max_loyalty_discount:
-							loyalty_discount = max_loyalty_discount
-							loyalty_coins = cint(loyalty_discount / (loyalty_prog.coin_value_in_inr or 1))
-						
-						discount += loyalty_discount
+					discount += loyalty_discount
 			except Exception as e:
 				frappe.log_error(f"Loyalty redemption error: {str(e)}")
 				loyalty_coins = 0
@@ -426,22 +424,19 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 		
 		# Process Loyalty Earning and Referral Rewards
 		try:
+			from dinematters.dinematters.utils.loyalty import earn_loyalty_coins, redeem_loyalty_coins, add_loyalty_coins
+			
 			loyalty_prog = frappe.get_doc("Restaurant Loyalty Config", {"restaurant": restaurant, "is_active": 1})
 			if loyalty_prog and platform_customer:
-				from dinematters.dinematters.api.loyalty import credit_loyalty_points
-				
-				# 1. Earn points on current order
-				coins_earned = cint((subtotal - discount) * loyalty_prog.points_per_inr)
-				if coins_earned > 0:
-					credit_loyalty_points(
-						customer=platform_customer,
-						restaurant=restaurant,
-						coins=coins_earned,
-						reason="Order",
-						ref_doctype="Order",
-						ref_name=order_doc.name
-					)
-					frappe.db.set_value("Order", order_doc.name, "coins_earned", coins_earned)
+				# 1. Earn points on current order (10% on total)
+				earn_loyalty_coins(
+					customer=platform_customer,
+					restaurant=restaurant,
+					amount_paid=order_doc.total,
+					reason="Order",
+					ref_doctype="Order",
+					ref_name=order_doc.name
+				)
 				
 				# 2. Handle Referral Conversion Reward
 				if order_doc.referral_link:
@@ -451,7 +446,7 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 						ref_link = frappe.get_doc("Referral Link", order_doc.referral_link)
 						
 						# Reward Referrer
-						credit_loyalty_points(
+						add_loyalty_coins(
 							customer=ref_link.referrer,
 							restaurant=restaurant,
 							coins=loyalty_prog.referral_order_reward_coins,
@@ -460,7 +455,7 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 							ref_name=order_doc.name
 						)
 						
-						credit_loyalty_points(
+						add_loyalty_coins(
 							customer=platform_customer,
 							restaurant=restaurant,
 							coins=loyalty_prog.new_user_welcome_reward_coins,
@@ -471,14 +466,13 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 				
 				# 3. Deduct points if redeemed
 				if loyalty_coins > 0:
-					credit_loyalty_points(
+					redeem_loyalty_coins(
 						customer=platform_customer,
 						restaurant=restaurant,
 						coins=loyalty_coins,
 						reason="Redemption",
 						ref_doctype="Order",
-						ref_name=order_doc.name,
-						transaction_type="Redeem"
+						ref_name=order_doc.name
 					)
 			frappe.db.commit()
 		except Exception as e:

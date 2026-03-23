@@ -178,7 +178,10 @@ doc_events = {
 			"dinematters.dinematters.api.customers.update_customer_last_visited",
 			"dinematters.dinematters.api.realtime.notify_order_update"
 		],
-		"on_update": "dinematters.dinematters.api.realtime.notify_order_update",
+		"on_update": [
+			"dinematters.dinematters.api.realtime.notify_order_update",
+			"dinematters.dinematters.utils.loyalty.handle_order_cancellation"
+		],
 	},
 	"Table Booking": {
 		"after_insert": "dinematters.dinematters.api.customers.update_customer_last_visited",

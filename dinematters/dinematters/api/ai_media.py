@@ -72,23 +72,24 @@ def _update_theme_history(config_name, image_url, source_images, activate=False)
 
 def _build_theme_generation_prompt(restaurant_name, source_count):
     return (
-        f"You are designing a premium decorative mobile menu background for the restaurant '{restaurant_name}'. "
-        f"Analyze the attached {source_count} menu page image(s) and grab exact visuals, graphics, and decorative materials available in menu"
-        "Ignore ALL text, menu items, prices, descriptions, menu grids, and layout structures from the uploaded menu pages. "
+        f"You are designing a premium decorative mobile menu background for the restaurant. "
+        f"Closely analyze the graphics and visuals in the attached {source_count} menu page image(s) and grab exactly those materials available in menu"
+        "Ignore ALL text, grpahical text, words, menu items, prices, descriptions, menu grids, and layout structures from the uploaded menu pages. "
+
+        "STRICTLY DO NOT INCLUDE: "
+        "strictly not graphical words, or written things, or restaurant name or heading etc"
+        "Any graphics having words, text, letters, words, menu items, numbers, prices, labels, typography, menu cards, menu grids, food collages, or screenshots. "
+        "No visible menus, no product listings, no watermarks. "
 
         "Generate a NEW background wallpaper image specifically designed for a mobile digital menu interface. "
 
         "VISUAL COMPOSITION: "
         "Leave the central 70% of the image mostly empty with very light graphics only. "
         "Place graphical visual elements only along the bottom or edges top. "
-        "Use exact similar graphics (not words, or restaurant name or heading etc) and visual available in menu and inspired by the menu theme and maybe items. "
+        "Use exact similar graphics and visual available in menu and inspired by the menu theme and maybe items. "
 
         "STYLE: "
         "Avoid too bright saturated colors that would reduce text readability. "
-
-        "STRICTLY DO NOT INCLUDE: "
-        "Any graphics having words, text, letters, words, menu items, numbers, prices, labels, typography, menu cards, menu grids, food collages, or screenshots. "
-        "No visible menus, no product listings, no watermarks. "
 
         "OUTPUT: "
         "restaurant-themed background optimized for mobile app menu UI overlays."
@@ -547,7 +548,8 @@ def process_ai_image_enhancement(generation_name, mode="enhance", include_brandi
         frappe.db.set_value("AI Image Generation", generation_name, "status", "Failed")
         frappe.db.set_value("AI Image Generation", generation_name, "error_message", str(e))
         frappe.db.commit()
-        frappe.log_error(f"AI Generation Failed: {str(e)}", "AI Media Enhancement")
+        error_msg = f"AI Generation Failed: {str(e)}"
+        frappe.log_error(error_msg[:140], "AI Media Enhancement")
 
         # Auto-refund credits on failure
         if credits_to_refund > 0:
@@ -558,7 +560,8 @@ def process_ai_image_enhancement(generation_name, mode="enhance", include_brandi
                     credits=credits_to_refund
                 )
             except Exception as refund_err:
-                frappe.log_error(f"Credit Refund Failed for {generation_name}: {str(refund_err)}", "AI Billing Refund")
+                error_msg = f"Credit Refund Failed for {generation_name}: {str(refund_err)}"
+                frappe.log_error(error_msg[:140], "AI Billing Refund")
 
     finally:
         # Cleanup
@@ -724,7 +727,8 @@ def process_menu_theme_background_generation(restaurant, config_name, source_ima
         config_doc.db_set("menu_theme_generation_status", "Failed", update_modified=False)
         config_doc.db_set("menu_theme_last_error", str(e), update_modified=False)
         frappe.db.commit()
-        frappe.log_error(f"Menu Theme Background Generation Failed: {str(e)}", "AI Menu Theme Background")
+        error_msg = f"Menu Theme Background Generation Failed: {str(e)}"
+        frappe.log_error(error_msg[:140], "AI Menu Theme Background")
 
         if credits_to_refund > 0:
             try:
@@ -734,7 +738,8 @@ def process_menu_theme_background_generation(restaurant, config_name, source_ima
                     credits=credits_to_refund
                 )
             except Exception as refund_err:
-                frappe.log_error(f"Credit Refund Failed for menu theme {config_name}: {str(refund_err)}", "AI Billing Refund")
+                error_msg = f"Credit Refund Failed for menu theme {config_name}: {str(refund_err)}"
+                frappe.log_error(error_msg[:140], "AI Billing Refund")
 
     finally:
         for temp_input_path in temp_input_paths:

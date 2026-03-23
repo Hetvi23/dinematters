@@ -9,6 +9,8 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { Eye, LayoutGrid, List, Filter, X, Search, ShoppingBag, AlertCircle } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
 import { OrdersKanban } from '@/components/OrdersKanban'
+import { OrdersModernView } from '@/components/OrdersModernView'
+import { CancelledOrdersDialog } from '@/components/CancelledOrdersDialog'
 import { OrderDetailsDialog } from '@/components/OrderDetailsDialog'
 import {
   Select,
@@ -21,7 +23,7 @@ import { toast } from 'sonner'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { useCurrency } from '@/hooks/useCurrency'
 
-type ViewType = 'kanban' | 'list'
+type ViewType = 'kanban' | 'list' | 'modern'
 
 export default function Orders() {
   const { formatAmountNoDecimals } = useCurrency()
@@ -44,12 +46,19 @@ export default function Orders() {
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       return 'list' // Force list view on mobile
     }
-    // Load from localStorage or default to 'kanban' on desktop
+    // Load from localStorage or default to 'modern' on desktop
     try {
       const saved = localStorage.getItem('dinematters-orders-view-type')
-      return (saved === 'kanban' || saved === 'list') ? saved as ViewType : 'kanban'
+      // If the user hasn't specifically switched to modern yet, force it once
+      const hasSeenModern = localStorage.getItem('dinematters-seen-modern-v1')
+      if (!hasSeenModern) {
+        localStorage.setItem('dinematters-seen-modern-v1', 'true')
+        localStorage.setItem('dinematters-orders-view-type', 'modern')
+        return 'modern'
+      }
+      return (saved === 'kanban' || saved === 'list' || saved === 'modern') ? saved as ViewType : 'modern'
     } catch {
-      return 'kanban'
+      return 'modern'
     }
   })
 
@@ -76,6 +85,7 @@ export default function Orders() {
     return () => window.removeEventListener('resize', handleResize)
   }, [viewType])
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
+  const [isCancelledDialogOpen, setIsCancelledDialogOpen] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   
   // Filter states
@@ -128,7 +138,7 @@ export default function Orders() {
   const { data: orders, isLoading, mutate } = useFrappeGetDocList(
     'Order',
     {
-      fields: ['name', 'order_number', 'status', 'total', 'creation', 'restaurant', 'table_number', 'order_type', 'coupon', 'customer_name', 'customer_phone', 'payment_method', 'payment_status', 'subtotal', 'discount', 'tax', 'delivery_fee', 'packaging_fee'],
+    fields: ['name', 'order_number', 'status', 'total', 'creation', 'restaurant', 'table_number', 'order_type', 'coupon', 'customer_name', 'customer_phone', 'payment_method', 'payment_status', 'subtotal', 'discount', 'tax', 'delivery_fee', 'packaging_fee', 'order_items'],
       filters: restaurantFilter ? ([
         ['restaurant', '=', restaurantFilter],
         ['status', '!=', 'pending_verification'],
@@ -139,6 +149,12 @@ export default function Orders() {
     restaurantFilter ? `orders-${restaurantFilter}` : null // Use null to disable query when no restaurant selected
   )
   
+
+
+  // Debug: Log orders to verify filtering
+  useEffect(() => {
+    console.log('[Orders] Current Orders:', orders?.length, orders?.[0])
+  }, [orders])
   // Debug: Log orders to verify filtering
   useEffect(() => {
     if (orders && Array.isArray(orders)) {
@@ -346,11 +362,14 @@ export default function Orders() {
     return todayFiltered.filter((order: any) => {
       
       // Search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase()
-        const orderNumber = (order.order_number || order.name || '').toLowerCase()
-        if (!orderNumber.includes(query)) return false
-      }
+      const searchLower = searchQuery.toLowerCase()
+      const searchMatch = !searchQuery || 
+        order.name.toLowerCase().includes(searchLower) ||
+        order.order_number?.toLowerCase().includes(searchLower) ||
+        order.customer_name?.toLowerCase().includes(searchLower) ||
+        order.customer_phone?.includes(searchQuery)
+      
+      if (!searchMatch) return false
       
       // Status filter
       if (statusFilter !== 'all' && order.status !== statusFilter) {
@@ -378,6 +397,9 @@ export default function Orders() {
           if (orderDate > toDate) return false
         }
       }
+
+      // Hide cancelled orders from main view
+      if (order.status?.toLowerCase() === 'cancelled') return false
       
       return true
     })
@@ -418,6 +440,15 @@ export default function Orders() {
             <span className="hidden sm:inline">Filters</span>
           </Button>
           {/* Hide Kanban button on mobile */}
+          <Button
+            variant={viewType === 'modern' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewType('modern')}
+            className="flex-1 sm:flex-initial"
+          >
+            <LayoutGrid className="h-4 w-4" />
+            <span className="hidden sm:inline">Modern</span>
+          </Button>
           <Button
             variant={viewType === 'kanban' ? 'default' : 'outline'}
             size="sm"
@@ -573,6 +604,16 @@ export default function Orders() {
             </>
           ) : (
             <>
+              {/* Modern View */}
+              {viewType === 'modern' && (
+                <OrdersModernView
+                  orders={filteredOrders}
+                  onCheckOrder={handleCheckOrder}
+                  onOrderUpdate={() => mutate()}
+                  onShowCancelled={() => setIsCancelledDialogOpen(true)}
+                />
+              )}
+
               {/* Kanban View - Desktop Only */}
               {viewType === 'kanban' && (
                 <div className="hidden md:block">
@@ -812,6 +853,11 @@ export default function Orders() {
               )}
             </>
           )}
+          <CancelledOrdersDialog
+            isOpen={isCancelledDialogOpen}
+            onClose={() => setIsCancelledDialogOpen(false)}
+            orders={orders || []}
+          />
         </CardContent>
       </Card>
 

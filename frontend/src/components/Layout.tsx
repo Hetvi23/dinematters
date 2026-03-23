@@ -1212,18 +1212,7 @@ export default function Layout({ children }: LayoutProps) {
                   {formatAmountNoDecimals(analytics.avgOrderValue)}
                 </span>
               </div>
-
-              {/* Total Revenue */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-muted transition-colors group whitespace-nowrap">
-                <TrendingUp className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                <span className="text-xs text-muted-foreground">Total:</span>
-                <span className="text-sm font-semibold text-foreground">
-                  {formatAmountNoDecimals(analytics.totalRevenue)}
-                </span>
-              </div>
             </div>
-
-            {/* Mobile Analytics Panel - Compact */}
             <div className="lg:hidden flex-1 overflow-x-auto px-2">
               <div className="flex items-center gap-2">
                 {/* Today's Revenue - Mobile */}

@@ -45,6 +45,7 @@ import AIMenuThemeHistoryPage from './pages/AIMenuThemeHistoryPage'
 import AutopaySetupPage from './pages/AutopaySetupPage'
 import LoyaltySettings from './pages/LoyaltySettings'
 import CustomerInsights from './pages/CustomerInsights'
+import PaymentConfiguration from './pages/PaymentConfiguration'
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -98,6 +99,7 @@ function AppContent() {
 							<Route path="/frontend-ordering" element={<Layout><OrderSettings /></Layout>} />
 							<Route path="/order-settings" element={<Layout><OrderSettings /></Layout>} />
 							<Route path="/billing" element={<Layout><PaymentSettings /></Layout>} />
+							<Route path="/billing/configure" element={<Layout><PaymentConfiguration /></Layout>} />
 						</Route>
 
 						{/* PRO Feature: AI Recommendations - Requires PRO plan */}
@@ -125,6 +127,7 @@ function AppContent() {
 						<Route path="/Legacy Signature Dish" element={<Layout><LegacySignatureDish /></Layout>} />
 						<Route path="/restaurant/:restaurantId/payment" element={<Layout><Payment /></Layout>} />
 						<Route path="/restaurant/:restaurantId/billing" element={<Layout><PaymentSettings /></Layout>} />
+						<Route path="/restaurant/:restaurantId/billing/configure" element={<Layout><PaymentConfiguration /></Layout>} />
 						<Route path="/:doctype" element={<Layout><ModuleList /></Layout>} />
 						<Route path="/:doctype/:docname" element={<Layout><ModuleDetail /></Layout>} />
 					</Route>

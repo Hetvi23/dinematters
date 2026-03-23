@@ -61,7 +61,8 @@
   "customer_rating",
   "customer_feedback",
   "food_rating",
-  "service_rating"
+  "service_rating",
+  "idempotency_key"
  ],
  "fields": [
   {
@@ -396,6 +397,14 @@
    "label": "Service Rating",
    "description": "1-5 stars for service quality",
    "non_negative": 1
+  },
+  {
+   "fieldname": "idempotency_key",
+   "fieldtype": "Data",
+   "label": "Idempotency Key",
+   "read_only": 1,
+   "unique": 1,
+   "search_index": 1
   }
  ],
  "index_web_pages_for_search": 1,

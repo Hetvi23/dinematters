@@ -18,13 +18,29 @@ def get_r2_client():
 	"""Get boto3 S3 client configured for Cloudflare R2"""
 	config = get_r2_config()
 	
+	# Enhanced retry logic for R2 (S3-compatible)
+	# InternalError (500) from R2 should be retried more aggressively
+	retry_config = Config(
+		retries={
+			'max_attempts': 10,
+			'mode': 'standard'
+		},
+		connect_timeout=5,
+		read_timeout=60,
+		signature_version='s3v4',
+		s3={
+			'expect_100_continue': False,
+			'addressing_style': 'path'
+		}
+	)
+	
 	return boto3.client(
 		's3',
 		endpoint_url=config["endpoint_url"],
 		aws_access_key_id=config["access_key_id"],
 		aws_secret_access_key=config["secret_access_key"],
 		region_name=config["region"],
-		config=Config(signature_version='s3v4')
+		config=retry_config
 	)
 
 
@@ -54,12 +70,12 @@ def generate_object_key(restaurant_id, owner_doctype, owner_name, media_role, me
 	owner_safe = re.sub(r'[^a-z0-9-]', '', owner_name.lower())
 	
 	# Build path: restaurants/{restaurant}/{doctype}/{owner}/{media_id}/{variant}
+	ext = filename.split('.')[-1] if '.' in filename else 'jpg'
 	if variant:
-		# Variant: restaurants/unvind/menu_product/burger/med_abc123/md.webp
-		return f"restaurants/{restaurant_safe}/{doctype_folder}/{owner_safe}/{media_id}/{variant}.webp"
+		# Use .jpg for variants to match user preference and avoid mismatch mapping
+		return f"restaurants/{restaurant_safe}/{doctype_folder}/{owner_safe}/{media_id}/{variant}.{ext}"
 	else:
 		# Raw: restaurants/unvind/menu_product/burger/med_abc123/raw.jpg
-		ext = filename.split('.')[-1] if '.' in filename else 'jpg'
 		return f"restaurants/{restaurant_safe}/{doctype_folder}/{owner_safe}/{media_id}/raw.{ext}"
 
 
@@ -169,17 +185,21 @@ def upload_object(local_path, object_key, content_type=None, metadata=None):
 		cdn_config = get_cdn_config()
 		extra_args['CacheControl'] = cdn_config["cache_control"]
 		
-		client.upload_file(
-			local_path,
-			config["bucket_name"],
-			object_key,
-			ExtraArgs=extra_args
-		)
+		# Use put_object instead of upload_file for more direct R2 interaction
+		# This avoids managed multipart transfers which can sometimes cause InternalError on R2
+		with open(local_path, 'rb') as f:
+			client.put_object(
+				Bucket=config["bucket_name"],
+				Key=object_key,
+				Body=f,
+				**extra_args
+			)
 		
 		return get_cdn_url(object_key)
 	except ClientError as e:
-		frappe.log_error(f"Error uploading object: {str(e)}", "R2 Object Upload")
-		frappe.throw(f"Failed to upload object: {str(e)}")
+		error_msg = f"Error uploading object: {str(e)}"
+		frappe.log_error(error_msg[:140], "R2 Object Upload")
+		frappe.throw(error_msg)
 
 
 def delete_object(object_key):

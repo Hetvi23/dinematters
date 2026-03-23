@@ -32,12 +32,8 @@ def get_loyalty_summary(restaurant_id, phone):
 			order_by="creation desc"
 		)
 		
-		balance = 0
-		for entry in entries:
-			if entry.transaction_type == "Earn":
-				balance += entry.coins
-			else:
-				balance -= entry.coins
+		from dinematters.dinematters.utils.loyalty import get_loyalty_balance
+		balance = get_loyalty_balance(customer.name, restaurant)
 		
 		return {
 			"success": True,
@@ -182,22 +178,11 @@ def track_referral_visit(identifier, ip_address=None, user_agent=None):
 
 def credit_loyalty_points(customer, restaurant, coins, reason, ref_doctype=None, ref_name=None, transaction_type="Earn"):
 	"""Helper function to create a Restaurant Loyalty Entry"""
-	if coins <= 0:
-		return
-		
-	entry = frappe.get_doc({
-		"doctype": "Restaurant Loyalty Entry",
-		"customer": customer,
-		"restaurant": restaurant,
-		"coins": coins,
-		"transaction_type": transaction_type,
-		"reason": reason,
-		"reference_doctype": ref_doctype,
-		"reference_name": ref_name,
-		"posting_date": frappe.utils.today()
-	})
-	entry.insert(ignore_permissions=True)
-	frappe.db.commit()
+	from dinematters.dinematters.utils.loyalty import add_loyalty_coins, redeem_loyalty_coins
+	if transaction_type == "Earn":
+		return add_loyalty_coins(customer, restaurant, coins, reason, ref_doctype, ref_name)
+	else:
+		return redeem_loyalty_coins(customer, restaurant, coins, reason, ref_doctype, ref_name)
 
 @frappe.whitelist(allow_guest=True)
 def get_loyalty_config(restaurant_id):
@@ -301,27 +286,17 @@ def get_customer_insights(restaurant_id, search_query=None):
 		for cust_id in all_customer_ids:
 			customer = frappe.get_doc("Customer", cust_id)
 			
-			# Get balance
-			entries = frappe.get_all(
-				"Restaurant Loyalty Entry",
-				filters={"customer": cust_id, "restaurant": restaurant},
-				fields=["transaction_type", "coins"]
-			)
-			
-			balance = 0
-			for entry in entries:
-				if entry.transaction_type == "Earn":
-					balance += entry.coins
-				else:
-					balance -= entry.coins
-			
-			results.append({
-				"id": customer.name,
-				"name": customer.customer_name or customer.name,
-				"phone": customer.phone,
-				"balance": balance,
-				"last_active": customer.modified
-			})
+		# Get balance
+		from dinematters.dinematters.utils.loyalty import get_loyalty_balance
+		balance = get_loyalty_balance(cust_id, restaurant)
+		
+		results.append({
+			"id": customer.name,
+			"name": customer.customer_name or customer.name,
+			"phone": customer.phone,
+			"balance": balance,
+			"last_active": customer.modified
+		})
 			
 		# Sort by balance descending
 		results.sort(key=lambda x: x["balance"], reverse=True)
@@ -343,19 +318,13 @@ def adjust_customer_points(restaurant_id, customer_id, coins, reason, transactio
 		if coins <= 0:
 			return {"success": False, "error": "Coins must be greater than 0"}
 			
-		entry = frappe.get_doc({
-			"doctype": "Restaurant Loyalty Entry",
-			"customer": customer_id,
-			"restaurant": restaurant,
-			"coins": coins,
-			"transaction_type": transaction_type,
-			"reason": reason or "Manual Adjustment",
-			"posting_date": frappe.utils.today()
-		})
-		entry.insert(ignore_permissions=True)
-		frappe.db.commit()
+		from dinematters.dinematters.api.loyalty import credit_loyalty_points
+		credit_loyalty_points(customer_id, restaurant, coins, reason or "Manual Adjustment", transaction_type=transaction_type)
 		
-		return {"success": True, "message": f"Successfully {transaction_type.lower()}ed {coins} coins"}
+		return {
+			"success": True, 
+			"message": f"Successfully {transaction_type.lower()}ed {coins} coins"
+		}
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Loyalty Adjustment Error")
 		return {"success": False, "error": str(e)}
