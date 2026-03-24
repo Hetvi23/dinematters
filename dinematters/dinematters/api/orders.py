@@ -719,7 +719,7 @@ def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=Fa
 			where_sql = "restaurant = %s AND customer_phone IN (" + ph + ")"
 			params = [restaurant] + phone_variants
 
-		base_cols = "name, order_id, order_number, status, total, subtotal, discount, creation, estimated_delivery"
+		base_cols = "name, order_id, order_number, status, total, subtotal, discount, creation, estimated_delivery, delivery_partner, delivery_id, delivery_status, delivery_eta, delivery_rider_name, delivery_rider_phone, delivery_tracking_url, order_type"
 		feedback_cols = ""
 		if frappe.db.has_column("Order", "customer_rating"):
 			feedback_cols = ", customer_rating, customer_feedback"
@@ -753,6 +753,14 @@ def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=Fa
 				"discount": flt(o.get("discount") or 0),
 				"createdAt": get_datetime_str(o.get("creation")),
 				"estimatedDelivery": get_datetime_str(o.get("estimated_delivery")) if o.get("estimated_delivery") else None,
+				"orderType": o.get("order_type"),
+				"deliveryPartner": o.get("delivery_partner"),
+				"deliveryId": o.get("delivery_id"),
+				"deliveryStatus": o.get("delivery_status"),
+				"deliveryEta": get_datetime_str(o.get("delivery_eta")) if o.get("delivery_eta") else None,
+				"deliveryRiderName": o.get("delivery_rider_name"),
+				"deliveryRiderPhone": o.get("delivery_rider_phone"),
+				"deliveryTrackingUrl": o.get("delivery_tracking_url"),
 				"customerRating": cint(o.get("customer_rating")) if has_feedback_cols and o.get("customer_rating") is not None else None,
 				"customerFeedback": ((o.get("customer_feedback") or "").strip() or None) if has_feedback_cols else None,
 				"foodRating": cint(o.get("food_rating")) if o.get("food_rating") is not None else None,

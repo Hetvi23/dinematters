@@ -47,6 +47,13 @@
   "restaurant_transfer_amount",
   "section_break_delivery",
   "estimated_delivery",
+  "delivery_partner",
+  "delivery_id",
+  "delivery_status",
+  "delivery_eta",
+  "delivery_rider_name",
+  "delivery_rider_phone",
+  "delivery_tracking_url",
   "delivery_address",
   "delivery_landmark",
   "delivery_location_pin",
@@ -316,6 +323,47 @@
    "fieldname": "estimated_delivery",
    "fieldtype": "Datetime",
    "label": "Estimated Delivery"
+  },
+  {
+   "fieldname": "delivery_partner",
+   "fieldtype": "Select",
+   "label": "Delivery Partner",
+   "options": "\nporter"
+  },
+  {
+   "fieldname": "delivery_id",
+   "fieldtype": "Data",
+   "label": "Delivery ID",
+   "description": "External ID from delivery partner"
+  },
+  {
+   "fieldname": "delivery_status",
+   "fieldtype": "Data",
+   "label": "Delivery Status",
+   "description": "Current status from delivery partner"
+  },
+  {
+   "fieldname": "delivery_eta",
+   "fieldtype": "Datetime",
+   "label": "Delivery ETA",
+   "description": "ETA from delivery partner"
+  },
+  {
+   "fieldname": "delivery_rider_name",
+   "fieldtype": "Data",
+   "label": "Rider Name"
+  },
+  {
+   "fieldname": "delivery_rider_phone",
+   "fieldtype": "Data",
+   "label": "Rider Phone",
+   "options": "Phone"
+  },
+  {
+   "fieldname": "delivery_tracking_url",
+   "fieldtype": "Data",
+   "label": "Tracking URL",
+   "options": "URL"
   },
   {
    "fieldname": "delivery_address",

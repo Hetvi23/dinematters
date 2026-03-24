@@ -2,8 +2,9 @@ import { useParams, Link } from 'react-router-dom'
 import { useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Star } from 'lucide-react'
+import { ArrowLeft, Star, Truck, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { useState } from 'react'
 import {
   Select,
   SelectContent,
@@ -28,6 +29,50 @@ export default function OrderDetail() {
   
   // Table update API call
   const { call: updateTableNumber } = useFrappePostCall('dinematters.dinematters.api.order_status.update_table_number')
+  
+  const [assigningDelivery, setAssigningDelivery] = useState(false)
+  const [cancellingDelivery, setCancellingDelivery] = useState(false)
+
+  const handleAssignDelivery = async () => {
+    if (!order?.name) return
+    setAssigningDelivery(true)
+    try {
+      const res = await fetch('/api/delivery/assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: order.name })
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.detail || data.error || 'Failed to assign delivery')
+      toast.success('Delivery assigned successfully')
+      window.location.reload()
+    } catch (e: any) {
+      toast.error(e.message || 'Error occurred')
+    } finally {
+      setAssigningDelivery(false)
+    }
+  }
+
+  const handleCancelDelivery = async () => {
+    if (!order?.delivery_id) return
+    if (!confirm("Are you sure you want to cancel the delivery assignment?")) return;
+    setCancellingDelivery(true)
+    try {
+      const res = await fetch('/api/delivery/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ delivery_id: order.delivery_id, order_id: order.name })
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.detail || data.error || 'Failed to cancel delivery')
+      toast.success('Delivery cancelled successfully')
+      window.location.reload()
+    } catch (e: any) {
+      toast.error(e.message || 'Error occurred')
+    } finally {
+      setCancellingDelivery(false)
+    }
+  }
   
   // Generate table options based on restaurant tables count
   const tableOptions = [0, ...(restaurantDoc?.tables ? Array.from({length: restaurantDoc.tables}, (_, i) => i + 1) : [])]
@@ -216,6 +261,52 @@ export default function OrderDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {order.order_type === 'delivery' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Truck className="h-5 w-5" /> Delivery Workflow
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
+              <div>
+                <p className="font-semibold">{order.delivery_partner === 'porter' ? 'Porter Delivery' : 'Unassigned'}</p>
+                {order.delivery_id && (
+                  <p className="text-sm text-muted-foreground font-mono mt-1">
+                    ID: {order.delivery_id} | Status: <span className="font-semibold text-primary">{order.delivery_status}</span>
+                  </p>
+                )}
+                {order.delivery_eta && (
+                  <p className="text-sm text-muted-foreground">ETA: {order.delivery_eta}</p>
+                )}
+                {order.delivery_rider_name && (
+                  <div className="mt-2 text-sm bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-900/50">
+                    Rider: <span className="font-semibold">{order.delivery_rider_name}</span> ({order.delivery_rider_phone})
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                {!order.delivery_id && order.status !== 'cancelled' ? (
+                  <Button onClick={handleAssignDelivery} disabled={assigningDelivery}>
+                    {assigningDelivery ? 'Assigning...' : 'Assign Delivery'}
+                  </Button>
+                ) : order.delivery_id && order.delivery_status !== 'cancelled' && order.delivery_status !== 'delivered' && (
+                  <>
+                    <Button variant="outline" asChild>
+                      <a href={order.delivery_tracking_url} target="_blank" rel="noopener noreferrer">Track Delivery</a>
+                    </Button>
+                    <Button variant="destructive" onClick={handleCancelDelivery} disabled={cancellingDelivery}>
+                      {cancellingDelivery ? 'Cancelling...' : 'Cancel Delivery'}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {((order as any).customer_rating != null || (order as any).food_rating != null || (order as any).service_rating != null || !!((order as any).customer_feedback && String((order as any).customer_feedback).trim())) && (
         <Card>
