@@ -42,7 +42,7 @@ from routes import (
 	resource_routes,
 	media_routes,
 	ai_routes,
-	porter_routes
+	delivery_routes
 )
 
 # Setup logging
@@ -135,7 +135,7 @@ app.include_router(frappe_routes.router, prefix="/api/method", tags=["Frappe Cli
 app.include_router(resource_routes.router, prefix="/api/resource", tags=["Resource API"])
 app.include_router(media_routes.router, prefix="/api/media", tags=["Media Management"])
 app.include_router(ai_routes.router, prefix="/api/ai", tags=["AI Media Management"])
-app.include_router(porter_routes.router, prefix="/api/delivery", tags=["Porter Delivery"])
+app.include_router(delivery_routes.router, prefix="/api/delivery", tags=["Delivery Management"])
 
 
 # Debug: Catch-all route to see what paths are being requested

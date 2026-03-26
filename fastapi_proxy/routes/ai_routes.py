@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Body
 from pydantic import BaseModel
 import logging
 
-from ..clients.erpnext_client import get_erpnext_client
-from ..utils.auth import get_current_user, TokenData
+from clients.erpnext_client import get_erpnext_client
+from utils.auth import get_current_user, TokenData
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

@@ -58,7 +58,7 @@ def send_otp(restaurant_id, phone, purpose="verification", restaurant_name=None,
 			msg91_key = settings.get_password("msg91_auth_key")
 			msg91_template = settings.msg91_whatsapp_template_id
 			if msg91_key and msg91_template:
-				if send_otp_via_msg91_whatsapp(msg91_key, normalized, otp, msg91_template):
+				if send_otp_via_msg91_whatsapp(msg91_key, normalized, otp, msg91_template, restaurant_name=restaurant_name or restaurant_id):
 					used_channel = "whatsapp"
 
 		# 2. Fallback to Fast2SMS (SMS) if WhatsApp failed or channel='sms'

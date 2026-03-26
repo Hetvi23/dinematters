@@ -24,6 +24,14 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
 
 interface OrderDetailsDialogProps {
   orderId: string | null
@@ -41,6 +49,59 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
     fields: ['*'],
     enabled: open && !!orderId
   })
+
+  const [assigningDelivery, setAssigningDelivery] = useState(false)
+  const [cancellingDelivery, setCancellingDelivery] = useState(false)
+  const [deliveryMode, setDeliveryMode] = useState<'auto' | 'manual'>('manual')
+  const [manualForm, setManualForm] = useState({ partner_name: '', rider_name: '', rider_phone: '', eta: '' })
+
+  const handleAssignDelivery = async () => {
+    if (!order?.name) return
+    setAssigningDelivery(true)
+    try {
+      const payload: any = { order_id: order.name, delivery_mode: deliveryMode }
+      if (deliveryMode === 'manual') {
+        payload.partner_name = manualForm.partner_name || 'manual'
+        payload.rider_name = manualForm.rider_name
+        payload.rider_phone = manualForm.rider_phone
+        payload.eta = manualForm.eta
+      }
+      const res = await fetch('/api/delivery/assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.detail || data.error || 'Failed to assign delivery')
+      toast.success('Delivery assigned successfully')
+      window.location.reload()
+    } catch (e: any) {
+      toast.error(e.message || 'Error occurred')
+    } finally {
+      setAssigningDelivery(false)
+    }
+  }
+
+  const handleCancelDelivery = async () => {
+    if (!order?.delivery_id) return
+    if (!confirm("Are you sure you want to cancel the delivery assignment?")) return;
+    setCancellingDelivery(true)
+    try {
+      const res = await fetch('/api/delivery/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ delivery_id: order.delivery_id, order_id: order.name })
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.detail || data.error || 'Failed to cancel delivery')
+      toast.success('Delivery cancelled successfully')
+      window.location.reload()
+    } catch (e: any) {
+      toast.error(e.message || 'Error occurred')
+    } finally {
+      setCancellingDelivery(false)
+    }
+  }
 
   // Fetch coupon details if coupon is applied
   const { data: coupon } = useFrappeGetDoc('Coupon', order?.coupon || '', {
@@ -191,24 +252,118 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
               </div>
 
               {/* Delivery Details Section (If applicable) */}
-              {(order.delivery_address || order.delivery_city) && (
+              {order.order_type === 'delivery' && (
                 <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 overflow-hidden shadow-sm">
-                  <div className="px-4 py-3 border-b bg-gray-50/50 dark:bg-zinc-800/30 flex items-center gap-2">
-                    <Truck className="w-4 h-4 text-primary" />
-                    <h3 className="text-xs font-black uppercase tracking-widest">Delivery Details</h3>
-                  </div>
-                  <div className="p-4 flex gap-4">
-                    <div className="mt-1">
-                      <MapPin className="w-5 h-5 text-muted-foreground" />
+                  <div className="px-4 py-3 border-b bg-gray-50/50 dark:bg-zinc-800/30 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                       <Truck className="w-4 h-4 text-primary" />
+                       <h3 className="text-xs font-black uppercase tracking-widest">Delivery Management</h3>
                     </div>
-                    <div className="flex-1 space-y-1">
-                      <p className="text-sm font-medium leading-relaxed">{[order.delivery_address, order.delivery_landmark, order.delivery_city, order.delivery_zip_code].filter(Boolean).join(', ')}</p>
-                      {order.delivery_instructions && (
-                        <div className="mt-3 p-3 rounded-xl bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-800/50">
-                          <p className="text-[10px] font-black uppercase text-orange-600 mb-1">Delivery Instructions</p>
-                          <p className="text-xs italic text-orange-900 dark:text-orange-200">{order.delivery_instructions}</p>
+                  </div>
+                  
+                  <div className="p-4 space-y-4">
+                    {!order.delivery_id && order.status !== 'cancelled' && (
+                      <div className="p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-700 space-y-4">
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm font-bold">Partner:</span>
+                          <Select value={deliveryMode} onValueChange={(v: any) => setDeliveryMode(v)}>
+                            <SelectTrigger className="w-48 h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="auto">Borzo (Third Party)</SelectItem>
+                              <SelectItem value="manual">Self / Manual Delivery</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
-                      )}
+                        
+                        {deliveryMode === 'manual' && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t mt-4 border-zinc-200 dark:border-zinc-700">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black uppercase text-muted-foreground">Rider Name</label>
+                              <input className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-xs shadow-sm" value={manualForm.rider_name} onChange={e => setManualForm({...manualForm, rider_name: e.target.value})} placeholder="Rider Name" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black uppercase text-muted-foreground">Rider Phone</label>
+                              <input className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-xs shadow-sm" value={manualForm.rider_phone} onChange={e => setManualForm({...manualForm, rider_phone: e.target.value})} placeholder="Rider Phone" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black uppercase text-muted-foreground">ETA (mins)</label>
+                              <input className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-xs shadow-sm" value={manualForm.eta} onChange={e => setManualForm({...manualForm, eta: e.target.value})} placeholder="e.g. 30" />
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="flex justify-end">
+                          <Button size="sm" onClick={handleAssignDelivery} disabled={assigningDelivery} className="h-8 text-xs font-bold uppercase tracking-wider">
+                            {assigningDelivery ? 'Assigning...' : 'Assign Delivery'}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {(order.delivery_id || order.delivery_partner) && (
+                      <div className="flex flex-col gap-4 p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="text-xs font-black uppercase tracking-tighter text-muted-foreground mb-1">Assigned Partner</p>
+                            <p className="text-sm font-bold">
+                              {order.delivery_partner === 'borzo' ? 'Borzo Delivery' : 
+                               order.delivery_partner === 'manual' || order.delivery_mode === 'manual' ? 'Manual Delivery' : 
+                               'Unassigned'}
+                            </p>
+                            
+                            {order.delivery_id && order.delivery_partner !== 'manual' && order.delivery_mode !== 'manual' && (
+                              <p className="text-[10px] font-mono mt-1 bg-gray-100 dark:bg-zinc-700 px-1.5 py-0.5 rounded inline-block">
+                                ID: {order.delivery_id} | Status: <span className="font-bold text-primary">{order.delivery_status}</span>
+                              </p>
+                            )}
+                            {(order.delivery_partner === 'manual' || order.delivery_mode === 'manual') && (
+                              <p className="text-[10px] font-bold mt-1 bg-gray-100 dark:bg-zinc-700 px-1.5 py-0.5 rounded inline-block">
+                                Status: <span className="text-primary">{order.delivery_status || 'Assigned'}</span>
+                              </p>
+                            )}
+                            {order.delivery_eta && (
+                              <p className="text-[10px] font-bold text-muted-foreground mt-1">ETA: {order.delivery_eta}</p>
+                            )}
+                          </div>
+                          
+                          <div className="flex flex-col gap-2">
+                            {order.delivery_status !== 'cancelled' && order.delivery_status !== 'delivered' && (
+                              <Button size="sm" variant="destructive" onClick={handleCancelDelivery} disabled={cancellingDelivery} className="h-7 text-[10px] font-bold uppercase">
+                                {cancellingDelivery ? 'Cancelling...' : 'Cancel Assignment'}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        {order.delivery_rider_name && (
+                          <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-800/50">
+                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-black">
+                              {order.delivery_rider_name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black uppercase text-blue-600">Active Rider</p>
+                              <p className="text-xs font-bold leading-none">{order.delivery_rider_name}</p>
+                              <p className="text-[10px] font-mono text-muted-foreground mt-0.5">{order.delivery_rider_phone}</p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {order.delivery_partner === 'borzo' && order.delivery_tracking_url && order.delivery_status !== 'cancelled' && (
+                          <Button variant="outline" size="sm" asChild className="h-8 text-xs font-bold uppercase w-full">
+                            <a href={order.delivery_tracking_url} target="_blank" rel="noopener noreferrer">Track on Borzo</a>
+                          </Button>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex gap-4 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                      <div className="mt-1">
+                        <MapPin className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <p className="text-xs font-bold uppercase tracking-tighter text-muted-foreground">Drop Location</p>
+                        <p className="text-xs font-medium leading-relaxed">{[order.delivery_address, order.delivery_landmark, order.delivery_city, order.delivery_zip_code].filter(Boolean).join(', ')}</p>
+                      </div>
                     </div>
                   </div>
                 </div>

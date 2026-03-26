@@ -90,30 +90,82 @@ def send_otp_via_whatsapp(api_key: str, phone: str, otp: str) -> bool:
 		return False
 
 
-def send_otp_via_msg91_whatsapp(auth_key: str, mobile: str, otp: str, template_id: str) -> bool:
-	"""Send OTP via MSG91 WhatsApp. Returns True if successful."""
+def send_otp_via_msg91_whatsapp(auth_key: str, mobile: str, otp: str, template: str, restaurant_name: str = None) -> bool:
+	"""Send OTP via MSG91 WhatsApp. Supports Template ID or Name with variables."""
 	try:
-		if not auth_key or not template_id:
+		if not auth_key or not template:
 			return False
 
-		# MSG91 v5 OTP API: mobile should include country code without '+'
 		to = re.sub(r"\D", "", str(mobile))
 		if len(to) == 10:
 			to = "91" + to
 
-		url = "https://api.msg91.com/api/v5/otp"
-		params = {
-			"template_id": template_id,
-			"mobile": to,
-			"authkey": auth_key,
-			"otp": otp
-		}
+		# If 'template' looks like a Template Name (non-numeric), use WhatsApp API
+		# Otherwise use standard OTP API
+		is_template_name = not template.isdigit()
 
-		# Some MSG91 templates might require variables_values instead of direct otp
-		# but for Authentication templates, 'otp' param is standard.
-		resp = requests.get(url, params=params, timeout=10)
+		if is_template_name:
+			# WhatsApp API (v5)
+			url = "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/"
+			settings = frappe.get_single("Dinematters Settings")
+			sender_number = getattr(settings, "whatsapp_phone_number_id", None) or "917801838526"
+			
+			payload = {
+				"integrated_number": sender_number,
+				"content_type": "template",
+				"payload": {
+					"messaging_product": "whatsapp",
+					"type": "template",
+					"template": {
+						"name": template,
+						"language": {
+							"code": "en_US",
+							"policy": "deterministic"
+						},
+						"namespace": "7d8e31f4_d5d5_4ee7_8a76_3abb99331d00",
+						"to_and_components": [
+							{
+								"to": [to],
+								"components": {
+									"body_restaurant_name": {
+										"type": "text",
+										"value": f"{restaurant_name or 'DineMatters'}",
+										"parameter_name": "restaurant_name"
+									},
+									"body_otp": {
+										"type": "text",
+										"value": f"{otp}",
+										"parameter_name": "otp"
+									}
+								}
+							}
+						]
+					}
+				}
+			}
+			headers = {
+				"authkey": auth_key,
+				"Content-Type": "application/json"
+			}
+			resp = requests.post(url, json=payload, headers=headers, timeout=10)
+		else:
+			# Standard OTP API
+			url = "https://api.msg91.com/api/v5/otp"
+			params = {
+				"template_id": template,
+				"mobile": to,
+				"authkey": auth_key,
+				"otp": otp
+			}
+			resp = requests.get(url, params=params, timeout=10)
+
 		data = resp.json() if resp.text else {}
-		return resp.status_code == 200 and data.get("type") == "success"
+		frappe.log_error(f"MSG91 Response ({resp.status_code}): {resp.text}", "OTP_MSG91_Debug")
+		
+		if not (resp.status_code == 200 and (data.get("type") == "success" or data.get("status") == "success")):
+			return {"success": False, "error": "MSG91_FAILED", "message": resp.text, "status_code": resp.status_code}
+
+		return {"success": True, "message": "OTP sent successfully", "raw_response": data}
 	except Exception as e:
 		frappe.log_error(f"MSG91 WhatsApp failed: {e}", "OTP_MSG91_Failed")
 		return False

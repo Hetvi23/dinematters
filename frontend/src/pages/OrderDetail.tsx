@@ -2,7 +2,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Star, Truck, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Star, Truck } from 'lucide-react'
 import { toast } from 'sonner'
 import { useState } from 'react'
 import {
@@ -32,15 +32,24 @@ export default function OrderDetail() {
   
   const [assigningDelivery, setAssigningDelivery] = useState(false)
   const [cancellingDelivery, setCancellingDelivery] = useState(false)
+  const [deliveryMode, setDeliveryMode] = useState<'auto' | 'manual'>('manual')
+  const [manualForm, setManualForm] = useState({ partner_name: '', rider_name: '', rider_phone: '', eta: '' })
 
   const handleAssignDelivery = async () => {
     if (!order?.name) return
     setAssigningDelivery(true)
     try {
+      const payload: any = { order_id: order.name, delivery_mode: deliveryMode }
+      if (deliveryMode === 'manual') {
+        payload.partner_name = manualForm.partner_name || 'manual'
+        payload.rider_name = manualForm.rider_name
+        payload.rider_phone = manualForm.rider_phone
+        payload.eta = manualForm.eta
+      }
       const res = await fetch('/api/delivery/assign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order_id: order.name })
+        body: JSON.stringify(payload)
       })
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data.detail || data.error || 'Failed to assign delivery')
@@ -270,40 +279,90 @@ export default function OrderDetail() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
-              <div>
-                <p className="font-semibold">{order.delivery_partner === 'porter' ? 'Porter Delivery' : 'Unassigned'}</p>
-                {order.delivery_id && (
-                  <p className="text-sm text-muted-foreground font-mono mt-1">
-                    ID: {order.delivery_id} | Status: <span className="font-semibold text-primary">{order.delivery_status}</span>
-                  </p>
-                )}
-                {order.delivery_eta && (
-                  <p className="text-sm text-muted-foreground">ETA: {order.delivery_eta}</p>
-                )}
-                {order.delivery_rider_name && (
-                  <div className="mt-2 text-sm bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-900/50">
-                    Rider: <span className="font-semibold">{order.delivery_rider_name}</span> ({order.delivery_rider_phone})
+            {!order.delivery_id && order.status !== 'cancelled' && (
+              <div className="p-4 bg-muted/50 rounded-lg border space-y-4">
+                <div className="flex items-center gap-4">
+                  <span className="font-medium">Assignment Mode:</span>
+                  <Select value={deliveryMode} onValueChange={(v: any) => setDeliveryMode(v)}>
+                    <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Borzo (Third Party)</SelectItem>
+                      <SelectItem value="manual">Self / Manual Delivery</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {deliveryMode === 'manual' && (
+                  <div className="grid grid-cols-2 gap-4 pt-2 border-t mt-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Partner Name (Optional)</label>
+                      <input className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" value={manualForm.partner_name} onChange={e => setManualForm({...manualForm, partner_name: e.target.value})} placeholder="e.g. Self, Porter" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Rider Name</label>
+                      <input className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" value={manualForm.rider_name} onChange={e => setManualForm({...manualForm, rider_name: e.target.value})} placeholder="Rider Name" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Rider Phone</label>
+                      <input className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" value={manualForm.rider_phone} onChange={e => setManualForm({...manualForm, rider_phone: e.target.value})} placeholder="Rider Phone" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Estimated Time (ETA)</label>
+                      <input className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" value={manualForm.eta} onChange={e => setManualForm({...manualForm, eta: e.target.value})} placeholder="e.g. 30 mins" />
+                    </div>
                   </div>
                 )}
-              </div>
-              <div className="flex flex-col gap-2">
-                {!order.delivery_id && order.status !== 'cancelled' ? (
+                
+                <div className="flex justify-end pt-2">
                   <Button onClick={handleAssignDelivery} disabled={assigningDelivery}>
                     {assigningDelivery ? 'Assigning...' : 'Assign Delivery'}
                   </Button>
-                ) : order.delivery_id && order.delivery_status !== 'cancelled' && order.delivery_status !== 'delivered' && (
-                  <>
-                    <Button variant="outline" asChild>
+                </div>
+              </div>
+            )}
+            
+            {(order.delivery_id || order.delivery_partner) && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-muted/50 rounded-lg border">
+                <div>
+                  <p className="font-semibold">
+                    {order.delivery_partner === 'borzo' ? 'Borzo Delivery' : 
+                     order.delivery_partner === 'manual' || order.delivery_mode === 'manual' ? 'Manual Delivery' : 
+                     'Unassigned'}
+                  </p>
+                  
+                  {order.delivery_id && order.delivery_partner !== 'manual' && order.delivery_mode !== 'manual' && (
+                    <p className="text-sm text-muted-foreground font-mono mt-1">
+                      ID: {order.delivery_id} | Status: <span className="font-semibold text-primary">{order.delivery_status}</span>
+                    </p>
+                  )}
+                  {(order.delivery_partner === 'manual' || order.delivery_mode === 'manual') && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Status: <span className="font-semibold text-primary">{order.delivery_status || 'Assigned'}</span>
+                    </p>
+                  )}
+                  {order.delivery_eta && (
+                    <p className="text-sm text-muted-foreground mt-1">ETA: {order.delivery_eta}</p>
+                  )}
+                  {order.delivery_rider_name && (
+                    <div className="mt-2 text-sm bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-900/50">
+                      Rider: <span className="font-semibold">{order.delivery_rider_name}</span> ({order.delivery_rider_phone})
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2 w-full sm:w-auto">
+                  {order.delivery_partner !== 'manual' && order.delivery_mode !== 'manual' && order.delivery_status !== 'cancelled' && order.delivery_status !== 'delivered' && order.delivery_tracking_url && (
+                    <Button variant="outline" asChild className="w-full sm:w-auto">
                       <a href={order.delivery_tracking_url} target="_blank" rel="noopener noreferrer">Track Delivery</a>
                     </Button>
-                    <Button variant="destructive" onClick={handleCancelDelivery} disabled={cancellingDelivery}>
+                  )}
+                  {order.delivery_status !== 'cancelled' && order.delivery_status !== 'delivered' && (
+                    <Button variant="destructive" onClick={handleCancelDelivery} disabled={cancellingDelivery} className="w-full sm:w-auto">
                       {cancellingDelivery ? 'Cancelling...' : 'Cancel Delivery'}
                     </Button>
-                  </>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       )}

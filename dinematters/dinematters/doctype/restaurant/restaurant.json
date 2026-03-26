@@ -26,6 +26,8 @@
   "state",
   "column_break_address",
   "zip_code",
+  "latitude",
+  "longitude",
   "city_latitude",
   "city_longitude",
   "country",
@@ -200,6 +202,18 @@
    "fieldname": "zip_code",
    "fieldtype": "Data",
    "label": "Zip Code"
+  },
+  {
+   "fieldname": "latitude",
+   "fieldtype": "Float",
+   "label": "Latitude",
+   "read_only": 1
+  },
+  {
+   "fieldname": "longitude",
+   "fieldtype": "Float",
+   "label": "Longitude",
+   "read_only": 1
   },
   {
    "fieldname": "city_latitude",

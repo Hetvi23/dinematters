@@ -48,6 +48,7 @@
   "section_break_delivery",
   "estimated_delivery",
   "delivery_partner",
+  "delivery_mode",
   "delivery_id",
   "delivery_status",
   "delivery_eta",
@@ -55,6 +56,8 @@
   "delivery_rider_phone",
   "delivery_tracking_url",
   "delivery_address",
+  "delivery_latitude",
+  "delivery_longitude",
   "delivery_landmark",
   "delivery_location_pin",
   "column_break_delivery",
@@ -328,7 +331,14 @@
    "fieldname": "delivery_partner",
    "fieldtype": "Select",
    "label": "Delivery Partner",
-   "options": "\nporter"
+   "options": "borzo\nmanual"
+  },
+  {
+   "fieldname": "delivery_mode",
+   "fieldtype": "Select",
+   "label": "Delivery Mode",
+   "options": "auto\nmanual",
+   "default": "auto"
   },
   {
    "fieldname": "delivery_id",
@@ -344,7 +354,7 @@
   },
   {
    "fieldname": "delivery_eta",
-   "fieldtype": "Datetime",
+   "fieldtype": "Data",
    "label": "Delivery ETA",
    "description": "ETA from delivery partner"
   },
@@ -369,6 +379,18 @@
    "fieldname": "delivery_address",
    "fieldtype": "Small Text",
    "label": "Delivery Address"
+  },
+  {
+   "fieldname": "delivery_latitude",
+   "fieldtype": "Float",
+   "label": "Delivery Latitude",
+   "read_only": 1
+  },
+  {
+   "fieldname": "delivery_longitude",
+   "fieldtype": "Float",
+   "label": "Delivery Longitude",
+   "read_only": 1
   },
   {
    "fieldname": "delivery_landmark",
