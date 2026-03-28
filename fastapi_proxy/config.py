@@ -63,6 +63,7 @@ class Settings(BaseSettings):
 	
 	# Borzo Delivery
 	borzo_api_token: str = ""
+	borzo_webhook_token: str = ""
 	borzo_api_url: str = "https://robot-in.borzodelivery.com/api/business/1.6"  # Production (India)
 	borzo_sandbox_url: str = "https://robotapitest-in.borzodelivery.com/api/business/1.6" # Sandbox (India)
 	borzo_mode: str = "sandbox"  # sandbox or production

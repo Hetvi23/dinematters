@@ -145,6 +145,8 @@ def get_restaurant_config(restaurant_id):
 				"tagline": config.get("tagline", ""),
 				"subtitle": config.get("subtitle", ""),
 				"description": config.get("description", ""),
+				"latitude": config.get("latitude") or restaurant_doc.latitude,
+				"longitude": config.get("longitude") or restaurant_doc.longitude,
 				"googleMapUrl": (restaurant_context.get("google_map_url") if restaurant_context else "") or ""
 			},
 			"branding": {
@@ -190,6 +192,7 @@ def get_restaurant_config(restaurant_id):
 				"order_settings": {
 					"enable_takeaway": bool(restaurant_doc.get("enable_takeaway", 1)),
 					"enable_delivery": bool(restaurant_doc.get("enable_delivery", 0)),
+					"no_ordering": bool(restaurant_doc.get("no_ordering", 0)),
 					"default_packaging_fee": flt(restaurant_doc.get("default_packaging_fee", 0)),
 					"minimum_order_value": flt(restaurant_doc.get("minimum_order_value", 0)),
 					"estimated_prep_time": cint(restaurant_doc.get("estimated_prep_time", 30) or 30)
@@ -593,6 +596,7 @@ def update_order_settings(restaurant_id, settings):
 		allowed_fields = [
 			"enable_takeaway", 
 			"enable_delivery", 
+			"no_ordering",
 			"default_packaging_fee", 
 			"minimum_order_value", 
 			"estimated_prep_time", 
@@ -603,7 +607,7 @@ def update_order_settings(restaurant_id, settings):
 			if field in settings:
 				value = settings[field]
 				# Ensure correct type for Check fields
-				if field in ["enable_takeaway", "enable_delivery"]:
+				if field in ["enable_takeaway", "enable_delivery", "no_ordering"]:
 					value = 1 if value else 0
 				# Ensure correct type for Numeric fields
 				elif field in ["default_packaging_fee", "minimum_order_value", "default_delivery_fee"]:

@@ -60,6 +60,9 @@
   "delivery_longitude",
   "delivery_landmark",
   "delivery_location_pin",
+  "rider_latitude",
+  "rider_longitude",
+  "rider_last_updated",
   "column_break_delivery",
   "delivery_city",
   "delivery_state",
@@ -401,6 +404,24 @@
    "fieldname": "delivery_location_pin",
    "fieldtype": "Data",
    "label": "Location Pin (Lat, Lng or URL)"
+  },
+  {
+   "fieldname": "rider_latitude",
+   "fieldtype": "Float",
+   "label": "Rider Latitude",
+   "read_only": 1
+  },
+  {
+   "fieldname": "rider_longitude",
+   "fieldtype": "Float",
+   "label": "Rider Longitude",
+   "read_only": 1
+  },
+  {
+   "fieldname": "rider_last_updated",
+   "fieldtype": "Datetime",
+   "label": "Rider Last Updated",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_delivery",

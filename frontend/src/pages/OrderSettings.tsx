@@ -18,7 +18,8 @@ export default function OrderSettings() {
     default_packaging_fee: 0,
     minimum_order_value: 0,
     estimated_prep_time: 30,
-    default_delivery_fee: 0
+    default_delivery_fee: 0,
+    no_ordering: 0
   })
 
   const { data: restaurantDoc, isValidating, mutate } = useFrappeGetDoc(
@@ -35,7 +36,8 @@ export default function OrderSettings() {
         default_packaging_fee: restaurantDoc.default_packaging_fee ?? 0,
         minimum_order_value: restaurantDoc.minimum_order_value ?? 0,
         estimated_prep_time: restaurantDoc.estimated_prep_time ?? 30,
-        default_delivery_fee: restaurantDoc.default_delivery_fee ?? 0
+        default_delivery_fee: restaurantDoc.default_delivery_fee ?? 0,
+        no_ordering: restaurantDoc.no_ordering ?? 0
       })
     }
   }, [restaurantDoc])
@@ -55,7 +57,8 @@ export default function OrderSettings() {
           default_packaging_fee: settings.default_packaging_fee,
           minimum_order_value: settings.minimum_order_value,
           estimated_prep_time: settings.estimated_prep_time,
-          default_delivery_fee: settings.default_delivery_fee
+          default_delivery_fee: settings.default_delivery_fee,
+          no_ordering: settings.no_ordering
         }
       })
 
@@ -112,6 +115,38 @@ export default function OrderSettings() {
           Configure takeaway, delivery options, and additional charges.
         </p>
       </div>
+
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Settings className="w-5 h-5 text-primary" />
+            <CardTitle>Ordering Mode</CardTitle>
+          </div>
+          <CardDescription>
+            Completely disable ordering to use other platform features (Games, Events)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-base">Disable All Ordering</Label>
+              <p className="text-sm text-muted-foreground">
+                When enabled, customers can only view the menu. Cart, coupons, and checkout will be hidden.
+              </p>
+            </div>
+            <Checkbox
+              checked={settings.no_ordering === 1}
+              onCheckedChange={() => handleToggle('no_ordering')}
+              className="h-6 w-6"
+            />
+          </div>
+          {settings.no_ordering === 1 && (
+            <div className="mt-4 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-600 text-sm font-medium">
+              Note: A fixed monthly fee of 999 will be applied as revenue-based royalty cannot be calculated.
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>

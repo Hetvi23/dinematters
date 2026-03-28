@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { ArrowLeft, Star, Truck } from 'lucide-react'
 import { toast } from 'sonner'
 import { useState } from 'react'
+import DeliveryMap from '@/components/DeliveryMap'
 import {
   Select,
   SelectContent,
@@ -24,7 +25,7 @@ export default function OrderDetail() {
   // Get restaurant data to fetch table options
   const { data: restaurantDoc } = useFrappeGetDoc('Restaurant', order?.restaurant || '', {
     enabled: !!order?.restaurant,
-    fields: ['name', 'tables']
+    fields: ['name', 'tables', 'latitude', 'longitude', 'restaurant_name']
   })
   
   // Table update API call
@@ -32,6 +33,10 @@ export default function OrderDetail() {
   
   const [assigningDelivery, setAssigningDelivery] = useState(false)
   const [cancellingDelivery, setCancellingDelivery] = useState(false)
+  
+  // Delivery API calls
+  const { call: assignDeliveryAPI } = useFrappePostCall('dinematters.dinematters.api.delivery.assign_delivery')
+  const { call: cancelDeliveryAPI } = useFrappePostCall('dinematters.dinematters.api.delivery.cancel_delivery')
   const [deliveryMode, setDeliveryMode] = useState<'auto' | 'manual'>('manual')
   const [manualForm, setManualForm] = useState({ partner_name: '', rider_name: '', rider_phone: '', eta: '' })
 
@@ -46,13 +51,10 @@ export default function OrderDetail() {
         payload.rider_phone = manualForm.rider_phone
         payload.eta = manualForm.eta
       }
-      const res = await fetch('/api/delivery/assign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-      const data = await res.json()
-      if (!res.ok || !data.success) throw new Error(data.detail || data.error || 'Failed to assign delivery')
+      
+      const res = await assignDeliveryAPI(payload)
+      if (!res.success) throw new Error(res.error || 'Failed to assign delivery')
+      
       toast.success('Delivery assigned successfully')
       window.location.reload()
     } catch (e: any) {
@@ -63,17 +65,16 @@ export default function OrderDetail() {
   }
 
   const handleCancelDelivery = async () => {
-    if (!order?.delivery_id) return
+    if (!order?.delivery_id && !order?.delivery_partner) return
     if (!confirm("Are you sure you want to cancel the delivery assignment?")) return;
     setCancellingDelivery(true)
     try {
-      const res = await fetch('/api/delivery/cancel', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ delivery_id: order.delivery_id, order_id: order.name })
+      const res = await cancelDeliveryAPI({ 
+        order_id: order.name,
+        delivery_id: order.delivery_id 
       })
-      const data = await res.json()
-      if (!res.ok || !data.success) throw new Error(data.detail || data.error || 'Failed to cancel delivery')
+      if (!res.success) throw new Error(res.error || 'Failed to cancel delivery')
+      
       toast.success('Delivery cancelled successfully')
       window.location.reload()
     } catch (e: any) {
@@ -322,45 +323,70 @@ export default function OrderDetail() {
             )}
             
             {(order.delivery_id || order.delivery_partner) && (
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-muted/50 rounded-lg border">
-                <div>
-                  <p className="font-semibold">
-                    {order.delivery_partner === 'borzo' ? 'Borzo Delivery' : 
-                     order.delivery_partner === 'manual' || order.delivery_mode === 'manual' ? 'Manual Delivery' : 
-                     'Unassigned'}
-                  </p>
-                  
-                  {order.delivery_id && order.delivery_partner !== 'manual' && order.delivery_mode !== 'manual' && (
-                    <p className="text-sm text-muted-foreground font-mono mt-1">
-                      ID: {order.delivery_id} | Status: <span className="font-semibold text-primary">{order.delivery_status}</span>
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-muted/50 rounded-lg border">
+                  <div>
+                    <p className="font-semibold">
+                      {order.delivery_partner === 'borzo' ? 'Borzo Delivery' : 
+                       order.delivery_partner === 'manual' || order.delivery_mode === 'manual' ? 'Manual Delivery' : 
+                       'Unassigned'}
                     </p>
-                  )}
-                  {(order.delivery_partner === 'manual' || order.delivery_mode === 'manual') && (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Status: <span className="font-semibold text-primary">{order.delivery_status || 'Assigned'}</span>
-                    </p>
-                  )}
-                  {order.delivery_eta && (
-                    <p className="text-sm text-muted-foreground mt-1">ETA: {order.delivery_eta}</p>
-                  )}
-                  {order.delivery_rider_name && (
-                    <div className="mt-2 text-sm bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-900/50">
-                      Rider: <span className="font-semibold">{order.delivery_rider_name}</span> ({order.delivery_rider_phone})
-                    </div>
-                  )}
+                    
+                    {order.delivery_id && order.delivery_partner !== 'manual' && order.delivery_mode !== 'manual' && (
+                      <p className="text-sm text-muted-foreground font-mono mt-1">
+                        ID: {order.delivery_id} | Status: <span className="font-semibold text-primary">{order.delivery_status}</span>
+                      </p>
+                    )}
+                    {(order.delivery_partner === 'manual' || order.delivery_mode === 'manual') && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Status: <span className="font-semibold text-primary">{order.delivery_status || 'Assigned'}</span>
+                      </p>
+                    )}
+                    {order.delivery_eta && (
+                      <p className="text-sm text-muted-foreground mt-1">ETA: {order.delivery_eta}</p>
+                    )}
+                    {order.delivery_rider_name && (
+                      <div className="mt-2 text-sm bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-900/50">
+                        Rider: <span className="font-semibold">{order.delivery_rider_name}</span> ({order.delivery_rider_phone})
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2 w-full sm:w-auto">
+                    {order.delivery_partner !== 'manual' && order.delivery_mode !== 'manual' && order.delivery_status !== 'cancelled' && order.delivery_status !== 'delivered' && order.delivery_tracking_url && (
+                      <Button variant="outline" asChild className="w-full sm:w-auto">
+                        <a href={order.delivery_tracking_url} target="_blank" rel="noopener noreferrer">Track on Borzo</a>
+                      </Button>
+                    )}
+                    {order.delivery_status !== 'cancelled' && order.delivery_status !== 'delivered' && (
+                      <Button variant="destructive" onClick={handleCancelDelivery} disabled={cancellingDelivery} className="w-full sm:w-auto">
+                        {cancellingDelivery ? 'Cancelling...' : 'Cancel Delivery'}
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex flex-col gap-2 w-full sm:w-auto">
-                  {order.delivery_partner !== 'manual' && order.delivery_mode !== 'manual' && order.delivery_status !== 'cancelled' && order.delivery_status !== 'delivered' && order.delivery_tracking_url && (
-                    <Button variant="outline" asChild className="w-full sm:w-auto">
-                      <a href={order.delivery_tracking_url} target="_blank" rel="noopener noreferrer">Track Delivery</a>
-                    </Button>
-                  )}
-                  {order.delivery_status !== 'cancelled' && order.delivery_status !== 'delivered' && (
-                    <Button variant="destructive" onClick={handleCancelDelivery} disabled={cancellingDelivery} className="w-full sm:w-auto">
-                      {cancellingDelivery ? 'Cancelling...' : 'Cancel Delivery'}
-                    </Button>
-                  )}
-                </div>
+
+                {/* Integrated Live Map */}
+                {(order.delivery_latitude || order.delivery_location_pin || order.rider_latitude) && (
+                  <DeliveryMap
+                    restaurantName={restaurantDoc?.restaurant_name || restaurantDoc?.name}
+                    pickupLocation={restaurantDoc?.latitude && restaurantDoc?.longitude ? { 
+                      lat: parseFloat(restaurantDoc.latitude), 
+                      lng: parseFloat(restaurantDoc.longitude) 
+                    } : undefined}
+                    dropLocation={order.delivery_latitude && order.delivery_longitude ? {
+                      lat: parseFloat(order.delivery_latitude),
+                      lng: parseFloat(order.delivery_longitude)
+                    } : order.delivery_location_pin && String(order.delivery_location_pin).includes(',') ? {
+                      lat: parseFloat(String(order.delivery_location_pin).split(',')[0]),
+                      lng: parseFloat(String(order.delivery_location_pin).split(',')[1])
+                    } : undefined}
+                    riderLocation={order.rider_latitude && order.rider_longitude ? {
+                      lat: parseFloat(order.rider_latitude),
+                      lng: parseFloat(order.rider_longitude)
+                    } : undefined}
+                    riderLastUpdated={order.rider_last_updated}
+                  />
+                )}
               </div>
             )}
           </CardContent>

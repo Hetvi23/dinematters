@@ -36,6 +36,7 @@
   "default_delivery_fee",
   "enable_takeaway",
   "enable_delivery",
+  "no_ordering",
   "default_packaging_fee",
   "minimum_order_value",
   "estimated_prep_time",
@@ -264,6 +265,12 @@
    "fieldname": "enable_delivery",
    "fieldtype": "Check",
    "label": "Enable Delivery",
+   "default": "0"
+  },
+  {
+   "fieldname": "no_ordering",
+   "fieldtype": "Check",
+   "label": "No Ordering",
    "default": "0"
   },
   {

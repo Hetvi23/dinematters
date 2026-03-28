@@ -503,7 +503,7 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 
 
 @frappe.whitelist(allow_guest=True)
-def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None, admin_mode=False, date_from=None, date_to=None, search_query=None):
+def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None, admin_mode=False, date_from=None, date_to=None, search_query=None, recent_only=False):
 	"""
 	GET /api/v1/orders
 	Get user's orders for restaurant
@@ -576,6 +576,11 @@ def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None, ad
 					else:
 						search_filters["creation"] = ["<=", date_to]
 				filters = search_filters
+
+		if recent_only:
+			# Only show orders from the last 24 hours
+			# Using >= add_to_date(now_datetime(), hours=-24)
+			filters["creation"] = [">=", add_to_date(now_datetime(), hours=-24)]
 		
 		if status:
 			filters["status"] = status
@@ -623,12 +628,16 @@ def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None, ad
 					"creation as createdAt",
 					"estimated_delivery as estimatedDelivery",
 					"delivery_partner as deliveryPartner",
-					"delivery_id as deliveryId",
-					"delivery_status as deliveryStatus",
-					"delivery_eta as deliveryEta",
-					"delivery_rider_name as deliveryRiderName",
 					"delivery_rider_phone as deliveryRiderPhone",
-					"delivery_tracking_url as deliveryTrackingUrl"
+					"delivery_tracking_url as deliveryTrackingUrl",
+					"subtotal",
+					"tax",
+					"discount",
+					"packaging_fee as packagingFee",
+					"delivery_fee as deliveryFee",
+					"total",
+					"payment_method as paymentMethod",
+					"payment_status as paymentStatus"
 				],
 				filters=filters,
 				limit_start=start,
@@ -687,7 +696,7 @@ def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None, ad
 
 
 @frappe.whitelist(allow_guest=True)
-def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=False):
+def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=False, recent_only=False):
 	"""
 	GET /api/v1/customer-orders
 	Get orders for a customer by phone and restaurant.
@@ -726,7 +735,13 @@ def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=Fa
 			where_sql = "restaurant = %s AND customer_phone IN (" + ph + ")"
 			params = [restaurant] + phone_variants
 
-		base_cols = "name, order_id, order_number, status, total, subtotal, discount, creation, estimated_delivery, delivery_partner, delivery_id, delivery_status, delivery_eta, delivery_rider_name, delivery_rider_phone, delivery_tracking_url, order_type"
+		if recent_only:
+			# Use add_to_date for consistent 24-hour window
+			twenty_four_hours_ago = add_to_date(now_datetime(), hours=-24)
+			where_sql += " AND creation >= %s"
+			params.append(twenty_four_hours_ago)
+
+		base_cols = "name, order_id, order_number, status, total, subtotal, discount, tax, packaging_fee, delivery_fee, payment_method, payment_status, creation, estimated_delivery, delivery_partner, delivery_id, delivery_status, delivery_eta, delivery_rider_name, delivery_rider_phone, delivery_tracking_url, order_type"
 		feedback_cols = ""
 		if frappe.db.has_column("Order", "customer_rating"):
 			feedback_cols = ", customer_rating, customer_feedback"
@@ -758,6 +773,11 @@ def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=Fa
 				"total": flt(o.get("total")),
 				"subtotal": flt(o.get("subtotal")),
 				"discount": flt(o.get("discount") or 0),
+				"tax": flt(o.get("tax") or 0),
+				"packagingFee": flt(o.get("packaging_fee") or 0),
+				"deliveryFee": flt(o.get("delivery_fee") or 0),
+				"paymentMethod": o.get("payment_method"),
+				"paymentStatus": o.get("payment_status"),
 				"createdAt": get_datetime_str(o.get("creation")),
 				"estimatedDelivery": get_datetime_str(o.get("estimated_delivery")) if o.get("estimated_delivery") else None,
 				"orderType": o.get("order_type"),
@@ -810,6 +830,8 @@ def _format_order_items_light(order_doc):
 		items.append({
 			"dishId": item.product,
 			"quantity": item.quantity,
+			"customizations": json.loads(item.customizations) if item.customizations else {},
+			"totalPrice": flt(item.total_price),
 			"dish": dish
 		})
 	return items

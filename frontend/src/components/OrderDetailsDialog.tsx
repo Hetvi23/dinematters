@@ -1,4 +1,4 @@
-import { useFrappeGetDoc } from '@/lib/frappe'
+import { useFrappeGetDoc, useFrappePostCall, useFrappeEventListener } from '@/lib/frappe'
 import { usePrint } from '@/hooks/usePrint'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import {
@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import DeliveryMap from './DeliveryMap'
 import {
   Select,
   SelectContent,
@@ -45,15 +46,26 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
   const { print } = usePrint()
   const { restaurantConfig } = useRestaurant()
   
-  const { data: order, isLoading } = useFrappeGetDoc('Order', orderId || '', {
+  const { data: order, isLoading, mutate } = useFrappeGetDoc('Order', orderId || '', {
     fields: ['*'],
     enabled: open && !!orderId
+  })
+
+  // Listen for real-time order updates
+  useFrappeEventListener('order_update', (data: any) => {
+    if (data.order_id === orderId) {
+      mutate()
+    }
   })
 
   const [assigningDelivery, setAssigningDelivery] = useState(false)
   const [cancellingDelivery, setCancellingDelivery] = useState(false)
   const [deliveryMode, setDeliveryMode] = useState<'auto' | 'manual'>('manual')
   const [manualForm, setManualForm] = useState({ partner_name: '', rider_name: '', rider_phone: '', eta: '' })
+
+  // Delivery API calls
+  const { call: assignDeliveryAPI } = useFrappePostCall('dinematters.dinematters.api.delivery.assign_delivery')
+  const { call: cancelDeliveryAPI } = useFrappePostCall('dinematters.dinematters.api.delivery.cancel_delivery')
 
   const handleAssignDelivery = async () => {
     if (!order?.name) return
@@ -66,13 +78,10 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
         payload.rider_phone = manualForm.rider_phone
         payload.eta = manualForm.eta
       }
-      const res = await fetch('/api/delivery/assign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-      const data = await res.json()
-      if (!res.ok || !data.success) throw new Error(data.detail || data.error || 'Failed to assign delivery')
+      
+      const res = await assignDeliveryAPI(payload)
+      if (!res.success) throw new Error(res.error || 'Failed to assign delivery')
+      
       toast.success('Delivery assigned successfully')
       window.location.reload()
     } catch (e: any) {
@@ -83,17 +92,16 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
   }
 
   const handleCancelDelivery = async () => {
-    if (!order?.delivery_id) return
+    if (!order?.delivery_id && !order?.delivery_partner) return
     if (!confirm("Are you sure you want to cancel the delivery assignment?")) return;
     setCancellingDelivery(true)
     try {
-      const res = await fetch('/api/delivery/cancel', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ delivery_id: order.delivery_id, order_id: order.name })
+      const res = await cancelDeliveryAPI({ 
+        order_id: order.name,
+        delivery_id: order.delivery_id 
       })
-      const data = await res.json()
-      if (!res.ok || !data.success) throw new Error(data.detail || data.error || 'Failed to cancel delivery')
+      if (!res.success) throw new Error(res.error || 'Failed to cancel delivery')
+      
       toast.success('Delivery cancelled successfully')
       window.location.reload()
     } catch (e: any) {
@@ -109,6 +117,8 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
     enabled: open && !!order?.coupon
   })
 
+  const restaurantInfo = restaurantConfig?.restaurant || {}
+
   if (!orderId) return null
 
   const handleCopyId = () => {
@@ -120,7 +130,24 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
     }
   }
 
-  const getStatusConfig = (status: string) => {
+  const getStatusConfig = (status: string, deliveryStatus?: string, orderType?: string) => {
+    // Prioritize delivery status if it's a delivery order and we have a granular status
+    if (orderType === 'delivery' && deliveryStatus) {
+      const dStatus = deliveryStatus.toLowerCase()
+      if (dStatus === 'cancelled') {
+        return { color: 'text-red-600 bg-red-50 border-red-200 dark:bg-red-900/30 dark:border-red-800 dark:text-red-400', icon: AlertCircle, label: 'Delivery Cancelled' }
+      }
+      if (dStatus === 'delivered' || dStatus === 'completed') {
+        return { color: 'text-green-600 bg-green-50 border-green-200 dark:bg-green-900/30 dark:border-green-800 dark:text-green-400', icon: CheckCircle2, label: 'Delivered' }
+      }
+      // For active delivery statuses (assigned, departed, etc.)
+      return { 
+        color: 'text-primary bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30', 
+        icon: Truck, 
+        label: deliveryStatus 
+      }
+    }
+
     const s = status?.toLowerCase()
     switch (s) {
       case 'delivered':
@@ -152,7 +179,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
     return customizations
   }
 
-  const statusConfig = getStatusConfig(order?.status || '')
+  const statusConfig = getStatusConfig(order?.status || '', order?.delivery_status, order?.order_type)
   const StatusIcon = statusConfig.icon
 
   return (
@@ -353,6 +380,31 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                             <a href={order.delivery_tracking_url} target="_blank" rel="noopener noreferrer">Track on Borzo</a>
                           </Button>
                         )}
+                      </div>
+                    )}
+
+                    {/* Integrated Live Map */}
+                    {(order.delivery_latitude || order.delivery_location_pin || order.rider_latitude) && (
+                      <div className="mt-2">
+                        <DeliveryMap
+                          restaurantName={restaurantInfo.name}
+                          pickupLocation={restaurantInfo.latitude && restaurantInfo.longitude ? { 
+                            lat: parseFloat(restaurantInfo.latitude), 
+                            lng: parseFloat(restaurantInfo.longitude) 
+                          } : undefined}
+                          dropLocation={order.delivery_latitude && order.delivery_longitude ? {
+                            lat: parseFloat(order.delivery_latitude),
+                            lng: parseFloat(order.delivery_longitude)
+                          } : order.delivery_location_pin && String(order.delivery_location_pin).includes(',') ? {
+                            lat: parseFloat(String(order.delivery_location_pin).split(',')[0]),
+                            lng: parseFloat(String(order.delivery_location_pin).split(',')[1])
+                          } : undefined}
+                          riderLocation={order.rider_latitude && order.rider_longitude ? {
+                            lat: parseFloat(order.rider_latitude),
+                            lng: parseFloat(order.rider_longitude)
+                          } : undefined}
+                          riderLastUpdated={order.rider_last_updated}
+                        />
                       </div>
                     )}
 

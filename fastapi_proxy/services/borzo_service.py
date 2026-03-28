@@ -51,9 +51,12 @@ class BorzoService:
                 "phone": order_data.get("drop_phone"),
                 "name": order_data.get("drop_name")
             },
-            "note": order_data.get("order_items_summary", "Food Order"),
-            "payment_amount": str(order_data.get("cod_amount", 0)) if order_data.get("is_cod") else "0"
+            "note": order_data.get("order_items_summary", "Food Order")
         }
+        
+        # Only include payment_amount for COD orders
+        if order_data.get("is_cod") and order_data.get("cod_amount"):
+            drop_point["payment_amount"] = str(order_data.get("cod_amount"))
         
         drop_pin = order_data.get("drop_location_pin")
         if drop_pin and "," in drop_pin:

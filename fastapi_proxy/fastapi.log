@@ -33,3 +33,12 @@ INFO:     127.0.0.1:38586 - "POST /api/delivery/assign HTTP/1.1" 200 OK
 {"timestamp": "2026-03-26T10:59:54.213387+00:00", "level": null, "name": "services.borzo_service", "message": "Exception in Borzo create_delivery: [Errno -2] Name or service not known", "taskName": "starlette.middleware.base.BaseHTTPMiddleware.__call__.<locals>.call_next.<locals>.coro"}
 {"timestamp": "2026-03-26T10:59:54.213875+00:00", "level": null, "name": "__main__", "message": "Request completed: POST http://localhost:8001/api/delivery/assign - Status: 200 - Time: 0.092s", "taskName": "Task-56"}
 INFO:     127.0.0.1:46756 - "POST /api/delivery/assign HTTP/1.1" 200 OK
+{"timestamp": "2026-03-26T13:46:29.404521+00:00", "level": null, "name": "__main__", "message": "Request started: GET http://localhost:8001/health from 127.0.0.1", "taskName": "Task-70"}
+{"timestamp": "2026-03-26T13:46:29.466886+00:00", "level": null, "name": "__main__", "message": "Request completed: GET http://localhost:8001/health - Status: 200 - Time: 0.064s", "taskName": "Task-70"}
+INFO:     127.0.0.1:47462 - "GET /health HTTP/1.1" 200 OK
+{"timestamp": "2026-03-26T13:46:36.540798+00:00", "level": null, "name": "__main__", "message": "Request started: POST http://localhost:8001/api/auth/login from 127.0.0.1", "taskName": "Task-81"}
+{"timestamp": "2026-03-26T13:46:36.544101+00:00", "level": null, "name": "__main__", "message": "Request completed: POST http://localhost:8001/api/auth/login - Status: 404 - Time: 0.003s", "taskName": "Task-81"}
+INFO:     127.0.0.1:38740 - "POST /api/auth/login HTTP/1.1" 404 Not Found
+{"timestamp": "2026-03-26T13:51:02.044531+00:00", "level": null, "name": "__main__", "message": "Request started: GET http://localhost:8001/health from 127.0.0.1", "taskName": "Task-92"}
+{"timestamp": "2026-03-26T13:51:02.049288+00:00", "level": null, "name": "__main__", "message": "Request completed: GET http://localhost:8001/health - Status: 200 - Time: 0.005s", "taskName": "Task-92"}
+INFO:     127.0.0.1:48632 - "GET /health HTTP/1.1" 200 OK

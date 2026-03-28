@@ -5,7 +5,6 @@ import { useRestaurant } from '@/contexts/RestaurantContext'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { 
-  Eye, 
   Clock, 
   User, 
   CreditCard, 
@@ -16,7 +15,8 @@ import {
   ShoppingBag,
   Bell,
   Printer,
-  XCircle
+  XCircle,
+  ChevronDown
 } from 'lucide-react'
 import { useFrappePostCall } from '@/lib/frappe'
 import { toast } from 'sonner'
@@ -241,8 +241,18 @@ function OrderCard({
   })
   const orderItems: OrderItem[] = (fullOrder?.order_items as any) || []
 
+  const ALL_STATUSES = [
+    { value: 'confirmed', label: 'Confirmed' },
+    { value: 'preparing', label: 'Preparing' },
+    { value: 'ready', label: 'Ready' },
+    { value: 'in_billing', label: 'In Billing' },
+    { value: 'delivered', label: 'Delivered' },
+    { value: 'billed', label: 'Billed' },
+    { value: 'cancelled', label: 'Cancelled' },
+  ]
+
   return (
-    <Card className="group hover:shadow-xl transition-all duration-300 border-border/50 overflow-hidden bg-[#fafafa]/80 hover:bg-[#fafafa] relative border-l-4">
+    <Card className="group hover:shadow-xl transition-all duration-300 border-border/50 overflow-hidden bg-white dark:bg-zinc-900/50 hover:bg-[#fafafa] dark:hover:bg-zinc-900 relative border-l-4">
       <div className={cn(
         "absolute left-[-4px] top-0 bottom-0 w-1 rounded-l-full transition-all duration-300",
         status === 'confirmed' || status === 'accepted' || status === 'auto accepted' ? "bg-blue-500" :
@@ -304,11 +314,11 @@ function OrderCard({
               variant="secondary" 
               className={cn(
                 "text-[9px] font-black uppercase px-2 py-0 h-4.5 border-none whitespace-nowrap shrink-0 ml-auto",
-                status === 'confirmed' ? "bg-blue-100 text-blue-700" :
-                status === 'preparing' ? "bg-purple-100 text-purple-700" :
-                status === 'ready' ? "bg-emerald-100 text-emerald-700" :
-                status === 'billed' || status === 'in billing' || status === 'delivered' ? "bg-gray-100 text-gray-700" :
-                "bg-orange-100 text-orange-700"
+                status === 'confirmed' ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" :
+                status === 'preparing' ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" :
+                status === 'ready' ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" :
+                status === 'billed' || status === 'in billing' || status === 'delivered' ? "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" :
+                "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
               )}
             >
               {status?.replace('_', ' ')}
@@ -341,9 +351,9 @@ function OrderCard({
              </div>
              <p className={cn(
                "text-[9px] font-black uppercase tracking-wider",
-               order.payment_status === 'completed' ? "text-emerald-500" : "text-amber-500"
+               order.payment_status === 'Paid' || order.payment_status === 'completed' ? "text-emerald-500" : "text-amber-500"
              )}>
-               {order.payment_status === 'completed' ? 'Paid' : 'Pending'}
+               {order.payment_status === 'Paid' || order.payment_status === 'completed' ? 'Paid' : 'Pending'}
              </p>
           </div>
         </div>
@@ -357,7 +367,7 @@ function OrderCard({
               e.stopPropagation()
               print(order, { type: 'RECEIPT', restaurant: restaurantConfig?.restaurant })
             }}
-            className="h-8 w-8 p-0 rounded-lg bg-background/50 hover:bg-zinc-100 border border-border/80 shadow-sm shrink-0"
+            className="h-8 w-8 p-0 rounded-lg bg-background/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-border/80 shadow-sm shrink-0"
             title="Print Receipt"
           >
             <Printer className="w-3.5 h-3.5 text-muted-foreground" />
@@ -370,7 +380,7 @@ function OrderCard({
               e.stopPropagation()
               print(order, { type: 'KOT' })
             }}
-            className="h-8 w-8 p-0 rounded-lg bg-background/50 hover:bg-zinc-100 border border-border/80 shadow-sm shrink-0"
+            className="h-8 w-8 p-0 rounded-lg bg-background/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-border/80 shadow-sm shrink-0"
             title="Print KOT"
           >
             <ChefHat className="w-3.5 h-3.5 text-muted-foreground" />
@@ -382,71 +392,38 @@ function OrderCard({
             onClick={onView}
             className="flex-1 h-8 rounded-lg bg-background/50 hover:bg-accent border border-border/80 shadow-sm text-[10px] font-bold uppercase gap-1.5"
           >
-            <Eye className="w-3.5 h-3.5 text-muted-foreground" />
             Details
           </Button>
 
-          {/* Contextual Status Action */}
-          {['accepted', 'auto accepted', 'placed', 'pending', 'pending verification', 'pending_verification'].includes(status) && (
-            <Button 
-              size="sm" 
-              onClick={() => onStatusUpdate(order.name, 'confirmed', 'Confirmed')}
-              className="flex-1 h-8 px-2 rounded-lg font-black text-[10px] uppercase bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+          {/* Contextual Status Action Dropdown */}
+          <div className="flex-1 relative group/status">
+            <select
+              value={status === 'in billing' ? 'in_billing' : status}
+              onChange={(e) => {
+                const newStatus = e.target.value
+                const label = ALL_STATUSES.find(s => s.value === newStatus)?.label || newStatus
+                onStatusUpdate(order.name, newStatus, label)
+              }}
+              className={cn(
+                "w-full h-8 px-2 pr-6 rounded-lg font-black text-[10px] uppercase shadow-sm cursor-pointer border-none outline-none appearance-none text-center transition-all duration-200",
+                status === 'confirmed' ? "bg-blue-600 hover:bg-blue-700 text-white" :
+                status === 'preparing' ? "bg-purple-600 hover:bg-purple-700 text-white" :
+                status === 'ready' ? "bg-emerald-600 hover:bg-emerald-700 text-white" :
+                status === 'in_billing' || status === 'in billing' ? "bg-orange-600 hover:bg-orange-700 text-white" :
+                status === 'delivered' || status === 'billed' ? "bg-gray-900 hover:bg-black text-white" :
+                "bg-blue-600 hover:bg-blue-700 text-white"
+              )}
             >
-              Confirm
-            </Button>
-          )}
-
-          {status === 'confirmed' && (
-            <Button 
-              size="sm" 
-              onClick={() => onStatusUpdate(order.name, 'preparing', 'Preparing')}
-              className="flex-1 h-8 px-2 rounded-lg font-black text-[10px] uppercase bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
-            >
-              Cook
-            </Button>
-          )}
-
-          {status === 'preparing' && (
-            <Button 
-              size="sm" 
-              onClick={() => onStatusUpdate(order.name, 'ready', 'Ready')}
-              className="flex-1 h-8 px-2 rounded-lg font-black text-[10px] uppercase bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-            >
-              Ready
-            </Button>
-          )}
-
-          {status === 'ready' && (
-            <Button 
-              size="sm" 
-              onClick={() => onStatusUpdate(order.name, 'in_billing', 'Settle / Bill')}
-              className="flex-1 h-8 px-2 rounded-lg font-black text-[10px] uppercase bg-orange-600 hover:bg-orange-700 text-white shadow-sm"
-            >
-              Bill
-            </Button>
-          )}
-
-          {['in billing', 'in_billing', 'delivered'].includes(status) && (
-            <Button 
-              size="sm" 
-              onClick={() => onStatusUpdate(order.name, 'billed', 'Billed/Settled')}
-              className="flex-1 h-8 px-2 rounded-lg font-black text-[10px] uppercase bg-gray-900 hover:bg-black text-white shadow-sm"
-            >
-              Settle
-            </Button>
-          )}
-
-          {/* Unrecognized but active status fallback */}
-          {!['accepted', 'auto accepted', 'placed', 'pending', 'pending verification', 'pending_verification', 'confirmed', 'preparing', 'ready', 'in billing', 'in_billing', 'delivered', 'billed', 'cancelled'].includes(status) && (
-             <Button 
-              size="sm" 
-              onClick={() => onStatusUpdate(order.name, 'confirmed', 'Confirmed')}
-              className="flex-1 h-8 px-2 rounded-lg font-black text-[10px] uppercase bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-            >
-              Accept
-            </Button>
-          )}
+              {ALL_STATUSES.map(s => (
+                <option key={s.value} value={s.value} className="bg-white dark:bg-zinc-900 text-foreground">
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-white/70 group-hover/status:text-white transition-colors">
+              <ChevronDown className="w-3 h-3" />
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>

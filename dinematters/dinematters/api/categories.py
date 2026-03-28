@@ -56,41 +56,56 @@ def get_categories(restaurant_id):
 				"productCount": product_count
 			}
 			
-			# Use centralized media fetcher for CDN URLs and blur placeholders
-			# Use centralized media fetcher for CDN URLs and blur placeholders
-			if cat.get("category_image"):
-				format_media_field(category_data, "category_image", "Menu Category", cat.get("name"), "category_image", "image")
-			else:
-				# Fallback: Use image from first active product in this category for this restaurant
-				first_product_media = frappe.db.get_value(
-					"Product Media",
-					{
-						"parenttype": "Menu Product",
-						"media_type": "image",
-						"parent": ["in", frappe.get_all(
-							"Menu Product", 
-							filters={"category_name": cat["name"], "is_active": 1, "restaurant": restaurant}, 
-							pluck="name"
-						)]
-					},
-					["name", "parent", "media_url"],
-					order_by="idx asc",
-					as_dict=True
+			# Robust image resolution:
+			# 1. Try to find an explicit Media Asset for the category (high quality CDN URL)
+			has_category_media_asset = frappe.db.get_value(
+				"Media Asset",
+				{
+					"owner_doctype": "Menu Category",
+					"owner_name": cat.get("id"),
+					"media_role": "category_image",
+					"status": "ready"
+				},
+				"name"
+			)
+			
+			# 2. Try to find a fallback product image (fallback)
+			first_product_media = frappe.db.get_value(
+				"Product Media",
+				{
+					"parenttype": "Menu Product",
+					"media_type": "image",
+					"parent": ["in", frappe.get_all(
+						"Menu Product", 
+						filters={"category": cat["id"], "is_active": 1, "restaurant": restaurant}, 
+						pluck="name"
+					)]
+				},
+				["name", "media_url"],
+				order_by="idx asc",
+				as_dict=True
+			)
+			
+			if has_category_media_asset:
+				format_media_field(category_data, "category_image", "Menu Category", cat.get("id"), "category_image", "image")
+			elif first_product_media:
+				# Use product thumbnail
+				category_data["category_image"] = first_product_media["media_url"]
+				format_media_field(
+					category_data, 
+					"category_image", 
+					"Product Media", 
+					first_product_media["name"], 
+					"media_url", 
+					"image"
 				)
-				if first_product_media:
-					# Temporarily put the media URL in the dict so format_media_field can pick it up as fallback_url
-					category_data["category_image"] = first_product_media["media_url"]
-					format_media_field(
-						category_data, 
-						"category_image", 
-						"Product Media", 
-						first_product_media["name"], 
-						"product_image", 
-						"image"
-					)
-				else:
-					# Final fallback: use a generic icon path
-					category_data["image"] = "/images/icons/burger.png"
+			elif cat.get("category_image"):
+				# Fallback to legacy field if it exists
+				category_data["category_image"] = cat.get("category_image")
+				format_media_field(category_data, "category_image", "Menu Category", cat.get("id"), "category_image", "image")
+			else:
+				# Final fallback: generic icon
+				category_data["image"] = "/images/icons/burger.png"
 			
 			formatted_categories.append(category_data)
 		

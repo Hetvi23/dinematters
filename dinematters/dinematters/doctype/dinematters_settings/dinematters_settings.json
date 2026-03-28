@@ -4,7 +4,7 @@
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
-  "field_order": [
+ "field_order": [
   "section_otp",
   "fast2sms_api_key",
   "fast2sms_sender_id",
@@ -15,7 +15,12 @@
   "whatsapp_otp_template_name",
   "section_msg91",
   "msg91_auth_key",
-  "msg91_whatsapp_template_id"
+  "msg91_whatsapp_template_id",
+  "section_borzo",
+  "borzo_api_token",
+  "borzo_webhook_token",
+  "borzo_mode",
+  "google_maps_api_key"
  ],
  "fields": [
   {
@@ -79,12 +84,42 @@
    "fieldtype": "Data",
    "label": "MSG91 WhatsApp Template ID",
    "description": "Approved template ID for WhatsApp authentication"
+  },
+  {
+   "fieldname": "section_borzo",
+   "fieldtype": "Section Break",
+   "label": "Borzo Delivery Configuration"
+  },
+  {
+   "fieldname": "borzo_api_token",
+   "fieldtype": "Password",
+   "label": "Borzo API Token",
+   "description": "Business API token from Borzo dashboard"
+  },
+  {
+   "fieldname": "borzo_webhook_token",
+   "fieldtype": "Data",
+   "label": "Borzo Webhook Token",
+   "description": "Optional. Token to verify Borzo webhooks"
+  },
+  {
+   "default": "Sandbox",
+   "fieldname": "borzo_mode",
+   "fieldtype": "Select",
+   "label": "Borzo Mode",
+   "options": "Sandbox\nProduction"
+  },
+  {
+   "fieldname": "google_maps_api_key",
+   "fieldtype": "Password",
+   "label": "Google Maps API Key",
+   "description": "API key for Google Maps integration (must have Places and Roads API enabled)"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-02-27 10:00:00.000000",
+ "modified": "2026-03-26 20:30:00.000000",
  "modified_by": "Administrator",
  "module": "Dinematters",
  "name": "Dinematters Settings",

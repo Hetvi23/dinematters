@@ -142,16 +142,11 @@ def normalize_menu_theme_background_image(source_path, target_size=MENU_THEME_OU
         image = ImageOps.exif_transpose(image)
         image = image.convert("RGB")
 
-        background = ImageOps.fit(image, target_size, method=Image.Resampling.LANCZOS)
-        background = background.filter(ImageFilter.GaussianBlur(radius=18))
-        fitted = ImageOps.contain(image, target_size, method=Image.Resampling.LANCZOS)
-        canvas = Image.new("RGB", target_size)
-        canvas.paste(background, (0, 0))
-
-        offset_x = (target_width - fitted.width) // 2
-        offset_y = (target_height - fitted.height) // 2
-        canvas.paste(fitted, (offset_x, offset_y))
-        canvas.save(temp_output, format="JPEG", quality=92, optimize=True)
+        # Switch to direct fit (Aspect Fill) which crops sides if necessary
+        # instead of containing with blurred padding
+        final_image = ImageOps.fit(image, target_size, method=Image.Resampling.LANCZOS)
+        
+        final_image.save(temp_output, format="JPEG", quality=92, optimize=True)
 
     return temp_output
 
