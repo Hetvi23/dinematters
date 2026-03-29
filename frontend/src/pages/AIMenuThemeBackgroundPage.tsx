@@ -214,7 +214,7 @@ export default function AIMenuThemeBackgroundPage() {
                             {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                          </Button>
                       </div>
-                    </>
+                    </div>
                   ) : (
                     <div className="p-6 text-center space-y-3">
                       <div className="w-12 h-12 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center mx-auto">
