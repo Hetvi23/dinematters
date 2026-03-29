@@ -69,39 +69,55 @@ def _update_theme_history(config_name, image_url, source_images, activate=False)
         config_doc.db_set("menu_theme_background_active", image_url, update_modified=False)
     return entry
 
+        # "Use 100% of the canvas. The composition should be bold and fill the entire screen, as it will serve as a vibrant backdrop under a blurred UI layer. "
 
-def _build_theme_generation_prompt(restaurant_name, source_count):
+def _build_theme_generation_prompt(restaurant_name, items=None, color_theme=None):
+    # Determine the color instruction based on the theme
+    if color_theme and color_theme != "Multi-color" and color_theme != "None":
+        color_instruction = f"COLOR THEME: Use vibrant, rich colors with a {color_theme} dominant tone that strictly matches the aesthetic of the original artwork."
+    elif color_theme == "Multi-color":
+        color_instruction = "COLOR THEME: Use a vibrant, rich multi-color palette that harmonizes with the original menu visuals."
+    else:
+        color_instruction = "COLOR THEME: EXACT COLOR MATCH. Do not change the colors. Use the exact same color palette, saturation, and tones from the original menu image."
+
+    identify_instruction = (
+        f"You are designing a premium, high-fidelity modern wallpaper based on {restaurant_name}'s actual menu visuals. "
+        "CRITICAL ANALYSIS: Closely analyze the specific graphics, visual assets, icons, and illustrations in the attached menu image. "
+        "EXACT EXTRACTION: Extract the core visual identity from the menu. Do not create new items from scratch; you MUST faithfully reproduce the exact graphical elements, food imagery, or unique design assets shown. "
+    )
+    
+    layout_instruction = (
+        "VISUAL RECOMPOSITION: Rearrange and 'paste' the extracted graphics onto the 9:16 vertical canvas in a sophisticated, layered composition. "
+        "Center the most prominent visual subject and arrange secondary elements around it. Implement a professional depth effect (bokeh) to create separation between layers. "
+    )
+
     return (
-        f"You are designing a premium decorative mobile menu background for the restaurant. "
-        f"Closely analyze the graphics and visuals in the attached {source_count} menu page image(s) and grab exactly those materials available in menu"
-        "Ignore ALL text, grpahical text, words, menu items, prices, descriptions, menu grids, and layout structures from the uploaded menu pages. "
-
+        f"{identify_instruction}"
+        
+        "VISUAL STYLE: "
+        "Create a modern, premium wallpaper with a sophisticated iphone like depth effect. "
+        f"{color_instruction} Incorporate dynamic elements or subtle light leaks that complement the extracted graphics to enhance depth. "
+        
+        "LAYOUT: "
+        f"{layout_instruction}"
+        "Use 100% of the canvas. The composition should be bold and fill the entire screen, as it will serve as a vibrant backdrop under a blurred UI layer. "
+      
         "STRICTLY DO NOT INCLUDE: "
-        "strictly not graphical words, or written things, or restaurant name or heading etc"
-        "Any graphics having words, text, letters, words, menu items, numbers, prices, labels, typography, menu cards, menu grids, food collages, or screenshots. "
-        "No visible menus, no product listings, no watermarks. "
-
-        "Generate a NEW background wallpaper image specifically designed for a mobile digital menu interface. "
-
-        "VISUAL COMPOSITION: "
-        "Leave the central 70% of the image mostly empty with very light graphics only. "
-        "Place graphical visual elements only along the bottom or edges top. "
-        "Use exact similar graphics and visual available in menu and inspired by the menu theme and maybe items. "
-
-        "STYLE: "
-        "Avoid too bright saturated colors that would reduce text readability. "
+        "Ignore ALL text, price labels, descriptions, menu grids, and layout structures. "
+        "Absolutely NO words, letters, restaurant names, headings, or any typography. "
+        "The final output must be a clean, text-free graphical wallpaper. "
 
         "OUTPUT: "
-        "restaurant-themed background optimized for mobile app menu UI overlays."
+        "A premium, saturated, high-fidelity restaurant wallpaper that perfectly represents the menu's original visual identity."
     )
 
 
-def generate_menu_theme_background_gemini(image_paths, restaurant_name):
+def generate_menu_theme_background_gemini(image_paths, restaurant_name, items=None, color_theme=None):
     gemini_key = frappe.conf.get("gemini_api_key")
     if not gemini_key:
         frappe.throw("Gemini API key required for generation")
 
-    prompt = _build_theme_generation_prompt(restaurant_name, len(image_paths))
+    prompt = _build_theme_generation_prompt(restaurant_name, items=items, color_theme=color_theme)
     parts = [{"text": prompt}]
 
     for image_path in image_paths:
@@ -117,7 +133,15 @@ def generate_menu_theme_background_gemini(image_paths, restaurant_name):
         })
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key={gemini_key}"
-    payload = {"contents": [{"parts": parts}]}
+    payload = {
+        "contents": [{"parts": parts}],
+        "generationConfig": {
+            "responseModalities": ["IMAGE"],
+            "imageConfig": {
+                "aspectRatio": "9:16"
+            }
+        }
+    }
 
     response = requests.post(url, json=payload)
     response.raise_for_status()
@@ -142,9 +166,8 @@ def normalize_menu_theme_background_image(source_path, target_size=MENU_THEME_OU
         image = ImageOps.exif_transpose(image)
         image = image.convert("RGB")
 
-        # Switch to direct fit (Aspect Fill) which crops sides if necessary
-        # instead of containing with blurred padding
-        final_image = ImageOps.fit(image, target_size, method=Image.Resampling.LANCZOS)
+        # Directly resize since the AI generates the image natively at 9:16 ratio
+        final_image = image.resize(target_size, resample=Image.Resampling.LANCZOS)
         
         final_image.save(temp_output, format="JPEG", quality=92, optimize=True)
 
@@ -567,59 +590,118 @@ def process_ai_image_enhancement(generation_name, mode="enhance", include_brandi
 
 
 @frappe.whitelist(allow_guest=False)
-def generate_menu_theme_background(restaurant, source_images, activate=1):
-    from dinematters.dinematters.api.ai_billing import deduct_credits_for_enhancement
+def upload_menu_theme_wallpaper(restaurant, filedata, filename, index):
+    """
+    Directly uploads a wallpaper image to R2 and updates the specific wallpaper slot.
+    """
+    index = frappe.utils.cint(index)
+    if index < 0 or index > 2:
+        frappe.throw("Invalid wallpaper index. Must be 0, 1, or 2.")
 
-    if isinstance(source_images, str):
-        source_images = json.loads(source_images) if source_images else []
+    # Decode base64 data
+    if "base64," in filedata:
+        filedata = filedata.split("base64,")[1]
+    
+    content = base64.b64decode(filedata)
+    temp_path = f"/tmp/{uuid.uuid4().hex}_{filename}"
+    with open(temp_path, "wb") as f:
+        f.write(content)
 
-    if not isinstance(source_images, list):
-        frappe.throw("source_images must be a list of uploaded image URLs.")
-
-    source_images = [img for img in source_images if img]
-    if len(source_images) < 1 or len(source_images) > 3:
-        frappe.throw("Please upload between 1 and 3 menu images.")
-
-    balance = frappe.db.get_value("Restaurant", restaurant, "ai_credits") or 0
-    if balance < MENU_THEME_CREDITS:
-        frappe.throw(
-            f"Insufficient AI credits. You need {MENU_THEME_CREDITS} credits but only have {balance}. Please recharge your AI credit wallet.",
-            frappe.ValidationError,
+    try:
+        config_name = _get_restaurant_config_name(restaurant)
+        uid = frappe.generate_hash(length=8)
+        
+        # Generate object key for R2
+        object_key = generate_object_key(
+            restaurant_id=restaurant,
+            owner_doctype="Restaurant Config",
+            owner_name=config_name,
+            media_role="menu_wallpaper",
+            media_id=f"wall_{index}_{uid}",
+            filename=filename
         )
+        
+        # Determine content type
+        ext = filename.split('.')[-1].lower() if '.' in filename else 'jpg'
+        content_type = f"image/{ext}" if ext in ['jpg', 'jpeg', 'png', 'webp'] else "image/jpeg"
+        if content_type == "image/jpg": content_type = "image/jpeg"
+
+        # Upload to R2
+        r2_url = upload_object(temp_path, object_key, content_type=content_type)
+
+        # Update Restaurant Config
+        config_doc = frappe.get_doc("Restaurant Config", config_name)
+        wallpapers = _coerce_json_list(config_doc.menu_theme_wallpapers)
+        
+        # Ensure we have 3 slots
+        while len(wallpapers) < 3:
+            wallpapers.append("")
+        
+        wallpapers[index] = r2_url
+        
+        # If this is the only wallpaper, or first upload, set main_index to 0
+        non_empty = [w for w in wallpapers if w]
+        if len(non_empty) == 1:
+            config_doc.db_set("menu_theme_main_index", 0, update_modified=False)
+            
+        config_doc.db_set("menu_theme_wallpapers", _to_json_string(wallpapers), update_modified=False)
+        frappe.db.commit()
+
+        return {
+            "success": True,
+            "url": r2_url,
+            "wallpapers": wallpapers
+        }
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+@frappe.whitelist(allow_guest=False)
+def set_main_menu_theme_wallpaper(restaurant, index):
+    """
+    Updates the main wallpaper index for the restaurant.
+    """
+    index = frappe.utils.cint(index)
+    if index < 0 or index > 2:
+        frappe.throw("Invalid wallpaper index.")
 
     config_name = _get_restaurant_config_name(restaurant)
     config_doc = frappe.get_doc("Restaurant Config", config_name)
-    config_doc.db_set("menu_theme_generation_status", "Pending", update_modified=False)
-    config_doc.db_set("menu_theme_background_preview", "", update_modified=False)
-    config_doc.db_set("menu_theme_background_sources", _to_json_string(source_images), update_modified=False)
-    config_doc.db_set("menu_theme_last_error", "", update_modified=False)
+    wallpapers = _coerce_json_list(config_doc.menu_theme_wallpapers)
+    
+    if index < len(wallpapers) and index != 0:
+        # Physical rearrangement: move selected wallpaper to Slot 1 (index 0)
+        # by swapping it with current Slot 1
+        target_val = wallpapers[index]
+        current_0 = wallpapers[0] if len(wallpapers) > 0 else ""
+        
+        # Swapping logic
+        wallpapers[0] = target_val
+        wallpapers[index] = current_0
+        
+        config_doc.db_set("menu_theme_wallpapers", _to_json_string(wallpapers), update_modified=False)
+
+    # Always reset main_index to 0 since we've rearranged
+    config_doc.db_set("menu_theme_main_index", 0, update_modified=False)
     frappe.db.commit()
+    return {"success": True, "main_index": 0, "wallpapers": wallpapers}
 
-    try:
-        deduct_credits_for_enhancement(restaurant=restaurant, generation_id=config_name, credits=MENU_THEME_CREDITS)
-    except Exception as e:
-        config_doc.db_set("menu_theme_generation_status", "Failed", update_modified=False)
-        config_doc.db_set("menu_theme_last_error", str(e), update_modified=False)
+@frappe.whitelist(allow_guest=False)
+def delete_menu_theme_wallpaper(restaurant, index):
+    """
+    Clears a specific wallpaper slot.
+    """
+    index = frappe.utils.cint(index)
+    config_name = _get_restaurant_config_name(restaurant)
+    config_doc = frappe.get_doc("Restaurant Config", config_name)
+    wallpapers = _coerce_json_list(config_doc.menu_theme_wallpapers)
+    
+    if index < len(wallpapers):
+        wallpapers[index] = ""
+        config_doc.db_set("menu_theme_wallpapers", _to_json_string(wallpapers), update_modified=False)
         frappe.db.commit()
-        raise
-
-    frappe.enqueue(
-        "dinematters.dinematters.api.ai_media.process_menu_theme_background_generation",
-        queue="default",
-        timeout=600,
-        restaurant=restaurant,
-        config_name=config_name,
-        source_images=source_images,
-        activate=frappe.utils.cint(activate),
-        credits_to_refund=MENU_THEME_CREDITS,
-    )
-
-    return {
-        "success": True,
-        "config_name": config_name,
-        "status": "Pending",
-    }
-
+    
+    return {"success": True, "wallpapers": wallpapers}
 
 @frappe.whitelist(allow_guest=False)
 def get_menu_theme_background_status(restaurant):
@@ -628,25 +710,45 @@ def get_menu_theme_background_status(restaurant):
     return {
         "success": True,
         "enabled": bool(config_doc.menu_theme_background_enabled),
-        "status": config_doc.menu_theme_generation_status or "Idle",
-        "active_image": config_doc.menu_theme_background_active,
-        "preview_image": config_doc.menu_theme_background_preview,
-        "source_images": _coerce_json_list(config_doc.menu_theme_background_sources),
-        "history": _coerce_json_list(config_doc.menu_theme_background_history),
-        "error_message": config_doc.menu_theme_last_error,
+        "wallpapers": _coerce_json_list(config_doc.menu_theme_wallpapers),
+        "main_index": frappe.utils.cint(config_doc.menu_theme_main_index or 0),
+        "active_image": config_doc.menu_theme_background_active, # Legacy support
     }
 
 
 @frappe.whitelist(allow_guest=False)
 def set_menu_theme_background_enabled(restaurant, enabled):
+    """
+    Toggles the Menu Theme Background feature.
+    - PRO: Free.
+    - LITE: 50 credits / 30 days.
+    """
     config_name = _get_restaurant_config_name(restaurant)
     config_doc = frappe.get_doc("Restaurant Config", config_name)
     enabled_value = 1 if frappe.utils.cint(enabled) else 0
+
+    # Monetization Logic: Only when enabling
+    if enabled_value:
+        plan_type = frappe.db.get_value("Restaurant", restaurant, "plan_type") or "LITE"
+        if plan_type == "LITE":
+            from dinematters.dinematters.api.ai_billing import deduct_credits_for_theme_activation
+            from frappe.utils import getdate, add_days, today
+            
+            paid_until = getdate(config_doc.menu_theme_paid_until) if config_doc.menu_theme_paid_until else None
+            if not paid_until or paid_until < getdate(today()):
+                # Deduction: Throws if insufficient credits
+                deduct_credits_for_theme_activation(restaurant)
+                # Extends for 30 days
+                config_doc.menu_theme_paid_until = add_days(today(), 30)
+                config_doc.save(ignore_permissions=True)
+
     config_doc.db_set("menu_theme_background_enabled", enabled_value, update_modified=False)
     frappe.db.commit()
+    
     return {
         "success": True,
         "enabled": bool(enabled_value),
+        "paid_until": config_doc.get("menu_theme_paid_until")
     }
 
 
@@ -677,79 +779,3 @@ def activate_menu_theme_background(restaurant, image_url):
     config_doc.db_set("menu_theme_background_history", _to_json_string(history), update_modified=False)
     frappe.db.commit()
     return {"success": True, "active_image": image_url}
-
-
-def process_menu_theme_background_generation(restaurant, config_name, source_images, activate=1, credits_to_refund=0):
-    from dinematters.dinematters.api.ai_billing import refund_credits_for_failed_enhancement
-
-    config_doc = frappe.get_doc("Restaurant Config", config_name)
-    config_doc.db_set("menu_theme_generation_status", "Processing", update_modified=False)
-    config_doc.db_set("menu_theme_last_error", "", update_modified=False)
-    frappe.db.commit()
-
-    temp_input_paths = []
-    temp_output_path = None
-    normalized_output_path = None
-
-    try:
-        restaurant_name = frappe.db.get_value("Restaurant", restaurant, "restaurant_name") or restaurant
-        for image_url in source_images:
-            temp_input_paths.append(download_image(image_url))
-
-        temp_output_path = generate_menu_theme_background_gemini(temp_input_paths, restaurant_name)
-        normalized_output_path = normalize_menu_theme_background_image(temp_output_path)
-
-        uid = frappe.generate_hash(length=8)
-        object_key = generate_object_key(
-            restaurant_id=restaurant,
-            owner_doctype="Restaurant Config",
-            owner_name=config_name,
-            media_role="restaurant_config_logo",
-            media_id=uid,
-            filename="menu-theme-background.jpg",
-            variant="lg"
-        )
-
-        r2_cdn_url = upload_object(normalized_output_path, object_key, content_type="image/jpeg")
-
-        config_doc.db_set("menu_theme_background_preview", r2_cdn_url, update_modified=False)
-        _update_theme_history(config_name, r2_cdn_url, source_images, activate=bool(frappe.utils.cint(activate)))
-        config_doc.db_set("menu_theme_generation_status", "Completed", update_modified=False)
-        config_doc.db_set("menu_theme_last_error", "", update_modified=False)
-        frappe.db.commit()
-
-    except Exception as e:
-        config_doc.db_set("menu_theme_generation_status", "Failed", update_modified=False)
-        config_doc.db_set("menu_theme_last_error", str(e), update_modified=False)
-        frappe.db.commit()
-        error_msg = f"Menu Theme Background Generation Failed: {str(e)}"
-        frappe.log_error(error_msg[:140], "AI Menu Theme Background")
-
-        if credits_to_refund > 0:
-            try:
-                refund_credits_for_failed_enhancement(
-                    restaurant=restaurant,
-                    generation_id=config_name,
-                    credits=credits_to_refund
-                )
-            except Exception as refund_err:
-                error_msg = f"Credit Refund Failed for menu theme {config_name}: {str(refund_err)}"
-                frappe.log_error(error_msg[:140], "AI Billing Refund")
-
-    finally:
-        for temp_input_path in temp_input_paths:
-            try:
-                if temp_input_path and os.path.exists(temp_input_path):
-                    os.remove(temp_input_path)
-            except Exception:
-                pass
-        try:
-            if temp_output_path and os.path.exists(temp_output_path):
-                os.remove(temp_output_path)
-        except Exception:
-            pass
-        try:
-            if normalized_output_path and os.path.exists(normalized_output_path):
-                os.remove(normalized_output_path)
-        except Exception:
-            pass

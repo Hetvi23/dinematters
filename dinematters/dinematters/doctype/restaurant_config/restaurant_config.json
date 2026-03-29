@@ -22,8 +22,13 @@
   "apple_touch_icon",
   "section_break_ai_theme_background",
   "menu_theme_background_enabled",
+  "menu_theme_paid_until",
   "menu_theme_generation_status",
   "menu_theme_background_active",
+  "menu_theme_wallpapers",
+  "menu_theme_main_index",
+  "menu_theme_selected_items",
+  "menu_theme_color_theme",
   "column_break_ai_theme_background",
   "menu_theme_background_preview",
   "menu_theme_background_sources",
@@ -136,6 +141,12 @@
    "label": "Enable Theme Background"
   },
   {
+   "fieldname": "menu_theme_paid_until",
+   "fieldtype": "Date",
+   "label": "Menu Theme Paid Until",
+   "read_only": 1
+  },
+  {
    "default": "Idle",
    "fieldname": "menu_theme_generation_status",
    "fieldtype": "Select",
@@ -147,6 +158,29 @@
    "fieldname": "menu_theme_background_active",
    "fieldtype": "Attach Image",
    "label": "Active Theme Background"
+  },
+  {
+   "fieldname": "menu_theme_wallpapers",
+   "fieldtype": "JSON",
+   "label": "Theme Wallpapers"
+  },
+  {
+   "default": "0",
+   "fieldname": "menu_theme_main_index",
+   "fieldtype": "Int",
+   "label": "Main Theme Wallpaper Index"
+  },
+  {
+   "fieldname": "menu_theme_selected_items",
+   "fieldtype": "JSON",
+   "label": "Selected Items for Theme",
+   "read_only": 1
+  },
+  {
+   "fieldname": "menu_theme_color_theme",
+   "fieldtype": "Data",
+   "label": "Theme Color Tone",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_ai_theme_background",

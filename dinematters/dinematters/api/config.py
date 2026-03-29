@@ -35,8 +35,10 @@ def get_restaurant_config(restaurant_id):
 			["restaurant_name", "tagline", "subtitle", "description", "primary_color", "default_theme",
 			 "logo", "hero_video", "apple_touch_icon", "color_palette_violet", "color_palette_indigo",
 			 "color_palette_blue", "color_palette_green", "color_palette_yellow", "color_palette_orange",
-			 "color_palette_red", "menu_theme_background_active", "menu_theme_background_preview", "menu_theme_background_history", "currency", "menu_layout", "enable_table_booking", "enable_banquet_booking",
-			 "menu_theme_background_enabled",
+			 "color_palette_red", "menu_theme_background_active", "menu_theme_background_preview", "menu_theme_background_history", 
+			 "menu_theme_wallpapers", "menu_theme_main_index",
+			 "currency", "menu_layout", "enable_table_booking", "enable_banquet_booking",
+			 "menu_theme_background_enabled", "menu_theme_paid_until",
 			 "enable_events", "enable_offers", "enable_coupons", "enable_experience_lounge", "verify_my_user",
 			 "enable_loyalty",
 			 "google_review_link", "instagram_profile_link", "facebook_profile_link", "whatsapp_phone_number"],
@@ -136,7 +138,17 @@ def get_restaurant_config(restaurant_id):
 		
 		# Get currency info with symbol
 		currency_info = get_restaurant_currency_info(restaurant)
+		
+		# Monetization Enforcement
+		plan_type = restaurant_doc.plan_type or "LITE"
 		menu_theme_background_enabled = bool(config.get("menu_theme_background_enabled", 1))
+		
+		if plan_type == "LITE" and menu_theme_background_enabled:
+			from frappe.utils import getdate, today
+			paid_until = getdate(config.get("menu_theme_paid_until")) if config.get("menu_theme_paid_until") else None
+			if not paid_until or paid_until < getdate(today()):
+				# Period expired, treat as disabled for customer app
+				menu_theme_background_enabled = False
 		
 		# Include restaurant basic info and location (google map URL from restaurant context)
 		response_data = {
@@ -163,6 +175,8 @@ def get_restaurant_config(restaurant_id):
 				"menuThemeBackground": config.get("menu_theme_background_active", "") if menu_theme_background_enabled else "",
 				"menuThemeBackgroundPreview": config.get("menu_theme_background_preview", "") if menu_theme_background_enabled else "",
 				"menuThemeBackgroundHistory": config.get("menu_theme_background_history", []) if menu_theme_background_enabled else [],
+				"menuThemeWallpapers": json.loads(config.get("menu_theme_wallpapers") or "[]") if menu_theme_background_enabled else [],
+				"menuThemeMainIndex": config.get("menu_theme_main_index", 0) if menu_theme_background_enabled else 0,
 				"colorPalette": color_palette if color_palette else {
 					"violet": "#A992B2",
 					"indigo": "#8892B0",

@@ -320,6 +320,51 @@ def refund_credits_for_failed_enhancement(restaurant, generation_id, credits):
     return new_balance
 
 
+    return new_balance
+
+
+def deduct_credits_for_theme_activation(restaurant):
+    """
+    Deducts 50 credits for a Lite restaurant to enable the Menu Theme Background for 30 days.
+    """
+    credits_to_deduct = 50
+    balance = frappe.db.get_value("Restaurant", restaurant, "ai_credits", for_update=True) or 0
+    if balance < credits_to_deduct:
+        frappe.throw(_(
+            f"Insufficient AI credits. You need {credits_to_deduct} credits to enable this feature, but your balance is {int(balance)}."
+        ), frappe.ValidationError)
+
+    _record_transaction(
+        restaurant=restaurant,
+        txn_type="Deduction",
+        credits=credits_to_deduct,
+        description="Menu Theme Background activation fee (30 days)",
+    )
+
+
+def refill_monthly_pro_credits(restaurant):
+    """
+    Provides the 30 free monthly credits for PRO restaurants.
+    """
+    credits_to_add = 30
+    _record_transaction(
+        restaurant=restaurant,
+        txn_type="Free Credits",
+        credits=credits_to_add,
+        description="Monthly PRO reward: 30 Free AI Credits",
+    )
+
+
+def process_monthly_pro_refill():
+    """
+    Scheduled task: Give 30 credits to all PRO restaurants.
+    Run monthly via hooks.py.
+    """
+    pro_restaurants = frappe.get_all("Restaurant", filters={"plan_type": "PRO"}, fields=["name"])
+    for res in pro_restaurants:
+        refill_monthly_pro_credits(res.name)
+
+
 def initialize_free_credits(restaurant):
     """
     Give FREE_CREDITS_ON_SIGNUP free credits to a new restaurant.

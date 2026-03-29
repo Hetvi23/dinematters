@@ -1,13 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useFrappePostCall } from '@/lib/frappe'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { toast } from 'sonner'
-import { Link } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
@@ -16,90 +12,32 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { AiRechargeModal } from '@/components/AiRechargeModal'
-import {
-  Sparkles,
-  Upload,
-  Loader2,
-  Eye,
-  Image as ImageIcon,
-  CheckCircle2,
-  AlertTriangle,
-  Download,
-  Grid3x3,
-  Power,
-} from 'lucide-react'
-import { format } from 'date-fns'
-
-interface ThemeHistoryItem {
-  id: string
-  image_url: string
-  source_images?: string[]
-  created_on?: string
-  active?: boolean
-}
+import { Loader2, Upload, Trash2, CheckCircle2, Image as ImageIcon, Power, Eye, Info } from 'lucide-react'
 
 interface ThemeStatusResponse {
   success: boolean
   enabled?: boolean
-  status: 'Idle' | 'Pending' | 'Processing' | 'Completed' | 'Failed'
+  wallpapers: string[]
+  main_index: number
   active_image?: string | null
-  preview_image?: string | null
-  source_images?: string[]
-  history?: ThemeHistoryItem[]
-  error_message?: string | null
 }
 
-const CREDITS_REQUIRED = 15
-const MIN_IMAGES = 1
-const MAX_IMAGES = 3
-
 export default function AIMenuThemeBackgroundPage() {
-  const { selectedRestaurant, restaurantConfig } = useRestaurant()
-  const [files, setFiles] = useState<File[]>([])
-  const [previews, setPreviews] = useState<string[]>([])
-  const [uploadedUrls, setUploadedUrls] = useState<string[]>([])
-  const [isUploading, setIsUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
+  const { selectedRestaurant } = useRestaurant()
   const [status, setStatus] = useState<ThemeStatusResponse | null>(null)
-  const [creditBalance, setCreditBalance] = useState(0)
-  const [creditLoading, setCreditLoading] = useState(false)
-  const [showRechargeModal, setShowRechargeModal] = useState(false)
+  const [isTogglingEnabled, setIsTogglingEnabled] = useState(false)
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
+  const [deletingIndex, setDeletingIndex] = useState<number | null>(null)
+  const [settingMainIndex, setSettingMainIndex] = useState<number | null>(null)
+  
   const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
-  const [isBackgroundEnabled, setIsBackgroundEnabled] = useState(true)
-  const [isTogglingEnabled, setIsTogglingEnabled] = useState(false)
-  const [isStartingGeneration, setIsStartingGeneration] = useState(false)
-  const [lastKnownStatus, setLastKnownStatus] = useState<ThemeStatusResponse['status']>('Idle')
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  const { call: uploadFile } = useFrappePostCall('dinematters.dinematters.api.ai_media.upload_base64_image')
-  const { call: generateThemeBackground, loading: isGenerating } = useFrappePostCall('dinematters.dinematters.api.ai_media.generate_menu_theme_background')
   const { call: getThemeStatus } = useFrappePostCall<ThemeStatusResponse>('dinematters.dinematters.api.ai_media.get_menu_theme_background_status')
   const { call: setThemeBackgroundEnabled } = useFrappePostCall('dinematters.dinematters.api.ai_media.set_menu_theme_background_enabled')
-  const { call: activateThemeBackground, loading: isActivating } = useFrappePostCall('dinematters.dinematters.api.ai_media.activate_menu_theme_background')
-  const { call: getBillingInfo } = useFrappePostCall('dinematters.dinematters.api.ai_billing.get_ai_billing_info')
-
-  const activeImage = status?.active_image || restaurantConfig?.branding?.menuThemeBackground || ''
-  const previewOutput = status?.preview_image || restaurantConfig?.branding?.menuThemeBackgroundPreview || ''
-  const history = useMemo(() => status?.history || restaurantConfig?.branding?.menuThemeBackgroundHistory || [], [status, restaurantConfig])
-  const isProcessing = status?.status === 'Pending' || status?.status === 'Processing'
-  const isBusy = isUploading || isGenerating || isStartingGeneration || isProcessing
-
-  const fetchCredits = useCallback(async () => {
-    if (!selectedRestaurant) return
-    setCreditLoading(true)
-    try {
-      const res: any = await getBillingInfo({ restaurant: selectedRestaurant })
-      const balance = res?.message?.ai_credits ?? 0
-      setCreditBalance(balance)
-      window.dispatchEvent(new CustomEvent('ai-credits-updated', { detail: { balance } }))
-    } catch {
-      toast.error('Failed to load AI credits')
-    } finally {
-      setCreditLoading(false)
-    }
-  }, [getBillingInfo, selectedRestaurant])
+  const { call: uploadWallpaper } = useFrappePostCall('dinematters.dinematters.api.ai_media.upload_menu_theme_wallpaper')
+  const { call: deleteWallpaper } = useFrappePostCall('dinematters.dinematters.api.ai_media.delete_menu_theme_wallpaper')
+  const { call: setMainWallpaper } = useFrappePostCall('dinematters.dinematters.api.ai_media.set_main_menu_theme_wallpaper')
 
   const fetchStatus = useCallback(async () => {
     if (!selectedRestaurant) return
@@ -108,7 +46,6 @@ export default function AIMenuThemeBackgroundPage() {
       const payload = res?.message || res
       if (payload?.success) {
         setStatus(payload)
-        setIsBackgroundEnabled(payload?.enabled ?? true)
       }
     } catch (error: any) {
       toast.error('Failed to load background status', { description: error?.message })
@@ -116,227 +53,108 @@ export default function AIMenuThemeBackgroundPage() {
   }, [getThemeStatus, selectedRestaurant])
 
   useEffect(() => {
-    fetchCredits()
     fetchStatus()
-  }, [fetchCredits, fetchStatus])
-
-  useEffect(() => {
-    if (!status?.status) return
-
-    if ((lastKnownStatus === 'Pending' || lastKnownStatus === 'Processing') && status.status === 'Completed') {
-      toast.success('Preview generated successfully')
-    }
-
-    if ((lastKnownStatus === 'Pending' || lastKnownStatus === 'Processing') && status.status === 'Failed') {
-      toast.error('Preview generation failed', {
-        description: status.error_message || 'The AI background generation could not be completed.',
-      })
-    }
-
-    setLastKnownStatus(status.status)
-    if (status.status === 'Completed' || status.status === 'Failed') {
-      setIsStartingGeneration(false)
-    }
-  }, [lastKnownStatus, status])
-
-  useEffect(() => {
-    if (!isProcessing || !selectedRestaurant) return
-    const interval = setInterval(() => {
-      fetchStatus()
-      fetchCredits()
-    }, 3000)
-    return () => clearInterval(interval)
-  }, [fetchCredits, fetchStatus, isProcessing, selectedRestaurant])
-
-  useEffect(() => {
-    return () => {
-      previews.forEach((url) => URL.revokeObjectURL(url))
-    }
-  }, [previews])
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = Array.from(event.target.files || []).slice(0, MAX_IMAGES)
-    if (!selected.length) return
-
-    previews.forEach((url) => URL.revokeObjectURL(url))
-    const nextPreviews = selected.map((file) => URL.createObjectURL(file))
-    setFiles(selected)
-    setPreviews(nextPreviews)
-    setUploadedUrls([])
-  }
-
-  const readFileAsBase64 = (file: File) => new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = typeof reader.result === 'string' ? reader.result.split(',')[1] : ''
-      resolve(result)
-    }
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-
-  const uploadSelectedFiles = async () => {
-    if (files.length < MIN_IMAGES || files.length > MAX_IMAGES) {
-      toast.error(`Please select between ${MIN_IMAGES} and ${MAX_IMAGES} images`)
-      return []
-    }
-
-    setIsUploading(true)
-    setUploadProgress(0)
-
-    try {
-      const urls: string[] = []
-      for (let index = 0; index < files.length; index += 1) {
-        const file = files[index]
-        const filedata = await readFileAsBase64(file)
-        const res: any = await uploadFile({ filename: file.name, filedata })
-        const fileUrl = res?.message?.file_url || res?.file_url
-        if (!fileUrl) {
-          throw new Error(`Upload failed for ${file.name}`)
-        }
-        urls.push(fileUrl)
-        setUploadProgress(Math.round(((index + 1) / files.length) * 100))
-      }
-      setUploadedUrls(urls)
-      toast.success(`${urls.length} menu image(s) uploaded`)
-      return urls
-    } catch (error: any) {
-      toast.error('Failed to upload menu images', { description: error?.message })
-      return []
-    } finally {
-      setIsUploading(false)
-    }
-  }
-
-  const handleGenerate = async () => {
-    if (!selectedRestaurant) {
-      toast.error('Please select a restaurant')
-      return
-    }
-
-    if (!isBackgroundEnabled) {
-      toast.error('Menu background is turned off')
-      return
-    }
-
-    if (creditBalance < CREDITS_REQUIRED) {
-      setShowRechargeModal(true)
-      return
-    }
-
-    let sourceImages = uploadedUrls
-    if (!sourceImages.length) {
-      sourceImages = await uploadSelectedFiles()
-    }
-
-    if (sourceImages.length < MIN_IMAGES || sourceImages.length > MAX_IMAGES) {
-      return
-    }
-
-    try {
-      setIsStartingGeneration(true)
-      await generateThemeBackground({
-        restaurant: selectedRestaurant,
-        source_images: JSON.stringify(sourceImages),
-        activate: 0,
-      })
-      toast.success('AI theme background generation started')
-      await fetchStatus()
-      await fetchCredits()
-    } catch (error: any) {
-      setIsStartingGeneration(false)
-      toast.error('Failed to start generation', { description: error?.message })
-    }
-  }
-
-  const handleActivate = async (imageUrl: string) => {
-    if (!selectedRestaurant || !imageUrl) return
-    if (!isBackgroundEnabled) {
-      toast.error('Menu background is turned off')
-      return
-    }
-    try {
-      await activateThemeBackground({ restaurant: selectedRestaurant, image_url: imageUrl })
-      toast.success('Theme background activated')
-      await fetchStatus()
-    } catch (error: any) {
-      toast.error('Failed to activate background', { description: error?.message })
-    }
-  }
-
-  const handleDownload = (url: string, filename: string) => {
-    const proxyUrl = `/api/method/dinematters.dinematters.api.ai_media.download_proxy?file_url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
-    const link = document.createElement('a')
-    link.href = proxyUrl
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    toast.success('Download started')
-  }
+  }, [fetchStatus])
 
   const handleToggleBackground = async () => {
     if (!selectedRestaurant || isTogglingEnabled) return
-    const nextEnabled = !isBackgroundEnabled
+    const isEnabled = status?.enabled ?? true
+    const nextEnabled = !isEnabled
     setIsTogglingEnabled(true)
     try {
       await setThemeBackgroundEnabled({ restaurant: selectedRestaurant, enabled: nextEnabled ? 1 : 0 })
-      setIsBackgroundEnabled(nextEnabled)
       toast.success(nextEnabled ? 'Menu background enabled' : 'Menu background disabled')
       await fetchStatus()
     } catch (error: any) {
-      toast.error('Failed to update menu background setting', { description: error?.message })
+      toast.error('Failed to update setting', { description: error?.message })
     } finally {
       setIsTogglingEnabled(false)
     }
   }
 
-  const statusTone = useMemo(() => {
-    switch (status?.status) {
-      case 'Completed':
-        return 'bg-green-500/10 text-green-600 border-green-200'
-      case 'Failed':
-        return 'bg-red-500/10 text-red-600 border-red-200'
-      case 'Processing':
-      case 'Pending':
-        return 'bg-amber-500/10 text-amber-600 border-amber-200'
-      default:
-        return 'bg-muted text-muted-foreground border-border'
-    }
-  }, [status?.status])
+  const handleFileUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !selectedRestaurant) return
 
-  const processingProgress = useMemo(() => {
-    if (status?.status === 'Pending') return 25
-    if (status?.status === 'Processing') return 70
-    if (status?.status === 'Completed') return 100
-    if (status?.status === 'Failed') return 100
-    if (isStartingGeneration) return 15
-    return 0
-  }, [isStartingGeneration, status?.status])
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image too large (max 5MB)')
+      return
+    }
+
+    setUploadingIndex(index)
+    const reader = new FileReader()
+    reader.onloadend = async () => {
+      try {
+        const base64 = reader.result as string
+        await uploadWallpaper({
+          restaurant: selectedRestaurant,
+          filedata: base64,
+          filename: file.name,
+          index: index
+        })
+        toast.success(`Wallpaper ${index + 1} uploaded`)
+        await fetchStatus()
+      } catch (error: any) {
+        toast.error('Upload failed', { description: error?.message })
+      } finally {
+        setUploadingIndex(null)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleDelete = async (index: number) => {
+    if (!selectedRestaurant) return
+    setDeletingIndex(index)
+    try {
+      await deleteWallpaper({ restaurant: selectedRestaurant, index })
+      toast.success(`Wallpaper ${index + 1} removed`)
+      await fetchStatus()
+    } catch (error: any) {
+      toast.error('Delete failed', { description: error?.message })
+    } finally {
+      setDeletingIndex(null)
+    }
+  }
+
+  const handleSetMain = async (index: number) => {
+    if (!selectedRestaurant || status?.wallpapers[index] === '') return
+    setSettingMainIndex(index)
+    try {
+      await setMainWallpaper({ restaurant: selectedRestaurant, index })
+      toast.success(`Wallpaper ${index + 1} set as main`)
+      await fetchStatus()
+    } catch (error: any) {
+      toast.error('Failed to set main', { description: error?.message })
+    } finally {
+      setSettingMainIndex(null)
+    }
+  }
 
   if (!selectedRestaurant) {
     return <div className="p-8 text-center text-muted-foreground">Please select a restaurant</div>
   }
 
+  const isEnabled = status?.enabled ?? true
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">AI Menu Theme Background</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Menu Theme Wallpapers</h1>
           <p className="text-muted-foreground mt-2">
-            Generate a personalized decorative menu background for <strong>{CREDITS_REQUIRED} credits</strong>.
+            Upload up to 3 wallpapers for your menu splash page. The "Main" wallpaper will also serve as the blurred background for your entire application.
           </p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
           <button
             type="button"
             role="switch"
-            aria-checked={isBackgroundEnabled}
-            aria-label="Toggle menu background"
+            aria-checked={isEnabled}
             onClick={handleToggleBackground}
-            disabled={isTogglingEnabled || isBusy}
+            disabled={isTogglingEnabled}
             className={`group inline-flex items-center gap-3 rounded-2xl border px-3 py-2 shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:opacity-60 ${
-              isBackgroundEnabled
+              isEnabled
                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300'
                 : 'border-border bg-background text-muted-foreground hover:bg-accent/50'
             }`}
@@ -344,260 +162,120 @@ export default function AIMenuThemeBackgroundPage() {
             <div className="flex items-center gap-2">
               <span
                 className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors duration-200 ${
-                  isBackgroundEnabled ? 'bg-emerald-500' : 'bg-muted-foreground/25'
+                  isEnabled ? 'bg-emerald-500' : 'bg-muted-foreground/25'
                 }`}
               >
                 <span
                   className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transition-transform duration-200 ${
-                    isBackgroundEnabled ? 'translate-x-6' : 'translate-x-1'
+                    isEnabled ? 'translate-x-6' : 'translate-x-1'
                   }`}
                 />
               </span>
               <div className="text-left leading-tight">
-                <p className="text-sm font-semibold text-foreground">Menu Background</p>
+                <p className="text-sm font-semibold text-foreground">Background Layer</p>
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  {isBackgroundEnabled ? 'Enabled' : 'Disabled'}
+                  {isEnabled ? 'Global On' : 'Global Off'}
                 </p>
               </div>
             </div>
-            <span className="flex items-center gap-1 rounded-full bg-white/70 px-2 py-1 text-xs font-medium shadow-sm dark:bg-black/20">
-              {isTogglingEnabled ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Power className="h-3.5 w-3.5" />}
-              {isBackgroundEnabled ? 'On' : 'Off'}
-            </span>
           </button>
-          <Link to="/ai-menu-theme-history">
-            <Button variant="outline" className="gap-2">
-              <Grid3x3 className="h-4 w-4" />
-              View Theme History
-            </Button>
-          </Link>
-          <Badge variant="outline" className={statusTone}>{status?.status || 'Idle'}</Badge>
         </div>
       </div>
 
-      {!creditLoading && creditBalance < CREDITS_REQUIRED && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/20 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />
-            <p className="text-sm text-red-700 dark:text-red-400">
-              <strong>Low AI credits.</strong> You need at least {CREDITS_REQUIRED} credits to generate a theme background.
-            </p>
-          </div>
-          <Button size="sm" className="bg-red-500 hover:bg-red-600 text-white shrink-0" onClick={() => setShowRechargeModal(true)}>
-            Recharge Now
-          </Button>
-        </div>
-      )}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {[0, 1, 2].map((index) => {
+          const url = status?.wallpapers?.[index]
+          const isMain = status?.main_index === index
+          const isUploading = uploadingIndex === index
+          const isDeleting = deletingIndex === index
+          const isSettingMain = settingMainIndex === index
 
-      {!isBackgroundEnabled && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="h-5 w-5 text-muted-foreground shrink-0" />
-            <p className="text-sm text-muted-foreground">
-              <strong>Menu background is OFF.</strong> Dinematters will not apply the generated theme background</p>
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-6">
-        <Card className="shadow-xs border-muted/60">
-          <CardHeader>
-            <CardTitle>1. Upload Menu References</CardTitle>
-            <CardDescription>Upload 1 to 3 JPG or PNG images of your menu pages.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-6">
-              <div className="flex flex-col items-center justify-center text-center gap-3">
-                <div className="rounded-full bg-background p-3 shadow-sm border">
-                  <Upload className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <p className="font-medium">Upload menu design samples</p>
-                </div>
-                <Input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg"
-                  multiple
-                  className="max-w-md"
-                  onChange={handleFileChange}
-                />
-              </div>
-            </div>
-
-            {files.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Selected Menu Images</Label>
-                  <span className="text-xs text-muted-foreground">{files.length}/{MAX_IMAGES}</span>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                  {previews.map((url, index) => (
-                    <div key={url} className="relative rounded-xl overflow-hidden border bg-muted/10 aspect-[3/4]">
-                      <img src={url} alt={`Menu reference ${index + 1}`} className="w-full h-full object-cover" />
-                      <div className="absolute bottom-2 left-2 right-2 rounded-md bg-black/55 text-white text-[10px] px-2 py-1 backdrop-blur-sm truncate">
-                        {files[index]?.name}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {isUploading && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span>Uploading reference images</span>
-                  <span>{uploadProgress}%</span>
-                </div>
-                <Progress value={uploadProgress} />
-              </div>
-            )}
-
-            {(isStartingGeneration || isProcessing || status?.status === 'Completed' || status?.status === 'Failed') && (
-              <div className="rounded-xl border bg-muted/20 p-4 space-y-3">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    {(isStartingGeneration || isProcessing) ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    ) : status?.status === 'Completed' ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    ) : (
-                      <AlertTriangle className="h-4 w-4 text-red-600" />
-                    )}
-                    <span>
-                      {isStartingGeneration
-                        ? 'Starting preview generation...'
-                        : status?.status === 'Pending'
-                          ? 'Preview request queued...'
-                          : status?.status === 'Processing'
-                            ? 'Generating preview in realtime...'
-                            : status?.status === 'Completed'
-                              ? 'Preview generation completed'
-                              : 'Preview generation failed'}
-                    </span>
-                  </div>
-                  <Badge variant="outline" className={statusTone}>{status?.status || 'Idle'}</Badge>
-                </div>
-                <Progress value={processingProgress} />
-                <p className="text-sm text-muted-foreground">
-                  {status?.status === 'Completed'
-                    ? 'Your latest generated preview is ready in the preview panel.'
-                    : status?.status === 'Failed'
-                      ? (status.error_message || 'Please retry with a clearer menu image or recharge credits if required.')
-                      : 'We will keep this page updated automatically until the preview finishes.'}
-                </p>
-              </div>
-            )}
-
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={handleGenerate} disabled={isBusy || !isBackgroundEnabled || files.length < MIN_IMAGES} className="gap-2">
-                {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                Generate Preview
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-6">
-          <Card className="shadow-xs border-muted/60">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <div className="space-y-1">
-                <CardTitle>2. Preview & Activate</CardTitle>
-                <CardDescription>Review the latest generated background and apply it to the customer menu.</CardDescription>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                disabled={!(previewOutput || activeImage)} 
-                onClick={() => handleDownload(previewOutput || activeImage, 'menu-theme-background.png')} 
-                className="gap-2 shrink-0"
-              >
-                <Download className="h-4 w-4" />
-                Download
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="mx-auto w-full max-w-[280px] rounded-xl overflow-hidden border bg-muted/10 aspect-[9/16] relative">
-                {previewOutput || activeImage ? (
-                  <>
-                    <img src={previewOutput || activeImage} alt="Generated menu theme background" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-black/20" />
-                    <div className="absolute top-4 left-4 right-4 rounded-2xl border border-white/40 bg-white/65 backdrop-blur-md p-4 shadow-lg">
-                      <div className="h-5 w-24 rounded-full bg-white/80 mb-3" />
-                      <div className="space-y-2">
-                        <div className="h-16 rounded-2xl bg-white/85" />
-                        <div className="h-16 rounded-2xl bg-white/80" />
-                        <div className="h-16 rounded-2xl bg-white/75" />
-                      </div>
-                    </div>
-                  </>
-                ) : isStartingGeneration || isProcessing ? (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-center p-6 gap-4 bg-muted/20">
-                    <div className="rounded-full bg-background p-3 border shadow-sm">
-                      <Loader2 className="h-6 w-6 text-primary animate-spin" />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="font-medium text-foreground">Generating live preview</p>
-                      <p className="text-sm text-muted-foreground">
-                        {status?.status === 'Pending' ? 'Queued for AI processing...' : 'Creating your decorative menu background...'}
-                      </p>
-                    </div>
-                    <div className="w-full max-w-xs space-y-2">
-                      <Progress value={processingProgress} />
-                      <p className="text-xs text-muted-foreground">This panel will update automatically when the preview is ready.</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-center p-6 text-muted-foreground gap-3">
-                    <div className="rounded-full bg-background p-3 border shadow-sm">
-                      <ImageIcon className="h-6 w-6 text-primary/70" />
-                    </div>
-                    <p>No generated background yet</p>
-                  </div>
+          return (
+            <Card key={index} className={`overflow-hidden border-2 transition-all ${isMain ? 'border-primary ring-1 ring-primary/20' : 'border-muted'}`}>
+              <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-sm font-medium">Slot {index + 1}</CardTitle>
+                {isMain && (
+                  <Badge className="bg-primary text-white gap-1 px-1.5 py-0.5">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Main
+                  </Badge>
                 )}
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <Button variant="outline" disabled={!previewOutput && !activeImage} onClick={() => { setPreviewImage(previewOutput || activeImage); setShowPreviewModal(true) }} className="gap-2">
-                  <Eye className="h-4 w-4" />
-                  Preview Fullscreen
-                </Button>
-                <Button disabled={!isBackgroundEnabled || !previewOutput || isActivating} onClick={() => handleActivate(previewOutput)} className="gap-2">
-                  {isActivating ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                  Set as Active
-                </Button>
-              </div>
-
-              {status?.error_message && status.status === 'Failed' && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {status.error_message}
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="relative aspect-[9/16] bg-muted flex flex-col items-center justify-center group">
+                  {url ? (
+                    <div className="w-full h-full bg-black relative">
+                      <img src={url} alt={`Wallpaper ${index + 1}`} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                         <Button size="icon" variant="secondary" className="rounded-full" onClick={() => { setPreviewImage(url); setShowPreviewModal(true) }}>
+                            <Eye className="h-4 w-4" />
+                         </Button>
+                         <Button size="icon" variant="destructive" className="rounded-full" onClick={() => handleDelete(index)} disabled={isDeleting}>
+                            {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                         </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-6 text-center space-y-3">
+                      <div className="w-12 h-12 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center mx-auto">
+                        {isUploading ? <Loader2 className="h-6 w-6 animate-spin text-primary" /> : <ImageIcon className="h-6 w-6 text-muted-foreground/40" />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">No Image</p>
+                        <p className="text-xs text-muted-foreground">9:16 portrait ratio recommended</p>
+                      </div>
+                      <Button size="sm" variant="outline" className="gap-2 relative" disabled={isUploading}>
+                        <Upload className="h-3.5 w-3.5" />
+                        {isUploading ? 'Uploading...' : 'Upload'}
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          onChange={(e) => handleFileUpload(index, e)}
+                          disabled={isUploading}
+                        />
+                      </Button>
+                    </div>
+                  )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                <div className="p-4 border-t bg-muted/30">
+                  <Button 
+                    className="w-full gap-2" 
+                    variant={isMain ? "default" : "outline"} 
+                    disabled={!url || isMain || isSettingMain}
+                    onClick={() => handleSetMain(index)}
+                  >
+                    {isSettingMain ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                    {isMain ? 'Currently Main' : 'Set as Main'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
 
-      <AiRechargeModal
-        open={showRechargeModal}
-        onClose={() => setShowRechargeModal(false)}
-        restaurant={selectedRestaurant}
-        currentBalance={creditBalance}
-        onSuccess={fetchCredits}
-      />
+      <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 flex gap-3 text-blue-800">
+        <Info className="h-5 w-5 shrink-0" />
+        <div className="text-sm space-y-1">
+          <p className="font-semibold">Quick Tip</p>
+          <p>
+            The wallpaper set as <strong>"Main"</strong> is highly visible as it serves as the blurred background for your customers as they navigate through category and product pages. For the best look, choose high-quality imagery with vibrant colors.
+          </p>
+        </div>
+      </div>
 
       <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>
-        <DialogContent className="max-w-4xl p-0 border-none bg-transparent shadow-none overflow-visible">
+        <DialogContent className="max-w-md p-0 border-none bg-transparent shadow-none">
           <DialogHeader className="sr-only">
-            <DialogTitle>Generated menu theme background preview</DialogTitle>
-            <DialogDescription>Preview the generated restaurant menu theme background image.</DialogDescription>
+            <DialogTitle>Wallpaper Preview</DialogTitle>
+            <DialogDescription>Full view of the uploaded wallpaper.</DialogDescription>
           </DialogHeader>
-          <div className="relative group overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/20">
-            {previewImage && (
-              <img src={previewImage} alt="Generated menu theme background" className="w-full h-auto max-h-[85vh] object-contain rounded-xl" />
-            )}
-          </div>
+          {previewImage && (
+            <div className="relative aspect-[9/16] rounded-2xl overflow-hidden shadow-2xl">
+              <img src={previewImage} alt="Wallpaper Preview" className="w-full h-full object-cover" />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
