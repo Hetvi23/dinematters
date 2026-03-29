@@ -474,6 +474,14 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 						ref_doctype="Order",
 						ref_name=order_doc.name
 					)
+				
+				# 4. Renew Referrer's Sharing Limit
+				try:
+					from dinematters.dinematters.api.loyalty import reset_referral_cycle
+					reset_referral_cycle(platform_customer, restaurant)
+				except Exception as e:
+					frappe.log_error(f"Error resetting referral cycle: {str(e)}")
+					
 			frappe.db.commit()
 		except Exception as e:
 			frappe.log_error(f"Error in loyalty earning/referral logic: {str(e)}")

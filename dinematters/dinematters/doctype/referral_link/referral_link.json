@@ -10,6 +10,7 @@
   "restaurant",
   "identifier",
   "platform",
+  "rewarded_opens_in_cycle",
   "is_active"
  ],
  "fields": [
@@ -43,6 +44,12 @@
    "label": "Platform",
    "options": "WhatsApp\nInstagram\nFacebook\nOther",
    "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "rewarded_opens_in_cycle",
+   "fieldtype": "Int",
+   "label": "Rewarded Opens In Cycle"
   },
   {
    "default": "1",

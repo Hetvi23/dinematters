@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { Users, Search, PlusCircle, MinusCircle, User } from 'lucide-react'
+import { Users, Search, PlusCircle, MinusCircle, User, History, Loader2, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -29,9 +29,13 @@ export default function CustomerInsights() {
   const [adjustReason, setAdjustReason] = useState('')
   const [adjustType, setAdjustType] = useState<'Earn' | 'Redeem'>('Earn')
   const [adjusting, setAdjusting] = useState(false)
+  const [historyModalOpen, setHistoryModalOpen] = useState(false)
+  const [transactions, setTransactions] = useState<any[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
 
   const { call: getInsights } = useFrappePostCall('dinematters.dinematters.api.loyalty.get_customer_insights')
   const { call: adjustPoints } = useFrappePostCall('dinematters.dinematters.api.loyalty.adjust_customer_points')
+  const { call: getTransactions } = useFrappePostCall('dinematters.dinematters.api.loyalty.get_customer_transactions')
 
   const fetchInsights = async () => {
     if (!selectedRestaurant) return
@@ -84,6 +88,27 @@ export default function CustomerInsights() {
     }
   }
 
+  const fetchHistory = async (customer: any) => {
+    if (!selectedRestaurant || !customer) return
+    setSelectedCustomer(customer)
+    setHistoryModalOpen(true)
+    setLoadingHistory(true)
+    try {
+      const res: any = await getTransactions({
+        restaurant_id: selectedRestaurant,
+        customer_id: customer.id
+      })
+      if (res.message?.success) {
+        setTransactions(res.message.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch transactions:', error)
+      toast.error('Failed to load transaction history')
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12">
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
@@ -124,6 +149,8 @@ export default function CustomerInsights() {
                   <TableHead>Customer</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Points Balance</TableHead>
+                  <TableHead>Referral Opens</TableHead>
+                  <TableHead className="w-[120px]">Cycle Rewards</TableHead>
                   <TableHead>Last Active</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -140,18 +167,44 @@ export default function CustomerInsights() {
                 ) : (
                   customers.map((customer) => (
                     <TableRow key={customer.id}>
-                      <TableCell className="font-medium">{customer.name}</TableCell>
-                      <TableCell>{customer.phone || 'N/A'}</TableCell>
+                      <TableCell className="font-medium text-sm">{customer.name}</TableCell>
+                      <TableCell className="text-sm">{customer.phone || 'N/A'}</TableCell>
                       <TableCell>
                         <Badge variant={customer.balance > 0 ? "default" : "secondary"} className="gap-1">
                           {customer.balance} Coins
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-sm font-semibold">{customer.referral_opens}</span>
+                          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Total Unique</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden min-w-[60px]">
+                            <div 
+                              className="h-full bg-blue-500 rounded-full transition-all duration-500" 
+                              style={{ width: `${(customer.cycle_opens / 7) * 100}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] font-medium text-gray-500">{customer.cycle_opens}/7</span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-xs">
                         {new Date(customer.last_active).toLocaleDateString()}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
+                           <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 gap-1"
+                            onClick={() => fetchHistory(customer)}
+                          >
+                            <History className="w-3.5 h-3.5" />
+                            History
+                          </Button>
                            <Button 
                             variant="outline" 
                             size="sm" 
@@ -188,7 +241,7 @@ export default function CustomerInsights() {
           </div>
         </CardContent>
       </Card>
-
+      
       {/* Adjustment Modal */}
       <Dialog open={adjustModalOpen} onOpenChange={setAdjustModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
@@ -231,6 +284,85 @@ export default function CustomerInsights() {
             >
               {adjusting ? 'Processing...' : (adjustType === 'Earn' ? 'Add Points' : 'Deduct Points')}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* History Modal */}
+      <Dialog open={historyModalOpen} onOpenChange={setHistoryModalOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-5 h-5 text-primary" />
+              Transaction History
+            </DialogTitle>
+            <DialogDescription>
+              Detailed loyalty point logs for {selectedCustomer?.name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto px-6 pb-6">
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-bold">Date</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-bold">Type</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-bold">Coins</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-bold">Reason</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loadingHistory ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="py-12 text-center">
+                        <div className="flex flex-col items-center gap-2">
+                          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">Loading history...</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : transactions.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="py-12 text-center text-muted-foreground italic">
+                        No transactions found for this customer.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    transactions.map((tx: any, idx: number) => (
+                      <TableRow key={idx}>
+                        <TableCell className="text-xs whitespace-nowrap">
+                          {new Date(tx.creation).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={tx.transaction_type === 'Earn' ? 'default' : 'destructive'} 
+                            className="text-[10px] h-5 px-1.5 uppercase font-bold"
+                          >
+                            {tx.transaction_type === 'Earn' ? (
+                              <ArrowUpRight className="w-2.5 h-2.5 mr-0.5" />
+                            ) : (
+                              <ArrowDownLeft className="w-2.5 h-2.5 mr-0.5" />
+                            )}
+                            {tx.transaction_type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className={`text-sm font-bold ${tx.transaction_type === 'Earn' ? 'text-green-500' : 'text-red-500'}`}>
+                          {tx.transaction_type === 'Earn' ? '+' : '-'}{tx.coins}
+                        </TableCell>
+                        <TableCell className="text-xs max-w-[200px] truncate" title={tx.reason}>
+                          {tx.reason}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+          
+          <DialogFooter className="p-6 pt-2 bg-muted/20 border-t">
+            <Button variant="outline" onClick={() => setHistoryModalOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

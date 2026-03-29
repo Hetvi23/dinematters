@@ -61,10 +61,10 @@ def generate_referral_link(restaurant_id, phone, platform="WhatsApp"):
 		
 		customer = get_or_create_customer(normalized_phone)
 		
-		# Check if link already exists
+		# Check if link already exists for this restaurant
 		existing_link = frappe.db.get_value(
 			"Referral Link",
-			{"referrer": customer.name, "restaurant": restaurant, "platform": platform},
+			{"referrer": customer.name, "restaurant": restaurant},
 			["name", "identifier"],
 			as_dict=True
 		)
@@ -72,10 +72,16 @@ def generate_referral_link(restaurant_id, phone, platform="WhatsApp"):
 		if existing_link:
 			identifier = existing_link.identifier
 		else:
-			# Generate unique identifier
-			identifier = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+			# Generate unique identifier / Personalized Slug
+			name_part = customer.customer_name or customer.name
+			# Slugify and take first part
+			slug_base = "".join(e for e in name_part if e.isalnum()).lower()[:10]
+			rand_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+			identifier = f"{slug_base}-{rand_part}"
+			
 			while frappe.db.exists("Referral Link", {"identifier": identifier}):
-				identifier = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+				rand_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+				identifier = f"{slug_base}-{rand_part}"
 			
 			link_doc = frappe.get_doc({
 				"doctype": "Referral Link",
@@ -83,17 +89,15 @@ def generate_referral_link(restaurant_id, phone, platform="WhatsApp"):
 				"restaurant": restaurant,
 				"identifier": identifier,
 				"platform": platform,
-				"is_active": 1
+				"is_active": 1,
+				"rewarded_opens_in_cycle": 0
 			})
 			link_doc.insert(ignore_permissions=True)
 		
-		# Build the full URL
-		# For local testing, we might use a placeholder. In production, we'd use the restaurant's subdomain/base URL.
-		config = frappe.get_doc("Restaurant Config", {"restaurant": restaurant})
-		base_url = config.google_review_link or "https://dinematters.com" # Fallback
-		# Actually, referral links should point to the restaurant's menu
-		# Assuming structure: base_url/r/{identifier}
-		referral_url = f"{base_url.rstrip('/')}/r/{identifier}"
+		# Use the restaurant's base URL for the storefront
+		base_url = frappe.db.get_value('Restaurant', restaurant, 'base_url') or 'https://dinematters.com'
+		# Ensure referral links point to the restaurant's menu landing via the ref route
+		referral_url = f"{base_url.rstrip('/')}/ref/{identifier}"
 		
 		return {
 			"success": True,
@@ -135,35 +139,27 @@ def track_referral_visit(identifier, ip_address=None, user_agent=None):
 		})
 		visit_doc.insert(ignore_permissions=True)
 		
-		# If unique, check if threshold for share reward is met
+		# If unique, reward the referrer if within their current cycle limit
 		if is_unique:
 			loyalty_prog = frappe.get_doc("Restaurant Loyalty Config", {"restaurant": link_doc.restaurant, "is_active": 1})
 			if loyalty_prog:
-				unique_visits = frappe.db.count("Referral Visit", {
-					"referral_link": link_name,
-					"is_unique": 1
-				})
+				# Check current cycle limit (Default 7 if not set)
+				max_limit = loyalty_prog.max_opens_rewarded_per_share or 7
+				current_count = link_doc.rewarded_opens_in_cycle or 0
 				
-				if unique_visits == loyalty_prog.min_unique_opens_for_reward:
-					# Initial threshold reward
+				if current_count < max_limit:
+					# Reward for unique open
 					credit_loyalty_points(
 						customer=link_doc.referrer,
 						restaurant=link_doc.restaurant,
-						coins=loyalty_prog.share_reward_coins,
-						reason="Referral Share (Initial Threshold)",
+						coins=loyalty_prog.coins_per_unique_open or 2,
+						reason=f"Referral Engagement (Unique Open #{current_count + 1})",
 						ref_doctype="Referral Link",
 						ref_name=link_name
 					)
-				elif unique_visits > loyalty_prog.min_unique_opens_for_reward and unique_visits <= loyalty_prog.max_opens_rewarded_per_share:
-					# Micro reward for engagement
-					credit_loyalty_points(
-						customer=link_doc.referrer,
-						restaurant=link_doc.restaurant,
-						coins=loyalty_prog.coins_per_unique_open,
-						reason=f"Referral Engagement (Unique Open #{unique_visits})",
-						ref_doctype="Referral Link",
-						ref_name=link_name
-					)
+					
+					# Increment cycle count
+					link_doc.db_set("rewarded_opens_in_cycle", current_count + 1)
 		
 		return {
 			"success": True,
@@ -175,6 +171,60 @@ def track_referral_visit(identifier, ip_address=None, user_agent=None):
 	except Exception as e:
 		frappe.log_error(f"Error in track_referral_visit: {str(e)}")
 		return {"success": False, "error": {"code": "TRACKING_ERROR", "message": str(e)}}
+
+@frappe.whitelist(allow_guest=True)
+def get_referral_details(identifier):
+	"""
+	GET /api/method/dinematters.dinematters.api.loyalty.get_referral_details
+	Get basic details about a referral link for social sharing previews
+	"""
+	try:
+		link_info = frappe.db.get_value(
+			"Referral Link", 
+			{"identifier": identifier}, 
+			["referrer", "restaurant"], 
+			as_dict=True
+		)
+		if not link_info:
+			return {"success": False, "message": "Link not found"}
+			
+		referrer_name = frappe.db.get_value("Customer", link_info.referrer, "customer_name") or link_info.referrer
+		restaurant_name = frappe.db.get_value("Restaurant", link_info.restaurant, "name")
+		
+		# Get restaurant config for images
+		logo = frappe.db.get_value("Restaurant Config", {"restaurant": link_info.restaurant}, "logo")
+		banner = frappe.db.get_value("Restaurant Config", {"restaurant": link_info.restaurant}, "banner_image")
+		
+		return {
+			"success": True,
+			"data": {
+				"referrer": referrer_name,
+				"restaurant_name": restaurant_name,
+				"restaurant_id": link_info.restaurant,
+				"logo": logo,
+				"banner": banner
+			}
+		}
+	except Exception as e:
+		return {"success": False, "error": str(e)}
+		
+def reset_referral_cycle(customer, restaurant):
+	"""
+	Resets the rewarded_opens_in_cycle counter for all referral links 
+	owned by a customer at a specific restaurant.
+	Called after order placement to 'renew' the sharing limit.
+	"""
+	try:
+		frappe.db.sql("""
+			UPDATE `tabReferral Link` 
+			SET rewarded_opens_in_cycle = 0 
+			WHERE referrer = %s AND restaurant = %s
+		""", (customer, restaurant))
+		frappe.db.commit()
+		return True
+	except Exception as e:
+		frappe.log_error(f"Error in reset_referral_cycle: {str(e)}")
+		return False
 
 def credit_loyalty_points(customer, restaurant, coins, reason, ref_doctype=None, ref_name=None, transaction_type="Earn"):
 	"""Helper function to create a Restaurant Loyalty Entry"""
@@ -286,17 +336,31 @@ def get_customer_insights(restaurant_id, search_query=None):
 		for cust_id in all_customer_ids:
 			customer = frappe.get_doc("Customer", cust_id)
 			
-		# Get balance
-		from dinematters.dinematters.utils.loyalty import get_loyalty_balance
-		balance = get_loyalty_balance(cust_id, restaurant)
-		
-		results.append({
-			"id": customer.name,
-			"name": customer.customer_name or customer.name,
-			"phone": customer.phone,
-			"balance": balance,
-			"last_active": customer.modified
-		})
+			# Get balance
+			from dinematters.dinematters.utils.loyalty import get_loyalty_balance
+			balance = get_loyalty_balance(cust_id, restaurant)
+			
+			# Get referral stats
+			referral_stats = frappe.db.sql("""
+				SELECT 
+					(SELECT COUNT(*) 
+					 FROM `tabReferral Visit` v 
+					 JOIN `tabReferral Link` l2 ON v.referral_link = l2.name 
+					 WHERE l2.referrer = %s AND l2.restaurant = %s AND v.is_unique = 1) as total_opens,
+					COALESCE(SUM(rewarded_opens_in_cycle), 0) as cycle_opens
+				FROM `tabReferral Link`
+				WHERE referrer = %s AND restaurant = %s
+			""", (cust_id, restaurant, cust_id, restaurant), as_dict=1)[0]
+			
+			results.append({
+				"id": customer.name,
+				"name": customer.customer_name or customer.name,
+				"phone": customer.phone,
+				"balance": balance,
+				"referral_opens": int(referral_stats.total_opens or 0),
+				"cycle_opens": int(referral_stats.cycle_opens or 0),
+				"last_active": customer.modified
+			})
 			
 		# Sort by balance descending
 		results.sort(key=lambda x: x["balance"], reverse=True)
@@ -304,6 +368,27 @@ def get_customer_insights(restaurant_id, search_query=None):
 		return {"success": True, "data": results}
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Loyalty Insights Error")
+		return {"success": False, "error": str(e)}
+
+@frappe.whitelist()
+def get_customer_transactions(restaurant_id, customer_id):
+	"""
+	Get all loyalty transactions for a specific customer and restaurant
+	"""
+	try:
+		restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user)
+		
+		# Get all loyalty entries for this customer at this restaurant
+		transactions = frappe.get_all(
+			"Restaurant Loyalty Entry",
+			filters={"customer": customer_id, "restaurant": restaurant},
+			fields=["transaction_type", "coins", "reason", "posting_date", "creation", "reference_doctype", "reference_name"],
+			order_by="creation desc"
+		)
+		
+		return {"success": True, "data": transactions}
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Loyalty Transactions Error")
 		return {"success": False, "error": str(e)}
 
 @frappe.whitelist()

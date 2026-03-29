@@ -223,22 +223,22 @@ export default function LoyaltySettings() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid gap-2">
-                <Label>Coins for Sharing Link</Label>
-                <Input 
-                  type="number" 
-                  value={settings.share_reward_coins}
-                  onChange={(e) => handleNumberChange('share_reward_coins', e.target.value)}
-                />
+              <div className="grid gap-2 p-3 bg-blue-50/50 rounded-lg border border-blue-100 dark:bg-blue-900/10 dark:border-blue-900/20">
+                <Label className="text-blue-700 dark:text-blue-400">Viral Growth Logic</Label>
+                <p className="text-[11px] text-muted-foreground">
+                  Rewards are given for <strong>Unique Opens</strong> only. Sharing the link alone grants no coins. 
+                  The limit resets after the customer places a new order.
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label className="text-[11px]">Min Opens for reward</Label>
+                  <Label className="text-[11px]">Max Rewards per Cycle</Label>
                   <Input 
                     type="number" 
-                    value={settings.min_unique_opens_for_reward}
-                    onChange={(e) => handleNumberChange('min_unique_opens_for_reward', e.target.value)}
+                    value={settings.max_opens_rewarded_per_share}
+                    onChange={(e) => handleNumberChange('max_opens_rewarded_per_share', e.target.value)}
                   />
+                  <p className="text-[10px] text-muted-foreground">Limit resets on order.</p>
                 </div>
                 <div className="grid gap-2">
                   <Label className="text-[11px]">Coins per unique open</Label>
