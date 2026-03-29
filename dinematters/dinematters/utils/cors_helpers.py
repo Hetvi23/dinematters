@@ -11,7 +11,7 @@ import frappe
 
 # Allowed origins for CORS
 ALLOWED_ORIGINS = [
-	'https://demo.dinematters.com',
+	'https://app.dinematters.com',
 	'https://dinematters.com',
 	'https://www.dinematters.com',
 	'http://localhost:3000',

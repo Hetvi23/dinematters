@@ -572,7 +572,7 @@ def parse_qr_code(qr_data):
 		
 		parts = qr_data.split("/")
 		
-		# Handle new format: base_url/restaurant-id/table-number (e.g., https://demo.dinematters.com/restaurant-id/1)
+		# Handle new format: base_url/restaurant-id/table-number (e.g., https://app.dinematters.com/restaurant-id/1)
 		# Or old format: restaurant-id/table-number (backward compatibility)
 		if len(parts) >= 3:
 			# New format with base URL: extract restaurant_id and table_number from last two parts

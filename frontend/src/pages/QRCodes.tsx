@@ -16,11 +16,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { 
-  QrCode, 
-  Download, 
-  Eye, 
-  Settings, 
+import {
+  QrCode,
+  Download,
+  Eye,
+  Settings,
   Loader2,
   AlertCircle,
   Info,
@@ -53,9 +53,9 @@ export default function QRCodes() {
   // Load restaurant data
   useEffect(() => {
     if (restaurantDoc) {
-      setBaseUrl(restaurantDoc.base_url || 'https://demo.dinematters.com/')
+      setBaseUrl(restaurantDoc.base_url || 'https://app.dinematters.com/')
       setTables(restaurantDoc.tables || 0)
-      
+
       // Load QR code URL if available
       if (restaurantDoc.qr_codes_pdf_url) {
         setQrCodeUrl(restaurantDoc.qr_codes_pdf_url)
@@ -68,7 +68,7 @@ export default function QRCodes() {
 
   const loadQrCodeUrl = async () => {
     if (!selectedRestaurant) return
-    
+
     try {
       const response: any = await getQrCodeUrl({ restaurant: selectedRestaurant })
       if (response?.message) {
@@ -115,11 +115,11 @@ export default function QRCodes() {
           // New format - JSON object with pdf_url
           url = response.message.pdf_url
         }
-        
+
         if (url) {
           // Add cache-busting parameter to the URL
-          const finalUrl = url.includes('?') 
-            ? `${url}&_t=${Date.now()}` 
+          const finalUrl = url.includes('?')
+            ? `${url}&_t=${Date.now()}`
             : `${url}?_t=${Date.now()}`
           setQrCodeUrl(finalUrl)
           toast.success('QR codes PDF generated successfully!')
@@ -173,8 +173,8 @@ export default function QRCodes() {
   const handleViewQrCodes = () => {
     if (qrCodeUrl) {
       // Add cache-busting parameter to force fresh load
-      const url = qrCodeUrl.includes('?') 
-        ? `${qrCodeUrl}&_t=${Date.now()}` 
+      const url = qrCodeUrl.includes('?')
+        ? `${qrCodeUrl}&_t=${Date.now()}`
         : `${qrCodeUrl}?_t=${Date.now()}`
       window.open(url, '_blank', 'noopener,noreferrer')
     }
@@ -206,7 +206,7 @@ export default function QRCodes() {
     setIsDeleting(true)
     try {
       const response: any = await deleteQrCodes({ restaurant: selectedRestaurant })
-      
+
       // Check if deletion was successful
       let deleted = false
       if (response?.message) {
@@ -216,7 +216,7 @@ export default function QRCodes() {
           deleted = true
         }
       }
-      
+
       if (deleted) {
         setQrCodeUrl(null)
         await refreshRestaurant()
@@ -272,8 +272,8 @@ export default function QRCodes() {
               <Download className="h-4 w-4 mr-2" />
               Download PDF
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleDeleteQrCodes}
               disabled={isDeleting}
               className="text-destructive hover:text-destructive"
@@ -314,7 +314,7 @@ export default function QRCodes() {
               value={baseUrl}
               readOnly
               disabled
-              placeholder="https://demo.dinematters.com/"
+              placeholder="https://app.dinematters.com/"
               className="bg-muted cursor-not-allowed"
             />
             <p className="text-xs text-muted-foreground">
@@ -336,8 +336,8 @@ export default function QRCodes() {
                 disabled={isUpdating}
                 className="flex-1"
               />
-              <Button 
-                onClick={handleUpdateTables} 
+              <Button
+                onClick={handleUpdateTables}
                 disabled={isUpdating || tables === (restaurantDoc?.tables || 0) || tables <= 0}
               >
                 {isUpdating ? (
@@ -392,8 +392,8 @@ export default function QRCodes() {
           {tables > 0 && (
             <div className="pt-4 border-t">
               <div className="space-y-2">
-                <Button 
-                  onClick={handleGenerateQrCodes} 
+                <Button
+                  onClick={handleGenerateQrCodes}
                   disabled={isGenerating || !tables || tables !== (restaurantDoc?.tables || 0)}
                   className="w-full sm:w-auto"
                 >

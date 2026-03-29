@@ -584,23 +584,23 @@ export default function Layout({ children }: LayoutProps) {
                       <SelectTrigger className="h-auto py-1.5 px-2 border-0 bg-transparent hover:bg-sidebar-accent shadow-none focus:ring-0 focus:ring-offset-0 w-full justify-between data-[state=open]:bg-sidebar-accent [&>svg:last-child]:hidden">
                         <div className="flex items-center min-w-0 flex-1 max-w-[calc(100%-2rem)]">
                           <div className="min-w-0 flex-1 overflow-hidden">
-                             <SelectValue className="text-sm font-semibold text-sidebar-foreground block">
-                               <div className="flex items-center gap-1.5 min-w-0">
-                                 <span className="inline-block truncate whitespace-nowrap overflow-hidden text-ellipsis">
-                                   {restaurantDoc?.restaurant_name || currentRestaurant?.restaurant_name || restaurants[0]?.restaurant_name || 'Select Restaurant'}
-                                 </span>
-                                 {isPro ? (
-                                   <span className="inline-flex items-center px-1.5 py-0 text-[9px] font-bold bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-sm rounded-full flex-shrink-0">
-                                     <Crown className="h-2.5 w-2.5 mr-1" />
-                                     PRO
-                                   </span>
-                                 ) : (
-                                   <span className="inline-flex items-center px-1.5 py-0 text-[9px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 rounded-full flex-shrink-0">
-                                     LITE
-                                   </span>
-                                 )}
-                               </div>
-                             </SelectValue>
+                            <SelectValue className="text-sm font-semibold text-sidebar-foreground block">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="inline-block truncate whitespace-nowrap overflow-hidden text-ellipsis">
+                                  {restaurantDoc?.restaurant_name || currentRestaurant?.restaurant_name || restaurants[0]?.restaurant_name || 'Select Restaurant'}
+                                </span>
+                                {isPro ? (
+                                  <span className="inline-flex items-center px-1.5 py-0 text-[9px] font-bold bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-sm rounded-full flex-shrink-0">
+                                    <Crown className="h-2.5 w-2.5 mr-1" />
+                                    PRO
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-1.5 py-0 text-[9px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 rounded-full flex-shrink-0">
+                                    LITE
+                                  </span>
+                                )}
+                              </div>
+                            </SelectValue>
                           </div>
                         </div>
                         <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2 opacity-70" />
@@ -729,8 +729,8 @@ export default function Layout({ children }: LayoutProps) {
                   const badgeCount = item.badgeHref === '/orders'
                     ? pendingOrders
                     : item.badgeHref === '/accept-orders'
-                    ? acceptPendingOrders
-                    : 0
+                      ? acceptPendingOrders
+                      : 0
                   const showBadge = badgeCount > 0
                   const isLocked = item.feature && !isPro && !(features as any)[item.feature]
 
@@ -935,8 +935,8 @@ export default function Layout({ children }: LayoutProps) {
                             const childBadgeCount = child.badgeHref === '/orders'
                               ? pendingOrders
                               : child.badgeHref === '/accept-orders'
-                              ? acceptPendingOrders
-                              : 0
+                                ? acceptPendingOrders
+                                : 0
                             const showChildBadge = childBadgeCount > 0
                             const isChildLocked = child.feature && !isPro && !(features as any)[child.feature]
                             return (
@@ -989,7 +989,7 @@ export default function Layout({ children }: LayoutProps) {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    const baseUrl = restaurantDoc?.base_url || 'https://demo.dinematters.com/'
+                    const baseUrl = restaurantDoc?.base_url || 'https://app.dinematters.com/'
                     const url = baseUrl.replace(/\/$/, '') + '/' + previewPath
                     window.open(url, '_blank', 'noopener,noreferrer')
                   }}
@@ -1063,7 +1063,7 @@ export default function Layout({ children }: LayoutProps) {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      const baseUrl = restaurantDoc?.base_url || 'https://demo.dinematters.com/'
+                      const baseUrl = restaurantDoc?.base_url || 'https://app.dinematters.com/'
                       const url = baseUrl.replace(/\/$/, '') + '/' + previewPath
                       window.open(url, '_blank', 'noopener,noreferrer')
                     }}

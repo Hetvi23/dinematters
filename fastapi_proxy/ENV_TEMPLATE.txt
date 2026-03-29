@@ -38,7 +38,7 @@ CACHE_CATEGORIES_TTL=600
 CACHE_PRODUCTS_TTL=300
 
 # CORS
-CORS_ORIGINS=https://demo.dinematters.com,https://admin.dinematters.com
+CORS_ORIGINS=https://app.dinematters.com,https://admin.dinematters.com
 CORS_ALLOW_CREDENTIALS=true
 CORS_ALLOW_METHODS=*
 CORS_ALLOW_HEADERS=*
