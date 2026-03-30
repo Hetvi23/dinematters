@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Loader2, RefreshCw, ChevronRight, Utensils } from 'lucide-react'
 import { toast } from 'sonner'
+import { getFrappeError } from '@/lib/utils'
 import { Input } from '../components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 
@@ -118,8 +119,7 @@ export default function RecommendationsEngine() {
       toast.success('Recommendations updated.')
       await mutate()
     } catch (error: any) {
-      const msg = error?.message || error?._server_messages || 'Failed to update recommendations.'
-      toast.error('Could not update recommendations', { description: msg })
+      toast.error('Could not update recommendations', { description: getFrappeError(error) })
     }
   }
 
@@ -165,8 +165,7 @@ export default function RecommendationsEngine() {
       }
       await mutate()
     } catch (error: any) {
-      const msg = error?.message || error?._server_messages || 'Failed to run recommendation engine.'
-      toast.error('Could not run recommendation engine', { description: msg })
+      toast.error('Could not run recommendation engine', { description: getFrappeError(error) })
     }
   }
 

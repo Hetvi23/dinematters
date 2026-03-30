@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
+import { getFrappeError } from '@/lib/utils'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -105,7 +106,6 @@ export default function QRCodes() {
     setIsGenerating(true)
     try {
       const response: any = await generateQrCodes({ restaurant: selectedRestaurant })
-      if (response?.message) {
         // Handle both old format (direct URL) and new format (JSON object)
         let url = null
         if (typeof response.message === 'string') {
@@ -126,9 +126,8 @@ export default function QRCodes() {
           // Refresh restaurant data to get updated URL
           await refreshRestaurant()
         }
-      }
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to generate QR codes')
+      toast.error('Failed to generate QR codes', { description: getFrappeError(error) })
     } finally {
       setIsGenerating(false)
     }
@@ -157,7 +156,7 @@ export default function QRCodes() {
       // Clear QR code URL since tables changed
       setQrCodeUrl(null)
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to update tables count')
+      toast.error('Failed to update tables count', { description: getFrappeError(error) })
     } finally {
       setIsUpdating(false)
     }
@@ -225,7 +224,7 @@ export default function QRCodes() {
         toast.error('Failed to delete QR codes PDF')
       }
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to delete QR codes PDF')
+      toast.error('Failed to delete QR codes PDF', { description: getFrappeError(error) })
     } finally {
       setIsDeleting(false)
     }

@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, endOfMonth, parseISO } from 'date-fns'
+import { getFrappeError } from '@/lib/utils'
 
 interface PaymentStats {
   current_month: string
@@ -95,11 +96,10 @@ export default function AutopaySetupPage() {
       const body = response?.message ?? response
       if (body?.success && body?.data) {
         setStats(body.data)
-      } else {
         toast.error(body?.error || 'Failed to load autopay status')
       }
     } catch (error: any) {
-      toast.error('Failed to load autopay status', { description: error?.message })
+      toast.error('Failed to load autopay status', { description: getFrappeError(error) })
     } finally {
       setLoading(false)
     }
@@ -176,7 +176,7 @@ export default function AutopaySetupPage() {
       })
       rzp.open()
     } catch (error: any) {
-      toast.error('Failed to start autopay setup', { description: error?.message })
+      toast.error('Failed to start autopay setup', { description: getFrappeError(error) })
     } finally {
       setIsSettingUp(false)
     }

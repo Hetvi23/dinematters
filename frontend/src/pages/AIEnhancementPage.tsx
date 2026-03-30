@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useFrappeGetDocList, useFrappePostCall, useFrappeGetDoc } from 'frappe-react-sdk'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { toast } from 'sonner'
+import { getFrappeError } from '@/lib/utils'
 import {
   Sparkles, Loader2, Image as ImageIcon, Plus, Eye, Download,
   LayoutGrid, ChevronLeft, ChevronRight, Coins, AlertTriangle, Camera, ShieldCheck
@@ -161,15 +162,15 @@ export default function AIEnhancementPage() {
               initialStatus[res.message.generation_id] = { status: 'Pending_Upload', url: null }
             }
           } catch (err: any) {
-            const msg = err?.message || ''
-            if (msg.toLowerCase().includes('insufficient')) {
+            const errorMsg = getFrappeError(err)
+            if (errorMsg.toLowerCase().includes('insufficient')) {
               toast.error('Insufficient credits!', {
                 description: 'Please recharge your AI credit wallet.',
                 action: { label: 'Recharge', onClick: () => setShowRechargeModal(true) }
               })
               break
             }
-            toast.error(`Variant ${i + 1} failed to start`, { description: msg })
+            toast.error(`Variant ${i + 1} failed to start`, { description: errorMsg })
           }
         }
       } else {
@@ -203,15 +204,15 @@ export default function AIEnhancementPage() {
                     initialStatus[res.message.generation_id] = { status: 'Pending_Upload', url: null }
                   }
                 } catch (err: any) {
-                  const msg = err?.message || ''
-                  if (msg.toLowerCase().includes('insufficient')) {
+                  const errorMsg = getFrappeError(err)
+                  if (errorMsg.toLowerCase().includes('insufficient')) {
                     toast.error('Insufficient credits!', {
                       description: 'Please recharge your AI credit wallet.',
                       action: { label: 'Recharge', onClick: () => setShowRechargeModal(true) }
                     })
                     break
                   }
-                  toast.error(`Variant ${i + 1} failed to start`, { description: msg })
+                  toast.error(`Variant ${i + 1} failed to start`, { description: errorMsg })
                 }
               }
               resolve()
@@ -221,8 +222,7 @@ export default function AIEnhancementPage() {
         })
       }
     } catch (err: any) {
-      console.error(err)
-      toast.error('Failed to start AI job', { description: err.message })
+      toast.error('Failed to start AI job', { description: getFrappeError(err) })
     } finally {
       // Refresh credits after deduction
       fetchCredits()
@@ -333,7 +333,7 @@ export default function AIEnhancementPage() {
       await mutateProduct()
       setOptimisticMedia(null)
     } catch (err: any) {
-      toast.error('Failed to apply', { description: err.message })
+      toast.error('Failed to apply', { description: getFrappeError(err) })
       setOptimisticMedia(null)
     } finally {
       setIsApplying(false)

@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Loader2, CreditCard, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { getFrappeError } from '@/lib/utils';
 
 // Extend window object to include Razorpay
 declare global {
@@ -155,10 +156,10 @@ const RazorpayCheckout: React.FC<RazorpayCheckoutProps> = ({
             if (onSuccess) {
               onSuccess(order_id, paymentResponse.razorpay_payment_id);
             }
-          } catch (error) {
+          } catch (error: any) {
             console.error('Payment verification failed:', error);
             setPaymentStatus('failed');
-            toast.error('Payment verification failed');
+            toast.error('Payment verification failed', { description: getFrappeError(error) });
             
             if (onFailure) {
               onFailure(error);
@@ -179,7 +180,7 @@ const RazorpayCheckout: React.FC<RazorpayCheckoutProps> = ({
       rzp.on('payment.failed', (response: any) => {
         setPaymentStatus('failed');
         setIsLoading(false);
-        toast.error('Payment failed: ' + response.error.description);
+        toast.error('Payment failed', { description: response.error?.description || 'Unknown error' });
         
         if (onFailure) {
           onFailure(response.error);
@@ -189,11 +190,11 @@ const RazorpayCheckout: React.FC<RazorpayCheckoutProps> = ({
       rzp.open();
       setIsLoading(false);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Payment initiation failed:', error);
       setPaymentStatus('failed');
       setIsLoading(false);
-      toast.error('Failed to initiate payment');
+      toast.error('Failed to initiate payment', { description: getFrappeError(error) });
       
       if (onFailure) {
         onFailure(error);

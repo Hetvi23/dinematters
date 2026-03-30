@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import { useFrappePostCall } from '@/lib/frappe'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
+import { cn, getFrappeError } from '@/lib/utils'
 import { useConfirm } from '@/hooks/useConfirm'
 import { useCurrency } from '@/hooks/useCurrency'
 import { Badge } from '@/components/ui/badge'
@@ -104,7 +104,7 @@ export function OrdersModernView({ orders, onCheckOrder, onOrderUpdate, onShowCa
       toast.success(`Order marked as ${label}`)
       if (onOrderUpdate) onOrderUpdate()
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to update status')
+      toast.error(`Failed to update status to ${label}`, { description: getFrappeError(error) })
     }
   }
 

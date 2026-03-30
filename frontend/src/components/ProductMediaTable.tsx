@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Trash2, Upload, Image as ImageIcon, Video, Edit2, X, Check } from 'lucide-react'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
+import { cn, getFrappeError } from '@/lib/utils'
 import { uploadToR2, getMediaType } from '@/lib/r2Upload'
 import LiteMediaUpload from './LiteMediaUpload'
 
@@ -132,7 +132,7 @@ export default function ProductMediaTable({ value = [], onChange, required, disa
       onChange?.(newItems)
       toast.success(`${uploadedItems.length} media file(s) uploaded successfully`)
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to upload media files')
+      toast.error('Failed to upload media files', { description: getFrappeError(error) })
     } finally {
       setUploading(false)
       e.target.value = ''

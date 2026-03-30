@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import { useConfirm } from '@/hooks/useConfirm'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { ListFilters, FilterCondition } from '@/components/ListFilters'
-import { cn } from '@/lib/utils'
+import { cn, getFrappeError } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 
 type SortField = 'product_name' | 'price' | 'original_price' | 'category_name' | 'calories' | 'display_order' | 'is_active' | 'is_vegetarian' | 'product_type' | 'main_category'
@@ -244,7 +244,7 @@ export default function Products() {
       mutate()
     } catch (error: any) {
       console.error('Failed to delete product:', error)
-      toast.error(error?.message || 'Failed to delete product')
+      toast.error('Failed to delete product', { description: getFrappeError(error) })
     }
   }
 

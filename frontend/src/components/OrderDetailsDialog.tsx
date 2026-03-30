@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { getFrappeError } from '@/lib/utils'
 import DeliveryMap from './DeliveryMap'
 import {
   Select,
@@ -85,7 +86,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
       toast.success('Delivery assigned successfully')
       window.location.reload()
     } catch (e: any) {
-      toast.error(e.message || 'Error occurred')
+      toast.error('Failed to assign delivery', { description: getFrappeError(e) })
     } finally {
       setAssigningDelivery(false)
     }
@@ -105,7 +106,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
       toast.success('Delivery cancelled successfully')
       window.location.reload()
     } catch (e: any) {
-      toast.error(e.message || 'Error occurred')
+      toast.error('Failed to cancel delivery', { description: getFrappeError(e) })
     } finally {
       setCancellingDelivery(false)
     }

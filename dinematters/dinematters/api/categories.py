@@ -111,7 +111,7 @@ def get_categories(restaurant_id):
 		
 		# Add virtual categories if products exist
 		# Top Picks
-		top_picks_count = frappe.db.count("Menu Product", filters={"product_type": "Popular", "is_active": 1, "restaurant": restaurant})
+		top_picks_count = frappe.db.count("Menu Product", filters={"product_type": "top-picks", "is_active": 1, "restaurant": restaurant})
 		if top_picks_count > 0:
 			top_picks = {
 				"id": "top-picks",
@@ -127,7 +127,7 @@ def get_categories(restaurant_id):
 				{
 					"parenttype": "Menu Product",
 					"media_type": "image",
-					"parent": ["in", frappe.get_all("Menu Product", filters={"product_type": "Popular", "is_active": 1, "restaurant": restaurant}, pluck="name")]
+					"parent": ["in", frappe.get_all("Menu Product", filters={"product_type": "top-picks", "is_active": 1, "restaurant": restaurant}, pluck="name")]
 				},
 				["name", "media_url"],
 				order_by="idx asc",
@@ -142,7 +142,7 @@ def get_categories(restaurant_id):
 			formatted_categories.insert(0, top_picks)
 			
 		# Chef Special
-		chef_special_count = frappe.db.count("Menu Product", filters={"product_type": "Chef Special", "is_active": 1, "restaurant": restaurant})
+		chef_special_count = frappe.db.count("Menu Product", filters={"product_type": "chef-special", "is_active": 1, "restaurant": restaurant})
 		if chef_special_count > 0:
 			chef_special = {
 				"id": "chef-special",

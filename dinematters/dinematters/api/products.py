@@ -17,6 +17,119 @@ from collections import defaultdict
 
 
 @frappe.whitelist(allow_guest=True)
+def get_top_picks(restaurant_id):
+	"""
+	GET /api/v1/top-picks
+	Get top picks for the restaurant with fallback logic.
+	1. Explicit top-picks
+	2. Random active items with media (to reach at least 3)
+	3. Any random active items (if still < 3)
+	"""
+	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
+		# 1. Fetch explicit top-picks
+		products = frappe.get_all(
+			"Menu Product",
+			fields=[
+				"name as docname",
+				"product_id as id",
+				"product_name as name",
+				"price",
+				"original_price",
+				"category_name as category",
+				"product_type as type",
+				"description",
+				"is_vegetarian",
+				"calories",
+				"estimated_time as estimatedTime",
+				"serving_size as servingSize",
+				"has_no_media",
+				"main_category as mainCategory",
+				"display_order",
+				"is_active",
+				"recommendations"
+			],
+			filters={"product_type": "top-picks", "is_active": 1, "restaurant": restaurant},
+			order_by="display_order, product_name",
+			limit_page_length=10
+		)
+		
+		# 2. If < 3, fetch random active items with media
+		if len(products) < 3:
+			needed = 3 - len(products)
+			existing_ids = [p["docname"] for p in products]
+			
+			# Priority 2: Random active items WITH media
+			random_with_media = frappe.db.sql(f"""
+				SELECT 
+					name as docname, product_id as id, product_name as name, price, original_price,
+					category_name as category, product_type as type, description, is_vegetarian,
+					calories, estimated_time as estimatedTime, serving_size as servingSize,
+					has_no_media, main_category as mainCategory, display_order, is_active,
+					recommendations
+				FROM `tabMenu Product`
+				WHERE 
+					restaurant = %s AND is_active = 1 AND has_no_media = 0
+					AND name NOT IN %s
+				ORDER BY RAND()
+				LIMIT %s
+			""", (restaurant, existing_ids or ["dummy"], needed), as_dict=True)
+			
+			products.extend(random_with_media)
+			
+		# 3. If still < 3, fetch any random active items
+		if len(products) < 3:
+			needed = 3 - len(products)
+			existing_ids = [p["docname"] for p in products]
+			
+			random_any = frappe.db.sql(f"""
+				SELECT 
+					name as docname, product_id as id, product_name as name, price, original_price,
+					category_name as category, product_type as type, description, is_vegetarian,
+					calories, estimated_time as estimatedTime, serving_size as servingSize,
+					has_no_media, main_category as mainCategory, display_order, is_active,
+					recommendations
+				FROM `tabMenu Product`
+				WHERE 
+					restaurant = %s AND is_active = 1
+					AND name NOT IN %s
+				ORDER BY RAND()
+				LIMIT %s
+			""", (restaurant, existing_ids or ["dummy"], needed), as_dict=True)
+			
+			products.extend(random_any)
+
+		# Format products with media and customizations
+		formatted_products = format_products_for_listing(products)
+		
+		# Get currency info for restaurant
+		currency_info = get_restaurant_currency_info(restaurant)
+		
+		return {
+			"success": True,
+			"data": {
+				"products": formatted_products,
+				"currency": currency_info.get("currency", "INR"),
+				"currencySymbol": currency_info.get("symbol", "₹"),
+				"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
+			}
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in get_top_picks: {str(e)}")
+		return {
+			"success": False,
+			"error": {
+				"code": "TOP_PICKS_FETCH_ERROR",
+				"message": str(e)
+			}
+		}
+
+
+
+
+@frappe.whitelist(allow_guest=True)
 def get_products(restaurant_id, category=None, type=None, vegetarian=None, search=None, page=1, limit=50):
 	"""
 	GET /api/v1/products

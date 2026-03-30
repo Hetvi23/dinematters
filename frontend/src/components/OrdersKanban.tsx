@@ -7,7 +7,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { useFrappePostCall } from '@/lib/frappe'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
+import { cn, getFrappeError } from '@/lib/utils'
 import { useConfirm } from '@/hooks/useConfirm'
 import { useCurrency } from '@/hooks/useCurrency'
 import {
@@ -473,7 +473,7 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
       toast.success(`Order moved to ${STATUSES.find(s => s.value === newStatus)?.label || newStatus}`)
     } catch (error: any) {
       console.error('Failed to update order status:', error)
-      toast.error(error?.message || 'Failed to update order status')
+      toast.error('Failed to update order status', { description: getFrappeError(error) })
     } finally {
       if (onOrderUpdate) {
         onOrderUpdate()
@@ -495,7 +495,7 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
       }
     } catch (error: any) {
       console.error('Failed to cancel order:', error)
-      toast.error(error?.message || 'Failed to cancel order')
+      toast.error('Failed to cancel order', { description: getFrappeError(error) })
       
       if (onOrderUpdate) {
         onOrderUpdate()
@@ -517,7 +517,7 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
       }
     } catch (error: any) {
       console.error('Failed to mark order as billed:', error)
-      toast.error(error?.message || 'Failed to mark order as billed')
+      toast.error('Failed to mark order as billed', { description: getFrappeError(error) })
       
       if (onOrderUpdate) {
         onOrderUpdate()
@@ -539,7 +539,7 @@ export function OrdersKanban({ orders, onCheckOrder, onOrderUpdate, onCancelOrde
       }
     } catch (error: any) {
       console.error('Failed to update table number:', error)
-      toast.error(error?.message || 'Failed to update table number')
+      toast.error('Failed to update table number', { description: getFrappeError(error) })
       
       if (onOrderUpdate) {
         onOrderUpdate()

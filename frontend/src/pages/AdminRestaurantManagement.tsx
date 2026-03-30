@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { toast } from 'sonner'
+import { getFrappeError } from '@/lib/utils'
 import { Shield, Users, Crown, Star, RefreshCw, Power, PowerOff } from 'lucide-react'
 
 interface Restaurant {
@@ -78,7 +79,7 @@ export default function AdminRestaurantManagement() {
       }
     } catch (error) {
       console.error('Error loading restaurants:', error)
-      toast.error('Failed to load restaurants')
+      toast.error('Failed to load restaurants', { description: getFrappeError(error) })
       setRestaurants([])
     } finally {
       setLoading(false)
@@ -102,11 +103,11 @@ export default function AdminRestaurantManagement() {
         // Reload restaurants to get updated data
         await loadRestaurants()
       } else {
-        toast.error(result?.message?.error || 'Failed to update plan')
+        toast.error(result?.message?.error || 'Failed to update plan', { description: getFrappeError(result) })
       }
     } catch (error) {
       console.error('Error updating plan:', error)
-      toast.error('Failed to update plan')
+      toast.error('Failed to update plan', { description: getFrappeError(error) })
     } finally {
       setUpdating(null)
     }
@@ -129,11 +130,11 @@ export default function AdminRestaurantManagement() {
         // Reload restaurants to get updated data
         await loadRestaurants()
       } else {
-        toast.error(result?.message?.error || 'Failed to update status')
+        toast.error(result?.message?.error || 'Failed to update status', { description: getFrappeError(result) })
       }
     } catch (error) {
       console.error('Error toggling status:', error)
-      toast.error('Failed to update status')
+      toast.error('Failed to update status', { description: getFrappeError(error) })
     } finally {
       setUpdating(null)
     }

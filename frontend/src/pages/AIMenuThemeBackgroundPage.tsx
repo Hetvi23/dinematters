@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useFrappePostCall } from '@/lib/frappe'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { toast } from 'sonner'
+import { getFrappeError } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -48,7 +49,7 @@ export default function AIMenuThemeBackgroundPage() {
         setStatus(payload)
       }
     } catch (error: any) {
-      toast.error('Failed to load background status', { description: error?.message })
+      toast.error('Failed to load background status', { description: getFrappeError(error) })
     }
   }, [getThemeStatus, selectedRestaurant])
 
@@ -66,7 +67,7 @@ export default function AIMenuThemeBackgroundPage() {
       toast.success(nextEnabled ? 'Menu background enabled' : 'Menu background disabled')
       await fetchStatus()
     } catch (error: any) {
-      toast.error('Failed to update setting', { description: error?.message })
+      toast.error('Failed to update setting', { description: getFrappeError(error) })
     } finally {
       setIsTogglingEnabled(false)
     }
@@ -95,7 +96,7 @@ export default function AIMenuThemeBackgroundPage() {
         toast.success(`Wallpaper ${index + 1} uploaded`)
         await fetchStatus()
       } catch (error: any) {
-        toast.error('Upload failed', { description: error?.message })
+        toast.error('Upload failed', { description: getFrappeError(error) })
       } finally {
         setUploadingIndex(null)
       }
@@ -111,7 +112,7 @@ export default function AIMenuThemeBackgroundPage() {
       toast.success(`Wallpaper ${index + 1} removed`)
       await fetchStatus()
     } catch (error: any) {
-      toast.error('Delete failed', { description: error?.message })
+      toast.error('Delete failed', { description: getFrappeError(error) })
     } finally {
       setDeletingIndex(null)
     }
@@ -125,7 +126,7 @@ export default function AIMenuThemeBackgroundPage() {
       toast.success(`Wallpaper ${index + 1} set as main`)
       await fetchStatus()
     } catch (error: any) {
-      toast.error('Failed to set main', { description: error?.message })
+      toast.error('Failed to set main', { description: getFrappeError(error) })
     } finally {
       setSettingMainIndex(null)
     }

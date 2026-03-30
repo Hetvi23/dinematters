@@ -22,6 +22,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { useCurrency } from '@/hooks/useCurrency'
 import { toast } from 'sonner'
+import { getFrappeError } from '@/lib/utils'
 
 export default function Coupons() {
   const { selectedRestaurant } = useRestaurant()
@@ -87,7 +88,7 @@ export default function Coupons() {
       mutate()
       setIsCreateDialogOpen(false)
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create coupon')
+      toast.error('Failed to create coupon', { description: getFrappeError(error) })
     }
   }
 
@@ -98,7 +99,7 @@ export default function Coupons() {
       mutate()
       setEditingCoupon(null)
     } catch (error: any) {
-      toast.error(error.message || 'Failed to update coupon')
+      toast.error('Failed to update coupon', { description: getFrappeError(error) })
     }
   }
 
@@ -112,7 +113,7 @@ export default function Coupons() {
       setDeleteDialogOpen(false)
       setCouponToDelete(null)
     } catch (error: any) {
-      toast.error(error.message || 'Failed to delete coupon')
+      toast.error('Failed to delete coupon', { description: getFrappeError(error) })
     }
   }
 
