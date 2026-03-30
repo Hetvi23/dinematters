@@ -721,18 +721,31 @@ def schedule_monthly_billing():
 			""", (r.name, current_month))[0][0] or 0
 			# Convert to paise
 			total_paise = int(float(total) * 100)
-			calculated_fee = int(math.floor(total_paise * 0.01))
-			min_amt = 999 * 100
-			max_amt = 3999 * 100
-			final_amount = max(min_amt, min(calculated_fee, max_amt))
+			# Fetch commission settings from Restaurant
+			res_doc = frappe.get_doc("Restaurant", r.name)
+			platform_fee_percent = float(res_doc.platform_fee_percent or 1.5)
+			monthly_min = float(res_doc.monthly_minimum or 999)
+
+			calculated_fee = int(math.floor(total_paise * (platform_fee_percent / 100.0)))
+			min_amt_paise = int(monthly_min * 100)
+			base_commission = max(min_amt_paise, calculated_fee)
+			
+			# GST Compliance (18% standard for SaaS)
+			tax_rate = 18.0
+			gst_amount = int(math.floor(base_commission * (tax_rate / 100.0)))
+			final_total = base_commission + gst_amount
+
 			ledger = frappe.get_doc({
 				"doctype": "Monthly Billing Ledger",
 				"restaurant": r.name,
 				"billing_month": current_month,
 				"total_gmv": total_paise,
-				"calculated_fee": calculated_fee,
-				"final_amount": final_amount,
-				"payment_status": "pending"
+				"calculated_fee": base_commission,
+				"gst_amount": gst_amount,
+				"tax_percent": tax_rate,
+				"final_amount": final_total,
+				"payment_status": "pending",
+				"notes": f"Base Commission: ₹{base_commission/100:.2f}, GST ({tax_rate}%): ₹{gst_amount/100:.2f}"
 			})
 			ledger.insert(ignore_permissions=True)
 			created.append(ledger.name)
@@ -773,6 +786,47 @@ def charge_monthly_bill(ledger_name):
 			return {"success": False, "error": "Restaurant missing customer/token"}
 
 		client = get_razorpay_client(restaurant.name)
+
+		# RBI Threshold Check (₹15,000 = 1500000 paise)
+		# For charges > ₹15,000, e-mandates require additional authentication (AFA).
+		# We fallback to a Payment Link in such cases to ensure compliance and success.
+		if int(ledger.final_amount) > 1500000:
+			try:
+				payment_link_payload = {
+					"amount": int(ledger.final_amount),
+					"currency": "INR",
+					"accept_partial": False,
+					"description": f"DineMatters SaaS Bill: {ledger.billing_month}",
+					"customer": {
+						"name": restaurant.owner_name or restaurant.restaurant_name,
+						"email": restaurant.owner_email or "",
+						"contact": restaurant.owner_phone or ""
+					},
+					"notify": {
+						"sms": True,
+						"email": True
+					},
+					"reminder_enable": True,
+					"notes": {"ledger": ledger.name}
+				}
+				
+				# SDK check: generic request vs SDK method
+				if hasattr(client, 'payment_link'):
+					link = client.payment_link.create(payment_link_payload)
+				else:
+					link = client.request('POST', '/payment_links', payment_link_payload)
+				
+				short_url = link.get('short_url')
+				frappe.db.set_value("Monthly Billing Ledger", ledger.name, {
+					"payment_status": "pending",
+					"notes": (ledger.notes or "") + f"\nRBI Limit exceeded (>₹15k). Payment Link: {short_url}"
+				})
+				frappe.db.commit()
+				
+				return {"success": True, "message": "RBI Limit Exceeded. Payment link generated.", "link": short_url}
+			except Exception as e:
+				frappe.log_error(f"Failed to create RBI fallback link for {ledger.name}: {str(e)}", "razorpay.charge_monthly_bill")
+				# Fall through to attempt autopay as last resort
 
 		# Attempt a charge using stored token. Different razorpay client versions expose different resources
 		payment_payload = {

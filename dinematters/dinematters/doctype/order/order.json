@@ -25,6 +25,9 @@
   "subtotal",
   "discount",
   "tax",
+  "cgst",
+  "sgst",
+  "tax_percent",
   "column_break_totals",
   "delivery_fee",
   "packaging_fee",
@@ -224,6 +227,21 @@
    "fieldname": "tax",
    "fieldtype": "Currency",
    "label": "Tax"
+  },
+  {
+   "fieldname": "cgst",
+   "fieldtype": "Currency",
+   "label": "CGST"
+  },
+  {
+   "fieldname": "sgst",
+   "fieldtype": "Currency",
+   "label": "SGST"
+  },
+  {
+   "fieldname": "tax_percent",
+   "fieldtype": "Percent",
+   "label": "Tax Rate Applied"
   },
   {
    "fieldname": "column_break_totals",

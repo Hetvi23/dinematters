@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useFrappeGetDoc, useFrappePostCall, useFrappeUpdateDoc } from '@/lib/frappe'
+import { useFrappeGetDoc, useFrappePostCall, useFrappeUpdateDoc, useFrappeGetCall } from '@/lib/frappe'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -46,6 +46,7 @@ export default function QRCodes() {
   })
 
   // API calls
+  const { data: settingsData } = useFrappeGetCall<{ message: { app_base_url: string } }>('dinematters.dinematters.utils.config_helpers.get_app_settings')
   const { call: generateQrCodes } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.generate_qr_codes_pdf')
   const { call: getQrCodeUrl } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.get_qr_codes_pdf_url')
   const { call: deleteQrCodes } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.delete_qr_codes_pdf')
@@ -54,7 +55,9 @@ export default function QRCodes() {
   // Load restaurant data
   useEffect(() => {
     if (restaurantDoc) {
-      setBaseUrl(restaurantDoc.base_url || 'https://app.dinematters.com/')
+      // Prioritize global setting from API, fallback to doc, and then hardcoded default
+      const globalBaseUrl = settingsData?.message?.app_base_url
+      setBaseUrl(globalBaseUrl || restaurantDoc.base_url || 'https://app.dinematters.com/')
       setTables(restaurantDoc.tables || 0)
 
       // Load QR code URL if available
@@ -65,7 +68,7 @@ export default function QRCodes() {
         loadQrCodeUrl()
       }
     }
-  }, [restaurantDoc])
+  }, [restaurantDoc, settingsData])
 
   const loadQrCodeUrl = async () => {
     if (!selectedRestaurant) return

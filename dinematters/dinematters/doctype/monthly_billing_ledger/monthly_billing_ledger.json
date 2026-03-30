@@ -31,6 +31,18 @@
       "default": 0
     },
     {
+      "fieldname": "gst_amount",
+      "fieldtype": "Int",
+      "label": "GST Amount (paise)",
+      "default": 0
+    },
+    {
+      "fieldname": "tax_percent",
+      "fieldtype": "Percent",
+      "label": "Tax Rate (%)",
+      "default": 18.0
+    },
+    {
       "fieldname": "final_amount",
       "fieldtype": "Int",
       "label": "Final Amount (paise)",

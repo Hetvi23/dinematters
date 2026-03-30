@@ -133,7 +133,8 @@ def resolve_qr_branding(restaurant_doc):
 
 
 def build_table_qr_url(restaurant_doc, table_number):
-	base_url = getattr(restaurant_doc, "base_url", None) or "https://app.dinematters.com/"
+	from dinematters.dinematters.utils.config_helpers import get_app_base_url
+	base_url = get_app_base_url()
 	return f"{base_url.rstrip('/')}/{restaurant_doc.restaurant_id}?table_no={table_number}"
 
 

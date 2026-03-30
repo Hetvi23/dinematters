@@ -94,10 +94,9 @@ def generate_referral_link(restaurant_id, phone, platform="WhatsApp"):
 			})
 			link_doc.insert(ignore_permissions=True)
 		
-		# Use the restaurant's base URL for the storefront
-		base_url = frappe.db.get_value('Restaurant', restaurant, 'base_url') or 'https://dinematters.com'
-		# Ensure referral links point to the restaurant's menu landing via the ref route
-		referral_url = f"{base_url.rstrip('/')}/ref/{identifier}"
+		from dinematters.dinematters.utils.config_helpers import get_app_base_url
+		base_url = get_app_base_url()
+		referral_url = f"{base_url.rstrip('/')}/{restaurant_id}/invite/{identifier}"
 		
 		return {
 			"success": True,
@@ -117,13 +116,20 @@ def track_referral_visit(identifier, ip_address=None, user_agent=None):
 	Track a visit to a referral link and reward the referrer if unique
 	"""
 	try:
+		# Auto-detect IP and User agent if not passed (Production Level Tracking)
+		if not ip_address and hasattr(frappe, 'request'):
+			ip_address = frappe.request.remote_addr
+			
+		if not user_agent and hasattr(frappe, 'request'):
+			user_agent = frappe.request.headers.get('User-Agent')
+
 		link_name = frappe.db.get_value("Referral Link", {"identifier": identifier}, "name")
 		if not link_name:
 			return {"success": False, "error": {"code": "LINK_NOT_FOUND", "message": "Invalid referral link"}}
 		
 		link_doc = frappe.get_doc("Referral Link", link_name)
 		
-		# Check if this IP has visited this link before
+		# Check if this identifier + IP has visited before
 		is_unique = not frappe.db.exists("Referral Visit", {
 			"referral_link": link_name,
 			"ip_address": ip_address
@@ -138,6 +144,7 @@ def track_referral_visit(identifier, ip_address=None, user_agent=None):
 			"timestamp": now_datetime()
 		})
 		visit_doc.insert(ignore_permissions=True)
+		frappe.db.commit() # Ensure visit is saved immediately
 		
 		# If unique, reward the referrer if within their current cycle limit
 		if is_unique:
@@ -153,7 +160,7 @@ def track_referral_visit(identifier, ip_address=None, user_agent=None):
 						customer=link_doc.referrer,
 						restaurant=link_doc.restaurant,
 						coins=loyalty_prog.coins_per_unique_open or 2,
-						reason=f"Referral Engagement (Unique Open #{current_count + 1})",
+						reason="Referral Share", # Must match allowed Select options in Loyalty Point Entry
 						ref_doctype="Referral Link",
 						ref_name=link_name
 					)
@@ -169,7 +176,7 @@ def track_referral_visit(identifier, ip_address=None, user_agent=None):
 			}
 		}
 	except Exception as e:
-		frappe.log_error(f"Error in track_referral_visit: {str(e)}")
+		frappe.log_error("Referral Tracking Error", str(e))
 		return {"success": False, "error": {"code": "TRACKING_ERROR", "message": str(e)}}
 
 @frappe.whitelist(allow_guest=True)
@@ -188,12 +195,15 @@ def get_referral_details(identifier):
 		if not link_info:
 			return {"success": False, "message": "Link not found"}
 			
-		referrer_name = frappe.db.get_value("Customer", link_info.referrer, "customer_name") or link_info.referrer
+		referrer_full_name = frappe.db.get_value("Customer", link_info.referrer, "customer_name") or link_info.referrer
+		# Swiggy/Zomato style: Show first name only for privacy
+		referrer_name = referrer_full_name.split(' ')[0] if referrer_full_name else link_info.referrer
 		restaurant_name = frappe.db.get_value("Restaurant", link_info.restaurant, "name")
 		
 		# Get restaurant config for images
 		logo = frappe.db.get_value("Restaurant Config", {"restaurant": link_info.restaurant}, "logo")
-		banner = frappe.db.get_value("Restaurant Config", {"restaurant": link_info.restaurant}, "banner_image")
+		# Using logo as fallback for banner as ‘banner_image’ field doesn’t exist
+		banner = logo 
 		
 		return {
 			"success": True,
@@ -224,6 +234,55 @@ def reset_referral_cycle(customer, restaurant):
 		return True
 	except Exception as e:
 		frappe.log_error(f"Error in reset_referral_cycle: {str(e)}")
+		return False
+
+def process_referral_welcome_bonus(customer, restaurant, referral_id):
+	"""
+	Awards the Welcome Bonus instantly upon signup/verification.
+	Validates that the referral_id belongs to the specified restaurant.
+	"""
+	try:
+		# 1. Validate the referral link
+		link_info = frappe.db.get_value("Referral Link", {"identifier": referral_id}, ["name", "restaurant"], as_dict=True)
+		if not link_info:
+			return False
+		
+		# Strict Scoping: Referral must match the restaurant the user is currently joining
+		if link_info.get("restaurant") != restaurant:
+			return False
+			
+		# 2. Check if customer already received a Welcome Bonus for this restaurant
+		# This prevents duplicate claims even if they re-verify
+		from dinematters.dinematters.utils.loyalty import get_loyalty_balance
+		already_rewarded = frappe.db.exists("Restaurant Loyalty Entry", {
+			"customer": customer,
+			"restaurant": restaurant,
+			"reason": "Welcome Bonus"
+		})
+		
+		if already_rewarded:
+			return False
+			
+		# 3. Get loyalty config
+		loyalty_prog = frappe.get_doc("Restaurant Loyalty Config", {"restaurant": restaurant, "is_active": 1})
+		if not loyalty_prog:
+			return False
+			
+		# 4. Award the Welcome Bonus
+		coins = loyalty_prog.new_user_welcome_reward_coins or 50
+		credit_loyalty_points(
+			customer=customer,
+			restaurant=restaurant,
+			coins=coins,
+			reason="Welcome Bonus",
+			ref_doctype="Referral Link",
+			ref_name=link_info.name
+		)
+		
+		frappe.db.commit()
+		return True
+	except Exception as e:
+		frappe.log_error(f"Error in process_referral_welcome_bonus: {str(e)}")
 		return False
 
 def credit_loyalty_points(customer, restaurant, coins, reason, ref_doctype=None, ref_name=None, transaction_type="Earn"):

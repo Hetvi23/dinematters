@@ -614,7 +614,9 @@ def update_order_settings(restaurant_id, settings):
 			"default_packaging_fee", 
 			"minimum_order_value", 
 			"estimated_prep_time", 
-			"default_delivery_fee"
+			"default_delivery_fee",
+			"tax_rate",
+			"gst_number"
 		]
 		
 		for field in allowed_fields:

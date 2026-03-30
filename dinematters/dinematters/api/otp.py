@@ -107,8 +107,8 @@ def send_otp(restaurant_id, phone, purpose="verification", restaurant_name=None,
 
 
 @frappe.whitelist(allow_guest=True)
-def verify_otp(restaurant_id, phone, otp, token, name=None, email=None):
-	"""Verify OTP. On success, create/update Customer with verified_at."""
+def verify_otp(restaurant_id, phone, otp, token, name=None, email=None, referral_id=None):
+	"""Verify OTP. On success, create/update Customer and award Instant Welcome Bonus if referred."""
 	try:
 		normalized = normalize_phone(phone)
 		if not normalized or len(normalized) != 10:
@@ -150,6 +150,11 @@ def verify_otp(restaurant_id, phone, otp, token, name=None, email=None):
 			if not current_phone:
 				frappe.db.set_value("Customer", customer.name, "phone", normalized)
 		frappe.db.commit()
+		
+		# Award Instant Welcome Bonus if referred
+		if referral_id:
+			from dinematters.dinematters.api.loyalty import process_referral_welcome_bonus
+			process_referral_welcome_bonus(customer.name, restaurant_id, referral_id)
 
 		# Generate session token for production-ready secure login
 		session_token = frappe.generate_hash(length=48)

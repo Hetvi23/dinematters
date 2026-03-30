@@ -319,3 +319,114 @@ def toggle_restaurant_status(restaurant_id, is_active):
             'success': False,
             'error': str(e)
         }
+
+@frappe.whitelist()
+def delete_restaurant(restaurant_id):
+    """
+    Permanently delete a restaurant and ALL associated data.
+    This includes: Configuration, Menu, Orders, Customers, Media, etc.
+    Only accessible by system administrators.
+    """
+    try:
+        # Check admin access first
+        access_check = check_admin_access()
+        if not access_check.get('success') or not access_check.get('data', {}).get('allowed'):
+            return {
+                'success': False,
+                'error': 'Admin access required'
+            }
+        
+        # Get restaurant record
+        restaurant = frappe.get_doc('Restaurant', {'restaurant_id': restaurant_id})
+        if not restaurant:
+            return {
+                'success': False,
+                'error': f'Restaurant {restaurant_id} not found'
+            }
+        
+        # List of DocTypes to clear where the field 'restaurant' matches the restaurant record ID
+        doctypes_to_clear = [
+            "Restaurant Config", "Restaurant Media", "Restaurant Social Link",
+            "Menu Category", "Menu Product", "Menu Product Addon", "Customization Option", "Customization Question",
+            "Order", "Order Item", "Table Booking", "Banquet Booking", "Restaurant Table", 
+            "Cart Entry", "Restaurant User", "Coupon", "Coupon Usage", "Offer", "Auto Offer", "Combo Offer", "Promo",
+            "Game", "Event", "Home Feature", "Media Asset", "Media Upload Session", "Media Variant", "Product Media",
+            "AI Credit Transaction", "Monthly Billing Ledger", "Monthly Revenue Ledger", "Razorpay Webhook Log",
+            "Plan Change Log", "Referral Link", "Referral Visit", "Otp Verification Log",
+            "Tokenization Attempt", "Menu Recommendation", "Menu Image Extractor", "Menu Image Item",
+            "Extracted Category", "Extracted Dish",
+            "Restaurant Loyalty Config", "Restaurant Loyalty Entry",
+            "Legacy Content", "Legacy Gallery Image", "Legacy Instagram Reel",
+            "Legacy Member", "Legacy Signature Dish", "Legacy Testimonial", "Legacy Testimonial Image"
+        ]
+
+        # For each DocType, delete all records linked to this restaurant
+        cleanup_report = []
+        
+        for dt in doctypes_to_clear:
+            try:
+                # Check if the doctype exists in this installation
+                if not frappe.db.table_exists(dt):
+                    continue
+                
+                # Find the names of records to delete using the primary restaurant name
+                records = frappe.get_all(dt, filters={'restaurant': restaurant.name}, pluck='name')
+                
+                if records:
+                    for record_name in records:
+                        # For each record, delete it and its files
+                        # delete_doc(dt, name, ignore_permissions=True, delete_permanently=True)
+                        frappe.delete_doc(dt, record_name, ignore_permissions=True, delete_permanently=True)
+                    
+                    cleanup_report.append(f"Deleted {len(records)} records from {dt}")
+                    
+            except Exception as inner_e:
+                frappe.log_error(f"Error deleting from {dt}: {str(inner_e)}", "Restaurant Delete Error")
+                # Continue with others even if one fails
+                cleanup_report.append(f"FAILED to delete from {dt}: {str(inner_e)}")
+
+        # Special handling for RestaurantConfig (linked via parent)
+        if frappe.db.table_exists('RestaurantConfig'):
+            try:
+                configs = frappe.get_all('RestaurantConfig', filters={'parent': restaurant.name}, pluck='name')
+                for cfg in configs:
+                    frappe.delete_doc('RestaurantConfig', cfg, ignore_permissions=True)
+                if configs:
+                    cleanup_report.append(f"Deleted {len(configs)} RestaurantConfig records")
+            except Exception as e:
+                frappe.log_error(f"Error deleting RestaurantConfig: {str(e)}", "Restaurant Delete Error")
+
+        # Delete any associated files in tabFile that were attached to these record types
+        # Note: This is partly handled by frappe.delete_doc if files are linked via fields,
+        # but manual cleanup ensures "every single entry" is gone.
+        try:
+            # We also clear files attached specifically to the Restaurant doc itself
+            frappe.db.sql("""
+                DELETE FROM `tabFile` 
+                WHERE (attached_to_doctype = 'Restaurant' AND attached_to_name = %s)
+            """, (restaurant.name,))
+        except Exception as e:
+            frappe.log_error(f"Error cleaning up files: {str(e)}", "Restaurant Delete Error")
+
+        # Finally, delete the Restaurant record itself
+        restaurant_name = restaurant.name
+        frappe.delete_doc('Restaurant', restaurant_name, ignore_permissions=True, delete_permanently=True)
+        cleanup_report.append(f"Deleted Restaurant record: {restaurant_id}")
+
+        # Commit all changes
+        frappe.db.commit()
+
+        return {
+            'success': True,
+            'message': f"Restaurant {restaurant_id} deleted successfully.",
+            'report': cleanup_report
+        }
+
+    except Exception as e:
+        frappe.log_error(f"Error in delete_restaurant API: {str(e)}", "Admin API Error")
+        frappe.db.rollback()
+        return {
+            'success': False,
+            'error': str(e)
+        }
+

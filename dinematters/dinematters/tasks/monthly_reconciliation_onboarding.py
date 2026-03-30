@@ -37,19 +37,23 @@ def process_monthly_minimums_by_onboarding_date():
 					WHERE restaurant=%s AND payment_status='completed' AND DATE_FORMAT(creation, '%%Y-%%m')=%s
 				""", (r.get("name"), previous_month))[0][0] or 0
 				total_paise = int(float(total) * 100)
-				calculated_fee = int(math.floor(total_paise * 0.01))
+				calculated_fee = int(math.floor(total_paise * 0.015))
 				min_amt = 999 * 100
-				max_amt = 3999 * 100
-				final_amount = max(min_amt, min(calculated_fee, max_amt))
+				base_commission = max(min_amt, calculated_fee)
+				
+				# GST Compliance (18%)
+				gst_amount = int(math.floor(base_commission * 0.18))
+				final_total = base_commission + gst_amount
 
 				ledger = frappe.get_doc({
 					"doctype": "Monthly Billing Ledger",
 					"restaurant": r.get("name"),
 					"billing_month": previous_month,
 					"total_gmv": total_paise,
-					"calculated_fee": calculated_fee,
-					"final_amount": final_amount,
-					"payment_status": "pending"
+					"calculated_fee": base_commission,
+					"final_amount": final_total,
+					"payment_status": "pending",
+					"notes": f"Base Commission: ₹{base_commission/100:.2f}, GST (18%): ₹{gst_amount/100:.2f}"
 				})
 				ledger.insert(ignore_permissions=True)
 				created.append(ledger.name)

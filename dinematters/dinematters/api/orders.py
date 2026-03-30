@@ -452,21 +452,18 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 					if order_count == 0:
 						ref_link = frappe.get_doc("Referral Link", order_doc.referral_link)
 						
-						# Reward Referrer
+						# 2. Handle Referral Conversion Reward (Fallback for non-verified or guest users)
+						from dinematters.dinematters.api.loyalty import process_referral_welcome_bonus
+						referral_id = ref_link.identifier
+						if referral_id:
+							process_referral_welcome_bonus(platform_customer, restaurant, referral_id)
+						
+						# 3. Reward Referrer for the order
 						add_loyalty_coins(
 							customer=ref_link.referrer,
 							restaurant=restaurant,
 							coins=loyalty_prog.referral_order_reward_coins,
 							reason="Referral Order",
-							ref_doctype="Order",
-							ref_name=order_doc.name
-						)
-						
-						add_loyalty_coins(
-							customer=platform_customer,
-							restaurant=restaurant,
-							coins=loyalty_prog.new_user_welcome_reward_coins,
-							reason="Welcome Bonus",
 							ref_doctype="Order",
 							ref_name=order_doc.name
 						)

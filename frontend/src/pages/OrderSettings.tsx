@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { Truck, ShoppingBag, Clock, DollarSign, Settings } from 'lucide-react'
+import { Truck, ShoppingBag, Clock, DollarSign, Settings, Percent, FileText } from 'lucide-react'
 
 export default function OrderSettings() {
   const { selectedRestaurant } = useRestaurant()
@@ -19,7 +19,9 @@ export default function OrderSettings() {
     minimum_order_value: 0,
     estimated_prep_time: 30,
     default_delivery_fee: 0,
-    no_ordering: 0
+    no_ordering: 0,
+    tax_rate: 5.0,
+    gst_number: ''
   })
 
   const { data: restaurantDoc, isValidating, mutate } = useFrappeGetDoc(
@@ -37,7 +39,9 @@ export default function OrderSettings() {
         minimum_order_value: restaurantDoc.minimum_order_value ?? 0,
         estimated_prep_time: restaurantDoc.estimated_prep_time ?? 30,
         default_delivery_fee: restaurantDoc.default_delivery_fee ?? 0,
-        no_ordering: restaurantDoc.no_ordering ?? 0
+        no_ordering: restaurantDoc.no_ordering ?? 0,
+        tax_rate: restaurantDoc.tax_rate ?? 5.0,
+        gst_number: restaurantDoc.gst_number ?? ''
       })
     }
   }, [restaurantDoc])
@@ -58,7 +62,9 @@ export default function OrderSettings() {
           minimum_order_value: settings.minimum_order_value,
           estimated_prep_time: settings.estimated_prep_time,
           default_delivery_fee: settings.default_delivery_fee,
-          no_ordering: settings.no_ordering
+          no_ordering: settings.no_ordering,
+          tax_rate: settings.tax_rate,
+          gst_number: settings.gst_number
         }
       })
 
@@ -276,6 +282,37 @@ export default function OrderSettings() {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">Additional fee applied to takeaway and delivery orders</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Percent className="w-4 h-4" />
+                  Tax Rate (%)
+                </Label>
+                <div className="flex items-center rounded-md border border-input bg-background overflow-hidden px-3">
+                  <Input
+                    type="number"
+                    className="h-8 border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:border-0 p-0"
+                    value={settings.tax_rate || ''}
+                    onChange={(e) => handleNumberChange('tax_rate', e.target.value)}
+                  />
+                  <span className="text-xs text-muted-foreground font-medium">%</span>
+                </div>
+                <p className="text-xs text-muted-foreground">GST percentage (e.g. 5 for 5% GST)</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  GST Number
+                </Label>
+                <Input
+                  value={settings.gst_number || ''}
+                  onChange={(e) => setSettings(prev => ({ ...prev, gst_number: e.target.value }))}
+                  placeholder="27XXXXX0000X1Z1"
+                  className="h-10"
+                />
+                <p className="text-xs text-muted-foreground">Registered GSTIN for invoice generation</p>
               </div>
             </div>
           </CardContent>
