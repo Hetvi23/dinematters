@@ -200,7 +200,34 @@ def get_products(restaurant_id, category=None, type=None, vegetarian=None, searc
 		}
 
 
+
+def format_products_for_listing(products):
+	"""
+	Full version of product formatting that includes nested data
+	(customizations and recommendations) for the main menu page.
+	"""
+	if not products:
+		return []
+
+	product_names = [product["docname"] for product in products if product.get("docname")]
+	media_by_product = get_product_media_map(product_names)
+	questions_by_product, question_names = get_customization_questions_map(product_names)
+	options_by_question = get_customization_options_map(question_names)
+
+	formatted_products = []
+	for product in products:
+		docname = product.get("docname")
+		formatted_products.append(
+			format_product_from_row(
+				product,
+				media_by_product.get(docname, []),
+				questions_by_product.get(docname, []),
+				options_by_question
+			)
+		)
+
 	return formatted_products
+
 
 
 def format_products_for_listing_minimal(products):
@@ -307,7 +334,67 @@ def get_customization_options_map(question_names):
 	return options_by_question
 
 
+
+def format_product_from_row(product_row, media_rows, customization_questions, options_by_question):
+	"""
+	Full row formatting including customizations and recommendations.
+	"""
+	# Start with the same base as minimal
+	product = format_product_from_row_minimal(
+		product_row, 
+		media_rows, 
+		has_customizations=len(customization_questions) > 0
+	)
+	
+	# Add customizations (Full version)
+	if customization_questions:
+		questions = []
+		for q in customization_questions:
+			q_data = {
+				"id": q.get("question_id"),
+				"title": q.get("title"),
+				"type": q.get("question_type"),
+				"required": bool(q.get("is_required")),
+				"displayOrder": cint(q.get("display_order"))
+			}
+			if q.get("subtitle"):
+				q_data["subtitle"] = q.get("subtitle")
+				
+			options = []
+			for opt in options_by_question.get(q.get("name"), []):
+				opt_data = {
+					"id": opt.get("option_id"),
+					"label": opt.get("label"),
+					"price": flt(opt.get("price")) or 0
+				}
+				if opt.get("is_vegetarian") is not None:
+					opt_data["isVegetarian"] = bool(opt.get("is_vegetarian"))
+				if opt.get("is_default"):
+					opt_data["isDefault"] = True
+				options.append(opt_data)
+			
+			if options:
+				q_data["options"] = options
+			questions.append(q_data)
+		
+		if questions:
+			product["customizationQuestions"] = questions
+
+	# Add recommendations
+	recs = product_row.get("recommendations")
+	if recs:
+		try:
+			recommendations = json.loads(recs) if isinstance(recs, str) else recs
+			if recommendations and isinstance(recommendations, list):
+				ids = [r.get("id") for r in recommendations if isinstance(r, dict) and r.get("id")]
+				if ids:
+					product["recommendedDishIds"] = ids
+					product["recommendedProducts"] = ids
+		except Exception:
+			pass
+
 	return product
+
 
 
 def format_product_from_row_minimal(product_row, media_rows=None, has_customizations=False):
