@@ -36,8 +36,7 @@ def send_otp(restaurant_id, phone, purpose="verification", restaurant_name=None,
 		if not normalized or len(normalized) != 10:
 			return {"success": False, "error": "INVALID_PHONE", "message": "Invalid phone number"}
 
-		if is_phone_verified(phone):
-			return {"success": True, "already_verified": True}
+		# A user must now always have a session token or verify via OTP.
 
 		# Rate limit
 		rate_key = f"otp_rate:{normalized}"
@@ -82,7 +81,7 @@ def send_otp(restaurant_id, phone, purpose="verification", restaurant_name=None,
 		token = frappe.generate_hash(length=32)
 		frappe.cache().set_value(
 			f"otp:{normalized}:{token}",
-			{"otp": otp, "purpose": purpose},
+			{"otp": otp, "purpose": purpose, "attempts": 0},
 			expires_in_sec=OTP_EXPIRY_MINUTES * 60
 		)
 
@@ -119,8 +118,17 @@ def verify_otp(restaurant_id, phone, otp, token, name=None, email=None):
 		if not cached:
 			return {"success": False, "error": "OTP_EXPIRED_OR_INVALID"}
 
+		# Anti-Brute Force: 5-Strikes Rule
+		attempts = cached.get("attempts", 0)
+		if attempts >= 5:
+			frappe.cache().delete_value(f"otp:{normalized}:{token}")
+			return {"success": False, "error": "MAX_ATTEMPTS_EXCEEDED", "message": "Too many failed attempts. Request a new OTP."}
+
 		if cached.get("otp") != otp:
-			return {"success": False, "error": "INVALID_OTP"}
+			# Increment attempts
+			cached["attempts"] = attempts + 1
+			frappe.cache().set_value(f"otp:{normalized}:{token}", cached, expires_in_sec=OTP_EXPIRY_MINUTES * 60)
+			return {"success": False, "error": "INVALID_OTP", "message": f"Invalid OTP. {5 - (attempts + 1)} attempts remaining."}
 
 		frappe.cache().delete_value(f"otp:{normalized}:{token}")
 
@@ -143,15 +151,62 @@ def verify_otp(restaurant_id, phone, otp, token, name=None, email=None):
 				frappe.db.set_value("Customer", customer.name, "phone", normalized)
 		frappe.db.commit()
 
-		return {"success": True, "verified": True, "customer_id": customer.name}
+		# Generate session token for production-ready secure login
+		session_token = frappe.generate_hash(length=48)
+		frappe.cache().set_value(
+			f"customer_session:{session_token}",
+			{"customer_id": customer.name, "phone": normalized},
+			expires_in_sec=30 * 24 * 60 * 60  # 30 days
+		)
+
+		return {
+			"success": True,
+			"verified": True,
+			"customer_id": customer.name,
+			"session_token": session_token
+		}
 	except Exception as e:
 		frappe.log_error(f"verify_otp error: {e}", "OTP_Verify_Error")
 		return {"success": False, "error": "INTERNAL_ERROR", "message": str(e)}
 
 
 @frappe.whitelist(allow_guest=True)
+def check_session(session_token):
+	"""
+	Validate a session token. Returns customer_id and phone if valid.
+	This is the secure replacement for checking 'is_phone_verified' based only on phone.
+	"""
+	try:
+		if not session_token:
+			return {"success": False, "verified": False}
+		
+		session = frappe.cache().get_value(f"customer_session:{session_token}")
+		if not session:
+			return {"success": False, "verified": False}
+		
+		# Confirm customer still exists
+		customer_id = session.get("customer_id")
+		if not customer_id or not frappe.db.exists("Customer", customer_id):
+			frappe.cache().delete_value(f"customer_session:{session_token}")
+			return {"success": False, "verified": False}
+
+		return {
+			"success": True,
+			"verified": True, 
+			"customer_id": customer_id,
+			"phone": session.get("phone")
+		}
+	except Exception as e:
+		frappe.log_error(f"check_session error: {e}", "OTP_Check_Error")
+		return {"success": False, "verified": False}
+
+
+@frappe.whitelist(allow_guest=True)
 def check_verified(phone):
-	"""Check if phone is verified (platform-wide)."""
+	"""
+	Check if phone number exists in DB. 
+	NOTE: This no longer suffices for login/ordering; use check_session instead.
+	"""
 	try:
 		normalized = normalize_phone(phone)
 		if not normalized or len(normalized) != 10:

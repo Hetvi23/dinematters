@@ -20,94 +20,52 @@ from collections import defaultdict
 def get_top_picks(restaurant_id):
 	"""
 	GET /api/v1/top-picks
-	Get top picks for the restaurant with fallback logic.
+	Optimized Top Picks API with Caching and Priority Selection.
+	Priority:
 	1. Explicit top-picks
-	2. Random active items with media (to reach at least 3)
-	3. Any random active items (if still < 3)
+	2. Items with media (has_no_media=0)
+	3. Newest items (creation desc)
+	Stable results (no randomness).
 	"""
 	try:
+		# Use cache for performance
+		cache_key = f"top_picks:{restaurant_id}"
+		cached_response = frappe.cache().get_value(cache_key)
+		if cached_response:
+			return json.loads(cached_response)
+
 		# Validate restaurant
 		restaurant = validate_restaurant_for_api(restaurant_id)
 		
-		# 1. Fetch explicit top-picks
-		products = frappe.get_all(
-			"Menu Product",
-			fields=[
-				"name as docname",
-				"product_id as id",
-				"product_name as name",
-				"price",
-				"original_price",
-				"category_name as category",
-				"product_type as type",
-				"description",
-				"is_vegetarian",
-				"calories",
-				"estimated_time as estimatedTime",
-				"serving_size as servingSize",
-				"has_no_media",
-				"main_category as mainCategory",
-				"display_order",
-				"is_active",
-				"recommendations"
-			],
-			filters={"product_type": "top-picks", "is_active": 1, "restaurant": restaurant},
-			order_by="display_order, product_name",
-			limit_page_length=10
-		)
-		
-		# 2. If < 3, fetch random active items with media
-		if len(products) < 3:
-			needed = 3 - len(products)
-			existing_ids = [p["docname"] for p in products]
-			
-			# Priority 2: Random active items WITH media
-			random_with_media = frappe.db.sql(f"""
-				SELECT 
-					name as docname, product_id as id, product_name as name, price, original_price,
-					category_name as category, product_type as type, description, is_vegetarian,
-					calories, estimated_time as estimatedTime, serving_size as servingSize,
-					has_no_media, main_category as mainCategory, display_order, is_active,
-					recommendations
-				FROM `tabMenu Product`
-				WHERE 
-					restaurant = %s AND is_active = 1 AND has_no_media = 0
-					AND name NOT IN %s
-				ORDER BY RAND()
-				LIMIT %s
-			""", (restaurant, existing_ids or ["dummy"], needed), as_dict=True)
-			
-			products.extend(random_with_media)
-			
-		# 3. If still < 3, fetch any random active items
-		if len(products) < 3:
-			needed = 3 - len(products)
-			existing_ids = [p["docname"] for p in products]
-			
-			random_any = frappe.db.sql(f"""
-				SELECT 
-					name as docname, product_id as id, product_name as name, price, original_price,
-					category_name as category, product_type as type, description, is_vegetarian,
-					calories, estimated_time as estimatedTime, serving_size as servingSize,
-					has_no_media, main_category as mainCategory, display_order, is_active,
-					recommendations
-				FROM `tabMenu Product`
-				WHERE 
-					restaurant = %s AND is_active = 1
-					AND name NOT IN %s
-				ORDER BY RAND()
-				LIMIT %s
-			""", (restaurant, existing_ids or ["dummy"], needed), as_dict=True)
-			
-			products.extend(random_any)
+		# Single prioritized query for all fallback logic
+		# 1. product_type == 'top-picks' gets highest priority (0)
+		# 2. has_no_media == 0 (with images) gets priority (0) over those without (1)
+		# 3. Stable order by display_order and creation date
+		products = frappe.db.sql(f"""
+			SELECT 
+				name as docname, product_id as id, product_name as name, price, original_price,
+				category_name as category, product_type as type, description, is_vegetarian,
+				calories, estimated_time as estimatedTime, serving_size as servingSize,
+				has_no_media, main_category as mainCategory, display_order, is_active,
+				recommendations
+			FROM `tabMenu Product`
+			WHERE 
+				restaurant = %s AND is_active = 1
+			ORDER BY 
+				(CASE WHEN product_type = 'top-picks' THEN 0 ELSE 1 END) ASC,
+				has_no_media ASC,
+				display_order ASC,
+				creation DESC
+			LIMIT 10
+		""", (restaurant), as_dict=True)
 
-		# Format products with media and customizations
-		formatted_products = format_products_for_listing(products)
+		# Format products with media only (minimal payload for fast home page)
+		formatted_products = format_products_for_listing_minimal(products)
 		
 		# Get currency info for restaurant
 		currency_info = get_restaurant_currency_info(restaurant)
 		
-		return {
+		result = {
 			"success": True,
 			"data": {
 				"products": formatted_products,
@@ -116,6 +74,11 @@ def get_top_picks(restaurant_id):
 				"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
 			}
 		}
+
+		# Cache results for 1 hour
+		frappe.cache().set_value(cache_key, json.dumps(result), expires_in_sec=3600)
+		
+		return result
 	except Exception as e:
 		frappe.log_error(f"Error in get_top_picks: {str(e)}")
 		return {
@@ -237,27 +200,39 @@ def get_products(restaurant_id, category=None, type=None, vegetarian=None, searc
 		}
 
 
-def format_products_for_listing(products):
+	return formatted_products
+
+
+def format_products_for_listing_minimal(products):
 	"""
-	Format Menu Product rows for the listing API using bulk-loaded child tables.
-	This avoids N+1 document and child-table queries while preserving the response shape.
+	Minimal version of product formatting that excludes heavy nested data
+	(customizations and recommendations) for fast home page access.
 	"""
 	if not products:
 		return []
 
 	product_names = [product["docname"] for product in products if product.get("docname")]
 	media_by_product = get_product_media_map(product_names)
-	questions_by_product, question_names = get_customization_questions_map(product_names)
-	options_by_question = get_customization_options_map(question_names)
+
+	# Fetch which products have customizations (bulk check)
+	customization_data = frappe.get_all(
+		"Customization Question",
+		filters={
+			"parent": ["in", product_names],
+			"parenttype": "Menu Product",
+			"parentfield": "customization_questions"
+		},
+		fields=["parent"]
+	)
+	has_customizations_set = {row["parent"] for row in customization_data}
 
 	formatted_products = []
 	for product in products:
 		formatted_products.append(
-			format_product_from_row(
+			format_product_from_row_minimal(
 				product,
 				media_by_product.get(product.get("docname"), []),
-				questions_by_product.get(product.get("docname"), []),
-				options_by_question,
+				product.get("docname") in has_customizations_set
 			)
 		)
 
@@ -332,9 +307,12 @@ def get_customization_options_map(question_names):
 	return options_by_question
 
 
-def format_product_from_row(product_row, media_rows=None, customization_questions=None, options_by_question=None):
+	return product
+
+
+def format_product_from_row_minimal(product_row, media_rows=None, has_customizations=False):
 	"""
-	Format a Menu Product row and bulk-loaded child rows to match the listing API contract.
+	Minimal row formatting excluding customizations and recommendations.
 	"""
 	product = {
 		"id": product_row["id"],
@@ -347,6 +325,7 @@ def format_product_from_row(product_row, media_rows=None, customization_question
 		"servingSize": product_row.get("servingSize") or "1",
 		"displayOrder": cint(product_row.get("display_order")) if product_row.get("display_order") is not None else 0,
 		"isActive": bool(product_row.get("is_active")) if product_row.get("is_active") is not None else True,
+		"hasCustomizations": has_customizations
 	}
 
 	if product_row.get("original_price"):
@@ -392,55 +371,6 @@ def format_product_from_row(product_row, media_rows=None, customization_question
 		product["media"] = media
 	elif product_row.get("has_no_media"):
 		product["hasNoMedia"] = True
-
-	formatted_questions = []
-	for question in customization_questions or []:
-		question_data = {
-			"id": question.get("question_id"),
-			"title": question.get("title"),
-			"type": question.get("question_type"),
-			"required": bool(question.get("is_required"))
-		}
-
-		if question.get("subtitle"):
-			question_data["subtitle"] = question.get("subtitle")
-
-		options = []
-		for opt in (options_by_question or {}).get(question.get("name"), []):
-			option_data = {
-				"id": opt.get("option_id"),
-				"label": opt.get("label"),
-				"price": flt(opt.get("price")) or 0
-			}
-
-			if opt.get("is_vegetarian") is not None:
-				option_data["isVegetarian"] = bool(opt.get("is_vegetarian"))
-
-			if opt.get("is_default"):
-				option_data["isDefault"] = True
-
-			options.append(option_data)
-
-		if options:
-			question_data["options"] = options
-
-		formatted_questions.append(question_data)
-
-	if formatted_questions:
-		product["customizationQuestions"] = formatted_questions
-
-	recommendations = product_row.get("recommendations")
-	if recommendations:
-		try:
-			recommendations = json.loads(recommendations) if isinstance(recommendations, str) else recommendations
-			if recommendations and isinstance(recommendations, list):
-				product["recommendations"] = recommendations
-				ids = [r.get("id") for r in recommendations if isinstance(r, dict) and r.get("id")]
-				if ids:
-					product["recommendedDishIds"] = ids
-					product["recommendedProducts"] = ids
-		except Exception:
-			pass
 
 	return product
 

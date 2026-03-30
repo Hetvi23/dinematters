@@ -89,6 +89,35 @@ def is_phone_verified(phone: str) -> bool:
 	return False
 
 
+def validate_customer_session(phone: str, session_token: str) -> bool:
+	"""
+	Verify that the provided session_token is valid and belongs to the phone number.
+	Essential for securing sensitive APIs like create_order.
+	"""
+	try:
+		if not session_token or not phone:
+			return False
+		
+		normalized = normalize_phone(phone)
+		session = frappe.cache().get_value(f"customer_session:{session_token}")
+		
+		if not session:
+			return False
+		
+		# Check if token belongs to this normalized phone
+		if session.get("phone") != normalized:
+			return False
+			
+		# Check if customer doc exists
+		customer_id = session.get("customer_id")
+		if not customer_id or not frappe.db.exists("Customer", customer_id):
+			return False
+			
+		return True
+	except Exception:
+		return False
+
+
 def require_verified_phone(restaurant_id: str, phone: str) -> bool:
 	"""Returns True if restaurant has verify_my_user OFF, or if phone is verified."""
 	config = frappe.db.get_value("Restaurant Config", {"restaurant": restaurant_id}, "verify_my_user")

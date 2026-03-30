@@ -6,7 +6,7 @@ import { Label } from './ui/label'
 import { toast } from 'sonner'
 
 const RESEND_COOLDOWN_SEC = 30
-const OTP_LENGTH = 4
+const OTP_LENGTH = 6
 
 interface OTPVerificationProps {
   restaurantId: string
@@ -59,7 +59,7 @@ export function OTPVerification({
           onVerified()
           return
         }
-        if (res.already_verified) {
+        if (res.skip_verification) {
           onVerified()
           return
         }
@@ -134,7 +134,7 @@ export function OTPVerification({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label>Enter 4-digit OTP</Label>
+        <Label>Enter 6-digit OTP</Label>
         <Input
           type="text"
           inputMode="numeric"

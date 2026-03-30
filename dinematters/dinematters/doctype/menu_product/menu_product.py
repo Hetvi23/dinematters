@@ -37,6 +37,16 @@ class MenuProduct(Document):
 			if self.name != new_product_id:
 				self.name = new_product_id
 	
+	def after_save(self):
+		"""Clear top picks cache for the restaurant"""
+		if self.get('restaurant'):
+			frappe.cache().delete_value(f"top_picks:{self.restaurant}")
+	
+	def on_trash(self):
+		"""Clear top picks cache on deletion"""
+		if self.get('restaurant'):
+			frappe.cache().delete_value(f"top_picks:{self.restaurant}")
+	
 	def generate_product_id_from_name(self, product_name):
 		"""Generate a slug-like product_id from product_name"""
 		if not product_name:

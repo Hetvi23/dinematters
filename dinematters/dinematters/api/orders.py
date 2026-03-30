@@ -13,6 +13,7 @@ from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_ap
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 from dinematters.dinematters.utils.customer_helpers import (
 	require_verified_phone,
+	validate_customer_session,
 	get_or_create_customer,
 	normalize_phone,
 	_find_customer_by_normalized_phone,
@@ -126,13 +127,19 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 					}
 				}
 		
-		# OTP gate: require verified phone when verify_my_user is on
+		# OTP/Session gate: require verified phone + valid session token when verify_my_user is on
 		phone = customer_info.get("phone")
-		if phone and not require_verified_phone(restaurant_id, phone):
-			return {
-				"success": False,
-				"error": {"code": "PHONE_NOT_VERIFIED", "message": "Please verify your phone with OTP first"}
-			}
+		if phone:
+			# Check if verification is active for this restaurant
+			config = frappe.db.get_value("Restaurant Config", {"restaurant": restaurant_id}, "verify_my_user")
+			if config:
+				# Secure Session Check: Validate the X-Customer-Token from headers
+				session_token = frappe.request.headers.get("X-Customer-Token") if frappe.request else None
+				if not validate_customer_session(phone, session_token):
+					return {
+						"success": False,
+						"error": {"code": "PHONE_NOT_VERIFIED", "message": "Secure session expired or invalid. Please verify with OTP again."}
+					}
 
 		platform_customer = None
 		if phone:
@@ -716,16 +723,19 @@ def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=Fa
 		restaurant = validate_restaurant_for_api(restaurant_id)
 
 		normalized = normalize_phone(phone)
+
 		if not normalized or len(normalized) != 10:
 			return {
 				"success": False,
 				"error": {"code": "INVALID_PHONE", "message": "Invalid phone number"}
 			}
 
-		if not require_verified_phone(restaurant_id, phone):
+		# Secure Session Check: Validate the X-Customer-Token from headers
+		session_token = frappe.request.headers.get("X-Customer-Token") if frappe.request else None
+		if not validate_customer_session(phone, session_token):
 			return {
 				"success": False,
-				"error": {"code": "PHONE_NOT_VERIFIED", "message": "Please verify your phone with OTP first"}
+				"error": {"code": "SECURE_SESSION_INVALID", "message": "Please log in to view your orders."}
 			}
 
 		customer_id = _find_customer_by_normalized_phone(normalized)

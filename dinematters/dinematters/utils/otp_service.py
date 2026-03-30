@@ -10,7 +10,7 @@ import requests
 import frappe
 
 FAST2SMS_SMS_URL = "https://www.fast2sms.com/dev/bulkV2"
-OTP_LENGTH = 4
+OTP_LENGTH = 6
 OTP_EXPIRY_MINUTES = 5
 OTP_RESEND_COOLDOWN = 30
 OTP_MAX_PER_HOUR = 3
