@@ -51,7 +51,7 @@ def _record_transaction(restaurant, txn_type, credits, description="", payment_i
     )
     balance = (balance[0][0] if balance and balance[0][0] is not None else 0)
 
-    if txn_type == "Deduction":
+    if txn_type == "AI Deduction":
         new_balance = balance - abs(credits)
     elif txn_type == "Admin Adjustment":
         # Admin adjustments support signed integers: negative subtracts, positive adds
@@ -278,7 +278,7 @@ def deduct_credits_for_enhancement(restaurant, generation_id, credits=None):
 
     new_balance = _record_transaction(
         restaurant=restaurant,
-        txn_type="Deduction",
+        txn_type="AI Deduction",
         credits=credits_to_deduct,
         description=f"AI image operation - Generation {generation_id}",
         generation_id=generation_id,
@@ -336,7 +336,7 @@ def deduct_credits_for_theme_activation(restaurant):
 
     _record_transaction(
         restaurant=restaurant,
-        txn_type="Deduction",
+        txn_type="AI Deduction",
         credits=credits_to_deduct,
         description="Menu Theme Background activation fee (30 days)",
     )

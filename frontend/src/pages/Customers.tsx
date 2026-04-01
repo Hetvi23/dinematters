@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { LockedFeature } from '@/components/FeatureGate/LockedFeature'
 import {
   Dialog,
   DialogContent,
@@ -66,7 +67,7 @@ interface CustomerProfileData {
 }
 
 export default function Customers() {
-  const { selectedRestaurant } = useRestaurant()
+  const { selectedRestaurant, isLux } = useRestaurant()
   const { formatAmountNoDecimals } = useCurrency()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [profileCustomerId, setProfileCustomerId] = useState<string | null>(null)
@@ -75,6 +76,10 @@ export default function Customers() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const pageSize = 20
+
+  if (!isLux) {
+    return <LockedFeature feature="customer" />
+  }
 
   const { data, isLoading, error } = useFrappeGetCall<CustomersResponse>(
     'dinematters.dinematters.api.customers.get_restaurant_customers',

@@ -39,6 +39,8 @@
   "referral_link",
   "section_break_status",
   "status",
+  "is_pushed_to_pos",
+  "pos_order_id",
   "column_break_status",
   "payment_method",
   "payment_status",
@@ -279,6 +281,19 @@
    "label": "Status",
    "options": "pending_verification\nPending Payment\nPending Verification\nAuto Accepted\nAccepted\nconfirmed\npreparing\nready\nIn Billing\ndelivered\nbilled\ncancelled",
    "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_pushed_to_pos",
+   "fieldtype": "Check",
+   "label": "Is Pushed to POS",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pos_order_id",
+   "fieldtype": "Data",
+   "label": "POS Order ID",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_status",

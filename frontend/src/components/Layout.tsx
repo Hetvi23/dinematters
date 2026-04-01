@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, Coins, Crown, CreditCard, Settings } from 'lucide-react'
+import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, Coins, Crown, CreditCard, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetCall, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
 import { AiRechargeModal } from '@/components/AiRechargeModal'
@@ -9,6 +9,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { useCurrency } from '@/hooks/useCurrency'
 import Breadcrumb from './Breadcrumb'
+import { BillingNotificationBar } from './BillingNotificationBar'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
@@ -20,6 +21,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
+import { SuspendedOverlay } from './SuspendedOverlay'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -100,6 +102,9 @@ type NavGroup = {
 }
 type NavItem = NavLink | NavGroup
 
+const LUX_ONLY_FEATURES = ['ordering', 'loyalty', 'coupons', 'pos_integration', 'customer', 'order_settings', 'customer_pay_and_usage']
+const PRO_FEATURES = ['analytics', 'ai_recommendations', 'custom_branding', 'table_booking', 'games', 'events', 'offers', 'experience_lounge', 'video_upload', 'branding']
+
 const navigation: NavItem[] = [
   { type: 'link', name: 'Dashboard', href: '/dashboard', icon: Home },
   { type: 'link', name: 'Setup Wizard', href: '/setup', icon: Sparkles },
@@ -115,7 +120,7 @@ const navigation: NavItem[] = [
     ],
   },
   { type: 'link', name: 'All Modules', href: '/modules', icon: Grid3x3 },
-  { type: 'link', name: 'Customer pay & Usage', href: '/billing', icon: CreditCard, feature: 'ordering' },
+  { type: 'link', name: 'Customer pay & Usage', href: '/billing', icon: CreditCard, feature: 'customer_pay_and_usage' },
   {
     type: 'group',
     id: 'manage-orders',
@@ -128,17 +133,18 @@ const navigation: NavItem[] = [
       { name: 'Past and Billed Orders', href: '/past-orders', icon: Clock, feature: 'ordering' },
     ],
   },
-  { type: 'link', name: 'Table Bookings', href: '/bookings', icon: Calendar, feature: 'ordering' },
-  { type: 'link', name: 'Customers', href: '/customers', icon: Users, feature: 'ordering' },
+  { type: 'link', name: 'Table Bookings', href: '/bookings', icon: Calendar, feature: 'table_booking' },
+  { type: 'link', name: 'POS Integration', href: '/pos-integration', icon: Settings, feature: 'pos_integration' },
+  { type: 'link', name: 'Customers', href: '/customers', icon: Users, feature: 'customer' },
   {
     type: 'group',
     id: 'loyalty-growth',
     name: 'Loyalty & Growth',
     icon: Coins,
-    feature: 'ordering',
+    feature: 'loyalty',
     children: [
-      { name: 'Loyalty Settings', href: '/loyalty-settings', icon: Settings, feature: 'ordering' },
-      { name: 'Customer Insights', href: '/loyalty-insights', icon: Users, feature: 'ordering' },
+      { name: 'Loyalty Settings', href: '/loyalty-settings', icon: Settings, feature: 'loyalty' },
+      { name: 'Customer Insights', href: '/loyalty-insights', icon: Users, feature: 'loyalty' },
     ],
   },
   {
@@ -150,7 +156,7 @@ const navigation: NavItem[] = [
       { name: 'Products', href: '/products', icon: Package },
       { name: 'Categories', href: '/categories', icon: FolderTree },
       { name: 'AI Image Gallery', href: '/ai-enhancements', icon: Sparkles },
-      { name: 'Recommendations Engine', href: '/recommendations-engine', icon: FolderTree, feature: 'aiRecommendations' },
+      { name: 'Recommendations Engine', href: '/recommendations-engine', icon: FolderTree, feature: 'ai_recommendations' },
     ],
   },
   { type: 'link', name: 'Manage Offers & Coupons', href: '/coupons', icon: Tag, feature: 'coupons' },
@@ -171,7 +177,7 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
-  const { selectedRestaurant, setSelectedRestaurant, setRestaurantsData, isPro, features } = useRestaurant()
+  const { selectedRestaurant, setSelectedRestaurant, setRestaurantsData, isPro, isLux, planType, coinsBalance, billingStatus, isActive, refreshConfig, billingInfo } = useRestaurant()
   const { formatAmountNoDecimals } = useCurrency()
   const [sidebarOpen, setSidebarOpen] = useState(false) // Mobile sidebar
   const [sidebarExpanded, setSidebarExpanded] = useState(true) // Desktop sidebar expanded/collapsed
@@ -180,32 +186,23 @@ export default function Layout({ children }: LayoutProps) {
   const [selectOpen, setSelectOpen] = useState(false) // Track if restaurant select is open
   const [lockAnimating, setLockAnimating] = useState(false) // Track lock animation state
 
-  // AI Credits in top bar
-  const [aiCredits, setAiCredits] = useState<number | null>(null)
+  // DineMatters Coins in top bar
   const [showTopBarRecharge, setShowTopBarRecharge] = useState(false)
-  const { call: getAiBillingInfo } = useFrappePostCall('dinematters.dinematters.api.ai_billing.get_ai_billing_info')
 
   // Admin access state - using exact same pattern as TestApiCalls.tsx
   const [isAdmin, setIsAdmin] = useState(false)
 
-  // Fetch AI credits for top bar — refresh whenever restaurant changes
+  // Sync balance when updated from other components (like Recharge Modal)
   useEffect(() => {
-    if (!selectedRestaurant) return
-    getAiBillingInfo({ restaurant: selectedRestaurant })
-      .then((res) => { if (res?.message) setAiCredits(res.message.ai_credits ?? 0) })
-      .catch(() => { })
-  }, [selectedRestaurant])
-
-  // Sync credits when updated from other components
-  useEffect(() => {
-    const handleCreditsUpdate = (e: any) => {
-      if (typeof e.detail?.balance === 'number') {
-        setAiCredits(e.detail.balance)
+    const handleBalanceUpdate = (e: any) => {
+      if (e.detail?.refresh) {
+        // Immediate refresh when explicitly requested via event
+         refreshConfig()
       }
     }
-    window.addEventListener('ai-credits-updated', handleCreditsUpdate)
-    return () => window.removeEventListener('ai-credits-updated', handleCreditsUpdate)
-  }, [])
+    window.addEventListener('ai-credits-updated', handleBalanceUpdate)
+    return () => window.removeEventListener('ai-credits-updated', handleBalanceUpdate)
+  }, [selectedRestaurant, refreshConfig])
 
   // Expanded nav groups (persisted in localStorage)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
@@ -250,6 +247,34 @@ export default function Layout({ children }: LayoutProps) {
       }
     })
   }, [location.pathname])
+
+  // Helper to determine feature locking and required plan
+  const getFeatureStatus = (feature?: string) => {
+    if (!feature) return { isLocked: false, requiredTier: null }
+    if (isLux) return { isLocked: false, requiredTier: null }
+    
+    if (LUX_ONLY_FEATURES.includes(feature)) {
+       return { isLocked: true, requiredTier: 'LUX' }
+    }
+    
+    if (PRO_FEATURES.includes(feature)) {
+       return { isLocked: !isPro, requiredTier: 'PRO' }
+    }
+    
+    return { isLocked: false, requiredTier: null }
+  }
+
+  const handleLockedClick = (e: React.MouseEvent, name: string, status: { isLocked: boolean; requiredTier: string | null }) => {
+    if (status.isLocked) {
+      e.preventDefault()
+      e.stopPropagation()
+      toast.error(`${name} requires ${status.requiredTier} plan`, {
+        description: `Upgrade to ${status.requiredTier} to unlock this feature`
+      })
+      return true
+    }
+    return false
+  }
 
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newRestaurantData, setNewRestaurantData] = useState({
@@ -589,7 +614,12 @@ export default function Layout({ children }: LayoutProps) {
                                 <span className="inline-block truncate whitespace-nowrap overflow-hidden text-ellipsis">
                                   {restaurantDoc?.restaurant_name || currentRestaurant?.restaurant_name || restaurants[0]?.restaurant_name || 'Select Restaurant'}
                                 </span>
-                                {isPro ? (
+                                {isLux ? (
+                                  <span className="inline-flex items-center px-1.5 py-0 text-[10px] font-black bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-md border border-white/20 rounded-full flex-shrink-0 animate-pulse-subtle">
+                                    <Crown className="h-2.5 w-2.5 mr-1 text-white" />
+                                    LUX
+                                  </span>
+                                ) : isPro ? (
                                   <span className="inline-flex items-center px-1.5 py-0 text-[9px] font-bold bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-sm rounded-full flex-shrink-0">
                                     <Crown className="h-2.5 w-2.5 mr-1" />
                                     PRO
@@ -732,25 +762,26 @@ export default function Layout({ children }: LayoutProps) {
                       ? acceptPendingOrders
                       : 0
                   const showBadge = badgeCount > 0
-                  const isLocked = item.feature && !isPro && !(features as any)[item.feature]
+                  // Unified locking logic
+                  const featureStatus = getFeatureStatus(item.feature)
+                  const isLocked = featureStatus.isLocked
+
+                  const LockIcon = (item.feature && LUX_ONLY_FEATURES.includes(item.feature)) 
+                    ? (
+                      <div className="flex items-center gap-0.5 flex-shrink-0">
+                        <Lock className="h-3 w-3 text-muted-foreground/60" />
+                        <Star className="h-2.5 w-2.5 text-amber-500 fill-amber-500" />
+                      </div>
+                    )
+                    : <Lock className="h-3.5 w-3.5 text-muted-foreground/60 flex-shrink-0" />
 
                   return (
                     <Link
                       key={item.name}
                       to={item.href}
                       onClick={(e) => {
-                        if (isLocked) {
-                          e.preventDefault()
-                          toast.error(`${item.name} requires PRO plan`, {
-                            description: 'Upgrade to PRO to unlock this feature',
-                            action: {
-                              label: 'Upgrade',
-                              onClick: () => navigate('/upgrade')
-                            }
-                          })
-                        } else {
-                          setSidebarOpen(false)
-                        }
+                        if (handleLockedClick(e, item.name, featureStatus)) return
+                        setSidebarOpen(false)
                       }}
                       className={cn(
                         "relative flex items-center rounded-md text-sm font-normal transition-all group",
@@ -758,8 +789,7 @@ export default function Layout({ children }: LayoutProps) {
                         "hover:bg-sidebar-accent active:bg-sidebar-accent/80",
                         isActive
                           ? "bg-primary/10 text-primary font-medium dark:bg-primary/20"
-                          : "text-sidebar-foreground hover:text-sidebar-foreground",
-                        isLocked && "opacity-60"
+                          : "text-sidebar-foreground hover:text-sidebar-foreground"
                       )}
                       title={!showExpanded ? item.name : undefined}
                     >
@@ -774,7 +804,7 @@ export default function Layout({ children }: LayoutProps) {
                         <>
                           <span className="flex-1">{item.name}</span>
                           {isLocked && (
-                            <Lock className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />
+                            LockIcon
                           )}
                           {!isLocked && showBadge && (
                             <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
@@ -808,7 +838,19 @@ export default function Layout({ children }: LayoutProps) {
                   return sum
                 }, 0)
                 const showBadge = groupBadgeCount > 0
-                const isGroupLocked = group.feature && !isPro && !(features as any)[group.feature]
+                
+                // Group locking logic
+                const groupStatus = getFeatureStatus(group.feature)
+                const isGroupLocked = groupStatus.isLocked
+
+                const GroupLockIcon = (group.feature && LUX_ONLY_FEATURES.includes(group.feature)) 
+                  ? (
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                      <Lock className="h-3 w-3 text-muted-foreground/60" />
+                      <Star className="h-2.5 w-2.5 text-amber-500 fill-amber-500" />
+                    </div>
+                  )
+                  : <Lock className="h-3.5 w-3.5 text-muted-foreground/60 flex-shrink-0" />
 
                 // Collapsed sidebar: show dropdown menu with child links
                 if (!showExpanded) {
@@ -836,26 +878,27 @@ export default function Layout({ children }: LayoutProps) {
                           .map((child) => {
                             const ChildIcon = child.icon || group.icon
                             const isChildActive = location.pathname === child.href || (child.href !== '/' && location.pathname.startsWith(child.href + '/'))
-                            const isChildLocked = child.feature && !isPro && !(features as any)[child.feature]
+                            
+                            // Unified child locking logic
+                            const childStatus = getFeatureStatus(child.feature)
+                            const isChildLocked = childStatus.isLocked
+
+                            const ChildLockIcon = (child.feature && LUX_ONLY_FEATURES.includes(child.feature)) 
+                              ? <Star className="h-3 w-3 text-amber-500 flex-shrink-0 ml-auto" />
+                              : <Lock className="h-3 w-3 text-muted-foreground/60 flex-shrink-0 ml-auto" />
                             return (
                               <DropdownMenuItem key={child.href} asChild>
                                 <Link
                                   to={child.href}
                                   onClick={(e) => {
-                                    if (isChildLocked) {
-                                      e.preventDefault()
-                                      toast.error(`${child.name} requires PRO plan`, {
-                                        description: 'Upgrade to PRO to unlock this feature'
-                                      })
-                                    } else {
-                                      setSidebarOpen(false)
-                                    }
+                                    if (handleLockedClick(e, child.name, childStatus)) return
+                                    setSidebarOpen(false)
                                   }}
                                   className={cn("flex items-center gap-2 cursor-pointer", isChildActive && "bg-primary/10 text-primary", isChildLocked && "opacity-60")}
                                 >
                                   <ChildIcon className="h-4 w-4" />
                                   {child.name}
-                                  {isChildLocked && <Lock className="h-3 w-3 text-orange-500 ml-auto" />}
+                                  {isChildLocked && ChildLockIcon}
                                   {!isChildLocked && child.badgeHref === '/orders' && pendingOrders > 0 && (
                                     <span className="ml-auto bg-destructive text-white text-xs px-1.5 rounded-full">
                                       {pendingOrders > 9 ? '9+' : pendingOrders}
@@ -902,7 +945,7 @@ export default function Layout({ children }: LayoutProps) {
                         <>
                           <span className="flex-1 text-left">{group.name}</span>
                           {isGroupLocked && (
-                            <Lock className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />
+                            GroupLockIcon
                           )}
                           {!isGroupLocked && showBadge && (
                             <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
@@ -938,20 +981,26 @@ export default function Layout({ children }: LayoutProps) {
                                 ? acceptPendingOrders
                                 : 0
                             const showChildBadge = childBadgeCount > 0
-                            const isChildLocked = child.feature && !isPro && !(features as any)[child.feature]
+                            
+                            // Unified child locking logic (Expanded View)
+                            const childStatus = getFeatureStatus(child.feature)
+                            const isChildLocked = childStatus.isLocked
+
+                            const ChildLockIcon = (child.feature && LUX_ONLY_FEATURES.includes(child.feature)) 
+                              ? (
+                                <div className="flex items-center gap-0.5 flex-shrink-0">
+                                  <Lock className="h-3 w-3 text-muted-foreground/60" />
+                                  <Star className="h-2.5 w-2.5 text-amber-500 fill-amber-500" />
+                                </div>
+                              )
+                              : <Lock className="h-3.5 w-3.5 text-muted-foreground/60 flex-shrink-0" />
                             return (
                               <Link
                                 key={child.href}
                                 to={child.href}
                                 onClick={(e) => {
-                                  if (isChildLocked) {
-                                    e.preventDefault()
-                                    toast.error(`${child.name} requires PRO plan`, {
-                                      description: 'Upgrade to PRO to unlock this feature'
-                                    })
-                                  } else {
-                                    setSidebarOpen(false)
-                                  }
+                                  if (handleLockedClick(e, child.name, childStatus)) return
+                                  setSidebarOpen(false)
                                 }}
                                 className={cn(
                                   "relative flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-all group",
@@ -964,7 +1013,7 @@ export default function Layout({ children }: LayoutProps) {
                               >
                                 <ChildIcon className="h-4 w-4 flex-shrink-0" />
                                 <span className="flex-1">{child.name}</span>
-                                {isChildLocked && <Lock className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />}
+                                {isChildLocked && ChildLockIcon}
                                 {!isChildLocked && showChildBadge && (
                                   <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-semibold">
                                     {childBadgeCount > 9 ? '9+' : childBadgeCount}
@@ -1012,12 +1061,12 @@ export default function Layout({ children }: LayoutProps) {
               <div className="flex">
                 <Button variant="outline" size="sm" onClick={() => navigate('/autopay-setup')} className="w-full gap-2">
                   <CreditCard className="h-3.5 w-3.5" />
-                  Billing & Autopay
+                  Billing & Subscription
                 </Button>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => navigate('/autopay-setup')} className="w-10 h-10 p-0" title="Billing & Autopay">
+                <Button variant="outline" size="sm" onClick={() => navigate('/autopay-setup')} className="w-10 h-10 p-0" title="Billing & Subscription">
                   <CreditCard className="h-4 w-4" />
                 </Button>
               </div>
@@ -1243,24 +1292,24 @@ export default function Layout({ children }: LayoutProps) {
               </div>
             </div>
 
-            {/* AI Credits Chip — always visible beside user avatar */}
-            {aiCredits !== null && selectedRestaurant && (
+            {/* DineMatters Coins Chip — always visible beside user avatar */}
+            {coinsBalance !== null && selectedRestaurant && (
               <button
                 type="button"
                 onClick={() => setShowTopBarRecharge(true)}
-                title={`AI Credits: ${aiCredits} — click to recharge`}
+                title={`DineMatters Coins: ${coinsBalance} — click to buy coins`}
                 className={cn(
                   'hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xs font-semibold transition-all hover:scale-105 active:scale-95 flex-shrink-0',
-                  aiCredits < 5
+                  coinsBalance < 300
                     ? 'bg-red-50 border-red-300 text-red-600 dark:bg-red-950/20 dark:border-red-700 dark:text-red-400'
-                    : aiCredits < 10
+                    : coinsBalance < 1000
                       ? 'bg-amber-50 border-amber-300 text-amber-600 dark:bg-amber-950/20 dark:border-amber-700 dark:text-amber-400'
                       : 'bg-primary/10 border-primary/30 text-primary dark:bg-primary/20 dark:border-primary/40'
                 )}
               >
                 <Coins className="h-4.5 w-4.5" />
-                <span className="tabular-nums">{aiCredits}</span>
-                <span className="opacity-60 text-[10px] font-normal">credits</span>
+                <span className="tabular-nums">{coinsBalance.toLocaleString()}</span>
+                <span className="opacity-60 text-[10px] font-normal uppercase tracking-wider">Coins</span>
               </button>
             )}
 
@@ -1269,6 +1318,8 @@ export default function Layout({ children }: LayoutProps) {
               <UserProfileDropdown />
             </div>
           </div>
+          {/* Global Billing Notifications */}
+          <BillingNotificationBar billingInfo={billingInfo} planType={planType} />
         </header>
 
         {/* Page Content */}
@@ -1376,20 +1427,24 @@ export default function Layout({ children }: LayoutProps) {
         </DialogContent>
       </Dialog>
 
-      {/* AI Credits Recharge Modal — triggered from top bar chip */}
+      {/* DineMatters Coins Recharge Modal — triggered from top bar chip */}
       {selectedRestaurant && (
         <AiRechargeModal
           open={showTopBarRecharge}
           onClose={() => setShowTopBarRecharge(false)}
           restaurant={selectedRestaurant}
-          currentBalance={aiCredits ?? 0}
-          onSuccess={() => {
-            // Balance is already updated via 'ai-credits-updated' event in AiRechargeModal
-            setShowTopBarRecharge(false)
-          }}
+          onSuccess={refreshConfig}
+        />
+      )}
+
+      {/* Hard Suspension Overlay */}
+      {!isActive && billingStatus === 'suspended' && (
+        <SuspendedOverlay 
+          restaurantName={restaurantDoc?.restaurant_name || currentRestaurant?.restaurant_name || "Your Restaurant"} 
         />
       )}
     </div>
   )
 }
+
 

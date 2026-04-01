@@ -23,6 +23,7 @@ import { useRestaurant } from '@/contexts/RestaurantContext'
 import { OrderDetailsDialog } from '@/components/OrderDetailsDialog'
 import { useConfirm } from '@/hooks/useConfirm'
 import { toast } from 'sonner'
+import { LockedFeature } from '@/components/FeatureGate/LockedFeature'
 
 interface Order {
   name: string
@@ -259,7 +260,7 @@ function DroppableColumn({
 }
 
 export default function AcceptOrders() {
-  const { selectedRestaurant } = useRestaurant()
+  const { selectedRestaurant, isLux } = useRestaurant()
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
@@ -407,6 +408,10 @@ export default function AcceptOrders() {
         <p className="text-muted-foreground">Select a restaurant to view pending orders</p>
       </div>
     )
+  }
+
+  if (!isLux) {
+    return <LockedFeature feature="ordering" requiredPlan={['LUX']} />
   }
 
   return (

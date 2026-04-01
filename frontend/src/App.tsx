@@ -46,6 +46,9 @@ import AutopaySetupPage from './pages/AutopaySetupPage'
 import LoyaltySettings from './pages/LoyaltySettings'
 import CustomerInsights from './pages/CustomerInsights'
 import PaymentConfiguration from './pages/PaymentConfiguration'
+import POSIntegration from './pages/POSIntegration'
+import LedgerPage from './pages/LedgerPage'
+
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -100,6 +103,7 @@ function AppContent() {
 							<Route path="/order-settings" element={<Layout><OrderSettings /></Layout>} />
 							<Route path="/billing" element={<Layout><PaymentSettings /></Layout>} />
 							<Route path="/billing/configure" element={<Layout><PaymentConfiguration /></Layout>} />
+							<Route path="/pos-integration" element={<Layout><POSIntegration /></Layout>} />
 						</Route>
 
 						{/* PRO Feature: AI Recommendations - Requires PRO plan */}
@@ -123,6 +127,8 @@ function AppContent() {
 						<Route path="/ai-menu-theme-background" element={<Layout><AIMenuThemeBackgroundPage /></Layout>} />
 						<Route path="/ai-menu-theme-history" element={<Layout><AIMenuThemeHistoryPage /></Layout>} />
 						<Route path="/autopay-setup" element={<Layout><AutopaySetupPage /></Layout>} />
+						<Route path="/ledger" element={<Layout><LedgerPage /></Layout>} />
+
 						<Route path="/Legacy Content" element={<Layout><LegacyContent /></Layout>} />
 						<Route path="/Legacy Signature Dish" element={<Layout><LegacySignatureDish /></Layout>} />
 						<Route path="/restaurant/:restaurantId/payment" element={<Layout><Payment /></Layout>} />

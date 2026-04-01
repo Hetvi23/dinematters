@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Eye, Filter, X, Search } from 'lucide-react'
 import { OrderDetailsDialog } from '@/components/OrderDetailsDialog'
+import { LockedFeature } from '@/components/FeatureGate/LockedFeature'
 import {
   Select,
   SelectContent,
@@ -35,12 +36,12 @@ export default function PastOrders() {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
 
-  const { selectedRestaurant, isLoading: contextLoading, isPro, restaurantConfig } = useRestaurant()
+  const { selectedRestaurant, isLoading: contextLoading, isLux, restaurantConfig } = useRestaurant()
   
   console.log('📊 PastOrders Initial State:', {
     selectedRestaurant,
     isLoading: contextLoading,
-    isPro,
+    isLux,
     planType: restaurantConfig?.subscription?.planType,
     searchQuery,
     statusFilter,
@@ -191,6 +192,10 @@ export default function PastOrders() {
 
     return filtered
   }, [orders, selectedRestaurant, tableFilter]) || []
+
+  if (!isLux) {
+    return <LockedFeature feature="ordering" requiredPlan={['LUX']} />
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6">

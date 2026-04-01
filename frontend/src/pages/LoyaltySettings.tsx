@@ -8,9 +8,10 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { Coins, Share2, TrendingUp, Gift, Info, Trophy, Settings } from 'lucide-react'
+import { LockedFeature } from '@/components/FeatureGate/LockedFeature'
 
 export default function LoyaltySettings() {
-  const { selectedRestaurant } = useRestaurant()
+  const { selectedRestaurant, isLux } = useRestaurant()
   const [saving, setSaving] = useState(false)
   const [programName, setProgramName] = useState('')
   const [enableLoyalty, setEnableLoyalty] = useState(false)
@@ -113,6 +114,10 @@ export default function LoyaltySettings() {
         [field]: 0
       }))
     }
+  }
+
+  if (!isLux) {
+    return <LockedFeature feature="loyalty" requiredPlan={['LUX']} />
   }
 
   return (

@@ -96,9 +96,9 @@ def create_payment_order(restaurant_id, order_items, total_amount, subtotal=None
 		# Convert total_amount to paise (integer)
 		total_amount_paise = int(float(total_amount) * 100)
 
-		# Calculate platform fee (1.5% by default) for ledgering purposes
-		platform_fee_percent = restaurant.platform_fee_percent or 1.5
-		platform_fee_paise = int(math.floor(total_amount_paise * platform_fee_percent / 100))
+		# Calculate platform fee (Dynamic % by restaurant config)
+		platform_fee_percent = float(restaurant.platform_fee_percent if restaurant.platform_fee_percent is not None else 1.5)
+		platform_fee_paise = int(math.floor(total_amount_paise * (platform_fee_percent / 100.0)))
 
 		# Create or Update order in ERPNext
 		order_doc = None
@@ -531,7 +531,7 @@ def get_restaurant_payment_stats(restaurant_id):
 		}
 		
 		# Get monthly minimum info (ensure numeric values)
-		monthly_minimum = float(restaurant.monthly_minimum or 999)
+		monthly_minimum = float(restaurant.monthly_minimum if restaurant.monthly_minimum is not None else 999.0)
 		platform_fee_collected = (stats["total_platform_fee"] or 0) / 100.0  # Convert from paise to rupees
 		minimum_due = max(0, monthly_minimum - platform_fee_collected)
 		
@@ -723,9 +723,9 @@ def schedule_monthly_billing():
 			total_paise = int(float(total) * 100)
 			# Fetch commission settings from Restaurant
 			res_doc = frappe.get_doc("Restaurant", r.name)
-			platform_fee_percent = float(res_doc.platform_fee_percent or 1.5)
-			monthly_min = float(res_doc.monthly_minimum or 999)
-
+			platform_fee_percent = float(res_doc.platform_fee_percent if res_doc.platform_fee_percent is not None else 1.5)
+			monthly_min = float(res_doc.monthly_minimum if res_doc.monthly_minimum is not None else 999.0)
+			
 			calculated_fee = int(math.floor(total_paise * (platform_fee_percent / 100.0)))
 			min_amt_paise = int(monthly_min * 100)
 			base_commission = max(min_amt_paise, calculated_fee)

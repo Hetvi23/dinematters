@@ -17,17 +17,26 @@ from functools import wraps
 # Feature to Plan Mapping
 # Features listed here require specific plan types
 FEATURE_PLAN_MAP = {
-    'ordering': ['PRO'],
-    'video_upload': ['PRO'],
-    'analytics': ['PRO'],
-    'ai_recommendations': ['PRO'],
-    'loyalty': ['PRO'],
-    'coupons': ['PRO'],
-    'pos_integration': ['PRO'],
-    'data_export': ['PRO'],
-    'games': ['PRO'],
-    'table_booking': ['PRO'],
-    'custom_branding': ['PRO'],
+    # LUX Only features (Transactional/Full Automation)
+    'ordering': ['LUX'],
+    'loyalty': ['LUX'],
+    'pos_integration': ['LUX'],
+    'coupons': ['LUX'],
+    'data_export': ['LUX'],
+    'customer': ['LUX'],
+    'order_settings': ['LUX'],
+    'customer_pay_and_usage': ['LUX'],
+    
+    # PRO & LUX features (Digital/Branding/Analytics/Table/Games)
+    'games': ['PRO', 'LUX'],
+    'video_upload': ['PRO', 'LUX'],
+    'analytics': ['PRO', 'LUX'],
+    'ai_recommendations': ['PRO', 'LUX'],
+    'custom_branding': ['PRO', 'LUX'],
+    'table_booking': ['PRO', 'LUX'],
+    'events': ['PRO', 'LUX'],
+    'offers': ['PRO', 'LUX'],
+    'experience_lounge': ['PRO', 'LUX'],
 }
 
 
@@ -113,8 +122,8 @@ def check_feature_access(restaurant_id, feature_name):
     except frappe.DoesNotExistError:
         frappe.throw(_('Restaurant {0} does not exist').format(restaurant_id))
     
-    # Get required plans for this feature
-    required_plans = FEATURE_PLAN_MAP.get(feature_name, ['LITE', 'PRO'])
+    # Get required plans for this feature. Fallback to all plans if not mapped.
+    required_plans = FEATURE_PLAN_MAP.get(feature_name, ['LITE', 'PRO', 'LUX'])
     
     # Check if current plan has access
     has_access = restaurant.plan_type in required_plans
@@ -132,17 +141,23 @@ def get_plan_features(plan_type):
     Get list of all features available for a specific plan
     
     Args:
-        plan_type (str): Plan type ('LITE' or 'PRO')
+        plan_type (str): Plan type ('LITE', 'PRO', or 'LUX')
     
     Returns:
         list: List of feature names available for this plan
     """
-    if plan_type == 'PRO':
-        # PRO has access to all features
-        return list(FEATURE_PLAN_MAP.keys()) + ['basic_menu', 'qr_code', 'website']
+    base_features = ['basic_menu', 'qr_code', 'website']
+    
+    if plan_type == 'LUX':
+        # LUX has access to everything
+        return list(FEATURE_PLAN_MAP.keys()) + base_features
+    elif plan_type == 'PRO':
+        # PRO has access to digital/branding features but no transactional ones
+        pro_features = [f for f, plans in FEATURE_PLAN_MAP.items() if 'PRO' in plans]
+        return pro_features + base_features
     else:
-        # LITE only has access to features not in FEATURE_PLAN_MAP
-        return ['basic_menu', 'qr_code', 'website']
+        # LITE only has access to base features
+        return base_features
 
 
 def check_image_upload_limit(restaurant_id):
@@ -165,13 +180,13 @@ def check_image_upload_limit(restaurant_id):
     """
     restaurant = frappe.get_doc('Restaurant', restaurant_id)
     
-    # PRO plan has unlimited images
-    if restaurant.plan_type == 'PRO':
+    # PRO and LUX plans have unlimited images
+    if restaurant.plan_type in ['PRO', 'LUX']:
         return {
             'can_upload': True,
             'current_count': restaurant.current_image_count or 0,
             'max_limit': -1,  # Unlimited
-            'plan_type': 'PRO'
+            'plan_type': restaurant.plan_type
         }
     
     # LITE plan has limit

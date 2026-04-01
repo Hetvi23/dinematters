@@ -38,14 +38,14 @@ def get_restaurant_plan(restaurant_id):
         'limits': {
             'max_images': restaurant.max_images_lite if restaurant.plan_type == 'LITE' else -1,
             'current_images': restaurant.current_image_count or 0,
-            'video_upload': restaurant.plan_type == 'PRO',
-            'ordering': restaurant.plan_type == 'PRO',
+            'video_upload': restaurant.plan_type in ['PRO', 'LUX'],
+            'ordering': restaurant.plan_type == 'LUX',
         },
         'metrics': {
             'total_orders': restaurant.total_orders or 0,
             'total_revenue': restaurant.total_revenue or 0,
             'commission_earned': restaurant.commission_earned or 0,
-        } if restaurant.plan_type == 'PRO' else None
+        } if restaurant.plan_type == 'LUX' else None
     }
 
 
@@ -65,16 +65,28 @@ def check_access(restaurant_id, feature_name):
 
 
 @frappe.whitelist()
-def get_plan_comparison():
+def get_plan_comparison(restaurant_id=None):
     """
     Get feature comparison between LITE and PRO plans
     
+    Args:
+        restaurant_id (str, optional): Restaurant ID to show personalized rates
+        
     Returns:
         dict: Plan comparison data
     """
+    commission_rate = "1.5%"
+    if restaurant_id:
+        try:
+            rate = frappe.db.get_value("Restaurant", restaurant_id, "platform_fee_percent")
+            if rate is not None:
+                commission_rate = f"{float(rate)}%"
+        except Exception:
+            pass
+
     return {
         'LITE': {
-            'name': 'Dinematters Lite',
+            'name': 'DineMatters Lite',
             'price': 'Free',
             'commission': '0%',
             'features': {
@@ -99,30 +111,54 @@ def get_plan_comparison():
                     'POS integration',
                     'Data export',
                 ],
-                'branding': 'Mandatory "Powered by Dinematters" branding',
-                'qr_logo': 'Dinematters logo watermark on QR codes'
+                'branding': 'Mandatory "Powered by DineMatters" branding',
+                'qr_logo': 'DineMatters logo watermark on QR codes'
             }
         },
         'PRO': {
-            'name': 'Dinematters Pro',
-            'price': 'Pay per order',
-            'commission': '1.5%',
+            'name': 'DineMatters Pro (Digital)',
+            'price': '₹999 / mo',
+            'commission': '0%',
             'features': {
                 'included': [
                     'All LITE features',
-                    'Online ordering',
                     'Video content support',
                     'AI-powered recommendations',
                     'Analytics dashboard',
-                    'Loyalty programs',
-                    'Coupons & discounts',
-                    'POS integration',
-                    'Data export',
                     'Unlimited photo uploads',
                     'Custom logo on QR codes',
                     'Priority support',
+                    'Gamification (spin/scratch)',
+                    'Custom branding (subtle footer)',
+                    'No transaction fees',
                 ],
-                'branding': 'Subtle "Powered by Dinematters" footer',
+                'excluded': [
+                    'Online ordering',
+                    'Loyalty programs',
+                    'Coupons & discounts',
+                    'POS integration',
+                    'Customer CRM Data',
+                ],
+                'branding': 'Subtle "Powered by DineMatters" footer',
+                'qr_logo': 'Your custom restaurant logo on QR codes'
+            }
+        },
+        'LUX': {
+            'name': 'DineMatters Lux (Automation)',
+            'price': '₹999 Floor / mo',
+            'commission': commission_rate,
+            'features': {
+                'included': [
+                    'All PRO features',
+                    'Online ordering & payments',
+                    'Loyalty programs',
+                    'Coupons & discounts',
+                    'POS integration',
+                    'Customer CRM Data access',
+                    'Table & Banquet booking',
+                    'Data export (CSV/PDF)',
+                ],
+                'branding': 'Minimal branding footer',
                 'qr_logo': 'Your custom restaurant logo on QR codes'
             }
         }
@@ -142,56 +178,36 @@ def get_upgrade_benefits(restaurant_id):
     """
     restaurant = frappe.get_doc('Restaurant', restaurant_id)
     
-    if restaurant.plan_type == 'PRO':
-        return {
-            'already_pro': True,
-            'message': 'You are already on the PRO plan with full feature access!'
-        }
-    
-    # Calculate potential benefits
-    current_images = restaurant.current_image_count or 0
-    max_images = restaurant.max_images_lite or 200
-    images_remaining = max(0, max_images - current_images)
-    
     return {
-        'already_pro': False,
-        'current_plan': 'LITE',
+        'already_lux': False,
+        'current_plan': restaurant.plan_type,
         'benefits': [
             {
-                'category': 'Revenue Generation',
+                'category': 'Revenue Generation (LUX Only)',
                 'items': [
                     'Accept online orders and payments',
-                    'Increase revenue by 30-40% on average',
-                    'Only pay 1.5% commission on orders',
+                    'Loyalty programs to retain customers',
+                    'Coupons & automatic discounts',
+                    f'Just {float(restaurant.platform_fee_percent or 1.5)}% commission on growth',
                 ]
             },
             {
-                'category': 'Customer Engagement',
+                'category': 'Digital Excellence (PRO & LUX)',
                 'items': [
                     'AI-powered menu recommendations',
-                    'Loyalty programs to retain customers',
-                    'Gamification (spin-the-wheel, scratch cards)',
+                    'Unlimited high-quality image uploads',
+                    'Professional video content support',
+                    'Custom branding & logo on QR codes',
                 ]
             },
             {
-                'category': 'Business Insights',
+                'category': 'Business Intelligence',
                 'items': [
                     'Real-time analytics dashboard',
-                    'Customer behavior insights',
-                    'Menu performance metrics',
-                    'Revenue reports and data export',
-                ]
-            },
-            {
-                'category': 'Media & Branding',
-                'items': [
-                    f'Unlimited image uploads (currently {images_remaining} remaining)',
-                    'Video content support',
-                    'Custom logo on QR codes',
-                    'Less prominent branding',
+                    'Customer behavior insights (LUX)',
+                    'POS integration (LUX)',
                 ]
             },
         ],
-        'locked_features_count': len([f for f in ['ordering', 'video_upload', 'analytics', 'ai_recommendations', 'loyalty', 'coupons', 'games']]),
-        'cta': 'Upgrade to PRO and unlock all features'
+        'cta': 'Upgrade to LUX for Full Automation' if restaurant.plan_type == 'PRO' else 'Upgrade to PRO for Digital Power'
     }

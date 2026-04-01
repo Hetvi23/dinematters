@@ -1,9 +1,9 @@
 /**
- * AiRechargeModal
+ * CoinRechargeModal
  * 
- * Allows restaurants to purchase additional AI credits using Razorpay.
- * Credit bundles: 20, 50, 100, or a custom amount (min 10 credits).
- * 1 credit = ₹2
+ * Allows restaurants to purchase DineMatters Coins using Razorpay.
+ * Bundles: 500, 2000, 5000.
+ * 1 coin = ₹1 (Base) + 18% GST (Collected Upfront)
  */
 import { useState } from 'react'
 import {
@@ -17,23 +17,21 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { useFrappePostCall } from 'frappe-react-sdk'
-import { Loader2, Sparkles, Zap, Star, Rocket, PenLine } from 'lucide-react'
+import { Loader2, Sparkles, Zap, Star, Rocket, PenLine, Coins } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-interface AiRechargeModalProps {
+interface CoinRechargeModalProps {
   open: boolean
   onClose: () => void
   restaurant: string
-  currentBalance: number
   onSuccess: () => void
 }
 
 interface Bundle {
   id: string
-  credits: number
+  coins: number
   price_inr: number
   label: string
   icon: React.ReactNode
@@ -43,28 +41,28 @@ interface Bundle {
 
 const BUNDLES: Bundle[] = [
   {
-    id: '20',
-    credits: 20,
-    price_inr: 40,
+    id: '999',
+    coins: 999,
+    price_inr: 999,
     label: 'Starter',
     icon: <Zap className="h-5 w-5" />,
     badge: undefined,
     highlight: false,
   },
   {
-    id: '50',
-    credits: 50,
-    price_inr: 100,
+    id: '2000',
+    coins: 2000,
+    price_inr: 2000,
     label: 'Popular',
     icon: <Star className="h-5 w-5" />,
     badge: 'POPULAR',
     highlight: true,
   },
   {
-    id: '100',
-    credits: 100,
-    price_inr: 200,
-    label: 'Pro',
+    id: '5000',
+    coins: 5000,
+    price_inr: 5000,
+    label: 'Best Value',
     icon: <Rocket className="h-5 w-5" />,
     badge: 'BEST VALUE',
     highlight: false,
@@ -88,30 +86,34 @@ function loadRazorpayScript(): Promise<boolean> {
   })
 }
 
-export function AiRechargeModal({ open, onClose, restaurant, currentBalance, onSuccess }: AiRechargeModalProps) {
-  const [selectedBundle, setSelectedBundle] = useState<string>('50')
-  const [customCredits, setCustomCredits] = useState<string>('')
+export function AiRechargeModal({ open, onClose, restaurant, onSuccess }: CoinRechargeModalProps) {
+  const [selectedBundle, setSelectedBundle] = useState<string>('2000')
+  const [customCoins, setCustomCoins] = useState<string>('')
   const [isProcessing, setIsProcessing] = useState(false)
 
   const { call: createOrder } = useFrappePostCall(
-    'dinematters.dinematters.api.ai_billing.create_credit_purchase_order'
+    'dinematters.dinematters.api.coin_billing.create_coin_purchase_order'
   )
   const { call: verifyPayment } = useFrappePostCall(
-    'dinematters.dinematters.api.ai_billing.verify_credit_purchase'
+    'dinematters.dinematters.api.coin_billing.verify_coin_purchase'
   )
 
   const isCustom = selectedBundle === 'custom'
-  const customCreditCount = parseInt(customCredits || '0', 10)
-  const selectedCredits = isCustom ? customCreditCount : BUNDLES.find(b => b.id === selectedBundle)?.credits || 0
-  const selectedPrice = isCustom ? customCreditCount * 2 : BUNDLES.find(b => b.id === selectedBundle)?.price_inr || 0
+  const customCoinCount = parseInt(customCoins || '0', 10)
+  const selectedCoins = isCustom ? customCoinCount : BUNDLES.find(b => b.id === selectedBundle)?.coins || 0
+
+  // Upfront GST Calculation: 18% on top of the base coin cost
+  const basePrice = selectedCoins
+  const gstAmount = Math.round(basePrice * 0.18 * 100) / 100
+  const totalPayable = basePrice + gstAmount
 
   const canPurchase = isCustom
-    ? customCreditCount >= 10
+    ? customCoinCount >= 300
     : selectedBundle !== ''
 
   const handlePurchase = async () => {
     if (!canPurchase) {
-      toast.error(isCustom ? 'Minimum 10 credits required.' : 'Please select a bundle.')
+      toast.error(isCustom ? 'Minimum 300 coins required.' : 'Please select a bundle.')
       return
     }
 
@@ -127,67 +129,59 @@ export function AiRechargeModal({ open, onClose, restaurant, currentBalance, onS
       // 1. Create Razorpay order
       const orderRes = await createOrder({
         restaurant,
-        bundle_id: selectedBundle,
-        custom_credits: isCustom ? customCreditCount : undefined,
+        amount: selectedCoins
       })
 
       if (!orderRes.message?.success) {
         throw new Error(orderRes.message?.error || 'Failed to create order')
       }
 
-      const { razorpay_order_id, amount, key_id, pending_txn_id, credits, price_inr } = orderRes.message
+      const { razorpay_order_id, amount, key_id } = orderRes.message
 
-      // 2. Open Razorpay modal — hide our dialog first so it doesn't block
-      let paymentCompleted = false
-      onClose() // hide the recharge modal behind Razorpay
-
+      // 2. Open Razorpay modal
       await new Promise<void>((resolve, reject) => {
         const rzp = new window.Razorpay({
           key: key_id,
           amount,
           currency: 'INR',
           order_id: razorpay_order_id,
-          name: 'Dinematters AI Credits',
-          description: `${credits} AI Credits @ ₹${price_inr}`,
+          name: 'DineMatters Coins',
+          description: `Purchase ${selectedCoins} Coins (₹${basePrice} + ₹${gstAmount} GST)`,
           theme: { color: '#f97316' },
           handler: async (response: any) => {
             try {
-              paymentCompleted = true
-              // 3. Verify payment and credit wallet
+              // 3. Verify Payment on Backend
               const verifyRes = await verifyPayment({
-                razorpay_order_id,
+                restaurant,
+                razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                pending_txn_id,
+                razorpay_signature: response.razorpay_signature
               })
 
               if (verifyRes.message?.success) {
-                const newBalance = verifyRes.message.new_balance
-                toast.success(`✅ ${verifyRes.message.credits_added} credits added! New balance: ${newBalance}`)
-                // Notify other components (Layout, AIEnhancementPage, etc.)
-                window.dispatchEvent(new CustomEvent('ai-credits-updated', { detail: { balance: newBalance } }))
+                toast.success(`✅ Success! ${selectedCoins} coins added to your account.`)
+                window.dispatchEvent(new CustomEvent('ai-credits-updated', { detail: { refresh: true } }))
                 onSuccess()
                 resolve()
               } else {
-                reject(new Error(verifyRes.message?.error || 'Payment verification failed'))
+                throw new Error(verifyRes.message?.error || 'Payment verification failed')
               }
             } catch (err: any) {
+              toast.error('Verification failed', { description: err.message })
               reject(err)
             }
           },
           modal: {
             ondismiss: () => {
-              if (!paymentCompleted) {
-                // User closed Razorpay without paying — nothing to do, modal already closed
-              }
               resolve()
             }
           }
         })
+        onClose() // Close the background modal to allow interaction with Razorpay
         rzp.open()
       })
     } catch (err: any) {
-      console.error('Credit purchase error:', err)
+      console.error('Coin purchase error:', err)
       toast.error('Purchase failed', { description: err.message })
     } finally {
       setIsProcessing(false)
@@ -199,48 +193,51 @@ export function AiRechargeModal({ open, onClose, restaurant, currentBalance, onS
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
-            <Sparkles className="h-5 w-5 text-primary" />
-            Recharge AI Credits
+            <Coins className="h-5 w-5 text-primary" />
+            Buy DineMatters Coins
           </DialogTitle>
           <DialogDescription>
-            Current balance:{' '}
-            <span className="font-semibold text-foreground">{currentBalance} credits</span>
+            Coins are used for AI services and platform commissions. 1 Coin = ₹1.
+            <br />
           </DialogDescription>
         </DialogHeader>
 
         {/* Bundle Selection */}
-        <div className="grid grid-cols-3 gap-3 mt-2">
+        <div className="grid grid-cols-3 gap-4 mt-6">
           {BUNDLES.map((bundle) => (
             <button
               key={bundle.id}
               type="button"
               onClick={() => setSelectedBundle(bundle.id)}
               className={cn(
-                'relative flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 p-4 transition-all focus:outline-none',
+                'relative flex flex-col items-center justify-center gap-2 rounded-2xl border-2 p-6 transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none group',
                 selectedBundle === bundle.id && !isCustom
-                  ? 'border-primary bg-primary/5 dark:bg-primary/10 shadow-md shadow-primary/10'
-                  : 'border-border hover:border-primary/40 hover:bg-muted/40'
+                  ? 'border-primary bg-primary/[0.03] dark:bg-primary/[0.08] shadow-lg shadow-primary/10'
+                  : 'border-border/60 hover:border-primary/40 hover:bg-muted/30'
               )}
             >
               {bundle.badge && (
-                <Badge
+                <div
                   className={cn(
-                    'absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] font-bold px-2 py-0.5 rounded-full',
-                    'bg-primary text-white'
+                    'absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-black tracking-tighter px-3 py-1 rounded-full shadow-sm whitespace-nowrap',
+                    'bg-primary text-white border border-primary/20'
                   )}
                 >
                   {bundle.badge}
-                </Badge>
+                </div>
               )}
               <div className={cn(
-                'p-2 rounded-full',
-                selectedBundle === bundle.id && !isCustom ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                'p-3 rounded-2xl transition-colors duration-300',
+                selectedBundle === bundle.id && !isCustom
+                  ? 'bg-primary text-white'
+                  : 'bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary'
               )}>
                 {bundle.icon}
               </div>
-              <span className="text-2xl font-bold">{bundle.credits}</span>
-              <span className="text-xs text-muted-foreground">credits</span>
-              <span className="text-sm font-semibold text-foreground">₹{bundle.price_inr}</span>
+              <div className="flex flex-col items-center">
+                <span className="text-2xl font-black tracking-tight">{bundle.coins.toLocaleString()}</span>
+                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest -mt-1">Coins</span>
+              </div>
             </button>
           ))}
         </div>
@@ -265,58 +262,58 @@ export function AiRechargeModal({ open, onClose, restaurant, currentBalance, onS
             </div>
             <div className="flex-1">
               <div className="font-medium text-sm">Custom Amount</div>
-              <div className="text-xs text-muted-foreground">Min. 10 credits</div>
+              <div className="text-xs text-muted-foreground">Min. 300 coins</div>
             </div>
             {isCustom && (
               <div className="flex items-center gap-1.5">
                 <Input
                   type="number"
-                  min={10}
+                  min={300}
                   step={1}
-                  placeholder="e.g. 30"
-                  value={customCredits}
+                  placeholder="e.g. 1500"
+                  value={customCoins}
                   onChange={e => {
                     const val = e.target.value
                     if (val === '' || (Number(val) >= 0 && /^\d*$/.test(val))) {
-                      setCustomCredits(val)
+                      setCustomCoins(val)
                     }
                   }}
                   onBlur={e => {
                     const val = parseInt(e.target.value || '0', 10)
-                    if (val > 0 && val < 10) setCustomCredits('10')
+                    if (val > 0 && val < 300) setCustomCoins('300')
                   }}
                   onKeyDown={e => {
                     if (e.key === '-' || e.key === '+' || e.key === 'e') e.preventDefault()
                   }}
                   onClick={e => e.stopPropagation()}
-                  className={cn('w-24 text-right', customCredits && customCreditCount < 10 && customCreditCount > 0 ? 'border-red-400 focus-visible:ring-red-400' : '')}
+                  className={cn('w-24 text-right', customCoins && customCoinCount < 300 && customCoinCount > 0 ? 'border-red-400 focus-visible:ring-red-400' : '')}
                 />
-                <Label className="text-xs shrink-0">credits</Label>
+                <Label className="text-xs shrink-0">Coins</Label>
               </div>
             )}
-            {isCustom && customCredits !== '' && customCreditCount > 0 && customCreditCount < 10 && (
-              <p className="text-xs text-red-500 mt-1 text-right">Minimum is 10 credits</p>
-            )}
           </button>
-
-            {isCustom && customCreditCount > 0 && (
-              <p className="text-xs text-muted-foreground mt-1.5 text-right">
-                {customCreditCount} credits
-              </p>
-            )}
         </div>
 
-        {/* Summary Bar */}
-        <div className="rounded-lg bg-muted/50 p-4 flex items-center justify-between mt-2">
-          <div>
-            <p className="text-sm font-medium">Total</p>
-            <p className="text-xs text-muted-foreground">
-              {selectedCredits > 0 ? `+${selectedCredits} credits` : '—'}
+        {/* Summary Bar with GST Breakdown */}
+        <div className="rounded-xl bg-muted/50 p-5 space-y-3 mt-2 border border-border/50">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Base Coin Amount</span>
+            <span className="font-medium">₹{basePrice.toLocaleString()}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">GST (18%)</span>
+            <span className="font-medium text-amber-600 dark:text-amber-400">+₹{gstAmount.toLocaleString()}</span>
+          </div>
+          <div className="h-px bg-border/50 w-full" />
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <p className="text-sm font-black uppercase tracking-tight">Total Payable</p>
+              <p className="text-[10px] text-muted-foreground">Net of all taxes</p>
+            </div>
+            <p className="text-3xl font-black text-primary tracking-tighter">
+              {totalPayable > 0 ? `₹${totalPayable.toLocaleString()}` : '—'}
             </p>
           </div>
-          <p className="text-2xl font-bold text-primary">
-            {selectedPrice > 0 ? `₹${selectedPrice}` : '—'}
-          </p>
         </div>
 
         <DialogFooter className="mt-2">
@@ -324,14 +321,14 @@ export function AiRechargeModal({ open, onClose, restaurant, currentBalance, onS
             Cancel
           </Button>
           <Button
-            disabled={!canPurchase || isProcessing || selectedCredits === 0}
+            disabled={!canPurchase || isProcessing || selectedCoins === 0}
             onClick={handlePurchase}
             className="bg-primary hover:bg-primary/90 text-white gap-2"
           >
             {isProcessing ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</>
             ) : (
-              <><Sparkles className="h-4 w-4" /> Pay ₹{selectedPrice}</>
+              <><Sparkles className="h-4 w-4" /> Pay ₹{totalPayable}</>
             )}
           </Button>
         </DialogFooter>

@@ -34,6 +34,9 @@ class Restaurant(Document):
 		# Validate plan change (admin-only)
 		self.validate_plan_change()
 		
+		# Prevent non-admin reactivation if suspended for billing
+		self.validate_billing_reactivation()
+		
 		# Note: QR codes are no longer auto-generated on table update
 		# They must be explicitly generated via the generate_qr_codes_pdf method
 	
@@ -108,6 +111,42 @@ class Restaurant(Document):
 			
 		except Exception as e:
 			frappe.log_error(f'Error logging plan change: {str(e)}', 'Plan Change Log Error')
+
+	def validate_billing_reactivation(self):
+		"""
+		Prevent non-admins from toggling 'is_active' to 1 if the account 
+		was suspended for billing reasons.
+		"""
+		if not self.is_new() and self.has_value_changed('is_active') and self.is_active:
+			# If it's currently suspended/overdue, only System Manager can re-enable
+			if self.billing_status in ["suspended", "overdue"]:
+				allowed_roles = ['System Manager', 'Administrator']
+				user_roles = frappe.get_roles(frappe.session.user)
+				
+				if not any(role in allowed_roles for role in user_roles):
+					frappe.throw(
+						_("This restaurant is suspended due to billing. Only an administrator can reactivate it. Please clear dues and contact support."),
+						frappe.PermissionError
+					)
+
+	def suspend_restaurant_billing(self, reason="Insufficient Balance"):
+		"""
+		Automatically deactivate restaurant for billing failure.
+		Hard Lock: Sets is_active=0 and billing_status=suspended.
+		"""
+		if self.billing_status == "suspended" and not self.is_active:
+			return # Already suspended
+			
+		self.is_active = 0
+		self.billing_status = "suspended"
+		
+		# Log the reason
+		self.add_comment("Comment", text=f"⚠️ System Auto-Suspension: {reason} (Balance below -₹300)")
+		self.save(ignore_permissions=True)
+		frappe.db.commit()
+		
+		# Notify owner (optional but recommended)
+		frappe.log_error(f"Billing Suspension: {self.name} deactivated due to {reason}", "Billing Enforcement")
 	
 	def generate_restaurant_id(self):
 		"""Generate unique restaurant_id from restaurant_name"""
@@ -627,13 +666,13 @@ def create_restaurant_config(self):
 			"apple_touch_icon": "",
 			"currency": self.currency or "INR",
 			"menu_layout": "2 Columns",
-			# Enable features based on subscription plan
-			"enable_table_booking": 1 if self.plan_type == "PRO" else 0,
-			"enable_banquet_booking": 1 if self.plan_type == "PRO" else 0,
-			"enable_events": 1 if self.plan_type == "PRO" else 0,
-			"enable_offers": 1 if self.plan_type == "PRO" else 0,
-			"enable_coupons": 1 if self.plan_type == "PRO" else 0,
-			"enable_experience_lounge": 1 if self.plan_type == "PRO" else 0,
+			# Enable transactional features only for LUX subscription plan
+			"enable_table_booking": 1 if self.plan_type == "LUX" else 0,
+			"enable_banquet_booking": 1 if self.plan_type == "LUX" else 0,
+			"enable_events": 1 if self.plan_type == "LUX" else 0,
+			"enable_offers": 1 if self.plan_type == "LUX" else 0,
+			"enable_coupons": 1 if self.plan_type == "LUX" else 0,
+			"enable_experience_lounge": 1 if self.plan_type == "LUX" else 0,
 			"verify_my_user": 0,
 			"google_review_link": "",
 			"instagram_profile_link": "",
@@ -672,8 +711,14 @@ def create_default_home_features(self):
 		]
 		
 		for idx, feat in enumerate(default_features, 1):
-			# Only enable PRO features for PRO restaurants (menu and legacy are LITE features)
-			is_enabled = feat["is_mandatory"] == 1 or (self.plan_type == "PRO")
+			# Features enabled logic:
+			# - Mandatory features (menu, legacy) are always enabled.
+			# - Transactional features (book-table, offers, lounge) are LUX only.
+			if feat["is_mandatory"] == 1:
+				is_enabled = True
+			else:
+				# These are the premium transactional features
+				is_enabled = (self.plan_type == "LUX")
 			
 			feat_doc = frappe.get_doc({
 				"doctype": "Home Feature",

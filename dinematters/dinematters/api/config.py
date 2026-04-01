@@ -143,6 +143,7 @@ def get_restaurant_config(restaurant_id):
 		plan_type = restaurant_doc.plan_type or "LITE"
 		menu_theme_background_enabled = bool(config.get("menu_theme_background_enabled", 1))
 		
+		# Premium themes/backgrounds allowed for PRO and LUX
 		if plan_type == "LITE" and menu_theme_background_enabled:
 			from frappe.utils import getdate, today
 			paid_until = getdate(config.get("menu_theme_paid_until")) if config.get("menu_theme_paid_until") else None
@@ -220,14 +221,31 @@ def get_restaurant_config(restaurant_id):
 			},
 			"subscription": {
 				"planType": restaurant_doc.plan_type or "LITE",
+				"billingStatus": restaurant_doc.billing_status or "active",
+				"coinsBalance": float(restaurant_doc.coins_balance or 0),
+				"isActive": bool(restaurant_doc.is_active),
+				"deferredPlanType": restaurant_doc.deferred_plan_type,
+				"planChangeDate": restaurant_doc.plan_change_date,
+				"mandateActive": restaurant_doc.mandate_status == "active",
+				"autoRechargeEnabled": bool(restaurant_doc.auto_recharge_enabled),
+				"autoRechargeThreshold": float(restaurant_doc.auto_recharge_threshold or 0),
+				"autoRechargeAmount": float(restaurant_doc.auto_recharge_amount or 0),
+				"dailyLimit": float(restaurant_doc.daily_auto_recharge_limit or 5000),
+				"currentDailyVol": float(restaurant_doc.daily_auto_recharge_count or 0),
+				"onboardingDate": restaurant_doc.onboarding_date,
+				"lastAutoRechargeDate": restaurant_doc.last_auto_recharge_date,
 				"features": {
-					"ordering": restaurant_doc.plan_type == "PRO",
-					"videoUpload": restaurant_doc.plan_type == "PRO",
-					"analytics": restaurant_doc.plan_type == "PRO",
-					"aiRecommendations": restaurant_doc.plan_type == "PRO",
-					"loyalty": restaurant_doc.plan_type == "PRO",
-					"coupons": restaurant_doc.plan_type == "PRO",
-					"games": restaurant_doc.plan_type == "PRO"
+					# Transactional (LUX only)
+					"ordering": restaurant_doc.plan_type == "LUX",
+					"loyalty": restaurant_doc.plan_type == "LUX",
+					"coupons": restaurant_doc.plan_type == "LUX",
+					"games": restaurant_doc.plan_type in ["PRO", "LUX"],
+					"tableBooking": restaurant_doc.plan_type in ["PRO", "LUX"],
+					# Digital/Branding (PRO and LUX)
+					"videoUpload": restaurant_doc.plan_type in ["PRO", "LUX"],
+					"analytics": restaurant_doc.plan_type in ["PRO", "LUX"],
+					"aiRecommendations": restaurant_doc.plan_type in ["PRO", "LUX"],
+					"customBranding": restaurant_doc.plan_type in ["PRO", "LUX"],
 				}
 			},
 			# placeholder for feature cards (will be populated below)
@@ -377,8 +395,9 @@ def get_home_features(restaurant_id):
 		# Filter features based on subscription plan
 		plan_type = frappe.db.get_value("Restaurant", restaurant, "plan_type") or "LITE"
 		if plan_type == "LITE":
-			# Lite restaurants only show: menu, legacy
-			# Restricted features: book-table, offers-events, dine-play
+			# Only PRO and LUX get: offers-events, dine-play
+			# Only LUX gets: book-table (usually, but let's follow feature_gate.py which says PRO gets table_booking)
+			# Re-evaluating based on system-wide PRO tier expansion:
 			restricted_ids = ["book-table", "offers-events", "dine-play"]
 			formatted_features = [f for f in formatted_features if f["id"] not in restricted_ids]
 

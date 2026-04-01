@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Eye, LayoutGrid, List, Filter, X, Search, ShoppingBag, AlertCircle } from 'lucide-react'
+import { LockedFeature } from '@/components/FeatureGate/LockedFeature'
 import { EmptyState } from '@/components/EmptyState'
 import { OrdersKanban } from '@/components/OrdersKanban'
 import { OrdersModernView } from '@/components/OrdersModernView'
@@ -26,6 +27,7 @@ import { useCurrency } from '@/hooks/useCurrency'
 type ViewType = 'kanban' | 'list' | 'modern'
 
 export default function Orders() {
+  const { isLux } = useRestaurant()
   const { formatAmountNoDecimals } = useCurrency()
 
   const getOrderTypeBadgeClass = (orderType?: string) => {
@@ -418,6 +420,10 @@ export default function Orders() {
   const handleCheckOrder = (orderId: string) => {
     setSelectedOrderId(orderId)
     setIsDialogOpen(true)
+  }
+
+  if (!isLux) {
+    return <LockedFeature feature="ordering" requiredPlan={['LUX']} />
   }
 
   return (

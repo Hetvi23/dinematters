@@ -10,6 +10,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate, today, now_datetime, get_datetime
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api, get_restaurant_from_id
+from dinematters.dinematters.utils.feature_gate import require_plan
 import json
 from datetime import datetime
 
@@ -110,6 +111,7 @@ def get_coupons(restaurant_id, active_only=True):
 
 
 @frappe.whitelist(allow_guest=True)
+@require_plan('LUX')
 def validate_coupon(restaurant_id, coupon_code, cart_total=0, customer_id=None, cart_items=None):
 	"""
 	POST /api/method/dinematters.dinematters.api.coupons.validate_coupon
@@ -347,6 +349,7 @@ def validate_coupon(restaurant_id, coupon_code, cart_total=0, customer_id=None, 
 
 
 @frappe.whitelist(allow_guest=True)
+@require_plan('LUX')
 def get_applicable_offers(restaurant_id, cart_items, cart_total, customer_id=None):
 	"""
 	POST /api/method/dinematters.dinematters.api.coupons.get_applicable_offers

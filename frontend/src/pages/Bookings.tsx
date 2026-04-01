@@ -8,6 +8,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import CalendarPicker from '@/components/CalendarPicker'
+import { LockedFeature } from '@/components/FeatureGate/LockedFeature'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Badge } from '@/components/ui/badge'
+import { History, LayoutDashboard } from 'lucide-react'
 
 interface Booking {
   id: string
@@ -28,9 +37,11 @@ interface Booking {
 const SELECTED_DATE_KEY = 'dinematters-bookings-selected-date'
 
 export default function Bookings() {
-  const { selectedRestaurant } = useRestaurant()
+  const { selectedRestaurant, isLux, isPro, isLite } = useRestaurant()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
+  const [showPastBookings, setShowPastBookings] = useState(false)
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const [selectedDate, setSelectedDate] = useState(() => {
     // Initialize from localStorage if available
     try {
@@ -65,7 +76,7 @@ export default function Bookings() {
       loadBookings()
       loadMonthlyBookings()
     }
-  }, [selectedRestaurant, selectedDate, statusFilter])
+  }, [selectedRestaurant, selectedDate, statusFilter, showPastBookings])
 
   // Format date without timezone conversion
   const formatDateForAPI = (date: Date): string => {
@@ -84,20 +95,33 @@ export default function Bookings() {
     try {
       setLoading(true)
       const dateStr = formatDateForAPI(selectedDate)
-      
+      let date_from = dateStr
+      let date_to = dateStr
+
+      if (showPastBookings) {
+        // Show last 30 days plus any future bookings
+        const thirtyDaysAgo = new Date()
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+        date_from = formatDateForAPI(thirtyDaysAgo)
+        
+        const nextYear = new Date()
+        nextYear.setFullYear(nextYear.getFullYear() + 1)
+        date_to = formatDateForAPI(nextYear)
+      }
+
       console.log('[Bookings] Fetching bookings:', {
         restaurant_id: selectedRestaurant,
-        date_from: dateStr,
-        date_to: dateStr,
+        date_from,
+        date_to,
         status: statusFilter === 'all' ? undefined : statusFilter
       })
       
       const response = await fetchBookings({
         restaurant_id: selectedRestaurant,
-        date_from: dateStr,
-        date_to: dateStr,
+        date_from,
+        date_to,
         status: statusFilter === 'all' ? undefined : statusFilter,
-        limit: 100
+        limit: 200
       })
       
       console.log('[Bookings] API Response:', response)
@@ -267,6 +291,10 @@ export default function Bookings() {
     )
   }
 
+  if (isLite) {
+    return <LockedFeature feature="table_booking" requiredPlan={['PRO', 'LUX']} />
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -318,23 +346,40 @@ export default function Bookings() {
       <div className="bg-card rounded-lg border p-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="icon" onClick={() => changeDate(-1)}>
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              className="min-w-[280px] justify-center"
-              onClick={() => setShowCalendarPicker(true)}
-            >
-              <Calendar className="w-4 h-4 mr-2" />
-              <span className="font-semibold">{formatDate(selectedDate)}</span>
-            </Button>
-            <Button variant="outline" size="icon" onClick={() => changeDate(1)}>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-            <Button variant="outline" onClick={() => setSelectedDate(new Date())}>
-              Today
-            </Button>
+            <Button 
+                variant={showPastBookings ? "default" : "outline"} 
+                className="gap-2"
+                onClick={() => setShowPastBookings(!showPastBookings)}
+              >
+                {showPastBookings ? (
+                  <LayoutDashboard className="w-4 h-4" />
+                ) : (
+                  <History className="w-4 h-4" />
+                )}
+                {showPastBookings ? "Show Daily View" : "Past Bookings"}
+              </Button>
+
+            {!showPastBookings && (
+              <div className="flex items-center gap-3">
+                <Button variant="outline" size="icon" onClick={() => changeDate(-1)}>
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  className="min-w-[280px] justify-center"
+                  onClick={() => setShowCalendarPicker(true)}
+                >
+                  <Calendar className="w-4 h-4 mr-2" />
+                  <span className="font-semibold">{formatDate(selectedDate)}</span>
+                </Button>
+                <Button variant="outline" size="icon" onClick={() => changeDate(1)}>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+                <Button variant="outline" onClick={() => setSelectedDate(new Date())}>
+                  Today
+                </Button>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -382,14 +427,25 @@ export default function Bookings() {
         ) : (
           <div className="space-y-3">
             {filteredBookings.map((booking) => (
-              <div key={booking.id} className="bg-card rounded-lg border p-4 hover:shadow-md transition-shadow">
+              <div 
+                key={booking.id} 
+                className="bg-card rounded-lg border p-4 hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-primary/30"
+                onClick={() => setSelectedBooking(booking)}
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold text-lg">{booking.customerName || 'Guest'}</h3>
-                      <span className="text-sm text-muted-foreground">#{booking.bookingNumber}</span>
+                      <div className="flex flex-col">
+                        <h3 className="font-bold text-lg text-foreground">{booking.customerName || 'Guest'}</h3>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider bg-muted px-1.5 py-0.5 rounded">#{booking.bookingNumber}</span>
+                          {showPastBookings && (
+                             <span className="text-xs font-medium text-primary/80">{booking.date}</span>
+                          )}
+                        </div>
+                      </div>
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                           <button className={`px-3 py-1.5 rounded-md text-sm font-semibold flex items-center gap-1.5 hover:opacity-80 transition-opacity ${
                             booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                             booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
@@ -464,6 +520,90 @@ export default function Bookings() {
           </div>
         )}
       </div>
+
+      {/* Booking Details Modal */}
+      <Dialog open={!!selectedBooking} onOpenChange={(open) => !open && setSelectedBooking(null)}>
+        <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-none shadow-2xl">
+          <div className="bg-primary/5 p-6 border-b border-primary/10">
+            <DialogHeader>
+              <div className="flex items-center justify-between">
+                <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Users className="w-5 h-5 text-primary" />
+                  </div>
+                  Booking Details
+                </DialogTitle>
+                <Badge variant="outline" className={`px-2.5 py-0.5 uppercase text-[10px] font-bold tracking-widest ${
+                  selectedBooking?.status === 'confirmed' ? 'bg-green-50 text-green-700 border-green-200' :
+                  selectedBooking?.status === 'pending' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                  'bg-muted text-muted-foreground border-muted'
+                }`}>
+                  {selectedBooking?.status}
+                </Badge>
+              </div>
+            </DialogHeader>
+          </div>
+          
+          <div className="p-6 space-y-6">
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-1">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Customer Name</p>
+                <p className="text-base font-semibold">{selectedBooking?.customerName || 'Guest'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Phone Number</p>
+                <p className="text-base font-semibold flex items-center gap-2">
+                  <Phone className="w-3.5 h-3.5 text-primary/60" />
+                  {selectedBooking?.customerPhone || 'Not provided'}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Reservation</p>
+                <p className="text-base font-semibold flex items-center gap-2">
+                  <Calendar className="w-3.5 h-3.5 text-primary/60" />
+                  {selectedBooking?.date}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Time Slot</p>
+                <p className="text-base font-semibold flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-primary/60" />
+                  {selectedBooking?.timeSlot}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Party Size</p>
+                <p className="text-base font-semibold flex items-center gap-2">
+                  <Users className="w-3.5 h-3.5 text-primary/60" />
+                  {selectedBooking?.numberOfDiners} Diners
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Booking ID</p>
+                <p className="font-mono text-sm text-muted-foreground">#{selectedBooking?.bookingNumber}</p>
+              </div>
+            </div>
+
+            {selectedBooking?.notes && (
+              <div className="space-y-2 pt-4 border-t border-muted">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1.5">
+                  <StickyNote className="w-3 h-3" />
+                  Special Notes
+                </p>
+                <div className="bg-muted/50 p-3 rounded-lg text-sm italic text-muted-foreground leading-relaxed">
+                  "{selectedBooking.notes}"
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className="p-4 bg-muted/20 flex justify-end">
+            <Button variant="ghost" size="sm" onClick={() => setSelectedBooking(null)}>
+              Close Details
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Calendar Picker Modal */}
       <CalendarPicker

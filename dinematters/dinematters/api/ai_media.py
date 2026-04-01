@@ -216,18 +216,18 @@ def enqueue_enhancement(restaurant, owner_doctype, owner_name, original_image_ur
     mode="enhance" costs 5 credits and requires original_image_url.
     mode="generate" costs 8 credits and uses only product info + reference image.
     """
-    from dinematters.dinematters.api.ai_billing import deduct_credits_for_enhancement
+    from dinematters.dinematters.api.coin_billing import deduct_coins
 
-    BASE_COST = 8 if mode == "generate" else 5
-    BRANDING_COST = 2 if include_branding else 0
-    CREDIT_COST = BASE_COST + BRANDING_COST
+    BASE_COST = 16 if mode == "generate" else 10
+    BRANDING_COST = 4 if include_branding else 0
+    COIN_COST = BASE_COST + BRANDING_COST
 
-    # Step 1: Verify credit balance before even creating the doc
-    balance = frappe.db.get_value("Restaurant", restaurant, "ai_credits") or 0
-    if balance < CREDIT_COST:
+    # Step 1: Verify coin balance before even creating the doc
+    balance = frappe.db.get_value("Restaurant", restaurant, "coins_balance") or 0.0
+    if balance < COIN_COST:
         frappe.throw(
-            f"Insufficient AI credits. You need {CREDIT_COST} credits but only have {balance}. "
-            "Please recharge your AI credit wallet.",
+            f"Insufficient DineMatters Coins. You need {COIN_COST} coins but only have {balance}. "
+            "Please recharge your coin wallet.",
             frappe.ValidationError
         )
 
@@ -245,11 +245,10 @@ def enqueue_enhancement(restaurant, owner_doctype, owner_name, original_image_ur
     doc.insert(ignore_permissions=True)
     frappe.db.commit()
 
-    # Step 2: Deduct credits immediately
     try:
-        deduct_credits_for_enhancement(restaurant=restaurant, generation_id=doc.name, credits=CREDIT_COST)
+        deduct_coins(restaurant, COIN_COST, "AI Deduction", f"AI {mode} - Generation {doc.name}", ref_doctype="AI Image Generation", ref_name=doc.name)
     except Exception as e:
-        # Rollback the generation document if credit deduction fails
+        # Rollback the generation document if deduction fails
         frappe.delete_doc("AI Image Generation", doc.name, ignore_permissions=True)
         frappe.db.commit()
         frappe.throw(str(e))
@@ -262,7 +261,7 @@ def enqueue_enhancement(restaurant, owner_doctype, owner_name, original_image_ur
         generation_name=doc.name,
         mode=mode,
         include_branding=include_branding,
-        credits_to_refund=CREDIT_COST
+        coins_to_refund=COIN_COST
     )
 
     return {"generation_id": doc.name}
@@ -505,9 +504,9 @@ def generate_image_gemini_from_product(dish_name, dish_description, dish_categor
     frappe.throw("Gemini failed to generate a new image from product details.")
 
 
-def process_ai_image_enhancement(generation_name, mode="enhance", include_branding=False, credits_to_refund=0):
+def process_ai_image_enhancement(generation_name, mode="enhance", include_branding=False, coins_to_refund=0):
     """Background Job Handler"""
-    from dinematters.dinematters.api.ai_billing import refund_credits_for_failed_enhancement
+    from dinematters.dinematters.api.coin_billing import refund_coins
 
     frappe.db.set_value("AI Image Generation", generation_name, "status", "Processing")
     frappe.db.commit()
@@ -569,16 +568,18 @@ def process_ai_image_enhancement(generation_name, mode="enhance", include_brandi
         error_msg = f"AI Generation Failed: {str(e)}"
         frappe.log_error(error_msg[:140], "AI Media Enhancement")
 
-        # Auto-refund credits on failure
-        if credits_to_refund > 0:
+        # Auto-refund coins on failure
+        if coins_to_refund > 0:
             try:
-                refund_credits_for_failed_enhancement(
+                refund_coins(
                     restaurant=doc.restaurant,
-                    generation_id=generation_name,
-                    credits=credits_to_refund
+                    amount=coins_to_refund,
+                    description=f"Refund for failed AI generation {generation_name}",
+                    ref_doctype="AI Image Generation",
+                    ref_name=generation_name
                 )
             except Exception as refund_err:
-                error_msg = f"Credit Refund Failed for {generation_name}: {str(refund_err)}"
+                error_msg = f"Coin Refund Failed for {generation_name}: {str(refund_err)}"
                 frappe.log_error(error_msg[:140], "AI Billing Refund")
 
     finally:
@@ -731,13 +732,13 @@ def set_menu_theme_background_enabled(restaurant, enabled):
     if enabled_value:
         plan_type = frappe.db.get_value("Restaurant", restaurant, "plan_type") or "LITE"
         if plan_type == "LITE":
-            from dinematters.dinematters.api.ai_billing import deduct_credits_for_theme_activation
+            from dinematters.dinematters.api.coin_billing import deduct_coins
             from frappe.utils import getdate, add_days, today
             
             paid_until = getdate(config_doc.menu_theme_paid_until) if config_doc.menu_theme_paid_until else None
             if not paid_until or paid_until < getdate(today()):
-                # Deduction: Throws if insufficient credits
-                deduct_credits_for_theme_activation(restaurant)
+                # AI Deduction (100 coins = ₹100): Throws if insufficient coins
+                deduct_coins(restaurant, 100, "AI Deduction", "Menu Theme Background activation fee (30 days)")
                 # Extends for 30 days
                 config_doc.menu_theme_paid_until = add_days(today(), 30)
                 config_doc.save(ignore_permissions=True)

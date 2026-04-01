@@ -19,13 +19,14 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Plus, Edit, Trash2, Tag, Percent, DollarSign, Gift, Calendar, Users, TrendingUp, AlertCircle } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
+import { LockedFeature } from '@/components/FeatureGate/LockedFeature'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { useCurrency } from '@/hooks/useCurrency'
 import { toast } from 'sonner'
 import { getFrappeError } from '@/lib/utils'
 
 export default function Coupons() {
-  const { selectedRestaurant } = useRestaurant()
+  const { selectedRestaurant, isLux } = useRestaurant()
   const { formatAmountNoDecimals } = useCurrency()
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editingCoupon, setEditingCoupon] = useState<any>(null)
@@ -141,6 +142,10 @@ export default function Coupons() {
         />
       </div>
     )
+  }
+
+  if (!isLux) {
+    return <LockedFeature feature="coupons" requiredPlan={['LUX']} />
   }
 
   return (

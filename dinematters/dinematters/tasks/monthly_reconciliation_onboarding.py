@@ -12,7 +12,10 @@ def process_monthly_minimums_by_onboarding_date():
 		previous_month = (today - relativedelta(months=1)).strftime("%Y-%m")
 		last_day_current = calendar.monthrange(today.year, today.month)[1]
 
-		restaurants = frappe.get_all("Restaurant", filters={"is_active": 1}, fields=["name", "onboarding_date", "monthly_minimum"])
+		restaurants = frappe.get_all("Restaurant", 
+			filters={"is_active": 1}, 
+			fields=["name", "onboarding_date", "monthly_minimum", "platform_fee_percent"]
+		)
 		created = []
 		for r in restaurants:
 			try:
@@ -37,9 +40,15 @@ def process_monthly_minimums_by_onboarding_date():
 					WHERE restaurant=%s AND payment_status='completed' AND DATE_FORMAT(creation, '%%Y-%%m')=%s
 				""", (r.get("name"), previous_month))[0][0] or 0
 				total_paise = int(float(total) * 100)
-				calculated_fee = int(math.floor(total_paise * 0.015))
-				min_amt = 999 * 100
-				base_commission = max(min_amt, calculated_fee)
+				
+				# Fetch commission settings from Restaurant
+				res_fee_percent = float(r.get("platform_fee_percent") if r.get("platform_fee_percent") is not None else 1.5)
+				calculated_fee = int(math.floor(total_paise * (res_fee_percent / 100.0)))
+				
+				res_min = float(r.get("monthly_minimum") if r.get("monthly_minimum") is not None else 999.0)
+				min_amt_paise = int(res_min * 100)
+				
+				base_commission = max(min_amt_paise, calculated_fee)
 				
 				# GST Compliance (18%)
 				gst_amount = int(math.floor(base_commission * 0.18))
@@ -53,7 +62,7 @@ def process_monthly_minimums_by_onboarding_date():
 					"calculated_fee": base_commission,
 					"final_amount": final_total,
 					"payment_status": "pending",
-					"notes": f"Base Commission: ₹{base_commission/100:.2f}, GST (18%): ₹{gst_amount/100:.2f}"
+					"notes": f"Base Commission: ₹{base_commission/100:.2f}, GST (18%): ₹{gst_amount/100:.2f} (Rate: {res_fee_percent}%)"
 				})
 				ledger.insert(ignore_permissions=True)
 				created.append(ledger.name)

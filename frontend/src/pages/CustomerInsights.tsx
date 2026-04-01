@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { Users, Search, PlusCircle, MinusCircle, User, History, Loader2, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
+import { LockedFeature } from '@/components/FeatureGate/LockedFeature'
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,7 @@ import {
 import { Label } from '@/components/ui/label'
 
 export default function CustomerInsights() {
-  const { selectedRestaurant } = useRestaurant()
+  const { selectedRestaurant, isLux } = useRestaurant()
   const [loading, setLoading] = useState(false)
   const [customers, setCustomers] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -107,6 +108,10 @@ export default function CustomerInsights() {
     } finally {
       setLoadingHistory(false)
     }
+  }
+
+  if (!isLux) {
+    return <LockedFeature feature="loyalty" requiredPlan={['LUX']} />
   }
 
   return (

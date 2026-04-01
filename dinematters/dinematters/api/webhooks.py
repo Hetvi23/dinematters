@@ -175,6 +175,30 @@ def handle_payment_captured(payload):
 			except Exception as e:
 				frappe.log_error(f"Failed to persist tokenization info: {str(e)}", "razorpay.webhook.token_save")
 				return {"error": str(e)}
+
+		# Handle Coin Purchase
+		if request_type == "coin_purchase":
+			try:
+				restaurant = restaurant_from_notes or notes.get("restaurant")
+				coins = float(notes.get("coins") or 0)
+				gst_amount = float(notes.get("gst_amount") or 0)
+				total_paid = float(notes.get("total_payable") or 0)
+				
+				if restaurant and coins > 0:
+					from dinematters.dinematters.api.coin_billing import record_transaction
+					record_transaction(
+						restaurant=restaurant,
+						txn_type="Purchase",
+						amount=coins,
+						gst_amount=gst_amount,
+						total_paid=total_paid,
+						description=f"Coin Purchase: {coins} Coins (GST ₹{gst_amount:.2f} included)",
+						payment_id=payment_id
+					)
+					return {"success": True, "message": "Coins added successfully"}
+			except Exception as e:
+				frappe.log_error(f"Coin purchase verification failed: {str(e)}", "razorpay.webhook.coin_purchase")
+				return {"error": str(e)}
 		# Fallback to ledger mapping if present
 		ledgers = frappe.get_all("Monthly Billing Ledger", filters={"razorpay_payment_id": payment_id}, fields=["name", "restaurant"])
 		if ledgers:

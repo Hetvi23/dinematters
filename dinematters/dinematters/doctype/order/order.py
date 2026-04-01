@@ -38,10 +38,76 @@ class Order(Document):
         
         self.total = taxable_amount + tax_amount + pkg_fee + del_fee - loyalty_disc
 
-        # 5. Update Platform Fee (1.5% commission on GMV)
+        # 5. Update Platform Fee (Dynamic commission on GMV)
         # GMV = total amount paid by customer
         # Field is 'platform_fee_amount' (Int, Paise)
-        self.platform_fee_amount = int(math.floor(float(self.total or 0) * 0.015 * 100))
+        rate = float(frappe.db.get_value("Restaurant", self.restaurant, "platform_fee_percent") or 1.5) / 100.0
+        self.platform_fee_amount = int(math.floor(float(self.total or 0) * rate * 100))
+
+    def on_update(self):
+        """
+        Trigger commission deduction when order is confirmed/paid.
+        Only applicable for PRO restaurants.
+        """
+        if self.status in ["confirmed", "completed", "billed"] or self.payment_status == "completed":
+            # 1. Plan Awareness: Only PRO restaurants pay 1.5% commission
+            plan_type = frappe.db.get_value("Restaurant", self.restaurant, "plan_type")
+            if plan_type != "PRO":
+                return
+
+            # Avoid duplicate deductions
+            if not frappe.db.exists("Coin Transaction", {
+                "reference_doctype": "Order",
+                "reference_name": self.name,
+                "transaction_type": "Commission Deduction"
+            }):
+                from dinematters.dinematters.api.coin_billing import deduct_coins
+                
+                res_fee_percent = float(frappe.db.get_value("Restaurant", self.restaurant, "platform_fee_percent") or 1.5)
+                commission_amt = float(self.total or 0) * (res_fee_percent / 100.0)
+                
+                if commission_amt > 0:
+                    try:
+                        deduct_coins(
+                            restaurant=self.restaurant,
+                            amount=commission_amt,
+                            type="Commission Deduction",
+                            description=f"{res_fee_percent}% Commission for Order {self.order_number}",
+                            ref_doctype="Order",
+                            ref_name=self.name
+                        )
+                    except Exception as e:
+                        # Log error but don't block order update (to avoid blocking kitchen flow)
+                        # Autopay should eventually recover this
+                        frappe.log_error(f"Commission deduction failed for {self.name}: {str(e)}", "Commission Error")
+
+        # Handle Cancellations (Refund if already charged)
+        if self.status == "cancelled":
+            # Check if deduction exists
+            deduction_txn = frappe.db.get_value("Coin Transaction", {
+                "reference_doctype": "Order",
+                "reference_name": self.name,
+                "transaction_type": "Commission Deduction"
+            }, ["name", "amount"], as_dict=True)
+
+            if deduction_txn:
+                # Check if refund already exists
+                if not frappe.db.exists("Coin Transaction", {
+                    "reference_doctype": "Order",
+                    "reference_name": self.name,
+                    "transaction_type": "Refund"
+                }):
+                    from dinematters.dinematters.api.coin_billing import refund_coins
+                    try:
+                        refund_coins(
+                            restaurant=self.restaurant,
+                            amount=deduction_txn.amount,
+                            description=f"Commission Refund for Cancelled Order {self.order_number}",
+                            ref_doctype="Order",
+                            ref_name=self.name
+                        )
+                    except Exception as e:
+                        frappe.log_error(f"Commission refund failed for {self.name}: {str(e)}", "Refund Error")
 
 
 

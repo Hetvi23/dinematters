@@ -34,7 +34,7 @@ export function useFeatureGate(feature: FeatureKey, restaurantId?: string) {
           setAccess({
             hasAccess: false,
             currentPlan: 'LITE',
-            requiredPlans: ['PRO'],
+            requiredPlans: ['PRO', 'LUX'],
             feature,
           });
         }
@@ -56,7 +56,7 @@ export function useFeatureGate(feature: FeatureKey, restaurantId?: string) {
 }
 
 export function usePlanType(restaurantId?: string) {
-  const [planType, setPlanType] = useState<'LITE' | 'PRO' | null>(null);
+  const [planType, setPlanType] = useState<'LITE' | 'PRO' | 'LUX' | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -104,5 +104,5 @@ export function usePlanType(restaurantId?: string) {
     };
   }, [restaurantId]);
 
-  return { planType, isPro: planType === 'PRO', isLite: planType === 'LITE', loading };
+  return { planType, isLux: planType === 'LUX', isPro: planType === 'PRO', isLite: planType === 'LITE', loading };
 }

@@ -6,7 +6,7 @@
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
- "field_order": [
+  "field_order": [
   "restaurant_id",
   "restaurant_name",
   "company",
@@ -70,12 +70,34 @@
   "total_orders",
   "total_revenue",
   "commission_earned",
+  "deferred_plan_type",
+  "plan_change_date",
   "plan_change_history",
-  "section_break_ai_credits",
-  "ai_credits",
+  "section_break_coins",
+  "coins_balance",
+  "auto_recharge_enabled",
+  "column_break_coins",
+  "auto_recharge_threshold",
+  "auto_recharge_amount",
+  "section_break_auto_recharge_safety",
+  "daily_auto_recharge_limit",
+  "daily_auto_recharge_count",
+  "column_break_safety",
+  "last_auto_recharge_date",
+  "section_break_ai_metrics",
   "total_ai_generations",
-  "column_break_ai_credits",
   "total_ai_cost",
+  "ai_credits",
+  "section_break_pos",
+  "pos_provider",
+  "pos_enabled",
+  "pos_app_key",
+  "pos_app_secret",
+  "pos_access_token",
+  "pos_merchant_id",
+  "column_break_pos",
+  "pos_last_sync_at",
+  "pos_sync_status",
   "section_break_branding",
   "logo",
   "hero_video",
@@ -337,41 +359,6 @@
    "hidden": 1
   },
   {
-   "fieldname": "section_break_branding",
-   "fieldtype": "Section Break",
-   "label": "Branding"
-  },
-  {
-   "fieldname": "logo",
-   "fieldtype": "Attach Image",
-   "label": "Logo"
-  },
-  {
-   "fieldname": "hero_video",
-   "fieldtype": "Attach",
-   "label": "Hero Video"
-  },
-  {
-   "fieldname": "section_break_metadata",
-   "fieldtype": "Section Break",
-   "label": "Description"
-  },
-  {
-   "fieldname": "description",
-   "fieldtype": "Small Text",
-   "label": "Description"
-  },
-  {
-   "fieldname": "column_break_google_map",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "google_map_url",
-   "fieldtype": "Long Text",
-   "label": "Google Map URL",
-   "description": "Enter the Google Maps URL for your restaurant location"
-  },
-  {
    "fieldname": "section_break_razorpay",
    "fieldtype": "Section Break",
    "label": "Razorpay Integration"
@@ -484,11 +471,11 @@
    "fieldname": "plan_type",
    "fieldtype": "Select",
    "label": "Plan Type",
-   "options": "\nLITE\nPRO",
+   "options": "\nLITE\nPRO\nLUX",
    "default": "LITE",
    "in_list_view": 1,
    "reqd": 1,
-   "description": "Subscription plan tier (LITE: Free with restrictions, PRO: 1.5% commission)"
+   "description": "Subscription plan tier (LITE: Free, PRO: Digital Menu \u20b9999/mo, LUX: Full Automation 1.5% Commission)"
   },
   {
    "fieldname": "plan_activated_on",
@@ -564,6 +551,19 @@
    "description": "Total commission earned by platform (1.5% of revenue)"
   },
   {
+   "fieldname": "deferred_plan_type",
+   "fieldtype": "Select",
+   "label": "Deferred Plan Type",
+   "options": "\nLITE\nPRO\nLUX",
+   "description": "The plan that will be activated at midnight"
+  },
+  {
+   "fieldname": "plan_change_date",
+   "fieldtype": "Date",
+   "label": "Plan Change Date",
+   "description": "Date when the deferred plan becomes active"
+  },
+  {
    "fieldname": "plan_change_history",
    "fieldtype": "JSON",
    "label": "Plan Change History",
@@ -572,38 +572,190 @@
    "description": "Historical log of plan changes"
   },
   {
-   "fieldname": "section_break_ai_credits",
+   "fieldname": "section_break_coins",
    "fieldtype": "Section Break",
-   "label": "AI Credit Wallet"
+   "label": "Coins & Autopay"
   },
   {
-   "fieldname": "ai_credits",
-   "fieldtype": "Int",
-   "label": "AI Credits Balance",
+   "fieldname": "coins_balance",
+   "fieldtype": "Float",
+   "label": "Coins Balance",
    "default": "0",
    "read_only": 1,
-   "in_list_view": 0,
-   "description": "Current AI credit balance. 1 credit = \u20b92. Each image enhancement costs 5 credits."
+   "in_list_view": 1,
+   "description": "Current DineMatters Coins balance (1 Coin = ₹1)"
+  },
+  {
+   "fieldname": "auto_recharge_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Auto-Recharge",
+   "default": "0",
+   "description": "Automatically recharge coins when balance falls below threshold"
+  },
+  {
+   "fieldname": "column_break_coins",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "auto_recharge_threshold",
+   "fieldtype": "Float",
+   "label": "Recharge Threshold (₹)",
+   "default": "200.0",
+   "description": "Trigger recharge when balance falls below this amount"
+  },
+  {
+   "fieldname": "auto_recharge_amount",
+   "fieldtype": "Float",
+   "label": "Recharge Amount (₹)",
+   "default": "1000.0",
+   "description": "Amount to automatically recharge via Razorpay mandate"
+  },
+  {
+   "fieldname": "section_break_auto_recharge_safety",
+   "fieldtype": "Section Break",
+   "label": "Auto-Recharge Safety"
+  },
+  {
+   "fieldname": "daily_auto_recharge_limit",
+   "fieldtype": "Float",
+   "label": "Daily Auto-Recharge Limit (₹)",
+   "default": "5000.0",
+   "description": "Maximum total auto-recharge amount allowed per day"
+  },
+  {
+   "fieldname": "daily_auto_recharge_count",
+   "fieldtype": "Float",
+   "label": "Day Auto-Recharge Volume (₹)",
+   "default": "0",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_safety",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_auto_recharge_date",
+   "fieldtype": "Date",
+   "label": "Last Auto-Recharge Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_ai_metrics",
+   "fieldtype": "Section Break",
+   "label": "AI Metrics"
   },
   {
    "fieldname": "total_ai_generations",
    "fieldtype": "Int",
    "label": "Total AI Generations",
    "default": "0",
-   "read_only": 1,
-   "description": "Total number of AI image generations performed."
-  },
-  {
-   "fieldname": "column_break_ai_credits",
-   "fieldtype": "Column Break"
+   "read_only": 1
   },
   {
    "fieldname": "total_ai_cost",
    "fieldtype": "Float",
-   "label": "Total AI Cost (\u20b9)",
+   "label": "Total AI Cost (₹)",
    "default": "0",
-   "read_only": 1,
-   "description": "Total INR value of AI credits consumed."
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_credits",
+   "fieldtype": "Int",
+   "label": "Legacy AI Credits",
+   "hidden": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_pos",
+   "fieldtype": "Section Break",
+   "label": "POS Integration"
+  },
+  {
+   "fieldname": "pos_provider",
+   "fieldtype": "Select",
+   "label": "POS Provider",
+   "options": "\nPetpooja"
+  },
+  {
+   "fieldname": "pos_enabled",
+   "fieldtype": "Check",
+   "label": "Enable POS Integration",
+   "default": 0
+  },
+  {
+   "fieldname": "pos_app_key",
+   "fieldtype": "Data",
+   "label": "POS App Key",
+   "depends_on": "eval:doc.pos_provider == 'Petpooja'"
+  },
+  {
+   "fieldname": "pos_app_secret",
+   "fieldtype": "Password",
+   "label": "POS App Secret",
+   "depends_on": "eval:doc.pos_provider == 'Petpooja'"
+  },
+  {
+   "fieldname": "pos_access_token",
+   "fieldtype": "Password",
+   "label": "POS Access Token",
+   "depends_on": "eval:doc.pos_provider == 'Petpooja'"
+  },
+  {
+   "fieldname": "pos_merchant_id",
+   "fieldtype": "Data",
+   "label": "POS Merchant ID / Rest ID",
+   "depends_on": "eval:doc.pos_provider == 'Petpooja'"
+  },
+  {
+   "fieldname": "column_break_pos",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pos_last_sync_at",
+   "fieldtype": "Datetime",
+   "label": "Last Sync At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pos_sync_status",
+   "fieldtype": "Small Text",
+   "label": "Sync Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_branding",
+   "fieldtype": "Section Break",
+   "label": "Branding"
+  },
+  {
+   "fieldname": "logo",
+   "fieldtype": "Attach Image",
+   "label": "Logo"
+  },
+  {
+   "fieldname": "hero_video",
+   "fieldtype": "Attach",
+   "label": "Hero Video"
+  },
+  {
+   "fieldname": "section_break_metadata",
+   "fieldtype": "Section Break",
+   "label": "Description"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "column_break_google_map",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "google_map_url",
+   "fieldtype": "Long Text",
+   "label": "Google Map URL",
+   "description": "Enter the Google Maps URL for your restaurant location"
   }
  ],
  "index_web_pages_for_search": 1,

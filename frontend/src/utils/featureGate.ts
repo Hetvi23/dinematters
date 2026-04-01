@@ -6,7 +6,7 @@
 
 export interface FeatureAccess {
   hasAccess: boolean;
-  currentPlan: 'LITE' | 'PRO';
+  currentPlan: 'LITE' | 'PRO' | 'LUX';
   requiredPlans: string[];
   feature: string;
 }
@@ -23,6 +23,10 @@ export const FEATURES = {
   GAMES: 'games',
   TABLE_BOOKING: 'table_booking',
   CUSTOM_BRANDING: 'custom_branding',
+  CUSTOMER: 'customer',
+  EXPERIENCE_LOUNGE: 'experience_lounge',
+  EVENTS: 'events',
+  OFFERS: 'offers',
 } as const;
 
 export type FeatureKey = typeof FEATURES[keyof typeof FEATURES];
@@ -59,7 +63,7 @@ export async function checkFeatureAccess(
     return {
       hasAccess: false,
       currentPlan: 'LITE',
-      requiredPlans: ['PRO'],
+      requiredPlans: ['PRO', 'LUX'],
       feature,
     };
   }

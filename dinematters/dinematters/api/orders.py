@@ -11,6 +11,7 @@ from frappe import _
 from frappe.utils import flt, cint, now_datetime, get_datetime_str, add_to_date
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api, validate_product_belongs_to_restaurant
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
+from dinematters.dinematters.utils.feature_gate import require_plan
 from dinematters.dinematters.utils.customer_helpers import (
 	require_verified_phone,
 	validate_customer_session,
@@ -53,6 +54,7 @@ def load_customization_options(product_doc):
 			question.options.append(option_obj)
 
 @frappe.whitelist(allow_guest=True)
+@require_plan('LUX')
 def create_order(restaurant_id, items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None, table_number=None, coupon_code=None, payment_method=None, order_type=None, packaging_fee=None, pickup_time=None, loyalty_coins_redeemed=0, referral_id=None):
 	"""
 	POST /api/v1/orders
@@ -515,6 +517,7 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 
 
 @frappe.whitelist(allow_guest=True)
+@require_plan('LUX')
 def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None, admin_mode=False, date_from=None, date_to=None, search_query=None, recent_only=False):
 	"""
 	GET /api/v1/orders

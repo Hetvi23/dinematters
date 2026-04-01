@@ -1,477 +1,516 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { useFrappePostCall } from '@/lib/frappe'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   AlertCircle,
-  CheckCircle2,
-  CreditCard,
   IndianRupee,
   Loader2,
   ShieldCheck,
-  Wallet,
-  Calendar,
-  ArrowRight,
   Zap,
-  Activity,
   Info,
-  Link as LinkIcon,
-  Fingerprint,
-  CircleDashed,
+  Plus,
+  Coins,
+  History,
+  ShieldAlert,
+  Crown,
+  CheckCircle2,
+  Smartphone,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { format, endOfMonth, parseISO } from 'date-fns'
-import { getFrappeError } from '@/lib/utils'
+import { AiRechargeModal } from '@/components/AiRechargeModal'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { format, addDays } from 'date-fns'
 
-interface PaymentStats {
-  current_month: string
-  total_orders: number
-  total_revenue: number
-  platform_fee_collected: number
-  monthly_minimum: number
-  minimum_due: number
-  razorpay_customer_id?: string | null
-  razorpay_token_id?: string | null
-  mandate_status?: string | null
-  masked_customer_id?: string | null
-  masked_token_id?: string | null
-  merchant_key_configured?: boolean
-  billing_status?: string | null
-}
-
-const statusToneMap: Record<string, string> = {
-  active: 'bg-green-500/10 text-green-700 border-green-200',
-  paid: 'bg-green-500/10 text-green-700 border-green-200',
-  overdue: 'bg-red-500/10 text-red-700 border-red-200',
-  pending: 'bg-amber-500/10 text-amber-700 border-amber-200',
-}
-
-const mandateToneMap: Record<string, string> = {
-  active: 'bg-green-500/10 text-green-700 border-green-200',
-  inactive: 'bg-muted text-muted-foreground border-border',
-  failed: 'bg-red-500/10 text-red-700 border-red-200',
-  pending: 'bg-amber-500/10 text-amber-700 border-amber-200',
+interface BillingInfo {
+  coins_balance: number
+  auto_recharge_enabled: boolean
+  auto_recharge_threshold: number
+  auto_recharge_amount: number
+  mandate_active: boolean
+  daily_limit: number
+  current_daily_vol: number
+  deferred_plan_type?: 'LITE' | 'PRO' | 'LUX' | null
+  plan_change_date?: string | null
 }
 
 export default function AutopaySetupPage() {
-  const { selectedRestaurant, restaurants } = useRestaurant()
-  const [stats, setStats] = useState<PaymentStats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [isSettingUp, setIsSettingUp] = useState(false)
-  const [ownerName, setOwnerName] = useState('')
-  const [ownerEmail, setOwnerEmail] = useState('')
+  const navigate = useNavigate()
+  const { selectedRestaurant, restaurants, planType, refreshConfig } = useRestaurant()
 
-  const { call: getPaymentStats } = useFrappePostCall<{ success: boolean; data: PaymentStats }>(
-    'dinematters.dinematters.api.payments.get_restaurant_payment_stats'
+  const [billingInfo, setBillingInfo] = useState<BillingInfo | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [isChangingPlan, setIsChangingPlan] = useState(false)
+  const [showRecharge, setShowRecharge] = useState(false)
+  
+  // Local form state
+  const [enabled, setEnabled] = useState(false)
+  const [threshold, setThreshold] = useState('200')
+  const [amount, setAmount] = useState('1000')
+
+  // Plan change confirmation state
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [newPlanSelection, setNewPlanSelection] = useState<'LITE' | 'PRO' | 'LUX' | null>(null)
+
+  const { call: getInfo } = useFrappePostCall<any>(
+    'dinematters.dinematters.api.coin_billing.get_coin_billing_info'
   )
-  const { call: createTokenOrder } = useFrappePostCall(
+  const { call: updateSettings } = useFrappePostCall<any>(
+    'dinematters.dinematters.api.coin_billing.update_autopay_settings'
+  )
+  const { call: updatePlan } = useFrappePostCall<any>(
+    'dinematters.dinematters.api.coin_billing.update_subscription_plan'
+  )
+  const { call: createTokenOrder } = useFrappePostCall<any>(
     'dinematters.dinematters.api.payments.create_tokenization_order'
   )
 
-  const activeRestaurant = useMemo(
-    () => restaurants.find((item: any) => item.name === selectedRestaurant || item.restaurant_id === selectedRestaurant),
-    [restaurants, selectedRestaurant]
-  )
+  const activeRes = restaurants.find(r => r.name === selectedRestaurant)
 
-  const loadRazorpay = async () => {
-    if ((window as any).Razorpay) return true
-    return new Promise<boolean>((resolve) => {
-      const script = document.createElement('script')
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js'
-      script.onload = () => resolve(true)
-      script.onerror = () => resolve(false)
-      document.body.appendChild(script)
-    })
-  }
-
-  const loadStats = async () => {
+  const loadInfo = async () => {
     if (!selectedRestaurant) return
     setLoading(true)
     try {
-      const response: any = await getPaymentStats({ restaurant_id: selectedRestaurant })
-      const body = response?.message ?? response
-      if (body?.success && body?.data) {
-        setStats(body.data)
-        toast.error(body?.error || 'Failed to load autopay status')
+      const res = await getInfo({ restaurant: selectedRestaurant })
+      if (res.message) {
+        setBillingInfo(res.message)
+        setEnabled(res.message.auto_recharge_enabled)
+        setThreshold(res.message.auto_recharge_threshold.toString())
+        setAmount(res.message.auto_recharge_amount.toString())
       }
-    } catch (error: any) {
-      toast.error('Failed to load autopay status', { description: getFrappeError(error) })
+    } catch (error) {
+      toast.error('Failed to load billing info')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    if (!selectedRestaurant) return
-    setOwnerName(activeRestaurant?.restaurant_name || activeRestaurant?.name || '')
-    setOwnerEmail((activeRestaurant as any)?.owner_email || '')
-  }, [activeRestaurant, selectedRestaurant])
-
-  useEffect(() => {
-    loadStats()
+    loadInfo()
   }, [selectedRestaurant])
 
-  const handleSetupAutopay = async () => {
-    if (!selectedRestaurant) {
-      toast.error('Please select a restaurant')
-      return
-    }
-    if (!ownerName || !ownerEmail) {
-      toast.error('Please provide account holder name and email')
+  const handlePlanToggle = async (newPlan: 'LITE' | 'PRO' | 'LUX') => {
+    if (!selectedRestaurant || newPlan === planType) return
+    
+    // 1. Check for pending changes
+    if (billingInfo?.deferred_plan_type) {
+      toast.error('A plan change is already scheduled for tomorrow.')
       return
     }
 
-    setIsSettingUp(true)
+    // 2. Entrance Barrier Check
+    if (newPlan === 'PRO' && (billingInfo?.coins_balance || 0) < 999) {
+      toast.error('Insufficient Coins', {
+        description: 'You need at least 999 coins in your wallet to upgrade to PRO.'
+      })
+      setShowRecharge(true)
+      return
+    }
+    
+    if (newPlan === 'LUX' && (billingInfo?.coins_balance || 0) < 2499) {
+      toast.error('Insufficient Coins', {
+        description: 'You need at least 2499 coins in your wallet to upgrade to LUX.'
+      })
+      setShowRecharge(true)
+      return
+    }
+
+
+    // 3. Trigger Modern Confirmation Dialog
+    setNewPlanSelection(newPlan)
+    setShowConfirm(true)
+  }
+
+  const confirmPlanChange = async () => {
+    if (!selectedRestaurant || !newPlanSelection) return
+    
+    setIsChangingPlan(true)
     try {
-      const razorpayLoaded = await loadRazorpay()
-      if (!razorpayLoaded) {
-        throw new Error('Failed to load Razorpay Checkout')
+      const res = await updatePlan({
+        restaurant: selectedRestaurant,
+        plan_type: newPlanSelection
+      })
+      
+      if (res.message?.success) {
+        toast.success(`Success! Plan change scheduled.`, {
+          description: res.message.message
+        })
       }
+      
+      await loadInfo()
+      await refreshConfig()
+    } catch (error: any) {
+      toast.error('Failed to schedule plan change', { description: error.message })
+    } finally {
+      setIsChangingPlan(false)
+      setShowConfirm(false)
+      setNewPlanSelection(null)
+    }
+  }
 
-      const response: any = await createTokenOrder({
-        restaurant_id: selectedRestaurant,
-        amount: 1,
-        customer_name: ownerName,
-        customer_email: ownerEmail,
+  const handleSaveSettings = async () => {
+    if (!selectedRestaurant) return
+    setIsUpdating(true)
+    try {
+      await updateSettings({
+        restaurant: selectedRestaurant,
+        enabled,
+        threshold: parseFloat(threshold),
+        amount: parseFloat(amount)
+      })
+      toast.success('Autopay settings updated')
+      loadInfo()
+    } catch (error) {
+      toast.error('Failed to update settings')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const handleSetupMandate = async () => {
+    try {
+      const loaded = await new Promise<boolean>((resolve) => {
+        if ((window as any).Razorpay) return resolve(true)
+        const script = document.createElement('script')
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+        script.onload = () => resolve(true)
+        script.onerror = () => resolve(false)
+        document.body.appendChild(script)
       })
 
-      const body = response?.message ?? response
-      if (!body?.success || !body?.data) {
-        throw new Error(body?.error || 'Failed to initiate autopay setup')
-      }
+      if (!loaded) throw new Error('Razorpay failed to load')
 
-      const { key_id, razorpay_order_id } = body.data
-      const options = {
+      const res = await createTokenOrder({
+        restaurant_id: selectedRestaurant,
+        amount: 1,
+        customer_name: activeRes?.restaurant_name || activeRes?.name,
+        customer_email: (activeRes as any)?.owner_email || ''
+      })
+
+      if (!res.message?.success) throw new Error(res.message?.error || 'Failed to start mandate setup')
+
+      const { key_id, razorpay_order_id } = res.message.data
+      const rzp = new (window as any).Razorpay({
         key: key_id,
         order_id: razorpay_order_id,
-        name: 'Dinematters',
-        description: 'Autopay setup for monthly commission billing',
-        prefill: {
-          name: ownerName,
-          email: ownerEmail,
-        },
-        theme: {
-          color: '#f97316',
-        },
-        modal: {
-          ondismiss: () => {
-            toast('Autopay setup was closed before completion')
-          },
-        },
-        handler: async () => {
-          toast.success('Autopay authorization submitted. We are verifying the mandate details.')
-          setTimeout(() => {
-            loadStats()
-          }, 3000)
-        },
-      }
-
-      const rzp = new (window as any).Razorpay(options)
-      rzp.on('payment.failed', (failure: any) => {
-        toast.error(failure?.error?.description || 'Autopay setup failed')
+        name: 'DineMatters Autopay',
+        description: 'Secure Mandate Setup (₹1 Refundable)',
+        theme: { color: '#f97316' },
+        handler: () => {
+          toast.success('Mandate authorized! It will be active shortly.')
+          setTimeout(loadInfo, 3000)
+        }
       })
       rzp.open()
     } catch (error: any) {
-      toast.error('Failed to start autopay setup', { description: getFrappeError(error) })
-    } finally {
-      setIsSettingUp(false)
+      toast.error('Mandate setup failed', { description: error.message })
     }
   }
 
-  if (!selectedRestaurant) {
-    return <div className="p-8 text-center text-muted-foreground">Please select a restaurant</div>
-  }
-
-  const billingStatus = stats?.billing_status || 'pending'
-  const statusTone = statusToneMap[billingStatus] || 'bg-muted text-muted-foreground border-border'
-  const autopayEnabled = Boolean(stats?.razorpay_customer_id)
-  const mandateStatus = stats?.mandate_status || (autopayEnabled ? 'active' : 'inactive')
-  const mandateTone = mandateToneMap[mandateStatus] || 'bg-muted text-muted-foreground border-border'
-  const currentMonthLabel = stats?.current_month || '—'
-  const ordersCount = stats?.total_orders ?? 0
-  const totalRevenue = (stats?.total_revenue ?? 0).toFixed(2)
-  const platformFee = (stats?.platform_fee_collected ?? 0).toFixed(2)
-  const minimumDue = (stats?.minimum_due ?? 0).toFixed(2)
-
-  // Calculate Next Billing Date
-  let nextBillingDate = 'End of current month'
-  if (stats?.current_month) {
-    try {
-      // current_month is "YYYY-MM", parse it to get the last day
-      const date = parseISO(`${stats.current_month}-01`)
-      nextBillingDate = format(endOfMonth(date), 'MMM do, yyyy')
-    } catch (e) {
-      // fallback if parsing fails
-    }
+  if (loading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-8 pb-10">
-      {/* Header Area */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Autopay Setup</h1>
-            <Badge variant="outline" className={statusTone}>{billingStatus}</Badge>
-          </div>
-          <p className="text-muted-foreground text-sm max-w-2xl">
-            Authorize Dinematters to collect your monthly platform commission seamlessly at the end of each billing cycle.
-          </p>
+    <div className="max-w-5xl mx-auto space-y-8 pb-20 animate-in fade-in duration-500">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black tracking-tight text-foreground">Billing & Subscription</h1>
+          <p className="text-sm text-muted-foreground">Manage your DineMatters tier, wallet and automatic recharge.</p>
         </div>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate('/ledger')}>
+             <History className="h-4 w-4" />
+             Ledger
+          </Button>
+          <Button size="sm" className="gap-2 bg-primary text-white" onClick={() => setShowRecharge(true)}>
+             <Plus className="h-4 w-4" />
+             Buy Coins
+          </Button>
+        </div>
+      </div>
 
-        {!autopayEnabled && !loading && (
-          <div className="flex items-center gap-4 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 p-4 rounded-xl border border-orange-100 dark:border-orange-900/30 group">
-            <div className="h-10 w-10 bg-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-orange-500/20">
-              <Zap className="h-5 w-5 text-white animate-pulse" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-orange-700 dark:text-orange-400">Action Required</p>
-              <p className="text-[11px] text-orange-600/80 dark:text-orange-500/80">Configure your billing mandate to prevent account suspension.</p>
-            </div>
+      {/* Pending Change Alert */}
+      {billingInfo?.deferred_plan_type && (
+        <Card className="border-primary/20 bg-primary/5 dark:bg-primary/10 overflow-hidden animate-in slide-in-from-top-4 duration-500">
+           <CardContent className="p-4 flex items-center gap-4">
+              <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                 <Loader2 className="h-5 w-5 text-primary animate-spin" />
+              </div>
+              <div className="flex-1">
+                 <h4 className="text-sm font-black uppercase tracking-tight text-primary">Plan switch scheduled</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Your {billingInfo.deferred_plan_type} plan will be effective from <b>{format(new Date(billingInfo.plan_change_date!), 'do MMMM')} at 12:00 AM</b>. 
+                    {(billingInfo.deferred_plan_type === 'PRO' || billingInfo.deferred_plan_type === 'LUX') && " Premium features will unlock then."}
+                  </p>
+              </div>
+              <Badge variant="outline" className="border-primary/30 text-primary">
+                 Effective {new Date(billingInfo.plan_change_date!).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+              </Badge>
+           </CardContent>
+        </Card>
+      )}
+
+      {/* Subscription Tier Switcher */}
+      <Card className="border-none shadow-lg bg-gradient-to-r from-primary/5 via-background to-primary/5 overflow-hidden">
+        <CardContent className="p-1">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-1">
+             <button
+              onClick={() => handlePlanToggle('LITE')}
+              disabled={isChangingPlan}
+              className={cn(
+                "flex items-center justify-center gap-3 py-4 px-6 rounded-xl transition-all",
+                planType === 'LITE' 
+                  ? "bg-background shadow-sm border border-border/50" 
+                  : "hover:bg-primary/5 text-muted-foreground opacity-60"
+              )}
+             >
+                <div className={cn("p-2 rounded-lg", planType === 'LITE' ? "bg-primary/10 text-primary" : "bg-muted")}>
+                   <Smartphone className="h-5 w-5" />
+                </div>
+                <div className="text-left">
+                   <p className="text-sm font-black uppercase tracking-tight">LITE PLAN</p>
+                   <p className="text-[10px] font-medium opacity-70">Free • Basic Features</p>
+                </div>
+                {planType === 'LITE' && <CheckCircle2 className="h-4 w-4 text-primary ml-auto" />}
+             </button>
+
+             <button
+              onClick={() => handlePlanToggle('PRO')}
+              disabled={isChangingPlan}
+              className={cn(
+                "flex items-center justify-center gap-3 py-4 px-6 rounded-xl transition-all",
+                planType === 'PRO' 
+                  ? "bg-background shadow-sm border border-border/50" 
+                  : "hover:bg-primary/5 text-muted-foreground opacity-60"
+              )}
+             >
+                <div className={cn("p-2 rounded-lg", planType === 'PRO' ? "bg-primary/10 text-primary" : "bg-muted")}>
+                   {isChangingPlan ? <Loader2 className="h-5 w-5 animate-spin" /> : <Crown className="h-5 w-5" />}
+                </div>
+                <div className="text-left">
+                   <div className="flex items-center gap-2">
+                       <p className="text-sm font-black uppercase tracking-tight">PRO PLAN</p>
+                       <Badge className="bg-primary/20 text-primary text-[8px] h-4 hover:bg-primary/20">POPULAR</Badge>
+                   </div>
+                   <p className="text-[10px] font-medium opacity-70">Min 999 / month • Pro Features</p>
+                </div>
+                {planType === 'PRO' && <CheckCircle2 className="h-4 w-4 text-primary ml-auto" />}
+             </button>
+
+             <button
+              onClick={() => handlePlanToggle('LUX')}
+              disabled={isChangingPlan}
+              className={cn(
+                "flex items-center justify-center gap-3 py-4 px-6 rounded-xl transition-all",
+                planType === 'LUX' 
+                  ? "bg-background shadow-sm border border-border/50" 
+                  : "hover:bg-indigo-500/5 text-muted-foreground opacity-60"
+              )}
+             >
+                <div className={cn("p-2 rounded-lg", planType === 'LUX' ? "bg-indigo-500/10 text-indigo-500" : "bg-muted")}>
+                   {isChangingPlan ? <Loader2 className="h-5 w-5 animate-spin" /> : <Crown className="h-5 w-5" />}
+                </div>
+                <div className="text-left">
+                   <div className="flex items-center gap-2">
+                       <p className="text-sm font-black uppercase tracking-tight">LUX PLAN</p>
+                       <Badge className="bg-indigo-500 text-white text-[8px] h-4 hover:bg-indigo-600">ELITE</Badge>
+                   </div>
+                   <p className="text-[10px] font-medium opacity-70">Min 2499 / month • Full Ordering</p>
+                </div>
+                {planType === 'LUX' && <CheckCircle2 className="h-4 w-4 text-indigo-500 ml-auto" />}
+             </button>
           </div>
-        )}
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* High-level Status Row - Following Dashboard StatCard Pattern */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="relative overflow-hidden transition-all duration-300 border-none bg-card shadow-sm">
-          <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Current Month
-            </CardTitle>
-            <Calendar className="h-4 w-4 text-primary" />
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* Balance Card */}
+        <Card className="md:col-span-1 shadow-sm border-none bg-primary/10 dark:bg-primary/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium uppercase tracking-wider text-primary">Current Balance</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold tracking-tight">{currentMonthLabel}</div>
-            <div className="mt-1 flex items-center gap-2">
-              <p className="text-[11px] text-muted-foreground">
-                Cycle ends <span className="font-medium text-foreground">{nextBillingDate}</span>
-              </p>
+            <div className="flex items-center gap-2">
+              <Coins className="h-8 w-8 text-primary" />
+              <div className="text-4xl font-bold tracking-tighter">{billingInfo?.coins_balance.toLocaleString()}</div>
             </div>
+            <p className="mt-2 text-xs text-muted-foreground">1 Coin = ₹1. Unified wallet for all charges.</p>
           </CardContent>
         </Card>
 
-        <Card className="relative overflow-hidden transition-all duration-300 border-none bg-card shadow-sm">
-          <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Orders Tracked
-            </CardTitle>
-            <Activity className="h-4 w-4 text-primary" />
+        {/* Mandate Status */}
+        <Card className="md:col-span-2 shadow-sm border-none bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Autopay Mandate Status</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold tracking-tight">{ordersCount}</div>
-            <div className="mt-1 flex items-center gap-2">
-              <p className="text-[11px] text-muted-foreground">Contributing to platform fee</p>
+          <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-full ${billingInfo?.mandate_active ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'}`}>
+                {billingInfo?.mandate_active ? <ShieldCheck className="h-6 w-6" /> : <ShieldAlert className="h-6 w-6" />}
+              </div>
+              <div>
+                <p className="font-bold text-lg">{billingInfo?.mandate_active ? 'Active' : 'Not Setup'}</p>
+                <p className="text-xs text-muted-foreground">
+                  {billingInfo?.mandate_active 
+                    ? 'Your account is linked for automatic top-ups.' 
+                    : 'Mandate required for automatic threshold-based recharging.'}
+                </p>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="relative overflow-hidden transition-all duration-300 border-none bg-card shadow-sm">
-          <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Est. Platform Fee
-            </CardTitle>
-            <IndianRupee className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold tracking-tight">₹{platformFee}</div>
-            <div className="mt-1 flex items-center gap-2">
-              <p className="text-[11px] text-muted-foreground">From GMV ₹{totalRevenue}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="relative overflow-hidden transition-all duration-300 border-none bg-card shadow-sm">
-          <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Minimum Due Guard
-            </CardTitle>
-            <ShieldCheck className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold tracking-tight">₹{minimumDue}</div>
-            <div className="mt-1 flex items-center gap-2">
-              <p className="text-[11px] text-muted-foreground">Floor amount if fees fall short</p>
-            </div>
+            <Button variant={billingInfo?.mandate_active ? "outline" : "default"} onClick={handleSetupMandate}>
+              {billingInfo?.mandate_active ? 'Update Card' : 'Setup Autopay'}
+            </Button>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Configuration Area */}
-      <div className="grid gap-6 lg:grid-cols-7">
-        <Card className="lg:col-span-4 shadow-sm border-none bg-card overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between pb-4">
+      {/* Main Settings */}
+      <Card className="shadow-sm border-none bg-card overflow-hidden">
+        <CardHeader className="border-b bg-muted/30">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
-              <CardTitle className="text-lg font-bold">Mandate Configuration</CardTitle>
-              <CardDescription>Link your account via Razorpay for automatic monthly billing</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-primary" />
+                Automatic Recharge Context
+              </CardTitle>
+              <CardDescription>Invisible billing to ensure your AI and Order flow stays uninterrupted.</CardDescription>
             </div>
-            {autopayEnabled && (
-               <span className="flex items-center text-xs font-medium text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-md">
-                 <CheckCircle2 className="h-3 w-3 mr-1" />
-                 Active
-               </span>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="flex items-center gap-2 bg-background p-2 rounded-lg border shadow-sm">
+              <Checkbox id="auto-recharge-toggle" checked={enabled} onCheckedChange={(checked) => setEnabled(!!checked)} />
+              <Label htmlFor="auto-recharge-toggle" className="font-bold text-xs uppercase tracking-widest cursor-pointer">{enabled ? 'Enabled' : 'Disabled'}</Label>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6 space-y-8">
+          <div className={cn("grid gap-8 md:grid-cols-2 transition-all duration-300", !enabled && "opacity-60 grayscale-[0.5] pointer-events-none select-none")}>
+            <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="autopay-name" className="text-xs uppercase tracking-wide text-muted-foreground font-bold">Account Holder Name</Label>
-                <Input 
-                  id="autopay-name" 
-                  value={ownerName} 
-                  onChange={(e) => setOwnerName(e.target.value)} 
-                  placeholder="Restaurant owner name" 
-                  className="bg-muted/50 border-transparent focus-visible:bg-background focus-visible:border-primary"
-                />
+                <Label className="text-sm font-bold">Auto-Recharge Threshold (₹)</Label>
+                <div className="relative">
+                  <IndianRupee className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    type="number" 
+                    min="300"
+                    className={cn(
+                      "pl-9 bg-muted/30 border-transparent focus:bg-background focus:border-primary",
+                      parseFloat(threshold) < 300 && "border-destructive focus:border-destructive"
+                    )} 
+                    value={threshold} 
+                    onChange={e => setThreshold(e.target.value)}
+                  />
+                </div>
+                {parseFloat(threshold) < 300 ? (
+                  <p className="text-[11px] text-destructive flex items-center gap-1 font-medium animate-pulse">
+                    <AlertCircle className="h-3 w-3" />
+                    Minimum threshold must be ₹300 for system stability.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">Trigger recharge when balance drops below this amount.</p>
+                )}
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="autopay-email" className="text-xs uppercase tracking-wide text-muted-foreground font-bold">Billing Email</Label>
-                <Input 
-                  id="autopay-email" 
-                  type="email" 
-                  value={ownerEmail} 
-                  onChange={(e) => setOwnerEmail(e.target.value)} 
-                  placeholder="owner@example.com" 
-                  className="bg-muted/50 border-transparent focus-visible:bg-background focus-visible:border-primary"
-                />
+                <Label className="text-sm font-bold">Recharge Amount (₹)</Label>
+                <div className="relative">
+                  <IndianRupee className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    type="number" 
+                    min="500"
+                    className={cn(
+                      "pl-9 bg-muted/30 border-transparent focus:bg-background focus:border-primary",
+                      parseFloat(amount) < 500 && "border-destructive focus:border-destructive"
+                    )} 
+                    value={amount} 
+                    onChange={e => setAmount(e.target.value)}
+                  />
+                </div>
+                {parseFloat(amount) < 500 ? (
+                  <p className="text-[11px] text-destructive flex items-center gap-1 font-medium animate-pulse">
+                    <AlertCircle className="h-3 w-3" />
+                    Minimum recharge amount must be ₹500.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">Every time threshold is hit, we will recharge this much.</p>
+                )}
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 flex items-start gap-3">
-              <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-foreground">Secure Vaulting</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Your payment details are processed and stored securely by Razorpay. Dinematters does not store your card information directly.
+            <div className="space-y-6">
+              <div className="rounded-xl border p-4 bg-muted/20 space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold uppercase text-muted-foreground">Daily Safety Limit</Label>
+                  <Badge variant="secondary">₹{billingInfo?.daily_limit.toLocaleString()}</Badge>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span>Used Today: ₹{billingInfo?.current_daily_vol.toLocaleString()}</span>
+                    <span>Remaining: ₹{(billingInfo?.daily_limit! - billingInfo?.current_daily_vol!).toLocaleString()}</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-background rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-primary transition-all" 
+                      style={{ width: `${(billingInfo?.current_daily_vol! / billingInfo?.daily_limit!) * 100}%` }} 
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground flex gap-1 items-start">
+                  <Info className="h-3 w-3 shrink-0" />
+                  This hard limit prevents runaway charges in case of high volume. Contact support to increase.
                 </p>
               </div>
             </div>
+          </div>
 
-            {autopayEnabled && (
-              <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">Linked Mandate Details</p>
-                    <p className="text-xs text-muted-foreground">Safe masked details from your Razorpay autopay linkage.</p>
-                  </div>
-                  <Badge variant="outline" className={mandateTone}>{mandateStatus}</Badge>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-lg border bg-background/70 px-3 py-3">
-                    <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground font-bold">
-                      <LinkIcon className="h-3.5 w-3.5" />
-                      Razorpay Customer
-                    </div>
-                    <p className="mt-2 text-sm font-semibold text-foreground">{stats?.masked_customer_id || 'Linked'}</p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">Customer reference stored for recurring billing.</p>
-                  </div>
-
-                  <div className="rounded-lg border bg-background/70 px-3 py-3">
-                    <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground font-bold">
-                      <Fingerprint className="h-3.5 w-3.5" />
-                      Token Reference
-                    </div>
-                    <p className="mt-2 text-sm font-semibold text-foreground">{stats?.masked_token_id || 'Available after mandate capture'}</p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">Masked token identifier used for secure recurring debit.</p>
-                  </div>
-
-                  <div className="rounded-lg border bg-background/70 px-3 py-3">
-                    <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground font-bold">
-                      <CircleDashed className="h-3.5 w-3.5" />
-                      Mandate Status
-                    </div>
-                    <p className="mt-2 text-sm font-semibold capitalize text-foreground">{mandateStatus}</p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">Current authorization state received from saved billing records.</p>
-                  </div>
-
-                  <div className="rounded-lg border bg-background/70 px-3 py-3">
-                    <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground font-bold">
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      Merchant Integration
-                    </div>
-                    <p className="mt-2 text-sm font-semibold text-foreground">{stats?.merchant_key_configured ? 'Configured' : 'Using default billing integration'}</p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">No raw card or bank account values are stored or displayed here.</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="pt-4 border-t border-border flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">Clicking setup will open Razorpay checkout.</p>
-              <Button 
-                onClick={handleSetupAutopay} 
-                disabled={isSettingUp} 
-                className="rounded-full bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 transition-all gap-2"
-              >
-                {isSettingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-                {autopayEnabled ? 'Update Mandate' : 'Setup Autopay'}
-                <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
+          <div className="flex items-center justify-between border-t pt-6">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+               <ShieldCheck className="h-4 w-4 text-emerald-500" />
+               PCI-DSS Compliant • SSL Encrypted • Razorpay Secure
             </div>
-          </CardContent>
-        </Card>
+            <Button 
+              className="gap-2" 
+              onClick={handleSaveSettings} 
+              disabled={isUpdating || (enabled && (parseFloat(threshold) < 300 || parseFloat(amount) < 500))}
+            >
+              {isUpdating && <Loader2 className="h-4 w-4 animate-spin" />}
+              Save Configuration
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Supporting Info Section */}
-        <div className="lg:col-span-3 space-y-6">
-          <Card className="shadow-sm border-none bg-card">
-            <CardHeader>
-              <CardTitle className="text-lg font-bold">Billing Lifecycle</CardTitle>
-              <CardDescription>How monthly collections work</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
-                  <div className="h-8 w-8 rounded-full bg-background border border-border flex items-center justify-center shrink-0">
-                    <Calendar className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold">1. End of Month</p>
-                    <p className="text-[11px] text-muted-foreground">We finalize your total order count and calculate the platform fee.</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
-                  <div className="h-8 w-8 rounded-full bg-background border border-border flex items-center justify-center shrink-0">
-                    <CreditCard className="h-4 w-4 text-emerald-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold">2. Secure Charge</p>
-                    <p className="text-[11px] text-muted-foreground">Razorpay securely processes the charge against your saved mandate.</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
-                  <div className="h-8 w-8 rounded-full bg-background border border-border flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="h-4 w-4 text-blue-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold">3. Account Good Standing</p>
-                    <p className="text-[11px] text-muted-foreground">Successful payment ensures your restaurant remains active on the platform.</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      <AiRechargeModal 
+        open={showRecharge} 
+        onClose={() => setShowRecharge(false)} 
+        restaurant={selectedRestaurant!} 
+        onSuccess={loadInfo}
+      />
 
-          <Card className="shadow-sm border-none bg-card bg-gradient-to-br from-amber-500/5 to-orange-500/5">
-            <CardContent className="p-5 flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-              <div className="space-y-1 text-sm">
-                <p className="font-semibold text-amber-900 dark:text-amber-400">Important Distinction</p>
-                <p className="text-amber-800/80 dark:text-amber-300/80 leading-relaxed text-xs">
-                  This page configures the billing mandate for <span className="font-bold">Dinematters platform fees</span>. 
-                  To manage how your customers pay you, please visit the <span className="font-bold">Customer pay & Usage</span> section.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <ConfirmDialog
+        open={showConfirm}
+        onOpenChange={setShowConfirm}
+        title={`Switch to ${newPlanSelection} plan?`}
+        description={`Your ${newPlanSelection} plan will be effective from tomorrow ${format(addDays(new Date(), 1), 'do MMMM')} at 12:00 AM.`}
+        confirmText="Yes, Switch Now"
+        cancelText="Maybe Later"
+        variant="info"
+        onConfirm={confirmPlanChange}
+        loading={isChangingPlan}
+      />
     </div>
   )
 }

@@ -180,7 +180,8 @@ doc_events = {
 		],
 		"on_update": [
 			"dinematters.dinematters.api.realtime.notify_order_update",
-			"dinematters.dinematters.utils.loyalty.handle_order_cancellation"
+			"dinematters.dinematters.utils.loyalty.handle_order_cancellation",
+			"dinematters.dinematters.pos.utils.handle_order_update"
 		],
 	},
 	"Table Booking": {
@@ -216,8 +217,12 @@ scheduler_events = {
 		"dinematters.dinematters.api.payments.process_retry_charges"
 	],
 	"cron": {
-		"0 0 * * *": [  # Run daily at midnight, each restaurant handled on its onboarding date
-			"dinematters.dinematters.tasks.monthly_reconciliation_onboarding.process_monthly_minimums_by_onboarding_date",
+		"59 23 * * *": [  # Run daily at 23:59 for floor recovery and lite renewals
+			"dinematters.dinematters.tasks.subscription_tasks.process_daily_subscription_floors",
+			"dinematters.dinematters.tasks.subscription_tasks.process_lite_feature_renewals",
+		],
+		"1 0 * * *": [    # Run daily at 00:01 for plan switches
+			"dinematters.dinematters.tasks.subscription_tasks.apply_deferred_plan_changes",
 		]
 	}
 }

@@ -5,12 +5,14 @@ import frappe
 from frappe import _
 from frappe.utils import flt, cint, now_datetime, get_datetime_str
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
+from dinematters.dinematters.utils.feature_gate import require_plan
 from dinematters.dinematters.utils.customer_helpers import normalize_phone, get_or_create_customer
 import json
 import random
 import string
 
 @frappe.whitelist(allow_guest=True)
+@require_plan('LUX')
 def get_loyalty_summary(restaurant_id, phone):
 	"""
 	GET /api/method/dinematters.dinematters.api.loyalty.get_loyalty_summary
@@ -47,6 +49,7 @@ def get_loyalty_summary(restaurant_id, phone):
 		return {"success": False, "error": {"code": "LOYALTY_FETCH_ERROR", "message": str(e)}}
 
 @frappe.whitelist(allow_guest=True)
+@require_plan('LUX')
 def generate_referral_link(restaurant_id, phone, platform="WhatsApp"):
 	"""
 	POST /api/method/dinematters.dinematters.api.loyalty.generate_referral_link
@@ -309,6 +312,7 @@ def get_loyalty_config(restaurant_id):
 		return {"success": False, "error": str(e)}
 
 @frappe.whitelist()
+@require_plan('LUX')
 def update_loyalty_config(restaurant_id, config, enable_loyalty=None):
 	"""Update loyalty configurations for admin"""
 	try:
@@ -344,6 +348,7 @@ def update_loyalty_config(restaurant_id, config, enable_loyalty=None):
 		frappe.log_error("Loyalty Save Error", frappe.get_traceback())
 		return {"success": False, "error": str(e)}
 @frappe.whitelist()
+@require_plan('LUX')
 def get_customer_insights(restaurant_id, search_query=None):
 	"""
 	Get list of customers with their points for a restaurant.
@@ -430,6 +435,7 @@ def get_customer_insights(restaurant_id, search_query=None):
 		return {"success": False, "error": str(e)}
 
 @frappe.whitelist()
+@require_plan('LUX')
 def get_customer_transactions(restaurant_id, customer_id):
 	"""
 	Get all loyalty transactions for a specific customer and restaurant
@@ -451,6 +457,7 @@ def get_customer_transactions(restaurant_id, customer_id):
 		return {"success": False, "error": str(e)}
 
 @frappe.whitelist()
+@require_plan('LUX')
 def adjust_customer_points(restaurant_id, customer_id, coins, reason, transaction_type="Earn"):
 	"""
 	Manually adjust customer points (for admin use).

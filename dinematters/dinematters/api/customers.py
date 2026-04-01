@@ -9,9 +9,10 @@ import frappe
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
 from dinematters.dinematters.utils.permission_helpers import get_user_restaurant_ids
 from dinematters.dinematters.utils.customer_helpers import normalize_phone
-
+from dinematters.dinematters.utils.feature_gate import require_plan
 
 @frappe.whitelist()
+@require_plan('LUX')
 def get_customer_by_phone(phone, restaurant_id):
 	"""
 	Fetch customer details by phone and restaurant.
@@ -114,6 +115,7 @@ def update_customer_last_visited(doc, event=None):
 
 
 @frappe.whitelist()
+@require_plan('LUX')
 def get_customer_profile(customer_id):
 	"""
 	Admin: Get customer profile with all restaurants visited, orders, bookings.
@@ -201,6 +203,7 @@ def get_customer_profile(customer_id):
 
 
 @frappe.whitelist()
+@require_plan('LUX')
 def get_restaurant_customers(restaurant_id, search=None, page=1, page_size=20):
 	"""
 	Restaurant: Get customers who have orders/bookings at this restaurant only. Supports search (name, phone), pagination.
