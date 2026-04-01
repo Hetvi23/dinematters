@@ -71,6 +71,47 @@ def process_daily_subscription_floors():
         except Exception as e:
             frappe.log_error(f"Daily floor recovery failed for {res.name}: {str(e)}", "Billing Task Error")
 
+def sync_restaurant_subscription(restaurant):
+    """
+    Core fail-safe function to flip a restaurant to its new scheduled plan.
+    Ensures idempotency and handles plan metadata.
+    """
+    res_doc = frappe.get_doc("Restaurant", restaurant)
+    today = getdate()
+
+    # check if switch is required (deferred plan exists and date is reached/passed)
+    if not res_doc.deferred_plan_type or not res_doc.plan_change_date:
+        return False
+    
+    if getdate(res_doc.plan_change_date) > today:
+        return False
+
+    try:
+        previous_plan = res_doc.plan_type
+        new_plan = res_doc.deferred_plan_type
+        
+        # Atomically update to avoid race conditions during JIT + scheduler
+        frappe.db.set_value("Restaurant", restaurant, {
+            "plan_type": new_plan,
+            "plan_activated_on": frappe.utils.now_datetime(),
+            "deferred_plan_type": None,
+            "plan_change_date": None
+        })
+        
+        # Log the success for billing audit
+        frappe.log_error(f"Subscription Switch Success: {restaurant} moved from {previous_plan} to {new_plan}. (Source: JIT/Scheduler Sync)", "Subscription Info")
+        
+        # If we have a Config record, ensure it is also sync'd (optional but recommended)
+        config_name = frappe.db.get_value("Restaurant Config", {"restaurant": restaurant}, "name")
+        if config_name:
+            # We don't change config fields yet, but we could trigger a feature re-validation if needed
+            pass
+
+        return True
+    except Exception as e:
+        frappe.log_error(f"Subscription Sync failed for {restaurant}: {str(e)}", "Subscription Error")
+        return False
+
 def apply_deferred_plan_changes():
     """
     Midnight task (00:01) to flip restaurants to their new scheduled plans.
@@ -78,32 +119,16 @@ def apply_deferred_plan_changes():
     today = getdate()
     
     # 1. Find all restaurants with a plan change scheduled for today or earlier
-    pending_changes = frappe.get_all("Restaurant", 
+    pending_res = frappe.get_all("Restaurant", 
         filters={
             "deferred_plan_type": ["is", "set"],
             "plan_change_date": ["<=", today]
         },
-        fields=["name", "deferred_plan_type", "plan_type"]
+        fields=["name"]
     )
     
-    for res in pending_changes:
-        try:
-            previous_plan = res.plan_type
-            new_plan = res.deferred_plan_type
-            
-            # Update the plan
-            frappe.db.set_value("Restaurant", res.name, {
-                "plan_type": new_plan,
-                "plan_activated_on": frappe.utils.now_datetime(),
-                "deferred_plan_type": None,
-                "plan_change_date": None
-            })
-            
-            # Log the change in history (optional enhancement)
-            frappe.log_error(f"Subscription Switch Success: {res.name} moved from {previous_plan} to {new_plan}", "Billing Task Info")
-            
-        except Exception as e:
-            frappe.log_error(f"Deferred plan change failed for {res.name}: {str(e)}", "Billing Task Error")
+    for res in pending_res:
+        sync_restaurant_subscription(res.name)
 
     frappe.db.commit()
 

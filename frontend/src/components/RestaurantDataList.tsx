@@ -1,7 +1,6 @@
 import { useFrappeGetDocList } from '@/lib/frappe'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Eye, Plus, Edit } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { usePermissions } from '@/lib/permissions'
@@ -21,13 +20,12 @@ export default function RestaurantDataList({ doctype, restaurantId, titleField }
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState<string | null>(null)
-  const [refreshKey, setRefreshKey] = useState(0)
 
   const { data: docs, isLoading, mutate } = useFrappeGetDocList(
     doctype,
     {
       fields: ['name', titleField, 'creation', 'modified'],
-      filters: { restaurant: restaurantId },
+      filters: [['restaurant', '=', restaurantId]],
       orderBy: { field: 'modified', order: 'desc' },
       limit: 100
     },
@@ -63,8 +61,8 @@ export default function RestaurantDataList({ doctype, restaurantId, titleField }
         <div className="text-center py-12 text-muted-foreground border rounded-md">
           <p>No {doctype.replace(/_/g, ' ')} found for this restaurant.</p>
           {permissions.create && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="mt-4"
               onClick={() => setShowCreateDialog(true)}
             >
@@ -98,7 +96,7 @@ export default function RestaurantDataList({ doctype, restaurantId, titleField }
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Link to={`/dinematters/modules/${doctype}/${item.name}`}>
+                      <Link to={`/${doctype}/${item.name}`}>
                         <Button variant="ghost" size="sm">
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -134,7 +132,7 @@ export default function RestaurantDataList({ doctype, restaurantId, titleField }
               doctype={doctype}
               mode="create"
               initialData={{ restaurant: restaurantId }}
-              onSave={(data) => {
+              onSave={() => {
                 setShowCreateDialog(false)
                 mutate()
                 toast.success(`${doctype} created successfully`)
@@ -155,7 +153,7 @@ export default function RestaurantDataList({ doctype, restaurantId, titleField }
               doctype={doctype}
               docname={selectedDoc}
               mode="edit"
-              onSave={(data) => {
+              onSave={() => {
                 setShowEditDialog(false)
                 setSelectedDoc(null)
                 mutate()

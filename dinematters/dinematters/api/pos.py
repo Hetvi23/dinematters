@@ -1,5 +1,7 @@
 import frappe
 import json
+from frappe import _
+from frappe.utils import get_datetime, now_datetime
 from dinematters.dinematters.pos.base import get_pos_provider
 
 @frappe.whitelist()
@@ -8,10 +10,15 @@ def sync_menu(restaurant_id):
     Manual trigger to sync menu from POS
     """
     restaurant = frappe.get_doc("Restaurant", restaurant_id)
+    
+    # 10/10 Tier Check: POS is a LUX feature
+    if restaurant.plan_type != "LUX":
+        frappe.throw(_("POS Integration is a premium feature available only on the LUX plan."), frappe.PermissionError)
+        
     provider = get_pos_provider(restaurant)
     
     if not provider:
-        frappe.throw("POS integration is not enabled for this restaurant.")
+        frappe.throw(_("POS integration is not enabled or configured for this restaurant."))
     
     # Enqueue as background job
     frappe.enqueue(
@@ -26,10 +33,8 @@ def _sync_menu_job(restaurant_id):
     restaurant = frappe.get_doc("Restaurant", restaurant_id)
     provider = get_pos_provider(restaurant)
     if provider:
-        result = provider.sync_menu()
-        restaurant.pos_sync_status = result.get("message", "Syncing...")
-        restaurant.pos_last_sync_at = frappe.utils.now_datetime()
-        restaurant.save(ignore_permissions=True)
+        # Provider sync_menu will update pos_sync_status internally for detailed logging
+        provider.sync_menu()
 
 @frappe.whitelist(allow_guest=True)
 def petpooja_callback():
@@ -88,4 +93,34 @@ def petpooja_menu_push():
         
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Petpooja Menu Push Error")
+        return {"status": "error", "message": str(e)}
+@frappe.whitelist(allow_guest=True)
+def urbanpiper_callback():
+    """
+    Real-time status updates from UrbanPiper Atlas
+    """
+    try:
+        data = json.loads(frappe.request.data)
+        # UrbanPiper pushes order status updates with store_id and order_id
+        order_info = data.get("order", {})
+        store_id = order_info.get("details", {}).get("store_id")
+        
+        if not store_id:
+            return {"status": "error", "message": "Missing store_id"}
+            
+        restaurant_name = frappe.db.get_value("Restaurant", {"pos_merchant_id": store_id}, "name")
+        if not restaurant_name:
+            return {"status": "error", "message": "Restaurant not found for Store ID"}
+            
+        restaurant = frappe.get_doc("Restaurant", restaurant_name)
+        provider = get_pos_provider(restaurant)
+        
+        if provider and hasattr(provider, 'handle_callback'):
+            provider.handle_callback(data)
+            return {"status": "success"}
+            
+        return {"status": "error", "message": "UrbanPiper provider not active"}
+        
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "UrbanPiper Webhook Error")
         return {"status": "error", "message": str(e)}

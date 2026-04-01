@@ -5,7 +5,6 @@ import {
   RefreshCcw, 
   CheckCircle2, 
   AlertCircle, 
-  ExternalLink,
   Save,
   ShieldCheck,
   Zap,
@@ -57,6 +56,36 @@ export default function POSIntegration() {
     }
   }, [restaurant]);
 
+  // Labels and Help Text configuration
+  const config = {
+    Petpooja: {
+      appKeyLabel: "App Key",
+      appSecretLabel: "App Secret",
+      idLabel: "Merchant ID / Restaurant ID",
+      idPlaceholder: "e.g. 12345",
+      idHelp: "Your unique Petpooja Restaurant ID from the developer portal.",
+      docLink: "https://petpooja.com/developers",
+      showAccessToken: true
+    },
+    UrbanPiper: {
+      appKeyLabel: "API Key",
+      appSecretLabel: "Username",
+      idLabel: "Store ID",
+      idPlaceholder: "e.g. 987654321",
+      idHelp: "Your UrbanPiper Atlas Store ID for this location.",
+      docLink: "https://developer.urbanpiper.com/",
+      showAccessToken: false
+    }
+  }[provider as 'Petpooja' | 'UrbanPiper'] || {
+    appKeyLabel: "App Key",
+    appSecretLabel: "App Secret",
+    idLabel: "Provider ID",
+    idPlaceholder: "Enter ID",
+    idHelp: "Identify your store with the provider.",
+    docLink: "#",
+    showAccessToken: true
+  };
+
   const handleSave = async () => {
     if (!selectedRestaurant) return;
     try {
@@ -71,7 +100,7 @@ export default function POSIntegration() {
         updateData.pos_app_secret = appSecret;
       }
 
-      if (accessToken) {
+      if (accessToken && config.showAccessToken) {
         updateData.pos_access_token = accessToken;
       }
 
@@ -95,7 +124,7 @@ export default function POSIntegration() {
       await syncMenu({
         restaurant_id: selectedRestaurant
       });
-      toast.success('Menu sync initiated');
+      toast.success('Menu sync initiated in background');
       mutate();
     } catch (error: any) {
       toast.error(error.message || 'Sync failed');
@@ -117,7 +146,7 @@ export default function POSIntegration() {
         
         <div className="flex items-center gap-3 bg-primary/5 px-4 py-2 rounded-full border border-primary/10">
           <ShieldCheck className="h-5 w-5 text-primary" />
-          <span className="text-sm font-semibold text-primary uppercase tracking-wider">Pro Feature</span>
+          <span className="text-sm font-semibold text-primary uppercase tracking-wider">Lux Feature</span>
         </div>
       </div>
 
@@ -135,7 +164,7 @@ export default function POSIntegration() {
               <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-muted/50">
                 <div className="space-y-0.5">
                   <Label className="text-base">Enable Integration</Label>
-                  <p className="text-sm text-muted-foreground">Activate real-time connection with PETPOOJA</p>
+                  <p className="text-sm text-muted-foreground">Activate real-time connection with your POS</p>
                 </div>
                 <Checkbox 
                   checked={enabled}
@@ -152,22 +181,23 @@ export default function POSIntegration() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Petpooja">Petpooja (Official Partner)</SelectItem>
+                      <SelectItem value="UrbanPiper">UrbanPiper (Atlas API)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>App Key</Label>
+                    <Label>{config.appKeyLabel}</Label>
                     <Input 
-                      placeholder="Enter App Key" 
+                      placeholder={`Enter ${config.appKeyLabel}`}
                       value={appKey}
                       onChange={(e) => setAppKey(e.target.value)}
                       className="bg-background/50 border-muted focus:ring-primary/20"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>App Secret</Label>
+                    <Label>{config.appSecretLabel}</Label>
                     <Input 
                       type="password" 
                       placeholder="••••••••••••" 
@@ -176,29 +206,31 @@ export default function POSIntegration() {
                       className="bg-background/50 border-muted focus:ring-primary/20"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Access Token (2026 Required)</Label>
-                    <Input 
-                      type="password" 
-                      placeholder="••••••••••••" 
-                      value={accessToken}
-                      onChange={(e) => setAccessToken(e.target.value)}
-                      className="bg-background/50 border-muted focus:ring-primary/20"
-                    />
-                  </div>
+                  {config.showAccessToken && (
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Access Token (2026 Required)</Label>
+                      <Input 
+                        type="password" 
+                        placeholder="••••••••••••" 
+                        value={accessToken}
+                        onChange={(e) => setAccessToken(e.target.value)}
+                        className="bg-background/50 border-muted focus:ring-primary/20"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Merchant ID / Restaurant ID</Label>
+                  <Label>{config.idLabel}</Label>
                   <Input 
-                    placeholder="e.g. 12345" 
+                    placeholder={config.idPlaceholder}
                     value={merchantId}
                     onChange={(e) => setMerchantId(e.target.value)}
                     className="bg-background/50 border-muted focus:ring-primary/20"
                   />
                   <p className="text-xs text-muted-foreground italic flex items-center gap-1 mt-1">
                     <AlertCircle className="h-3 w-3" />
-                    For Petpooja, this is your unique Restaurant ID provided in the dev portal.
+                    {config.idHelp}
                   </p>
                 </div>
               </div>
@@ -227,8 +259,11 @@ export default function POSIntegration() {
                 <div className="flex-1 space-y-2">
                   <div className="flex items-center gap-2">
                     <Label className="text-lg font-semibold">Current Status</Label>
-                    <div className="px-2 py-0.5 rounded-md bg-green-500/10 text-green-500 text-xs font-bold border border-green-500/20">
-                      CONNECTED
+                    <div className={cn(
+                      "px-2 py-0.5 rounded-md text-xs font-bold border",
+                      enabled ? "bg-green-500/10 text-green-500 border-green-500/20" : "bg-muted text-muted-foreground border-muted-foreground/10"
+                    )}>
+                      {enabled ? 'CONNECTED' : 'DISABLED'}
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground">
@@ -248,7 +283,7 @@ export default function POSIntegration() {
                   disabled={syncing || !enabled}
                 >
                   <RefreshCcw className={cn("h-4 w-4 text-primary", syncing && "animate-spin")} />
-                  {syncing ? 'Syncing...' : 'Sync Menu Now'}
+                  {syncing ? 'Processing...' : 'Sync Menu Now'}
                 </Button>
               </div>
             </CardContent>
@@ -269,8 +304,8 @@ export default function POSIntegration() {
                 {[
                   'Automated Menu Sync (Categories, Items, Prices)',
                   'One-click Order Push to KOT',
-                  'Inventory Sync (Coming Soon)',
-                  'Real-time Status Updates',
+                  'Inventory Sync (Real-time)',
+                  'Direct Order Relay into POS Hub',
                   'Reduced Manual Data Entry'
                 ].map((item, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm leading-tight text-muted-foreground">
@@ -282,22 +317,6 @@ export default function POSIntegration() {
             </CardContent>
           </Card>
 
-          <Card className="border-none shadow-lg bg-card/60">
-            <CardHeader>
-              <CardTitle className="text-lg">Need Help?</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Our team can help you set up your Petpooja integration in less than 5 minutes.
-              </p>
-              <Button variant="secondary" className="w-full gap-2 text-primary" asChild>
-                <a href="https://petpooja.com/developers" target="_blank" rel="noreferrer">
-                  Developer Documentation
-                  <ExternalLink className="h-4 w-4" />
-                </a>
-              </Button>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>

@@ -9,38 +9,59 @@ export default defineConfig(({ command, mode }) => {
 	const isDev = command === 'serve';
 	
 	return {
-	plugins: [react(), tailwindcss()],
+		plugins: [react(), tailwindcss()],
 		// Use /dinematters/ for dev, /assets/dinematters/dinematters/ for build
 		base: isDev ? '/dinematters/' : '/assets/dinematters/dinematters/',
-	server: {
-		port: 8081,
-		host: '0.0.0.0',
+		server: {
+			port: 8081,
+			host: '0.0.0.0',
 			proxy: proxyOptions,
 			hmr: {
 				port: 8081,
 			},
-	},
-	resolve: {
-		alias: {
-			'@': path.resolve(__dirname, './src')
-		}
-	},
-	build: {
-		outDir: '../dinematters/public/dinematters',
-		emptyOutDir: true,
-		target: 'es2015',
-	},
+		},
+		resolve: {
+			alias: {
+				'@': path.resolve(__dirname, './src')
+			}
+		},
+		build: {
+			outDir: '../dinematters/public/dinematters',
+			emptyOutDir: true,
+			target: 'esnext', // Use ESNext for better tree-shaking support
+			minify: 'esbuild',
+			chunkSizeWarningLimit: 1000,
+			rollupOptions: {
+				output: {
+					manualChunks: {
+						// Split core vendor libraries
+						'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+						'vendor-frappe': ['frappe-react-sdk'],
+						'vendor-ui': [
+							'@radix-ui/react-accordion',
+							'@radix-ui/react-alert-dialog',
+							'@radix-ui/react-avatar',
+							'@radix-ui/react-checkbox',
+							'@radix-ui/react-dialog',
+							'@radix-ui/react-dropdown-menu',
+							'@radix-ui/react-label',
+							'@radix-ui/react-popover',
+							'@radix-ui/react-select',
+							'@radix-ui/react-separator',
+							'@radix-ui/react-slot',
+							'@radix-ui/react-switch',
+							'@radix-ui/react-tabs',
+							'@radix-ui/react-tooltip',
+							'lucide-react',
+							'cmdk',
+							'sonner'
+						],
+						'vendor-geo': ['country-state-city'],
+						'vendor-utils': ['date-fns', 'clsx', 'tailwind-merge', 'zod', 'react-hook-form'],
+						'vendor-dnd': ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities']
+					}
+				}
+			}
+		},
 	};
 });
-
-
-
-
-
-
-
-
-
-
-
-

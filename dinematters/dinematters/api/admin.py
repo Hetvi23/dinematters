@@ -57,6 +57,8 @@ def get_all_restaurants():
                     r.is_active,
                     r.creation,
                     r.modified,
+                    COALESCE(r.coins_balance, 0) as coins_balance,
+                    COALESCE(r.platform_fee_percent, 1.5) as platform_fee_percent,
                     COALESCE(rc.subscription_plan, r.plan_type, 'LITE') as plan_type
                 FROM `tabRestaurant` r
                 LEFT JOIN `tabRestaurantConfig` rc ON r.name = rc.parent
@@ -73,6 +75,8 @@ def get_all_restaurants():
                     r.is_active,
                     r.creation,
                     r.modified,
+                    COALESCE(r.coins_balance, 0) as coins_balance,
+                    COALESCE(r.platform_fee_percent, 1.5) as platform_fee_percent,
                     COALESCE(r.plan_type, 'LITE') as plan_type
                 FROM `tabRestaurant` r
                 ORDER BY r.creation DESC
@@ -82,7 +86,7 @@ def get_all_restaurants():
         for restaurant in restaurants:
             restaurant['is_active'] = int(restaurant['is_active'] or 0)
             # Ensure plan_type is valid
-            if restaurant['plan_type'] not in ['LITE', 'PRO']:
+            if restaurant['plan_type'] not in ['LITE', 'PRO', 'LUX']:
                 restaurant['plan_type'] = 'LITE'
         
         return {
@@ -115,10 +119,10 @@ def update_restaurant_plan(restaurant_id, plan_type):
             }
         
         # Validate plan_type
-        if plan_type not in ['LITE', 'PRO']:
+        if plan_type not in ['LITE', 'PRO', 'LUX']:
             return {
                 'success': False,
-                'error': 'Invalid plan type. Must be LITE or PRO'
+                'error': 'Invalid plan type. Must be LITE, PRO or LUX'
             }
         
         # Get restaurant record
@@ -171,7 +175,20 @@ def update_restaurant_plan(restaurant_id, plan_type):
         config.subscription_plan = plan_type
         
         # Update subscription features based on plan
-        if plan_type == 'PRO':
+        if plan_type == 'LUX':
+             config.subscription_features = {
+                'ordering': True,
+                'videoUpload': True,
+                'analytics': True,
+                'aiRecommendations': True,
+                'loyalty': True,
+                'coupons': True,
+                'games': True,
+                'pos_integration': True,
+                'table_booking': True,
+                'experience_lounge': True
+            }
+        elif plan_type == 'PRO':
             config.subscription_features = {
                 'ordering': True,
                 'videoUpload': True,
@@ -179,7 +196,10 @@ def update_restaurant_plan(restaurant_id, plan_type):
                 'aiRecommendations': True,
                 'loyalty': True,
                 'coupons': True,
-                'games': True
+                'games': True,
+                'pos_integration': False,
+                'table_booking': True,
+                'experience_lounge': False
             }
         else:  # LITE
             config.subscription_features = {
@@ -189,7 +209,10 @@ def update_restaurant_plan(restaurant_id, plan_type):
                 'aiRecommendations': False,
                 'loyalty': False,
                 'coupons': False,
-                'games': False
+                'games': False,
+                'pos_integration': False,
+                'table_booking': False,
+                'experience_lounge': False
             }
         
         config.save(ignore_permissions=True)
@@ -290,6 +313,7 @@ def toggle_restaurant_status(restaurant_id, is_active):
                 COUNT(*) as total_restaurants,
                 SUM(CASE WHEN COALESCE(rc.subscription_plan, 'LITE') = 'LITE' THEN 1 ELSE 0 END) as lite_count,
                 SUM(CASE WHEN COALESCE(rc.subscription_plan, 'LITE') = 'PRO' THEN 1 ELSE 0 END) as pro_count,
+                SUM(CASE WHEN COALESCE(rc.subscription_plan, 'LITE') = 'LUX' THEN 1 ELSE 0 END) as lux_count,
                 SUM(CASE WHEN r.is_active = 1 THEN 1 ELSE 0 END) as active_count,
                 SUM(CASE WHEN r.is_active = 0 THEN 1 ELSE 0 END) as inactive_count
             FROM `tabRestaurant` r
@@ -308,6 +332,7 @@ def toggle_restaurant_status(restaurant_id, is_active):
                     'total_restaurants': 0,
                     'lite_count': 0,
                     'pro_count': 0,
+                    'lux_count': 0,
                     'active_count': 0,
                     'inactive_count': 0
                 }
@@ -429,4 +454,107 @@ def delete_restaurant(restaurant_id):
             'success': False,
             'error': str(e)
         }
+
+@frappe.whitelist()
+def admin_give_coins(restaurant_id, amount, reason="Admin Grant"):
+    """
+    Give coins to a restaurant manually from admin.
+    """
+    try:
+        # Check admin access first
+        access_check = check_admin_access()
+        if not access_check.get('success') or not access_check.get('data', {}).get('allowed'):
+            return {'success': False, 'error': 'Admin access required'}
+            
+        # Validate amount
+        try:
+            amount = float(amount)
+            if amount <= 0:
+                raise ValueError("Amount must be positive")
+        except:
+            return {'success': False, 'error': 'Invalid amount'}
+            
+        # Get restaurant
+        restaurant = frappe.get_doc('Restaurant', {'restaurant_id': restaurant_id})
+        if not restaurant:
+            return {'success': False, 'error': 'Restaurant not found'}
+            
+        # Update balance
+        current_bal = float(restaurant.coins_balance or 0)
+        new_bal = current_bal + amount
+        
+        frappe.db.set_value('Restaurant', restaurant.name, 'coins_balance', new_bal)
+        
+        # Log the transaction (audit trail)
+        frappe.get_doc({
+            "doctype": "AI Credit Transaction",
+            "restaurant": restaurant.name,
+            "amount": amount,
+            "type": "Credit",
+            "remarks": f"Admin: {reason} (+{amount} coins)",
+            "transaction_date": frappe.utils.now(),
+            "status": "Success"
+        }).insert(ignore_permissions=True)
+        
+        frappe.db.commit()
+        
+        return {
+            'success': True,
+            'message': f"Successfully credited {amount} coins to {restaurant_id}",
+            'new_balance': new_bal
+        }
+    except Exception as e:
+        frappe.log_error(f"Error in admin_give_coins: {str(e)}", "Admin API Error")
+        frappe.db.rollback()
+        return {'success': False, 'error': str(e)}
+
+@frappe.whitelist()
+def admin_update_restaurant_settings(restaurant_id, updates):
+    """
+    Update administrative settings for a restaurant.
+    """
+    try:
+        # Check admin access first
+        access_check = check_admin_access()
+        if not access_check.get('success') or not access_check.get('data', {}).get('allowed'):
+            return {'success': False, 'error': 'Admin access required'}
+            
+        # Get restaurant
+        restaurant = frappe.get_doc('Restaurant', {'restaurant_id': restaurant_id})
+        if not restaurant:
+            return {'success': False, 'error': 'Restaurant not found'}
+        
+        # Parse updates if it's a string
+        if isinstance(updates, str):
+            import json
+            updates = json.loads(updates)
+            
+        # Prevent non-admin fields from being updated here if needed, 
+        # but for now we follow the user's request for platform_fee_percent
+        allowed_fields = ['platform_fee_percent', 'is_active', 'restaurant_name', 'owner_email']
+        
+        for field, value in updates.items():
+            if field in allowed_fields:
+                if field == 'platform_fee_percent':
+                    try:
+                        value = float(value)
+                    except:
+                        continue
+                setattr(restaurant, field, value)
+        
+        restaurant.save(ignore_permissions=True)
+        frappe.db.commit()
+        
+        return {
+            'success': True,
+            'message': f"Restaurant settings updated successfully for {restaurant_id}",
+            'data': {
+                'restaurant_id': restaurant_id,
+                'updated_fields': list(updates.keys())
+            }
+        }
+    except Exception as e:
+        frappe.log_error(f"Error in admin_update_restaurant_settings: {str(e)}", "Admin API Error")
+        frappe.db.rollback()
+        return {'success': False, 'error': str(e)}
 

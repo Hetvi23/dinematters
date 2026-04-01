@@ -44,7 +44,6 @@ export default function Breadcrumb() {
     const routeLabels: Record<string, string> = {
       'dashboard': 'Dashboard',
       'setup': 'Setup Wizard',
-      'modules': 'All Modules',
       'orders': 'Orders',
       'past-orders': 'Past and Billed Orders',
       'customers': 'Customers',
@@ -76,18 +75,7 @@ export default function Breadcrumb() {
       return breadcrumbs
     }
 
-    // Check if this is a module route (doctype that's not in the standard routes)
-    const isModuleRoute = segments.length === 1 && 
-      !['dashboard', 'setup', 'modules', 'orders', 'past-orders', 'customers', 'products', 'categories', 'qr-codes'].includes(segments[0]) &&
-      !segments[0].includes('/')
 
-    // If it's a module route, add "All Modules" before it
-    if (isModuleRoute) {
-      breadcrumbs.push({
-        label: 'All Modules',
-        href: '/modules'
-      })
-    }
 
     let currentPath = ''
     

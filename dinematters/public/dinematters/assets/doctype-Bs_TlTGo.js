@@ -1,0 +1,1 @@
+import{E as i}from"./vendor-frappe-LlpT3ygC.js";function m(a){const{data:t,error:r,isLoading:s}=i("dinematters.dinematters.api.ui.get_doctype_meta",{doctype:a},a?`doctype-meta-${a}`:null),e=t?.message||null;return e&&!Array.isArray(e.fields)&&(e.fields=[]),{meta:e||null,isLoading:s,error:r}}export{m as u};

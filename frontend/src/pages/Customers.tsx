@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { LockedFeature } from '@/components/FeatureGate/LockedFeature'
 import {
   Dialog,
@@ -73,12 +75,37 @@ export default function Customers() {
   const [profileCustomerId, setProfileCustomerId] = useState<string | null>(null)
   const [profileData, setProfileData] = useState<CustomerProfileData | null>(null)
   const [profileLoading, setProfileLoading] = useState(false)
+  const [isUpdatingVerify, setIsUpdatingVerify] = useState(false)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const pageSize = 20
 
   if (!isLux) {
     return <LockedFeature feature="customer" />
+  }
+
+  const { restaurantConfig, refreshConfig } = useRestaurant()
+  const isVerifyEnabled = restaurantConfig?.settings?.verifyMyUser ?? false
+
+  const { call: setValue } = useFrappePostCall('frappe.client.set_value')
+
+  const handleToggleVerify = async (checked: boolean) => {
+    if (!selectedRestaurant) return
+    setIsUpdatingVerify(true)
+    try {
+      await setValue({
+        doctype: 'Restaurant Config',
+        name: selectedRestaurant,
+        fieldname: 'verify_my_user',
+        value: checked ? 1 : 0
+      })
+      toast.success(checked ? 'User verification enabled' : 'User verification disabled')
+      await refreshConfig()
+    } catch (err) {
+      toast.error('Failed to update verification setting')
+    } finally {
+      setIsUpdatingVerify(false)
+    }
   }
 
   const { data, isLoading, error } = useFrappeGetCall<CustomersResponse>(
@@ -175,17 +202,31 @@ export default function Customers() {
             Customers who have placed orders or bookings at this restaurant
           </p>
         </div>
-        <div className="relative max-w-sm w-full sm:w-auto">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by name or phone..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
-            className="pl-9"
-          />
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="flex items-center space-x-3 bg-muted/40 px-4 py-2.5 rounded-xl border border-black/5 dark:border-white/5 shadow-sm">
+            <Switch 
+              id="verify-user" 
+              checked={isVerifyEnabled}
+              onCheckedChange={handleToggleVerify}
+              disabled={isUpdatingVerify}
+            />
+            <Label htmlFor="verify-user" className="cursor-pointer">
+              <div className="font-semibold text-sm">Verify My User</div>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">Require OTP Auth</div>
+            </Label>
+          </div>
+          <div className="relative max-w-sm w-full sm:w-auto">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by name or phone..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(1)
+              }}
+              className="pl-9 h-11 rounded-xl"
+            />
+          </div>
         </div>
       </div>
 

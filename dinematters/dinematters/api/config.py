@@ -21,7 +21,13 @@ def get_restaurant_config(restaurant_id):
 	GET /api/method/dinematters.dinematters.api.config.get_restaurant_config
 	Get restaurant branding, configuration, and settings
 	"""
+	from dinematters.dinematters.tasks.subscription_tasks import sync_restaurant_subscription
+	
 	try:
+		# Fail-safe: Sync subscription if overdue (only for authenticated users to save guest performance)
+		if frappe.session.user != "Guest":
+			sync_restaurant_subscription(restaurant_id)
+
 		# Validate restaurant
 		restaurant = validate_restaurant_for_api(restaurant_id)
 		

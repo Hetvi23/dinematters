@@ -15,10 +15,14 @@ export default function HomeFeaturesManager() {
   const [saving, setSaving] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
-  // Filter features for Lite members - only show Explore Menu and The Place & Legacy
-  const filteredFeatures = isLite ? features.filter(f => 
-    f.id === 'menu' || f.id === 'legacy'
-  ) : features
+  // Filter features based on membership tier
+  const filteredFeatures = isLite 
+    ? features.filter(f => f.id === 'menu' || f.id === 'legacy') 
+    : features.filter(f => {
+        // Shared features for PRO and LUX
+        const sharedFeatures = ['menu', 'legacy', 'dine-play', 'offers-events', 'book-table']
+        return sharedFeatures.includes(f.id)
+      })
 
   const fetchFeatures = useCallback(async () => {
     if (!selectedRestaurant) return
@@ -247,7 +251,7 @@ export default function HomeFeaturesManager() {
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-800">
             <strong>Lite Plan:</strong> Only "Explore our Menu" and "The Place & Legacy" features are available. 
-            Upgrade to Pro plan to unlock all home features.
+            Upgrade to <strong>Pro</strong> or <strong>Lux</strong> to unlock engagement features like Dine & Play and Events.
           </p>
         </div>
       )}

@@ -119,7 +119,6 @@ const navigation: NavItem[] = [
       { name: 'AI Menu Background', href: '/ai-menu-theme-background', icon: Sparkles },
     ],
   },
-  { type: 'link', name: 'All Modules', href: '/modules', icon: Grid3x3 },
   { type: 'link', name: 'Customer pay & Usage', href: '/billing', icon: CreditCard, feature: 'customer_pay_and_usage' },
   {
     type: 'group',
@@ -789,7 +788,8 @@ export default function Layout({ children }: LayoutProps) {
                         "hover:bg-sidebar-accent active:bg-sidebar-accent/80",
                         isActive
                           ? "bg-primary/10 text-primary font-medium dark:bg-primary/20"
-                          : "text-sidebar-foreground hover:text-sidebar-foreground"
+                          : "text-sidebar-foreground hover:text-sidebar-foreground",
+                        isLocked && "opacity-60"
                       )}
                       title={!showExpanded ? item.name : undefined}
                     >
@@ -842,6 +842,10 @@ export default function Layout({ children }: LayoutProps) {
                 // Group locking logic
                 const groupStatus = getFeatureStatus(group.feature)
                 const isGroupLocked = groupStatus.isLocked
+                
+                // Check if all children are also locked (to mark parent as fully locked)
+                const allChildrenLocked = filteredChildren.length > 0 && filteredChildren.every(child => getFeatureStatus(child.feature).isLocked)
+                const isGroupFullyLocked = isGroupLocked || allChildrenLocked
 
                 const GroupLockIcon = (group.feature && LUX_ONLY_FEATURES.includes(group.feature)) 
                   ? (
@@ -862,12 +866,18 @@ export default function Layout({ children }: LayoutProps) {
                           className={cn(
                             "relative flex items-center justify-center w-full rounded-md p-2 transition-all",
                             "hover:bg-sidebar-accent",
-                            hasActiveChild ? "text-primary" : "text-muted-foreground hover:text-sidebar-foreground"
+                            hasActiveChild ? "text-primary" : "text-muted-foreground hover:text-sidebar-foreground",
+                            isGroupFullyLocked && "opacity-60"
                           )}
-                          title={group.name}
+                          title={`${group.name}${isGroupFullyLocked ? ' (Locked)' : ''}`}
                         >
                           <Icon className="h-4 w-4" />
-                          {showBadge && (
+                          {isGroupFullyLocked && (
+                            <div className="absolute -top-0.5 -right-0.5">
+                              <Lock className="h-2.5 w-2.5 text-muted-foreground/80" />
+                            </div>
+                          )}
+                          {!isGroupFullyLocked && showBadge && (
                             <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" />
                           )}
                         </button>
@@ -930,7 +940,7 @@ export default function Layout({ children }: LayoutProps) {
                         (hasActiveChild || isExpanded)
                           ? "text-sidebar-foreground hover:text-sidebar-foreground"
                           : "text-sidebar-foreground hover:text-sidebar-foreground",
-                        isGroupLocked && "opacity-60"
+                        isGroupFullyLocked && "opacity-60"
                       )}
                       title={!showExpanded ? group.name : undefined}
                     >
@@ -944,7 +954,7 @@ export default function Layout({ children }: LayoutProps) {
                       {showExpanded && (
                         <>
                           <span className="flex-1 text-left">{group.name}</span>
-                          {isGroupLocked && (
+                          {isGroupFullyLocked && (
                             GroupLockIcon
                           )}
                           {!isGroupLocked && showBadge && (
@@ -962,7 +972,7 @@ export default function Layout({ children }: LayoutProps) {
                       {!showExpanded && (
                         <span className="absolute left-full ml-2 px-2 py-1 rounded-md bg-foreground text-background text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 shadow-lg">
                           {group.name}
-                          {isGroupLocked && ' 🔒'}
+                          {isGroupFullyLocked && ' 🔒'}
                           {showBadge && ` (${groupBadgeCount} pending)`}
                         </span>
                       )}

@@ -147,8 +147,8 @@ function TopProductsChart({ products }: { products: { name: string, count: numbe
 }
 
 // Locked Content Wrapper
-function LockedInsight({ title, description, children, isPro }: { title: string, description: string, children: ReactNode, isPro: boolean }) {
-  if (isPro) return <>{children}</>
+function LockedInsight({ title, description, children, isUnlocked }: { title: string, description: string, children: ReactNode, isUnlocked: boolean }) {
+  if (isUnlocked) return <>{children}</>
   
   return (
     <div className="relative overflow-hidden rounded-xl border bg-card/50 p-6 min-h-[200px] flex flex-col justify-center">
@@ -183,7 +183,8 @@ function LockedInsight({ title, description, children, isPro }: { title: string,
 
 // Main Dashboard Component
 export default function Dashboard() {
-  const { selectedRestaurant, isPro } = useRestaurant()
+  const { selectedRestaurant, isPro, isLux } = useRestaurant()
+  const isAtLeastPro = isPro || isLux
   const { formatAmountNoDecimals } = useCurrency()
   const navigate = useNavigate()
   
@@ -288,7 +289,7 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {!isPro && (
+        {!isAtLeastPro && (
           <div 
             className="flex items-center gap-4 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 p-4 rounded-xl border border-orange-100 dark:border-orange-900/30 group cursor-pointer hover:shadow-md transition-all duration-300" 
             onClick={() => navigate('/billing')}
@@ -303,6 +304,22 @@ export default function Dashboard() {
             <ArrowRight className="h-4 w-4 text-orange-400 ml-4 group-hover:translate-x-1 transition-transform" />
           </div>
         )}
+
+        {isPro && !isLux && (
+          <div 
+            className="flex items-center gap-4 bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950/20 dark:to-blue-950/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/30 group cursor-pointer hover:shadow-md transition-all duration-300" 
+            onClick={() => navigate('/billing')}
+          >
+            <div className="h-10 w-10 bg-indigo-500 rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-110 transition-transform">
+              <Crown className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-indigo-700 dark:text-indigo-400">Unlock Full Automation</p>
+              <p className="text-[11px] text-indigo-600/80 dark:text-indigo-500/80">Upgrade to LUX to accept online orders and payments.</p>
+            </div>
+            <ArrowRight className="h-4 w-4 text-indigo-400 ml-4 group-hover:translate-x-1 transition-transform" />
+          </div>
+        )}
       </div>
 
       {/* Main Stats Grid */}
@@ -314,7 +331,7 @@ export default function Dashboard() {
           icon={TrendingUp}
           trend={revenueTrend >= 0 ? 'up' : 'down'}
           trendValue={`${Math.abs(Math.round(revenueTrend))}%`}
-          isPro={isPro}
+          isPro={isAtLeastPro}
           gradient="from-indigo-600 to-blue-500"
         />
         <StatCard 
@@ -324,15 +341,15 @@ export default function Dashboard() {
           icon={ShoppingCart}
           trend={ordersTrend >= 0 ? 'up' : 'down'}
           trendValue={`${Math.abs(Math.round(ordersTrend))}%`}
-          isPro={isPro}
+          isPro={isAtLeastPro}
           gradient="from-emerald-600 to-teal-500"
         />
         <StatCard 
           title="Avg Order Value"
-          value={formatAmountNoDecimals(todayOrders.length > 0 ? todayRevenue / todayOrders.length : 0)}
+          value={todayOrders.length > 0 ? formatAmountNoDecimals(todayRevenue / todayOrders.length) : formatAmountNoDecimals(0)}
           subtext="Based on today's orders"
           icon={Activity}
-          isPro={isPro}
+          isPro={isAtLeastPro}
           gradient="from-amber-500 to-orange-500"
         />
         <StatCard 
@@ -340,7 +357,7 @@ export default function Dashboard() {
           value={products?.length || 0}
           subtext={`${categories?.length || 0} active categories`}
           icon={Package}
-          isPro={isPro}
+          isPro={isAtLeastPro}
           gradient="from-rose-500 to-pink-500"
         />
       </div>
@@ -363,7 +380,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <LockedInsight 
-              isPro={isPro} 
+              isUnlocked={isAtLeastPro} 
               title="Revenue Analytics" 
               description="Visualize your growth trends and identify seasonal patterns."
             >
@@ -397,7 +414,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <LockedInsight 
-              isPro={isPro} 
+              isUnlocked={isAtLeastPro} 
               title="Inventory Insights" 
               description="Know exactly which products drive your revenue."
             >

@@ -8,7 +8,7 @@ interface FeatureProtectedRouteProps {
 }
 
 export default function FeatureProtectedRoute({ feature, requirePro = false }: FeatureProtectedRouteProps) {
-  const { isPro, features, isLoading, restaurantConfig } = useRestaurant()
+  const { isPro, isLux, features, isLoading } = useRestaurant()
   const [hasTimedOut, setHasTimedOut] = useState(false)
 
   useEffect(() => {
@@ -29,15 +29,15 @@ export default function FeatureProtectedRoute({ feature, requirePro = false }: F
 
   // Simple access determination
   const hasAccess = Boolean(
-    restaurantConfig?.subscription?.planType === 'PRO' ||
-    (requirePro && isPro) ||
-    (feature && (isPro || (features as any)?.[feature])) ||
+    isLux || 
+    (requirePro && (isPro || isLux)) ||
+    (feature && (features as any)?.[feature]) ||
     (!requirePro && !feature) ||
     hasTimedOut
   )
 
   if (!hasAccess) {
-    return <Navigate to="/feature-locked" replace />
+    return <Navigate to="/feature-locked" state={{ from: location.pathname }} replace />
   }
 
   return <Outlet />

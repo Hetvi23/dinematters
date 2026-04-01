@@ -147,24 +147,19 @@ export default function DynamicForm({
     }
   }, [JSON.stringify(initialData)])
 
+  // Track the last hydrated doc to prevent redundant hydration
+  const lastHydratedKeyRef = useRef<string | null>(null)
+  const currentDocKey = `${doctype}-${docname}`
+
   useEffect(() => {
     // Never overwrite user edits
     if (hasUserDataRef.current) {
-      console.log(`[DynamicForm] ${doctype} - Skipping hydrate: hasUserData=${hasUserDataRef.current}`)
       return
     }
 
-    // When docname changes from undefined to a value, or docData becomes available, initialize
-    if (docData && mode !== 'create' && !formDataInitialized) {
-      console.log(`[DynamicForm] ${doctype} - Loading docData into formData:`, {
-        hasDocData: !!docData,
-        docDataKeys: Object.keys(docData),
-        tagline: docData.tagline,
-        subtitle: docData.subtitle,
-        default_theme: docData.default_theme,
-        primary_color: docData.primary_color,
-        formDataInitialized
-      })
+    // When docData becomes available and we haven't hydrated it yet for this specific doc/doctype pair
+    if (docData && mode !== 'create' && (lastHydratedKeyRef.current !== currentDocKey || !formDataInitialized)) {
+      console.log(`[DynamicForm] ${doctype} - Hydrating docData:`, docname)
 
       // Load existing document data from backend - this is the source of truth for most fields
       const cleanDocData = { ...docData }
@@ -175,19 +170,12 @@ export default function DynamicForm({
       delete cleanDocData.modified_by
       delete cleanDocData.owner
 
-      // For edit mode, backend data (docData) is the source of truth for most fields
-      // Start with ALL backend data (tagline, theme, colors, etc.)
-      // Also initialize all fields from meta with their defaults if they're not in docData
       const mergedData = { ...cleanDocData }
 
       // If meta is available, ensure all fields are initialized (even if NULL in backend)
-      // This handles cases where the API only returns non-NULL fields
       if (meta && meta.fields) {
         meta.fields.forEach(field => {
-          // Only set if field is not already in mergedData (to preserve backend values)
-          // and field is not hidden
           if (!field.hidden && !(field.fieldname in mergedData)) {
-            // Use default value if available, otherwise undefined
             if (field.default !== undefined && field.default !== null) {
               mergedData[field.fieldname] = field.default
             }
@@ -195,9 +183,7 @@ export default function DynamicForm({
         })
       }
 
-      // Override read-only fields with initialData values (e.g., restaurant from context)
-      // This ensures restaurant field ALWAYS comes from context (top-left dropdown), not backend
-      // Use initialData prop directly to ensure we have the latest value
+      // Override read-only fields with initialData values
       readOnlyFields.forEach(fieldname => {
         if (initialData[fieldname] !== undefined && initialData[fieldname] !== null && initialData[fieldname] !== '') {
           mergedData[fieldname] = initialData[fieldname]
@@ -206,64 +192,36 @@ export default function DynamicForm({
         }
       })
 
-      // Special handling for restaurant field to avoid currency codes from being stored
+      // Special handling for restaurant field
       const restaurantFromInitial = initialData.restaurant || initialDataRef.current.restaurant
-      if (restaurantFromInitial && typeof restaurantFromInitial === 'string') {
-        // Skip if it looks like a currency code (3 uppercase letters)
-        const looksLikeCurrency = /^[A-Z]{3}$/.test(restaurantFromInitial)
-        if (!looksLikeCurrency) {
-          mergedData.restaurant = restaurantFromInitial
-        }
+      if (restaurantFromInitial && typeof restaurantFromInitial === 'string' && !/^[A-Z]{3}$/.test(restaurantFromInitial)) {
+        mergedData.restaurant = restaurantFromInitial
       }
 
-      console.log(`[DynamicForm] ${doctype} - Setting formData with mergedData:`, {
-        mergedDataKeys: Object.keys(mergedData),
-        tagline: mergedData.tagline,
-        subtitle: mergedData.subtitle,
-        default_theme: mergedData.default_theme,
-        primary_color: mergedData.primary_color,
-        restaurant: mergedData.restaurant
-      })
-
       setFormData(mergedData)
-      originalDataRef.current = { ...mergedData } // Store original data for comparison
+      originalDataRef.current = { ...mergedData } 
       setFormDataInitialized(true)
-      hasUserDataRef.current = false // Reset - user hasn't made changes yet
+      lastHydratedKeyRef.current = currentDocKey
+      hasUserDataRef.current = false 
     } else if (meta && !formDataInitialized && mode === 'create') {
-      // Initialize form with defaults and initial data only once
-      // Start with initialData (pre-filled data), then add defaults
+      // Initialize for create mode
       const defaults: Record<string, any> = { ...initialDataRef.current }
       meta.fields.forEach(field => {
-        // Only use default if field doesn't have a value in initialData
         if (field.default !== undefined && field.default !== null && !(field.fieldname in defaults)) {
           defaults[field.fieldname] = field.default
         }
       })
       setFormData(defaults)
-      originalDataRef.current = { ...defaults } // Store original data for comparison
+      originalDataRef.current = { ...defaults } 
       setFormDataInitialized(true)
-      hasUserDataRef.current = false // Reset - user hasn't made changes yet
-    } else if (Object.keys(initialDataRef.current).length > 0 && !formDataInitialized && !meta && mode === 'create') {
-      // If we have initial data but no meta yet, set it
-      setFormData(prev => {
-        // Only merge if formData is empty or doesn't have these keys
-        const merged = { ...prev }
-        Object.keys(initialDataRef.current).forEach(key => {
-          if (!(key in merged) || merged[key] === undefined || merged[key] === null || merged[key] === '') {
-            merged[key] = initialDataRef.current[key]
-          }
-        })
-        originalDataRef.current = { ...merged } // Store original data for comparison
-        hasUserDataRef.current = false // Reset - user hasn't made changes yet
-        return merged
-      })
-      setFormDataInitialized(true)
+      hasUserDataRef.current = false 
     }
-  }, [docData, meta, mode, formDataInitialized, docname])
+  }, [docData, meta, mode, formDataInitialized, docname, initialData])
 
-  // Reset initialization flag when mode or docname changes (but not when initialData changes)
+  // Reset when docname or mode changes
   useEffect(() => {
     setFormDataInitialized(false)
+    lastHydratedKeyRef.current = null
     hasUserDataRef.current = false
     setFormData({})
     originalDataRef.current = {}
@@ -1314,8 +1272,20 @@ export default function DynamicForm({
   if (!skipLoadingState && (isLoading || metaLoading)) {
     return (
       <Card>
-        <CardContent className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <CardContent className="space-y-6 py-8">
+          <div className="space-y-2">
+            <div className="h-4 w-32 bg-muted rounded animate-pulse" />
+            <div className="h-10 w-full bg-muted/60 rounded animate-pulse" />
+          </div>
+          <div className="grid grid-cols-2 gap-6">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="space-y-2">
+                <div className="h-3 w-24 bg-muted rounded animate-pulse" />
+                <div className="h-10 w-full bg-muted/40 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+          <div className="h-32 w-full bg-muted/20 rounded animate-pulse" />
         </CardContent>
       </Card>
     )
@@ -1342,8 +1312,20 @@ export default function DynamicForm({
   if (!skipLoadingState && !meta) {
     return (
       <Card>
-        <CardContent className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <CardContent className="space-y-6 py-8">
+          <div className="space-y-2">
+            <div className="h-4 w-32 bg-muted rounded animate-pulse" />
+            <div className="h-10 w-full bg-muted/60 rounded animate-pulse" />
+          </div>
+          <div className="grid grid-cols-2 gap-6">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="space-y-2">
+                <div className="h-3 w-24 bg-muted rounded animate-pulse" />
+                <div className="h-10 w-full bg-muted/40 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+          <div className="h-32 w-full bg-muted/20 rounded animate-pulse" />
         </CardContent>
       </Card>
     )
@@ -1406,7 +1388,7 @@ export default function DynamicForm({
   return (
     <div className="space-y-6">
       {/* Validation Status */}
-      {actualMode !== 'view' && requiredFieldsCount > 0 && (
+      {mode !== 'view' && requiredFieldsCount > 0 && (
         <div className={cn(
           "p-4 rounded-md border",
           allRequiredFieldsFilled
@@ -1433,6 +1415,8 @@ export default function DynamicForm({
         </div>
       )}
 
+      {/* Manual Refresh / Header Actions removed as per user request */}
+
       {/* Saving Progress */}
       {saving && progress > 0 && (
         <div className="space-y-2 p-4 bg-blue-50 border border-blue-200 rounded-md">
@@ -1448,6 +1432,7 @@ export default function DynamicForm({
           </div>
         </div>
       )}
+
 
       {/* Form Fields - Grouped by Sections */}
       {sections.length === 0 ? (
@@ -1511,7 +1496,7 @@ export default function DynamicForm({
                 Saving...
               </>
             ) : (
-              actualMode === 'create' ? 'Create' : 'Save Changes'
+              mode === 'create' ? 'Create' : 'Save Changes'
             )}
           </Button>
         )}

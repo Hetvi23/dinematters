@@ -108,122 +108,7 @@ def get_user_permissions(doctype):
 		}
 
 
-@frappe.whitelist()
-def get_all_doctypes():
-	"""Get list of all dinematters doctypes"""
-	try:
-		# Try both 'Dinematters' and 'dinematters' module names
-		doctypes = frappe.get_all('DocType', 
-			filters={'module': ('in', ['Dinematters', 'dinematters'])},
-			fields=['name'],
-			order_by='name'
-		)
-		
-		# If no results, try without module filter to see what we have
-		if not doctypes:
-			# Log for debugging
-			all_modules = frappe.get_all('Module Def', fields=['name'], filters={'app_name': 'dinematters'})
-			frappe.log_error(f"No doctypes found. Available modules: {all_modules}", "get_all_doctypes")
-		
-		# Get labels from DocType meta and filter by permissions
-		doctypes_with_labels = []
-		user = frappe.session.user
-		is_administrator = user == "Administrator"
-		
-		# Get user's restaurant access for restaurant-based doctypes (skip for Administrator)
-		from dinematters.dinematters.utils.permissions import get_user_restaurant_ids
-		user_restaurant_ids = get_user_restaurant_ids(user) if not is_administrator else []
-		
-		# Restaurant-based doctypes (from hooks.py)
-		restaurant_based_doctypes = [
-			"Menu Product", "Menu Category", "Order", "Cart Entry",
-			"Coupon", "Offer", "Event", "Game", "Table Booking", 
-			"Banquet Booking", "Restaurant Config", "Home Feature", "Legacy Content"
-		]
-		
-		for dt in doctypes:
-			try:
-				# Administrator has access to all doctypes - skip permission checks
-				if is_administrator:
-					# Administrator can see all modules
-					meta = frappe.get_meta(dt['name'])
-					label = getattr(meta, 'label', None)
-					if not label:
-						label = dt['name'].replace('_', ' ').replace('-', ' ').title()
-					doctypes_with_labels.append({
-						'name': dt['name'],
-						'label': label
-					})
-					continue
-				
-				# For non-administrator users:
-				# For restaurant-based doctypes, check if user has access to any restaurant
-				if dt['name'] in restaurant_based_doctypes:
-					if not user_restaurant_ids:
-						continue  # User has no restaurant access
-				
-				# Check if user has read permission for this doctype (role-based)
-				# This checks Role Permissions table
-				if not frappe.has_permission(dt['name'], 'read', raise_exception=False):
-					continue
-				
-				meta = frappe.get_meta(dt['name'])
-				# Get label from meta - it's a property
-				label = getattr(meta, 'label', None)
-				if not label:
-					# Fallback to formatted name
-					label = dt['name'].replace('_', ' ').replace('-', ' ').title()
-				doctypes_with_labels.append({
-					'name': dt['name'],
-					'label': label
-				})
-			except Exception as e:
-				# If permission check fails or meta not available, skip this doctype
-				frappe.log_error(f"Error processing {dt['name']}: {str(e)}", "get_all_doctypes")
-				continue
-		
-		doctypes = doctypes_with_labels
-		
-		# If no doctypes found, return empty result
-		if not doctypes:
-			return {}
-		
-		# Group by category - includes all setup wizard doctypes
-		categories = {
-			'Restaurant Setup': ['Restaurant', 'Restaurant Config', 'Restaurant User'],
-			'Menu Management': ['Menu Product', 'Menu Category', 'Product Media', 'Customization Question', 'Customization Option'],
-			'Orders': ['Order', 'Order Item', 'Cart Entry'],
-			'Bookings': ['Table Booking', 'Banquet Booking'],
-			'Marketing & Promotions': ['Offer', 'Coupon', 'Event', 'Game', 'Home Feature'],
-			'Legacy': ['Legacy Content', 'Legacy Gallery Image', 'Legacy Instagram Reel', 'Legacy Member', 'Legacy Signature Dish', 'Legacy Testimonial', 'Legacy Testimonial Image'],
-			'Tools': ['Menu Image Extractor', 'Menu Image Item', 'Extracted Category', 'Extracted Dish'],
-		}
-		
-		result = {}
-		for category, doctype_list in categories.items():
-			matching = [dt for dt in doctypes if dt['name'] in doctype_list]
-			if matching:  # Only add category if it has items
-				result[category] = matching
-		
-		# Add uncategorized - all doctypes that don't match any category
-		all_categorized = []
-		for doctype_list in categories.values():
-			all_categorized.extend(doctype_list)
-		
-		uncategorized = [dt for dt in doctypes if dt['name'] not in all_categorized]
-		if uncategorized:
-			result['Other'] = uncategorized
-		
-		# Log result for debugging
-		if not result or sum(len(v) for v in result.values()) == 0:
-			frappe.log_error(f"No doctypes in result. Found {len(doctypes)} doctypes: {[d['name'] for d in doctypes]}", "get_all_doctypes")
-		
-		return result
-	except Exception as e:
-		import traceback
-		frappe.log_error(f"Error getting doctypes: {str(e)}\n{traceback.format_exc()}", "get_all_doctypes")
-		# Return empty result structure instead of error dict
-		return {}
+
 
 
 @frappe.whitelist()
@@ -292,109 +177,136 @@ def get_restaurant_setup_progress(restaurant_id):
 
 
 @frappe.whitelist()
-def get_setup_wizard_steps():
-	"""Get steps for restaurant setup wizard - comprehensive setup"""
+def get_setup_wizard_steps(restaurant=None):
+	"""Get steps for restaurant setup wizard - tier-aware filtering"""
+	plan_type = 'LUX' # Default to LUX to see all steps for admin/system
+	if restaurant:
+		plan_type = frappe.db.get_value('Restaurant', restaurant, 'plan_type') or 'LITE'
+
+	all_steps = [
+		{
+			'id': 'restaurant',
+			'title': 'Create Restaurant',
+			'description': 'Set up your restaurant basic information (name, address, owner details)',
+			'doctype': 'Restaurant',
+			'required': True,
+			'depends_on': None,
+		},
+		{
+			'id': 'config',
+			'title': 'Restaurant Configuration',
+			'description': 'Configure branding, colors, settings, tax, delivery fees, and features',
+			'doctype': 'Restaurant Config',
+			'required': True,
+			'depends_on': 'restaurant',
+		},
+		{
+			'id': 'users',
+			'title': 'Staff Members',
+			'description': 'View and manage staff members for your restaurant (Owner is automatically created)',
+			'doctype': 'Restaurant User',
+			'required': False,
+			'depends_on': 'restaurant',
+			'view_only': True,
+		},
+		{
+			'id': 'categories',
+			'title': 'Menu Categories',
+			'description': 'View and manage menu categories for your restaurant',
+			'doctype': 'Menu Category',
+			'required': False,
+			'depends_on': 'restaurant',
+			'view_only': True,
+		},
+		{
+			'id': 'products',
+			'title': 'Menu Products',
+			'description': 'View and manage menu products for your restaurant',
+			'doctype': 'Menu Product',
+			'required': False,
+			'depends_on': 'restaurant',
+			'view_only': True,
+		},
+		{
+			'id': 'coupons',
+			'title': 'Create Coupons',
+			'description': 'Set up discount coupons for customers',
+			'doctype': 'Coupon',
+			'required': False,
+			'depends_on': 'restaurant',
+			'feature': 'coupons'
+		},
+		{
+			'id': 'events',
+			'title': 'Create Events',
+			'description': 'Set up events, special occasions, or themed nights',
+			'doctype': 'Event',
+			'required': False,
+			'depends_on': 'restaurant',
+			'feature': 'events'
+		},
+		{
+			'id': 'games',
+			'title': 'Add Games',
+			'description': 'Add interactive games for customer engagement',
+			'doctype': 'Game',
+			'required': False,
+			'depends_on': 'restaurant',
+			'feature': 'games'
+		},
+		{
+			'id': 'home_features',
+			'title': 'Home Features',
+			'description': 'Configure features to display on your restaurant homepage',
+			'doctype': 'Home Feature',
+			'required': False,
+			'depends_on': 'restaurant',
+			'feature': 'home_features'
+		},
+		{
+			'id': 'table_booking',
+			'title': 'Table Booking Setup',
+			'description': 'Configure table booking settings and availability',
+			'doctype': 'Table Booking',
+			'required': False,
+			'depends_on': 'restaurant',
+			'feature': 'table_booking'
+		},
+		{
+			'id': 'banquet_booking',
+			'title': 'Banquet Booking Setup',
+			'description': 'Set up banquet and large party booking options',
+			'doctype': 'Banquet Booking',
+			'required': False,
+			'depends_on': 'restaurant',
+			'feature': 'table_booking'
+		},
+		{
+			'id': 'legacy',
+			'title': 'Legacy Content',
+			'description': 'Configure your restaurant story, heritage, testimonials, and gallery',
+			'doctype': 'Legacy Content',
+			'required': False,
+			'depends_on': 'restaurant',
+		},
+	]
+
+	from dinematters.dinematters.utils.feature_gate import FEATURE_PLAN_MAP
+	
+	filtered_steps = []
+	for step in all_steps:
+		feature = step.get('feature')
+		if not feature:
+			filtered_steps.append(step)
+			continue
+			
+		required_plans = FEATURE_PLAN_MAP.get(feature, ['LITE', 'PRO', 'LUX'])
+		if plan_type in required_plans:
+			step_copy = step.copy()
+			step_copy['required_plans'] = required_plans
+			filtered_steps.append(step_copy)
+			
 	return {
-		'steps': [
-			{
-				'id': 'restaurant',
-				'title': 'Create Restaurant',
-				'description': 'Set up your restaurant basic information (name, address, owner details)',
-				'doctype': 'Restaurant',
-				'required': True,
-				'depends_on': None,
-			},
-			{
-				'id': 'config',
-				'title': 'Restaurant Configuration',
-				'description': 'Configure branding, colors, settings, tax, delivery fees, and features',
-				'doctype': 'Restaurant Config',
-				'required': True,
-				'depends_on': 'restaurant',
-			},
-			{
-				'id': 'users',
-				'title': 'Staff Members',
-				'description': 'View and manage staff members for your restaurant (Owner is automatically created)',
-				'doctype': 'Restaurant User',
-				'required': False,
-				'depends_on': 'restaurant',
-				'view_only': True,  # Show list instead of form
-			},
-			{
-				'id': 'categories',
-				'title': 'Menu Categories',
-				'description': 'View and manage menu categories for your restaurant',
-				'doctype': 'Menu Category',
-				'required': False,
-				'depends_on': 'restaurant',
-				'view_only': True,  # Show list instead of form
-			},
-			{
-				'id': 'products',
-				'title': 'Menu Products',
-				'description': 'View and manage menu products for your restaurant',
-				'doctype': 'Menu Product',
-				'required': False,
-				'depends_on': 'restaurant',
-				'view_only': True,  # Show list instead of form
-			},
-			{
-				'id': 'coupons',
-				'title': 'Create Coupons',
-				'description': 'Set up discount coupons for customers',
-				'doctype': 'Coupon',
-				'required': False,
-				'depends_on': 'restaurant',
-			},
-			{
-				'id': 'events',
-				'title': 'Create Events',
-				'description': 'Set up events, special occasions, or themed nights',
-				'doctype': 'Event',
-				'required': False,
-				'depends_on': 'restaurant',
-			},
-			{
-				'id': 'games',
-				'title': 'Add Games',
-				'description': 'Add interactive games for customer engagement',
-				'doctype': 'Game',
-				'required': False,
-				'depends_on': 'restaurant',
-			},
-			{
-				'id': 'home_features',
-				'title': 'Home Features',
-				'description': 'Configure features to display on your restaurant homepage',
-				'doctype': 'Home Feature',
-				'required': False,
-				'depends_on': 'restaurant',
-			},
-			{
-				'id': 'table_booking',
-				'title': 'Table Booking Setup',
-				'description': 'Configure table booking settings and availability',
-				'doctype': 'Table Booking',
-				'required': False,
-				'depends_on': 'restaurant',
-			},
-			{
-				'id': 'banquet_booking',
-				'title': 'Banquet Booking Setup',
-				'description': 'Set up banquet and large party booking options',
-				'doctype': 'Banquet Booking',
-				'required': False,
-				'depends_on': 'restaurant',
-			},
-			{
-				'id': 'legacy',
-				'title': 'Legacy Content',
-				'description': 'Configure your restaurant story, heritage, testimonials, and gallery',
-				'doctype': 'Legacy Content',
-				'required': False,
-				'depends_on': 'restaurant',
-			},
-		]
+		'steps': filtered_steps
 	}
 

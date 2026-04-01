@@ -674,7 +674,7 @@
    "fieldname": "pos_provider",
    "fieldtype": "Select",
    "label": "POS Provider",
-   "options": "\nPetpooja"
+   "options": "\nPetpooja\nUrbanPiper"
   },
   {
    "fieldname": "pos_enabled",
@@ -685,14 +685,14 @@
   {
    "fieldname": "pos_app_key",
    "fieldtype": "Data",
-   "label": "POS App Key",
-   "depends_on": "eval:doc.pos_provider == 'Petpooja'"
+   "label": "POS App Key / API Key",
+   "depends_on": "eval:doc.pos_provider && ['Petpooja', 'UrbanPiper'].includes(doc.pos_provider)"
   },
   {
    "fieldname": "pos_app_secret",
    "fieldtype": "Password",
-   "label": "POS App Secret",
-   "depends_on": "eval:doc.pos_provider == 'Petpooja'"
+   "label": "POS App Secret / Username",
+   "depends_on": "eval:doc.pos_provider && ['Petpooja', 'UrbanPiper'].includes(doc.pos_provider)"
   },
   {
    "fieldname": "pos_access_token",
@@ -703,8 +703,8 @@
   {
    "fieldname": "pos_merchant_id",
    "fieldtype": "Data",
-   "label": "POS Merchant ID / Rest ID",
-   "depends_on": "eval:doc.pos_provider == 'Petpooja'"
+   "label": "POS Merchant ID / Store ID",
+   "depends_on": "eval:doc.pos_provider && ['Petpooja', 'UrbanPiper'].includes(doc.pos_provider)"
   },
   {
    "fieldname": "column_break_pos",

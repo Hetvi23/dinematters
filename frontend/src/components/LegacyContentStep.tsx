@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useFrappeGetDoc, useFrappeGetDocList, useFrappePostCall, useFrappeUpdateDoc, useFrappeDeleteDoc } from '@/lib/frappe'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -7,10 +7,10 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Plus, Edit2, Trash2, Users, Star, Camera, Instagram, Image, Video, Upload, X, Check } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Plus, Edit2, Trash2, Users, Camera, Image, Star as StarIcon, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { uploadToR2, getMediaType } from '@/lib/r2Upload'
+import { uploadToR2 } from '@/lib/r2Upload'
 
 interface LegacyContentStepProps {
   selectedRestaurant: string
@@ -32,44 +32,43 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
   const [uploading, setUploading] = useState(false)
 
   // Get the main legacy content document
-  const { data: legacyContent, isLoading: contentLoading } = useFrappeGetDoc(
+  const { data: legacyContent, isLoading: contentLoading, mutate: mutateContent } = useFrappeGetDoc(
     'Legacy Content',
     selectedRestaurant,
     { enabled: !!selectedRestaurant }
   )
 
-  // Get child table data
-  const { data: signatureDishes } = useFrappeGetDocList('Legacy Signature Dish', {
+  // Get child table data with dedicated mutate functions
+  const { data: signatureDishes, mutate: mutateSignatureDishes } = useFrappeGetDocList('Legacy Signature Dish', {
     filters: selectedRestaurant ? ({ parent: selectedRestaurant } as any) : undefined,
     fields: ['name', 'dish', 'display_order', 'dish_name'],
     orderBy: { field: 'display_order', order: 'asc' } as any
   })
 
-  const { data: testimonials } = useFrappeGetDocList('Legacy Testimonial', {
+  // We only need the mutate functions for these, which are called in refreshAll()
+  const { mutate: mutateTestimonials } = useFrappeGetDocList('Legacy Testimonial', {
     filters: selectedRestaurant ? ({ parent: selectedRestaurant } as any) : undefined,
-    fields: ['name', 'customer_name', 'rating', 'text', 'location', 'avatar', 'display_order'],
-    orderBy: { field: 'display_order', order: 'asc' } as any
+    fields: ['name']
   })
 
-  const { data: members } = useFrappeGetDocList('Legacy Member', {
+  const { data: members, mutate: mutateMembers } = useFrappeGetDocList('Legacy Member', {
     filters: selectedRestaurant ? ({ parent: selectedRestaurant } as any) : undefined,
     fields: ['name', 'member_name', 'role', 'image', 'display_order'],
     orderBy: { field: 'display_order', order: 'asc' } as any
   })
 
-  const { data: galleryImages } = useFrappeGetDocList('Legacy Gallery Image', {
+  const { data: galleryImages, mutate: mutateGallery } = useFrappeGetDocList('Legacy Gallery Image', {
     filters: selectedRestaurant ? ({ parent: selectedRestaurant } as any) : undefined,
     fields: ['name', 'image', 'title', 'display_order'],
     orderBy: { field: 'display_order', order: 'asc' } as any
   })
 
-  const { data: instagramReels } = useFrappeGetDocList('Legacy Instagram Reel', {
+  const { mutate: mutateReels } = useFrappeGetDocList('Legacy Instagram Reel', {
     filters: selectedRestaurant ? ({ parent: selectedRestaurant } as any) : undefined,
-    fields: ['name', 'reel_link', 'title', 'display_order'],
-    orderBy: { field: 'display_order', order: 'asc' } as any
+    fields: ['name']
   })
 
-  // Get all menu products for signature dishes selection (like recommendation engine)
+  // Get all menu products for signature dishes selection
   const { data: allMenuProducts } = useFrappeGetDocList('Menu Product', {
     filters: selectedRestaurant ? ({ restaurant: selectedRestaurant, is_active: 1 } as any) : undefined,
     fields: ['name', 'product_name', 'image', 'category_name', 'main_category'],
@@ -81,7 +80,16 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
   const { deleteDoc, loading: isDeleting } = useFrappeDeleteDoc()
   const { call: updateLegacyContent } = useFrappePostCall('dinematters.dinematters.api.legacy.update_legacy_content')
 
-  const handleSave = async (data: any, type: string, doctype: string) => {
+  const refreshAll = () => {
+    mutateSignatureDishes()
+    mutateTestimonials()
+    mutateMembers()
+    mutateGallery()
+    mutateReels()
+    mutateContent()
+  }
+
+  const handleSaveChild = async (data: any, type: string, doctype: string) => {
     try {
       if (editingItem?.name) {
         await updateDoc(doctype, editingItem.name, data)
@@ -99,9 +107,7 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
       
       setIsDialogOpen(false)
       setEditingItem(null)
-      
-      // Force a page refresh to show updated data
-      window.location.reload()
+      refreshAll()
     } catch (error) {
       toast.error(`Failed to save ${type}`)
     }
@@ -111,8 +117,7 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
     try {
       await deleteDoc(doctype, name)
       toast.success(`${type} deleted successfully`)
-      // Force a page refresh to show updated data
-      window.location.reload()
+      refreshAll()
     } catch (error) {
       toast.error(`Failed to delete ${type}`)
     }
@@ -125,7 +130,7 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
         ...data
       })
       toast.success('Legacy content updated successfully')
-      window.location.reload()
+      mutateContent()
     } catch (error) {
       toast.error('Failed to update legacy content')
     }
@@ -165,7 +170,7 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <Star className="h-5 w-5" />
+            <StarIcon className="h-5 w-5" />
             Signature Dishes
             <Badge variant="secondary">{signatureDishes?.length || 0}/3</Badge>
           </CardTitle>
@@ -333,7 +338,7 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
     </Card>
   )
 
-  const renderForm = () => {
+  const renderFormDialogContent = () => {
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault()
       const formData = new FormData(e.target as HTMLFormElement)
@@ -355,7 +360,8 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
             if (memberPhotoFile && memberPhotoFile.size > 0) {
               data.image = await handleFileUpload(memberPhotoFile, 'legacy_member_image')
             } else if (!editingItem?.image) {
-              throw new Error('Member photo is required')
+              toast.error('Member photo is required')
+              return
             }
             break
           case 'Gallery Image':
@@ -367,12 +373,13 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
             if (galleryFile && galleryFile.size > 0) {
               data.image = await handleFileUpload(galleryFile, 'legacy_gallery_image')
             } else if (!editingItem?.image) {
-              throw new Error('Gallery image is required')
+              toast.error('Gallery image is required')
+              return
             }
             break
         }
         
-        await handleSave(data, currentSection, editingItem.doctype)
+        await handleSaveChild(data, currentSection, editingItem.doctype)
       } catch (error: any) {
         toast.error(error.message || `Failed to save ${currentSection}`)
       }
@@ -465,6 +472,7 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
               Cancel
             </Button>
             <Button type="submit" disabled={isCreating || isUpdating || uploading}>
+              {uploading ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
               {uploading ? 'Uploading...' : (editingItem?.name ? 'Update' : 'Create')}
             </Button>
           </div>
@@ -504,6 +512,7 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
               Cancel
             </Button>
             <Button type="submit" disabled={isCreating || isUpdating || uploading}>
+              {uploading ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
               {uploading ? 'Uploading...' : (editingItem?.name ? 'Update' : 'Create')}
             </Button>
           </div>
@@ -516,8 +525,16 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
 
   if (contentLoading) {
     return (
-      <div className="text-center py-8">
-        <p>Loading legacy content...</p>
+      <div className="space-y-6 py-8 animate-pulse">
+        <div className="space-y-2">
+          <div className="h-8 w-48 bg-muted rounded" />
+          <div className="h-4 w-96 bg-muted/60 rounded" />
+        </div>
+        <div className="grid gap-6">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-48 rounded-xl bg-muted border border-muted-foreground/10" />
+          ))}
+        </div>
       </div>
     )
   }
@@ -552,7 +569,7 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
           }} className="space-y-4">
             <div>
               <Label htmlFor="hero_media_type">Hero Media Type</Label>
-              <Select name="hero_media_type" defaultValue={legacyContent?.hero_media_type}>
+              <Select name="hero_media_type" defaultValue={legacyContent?.hero_media_type || 'image'}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select media type" />
                 </SelectTrigger>
@@ -578,7 +595,10 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
               <Label htmlFor="paragraph_2">Second Paragraph (Optional)</Label>
               <Textarea name="paragraph_2" defaultValue={legacyContent?.paragraph_2 || ''} placeholder="Continue your story" />
             </div>
-            <Button type="submit">Save Hero Section</Button>
+            <Button type="submit" disabled={isUpdating}>
+              {isUpdating ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
+              Save Hero Section
+            </Button>
           </form>
         </CardContent>
       </Card>
@@ -589,8 +609,8 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
         {renderGallerySection()}
       </div>
 
-      <div className="flex justify-end">
-        <Button onClick={onComplete} size="lg">
+      <div className="flex justify-end gap-4 pt-6">
+        <Button onClick={onComplete} size="lg" className="px-10">
           Complete Legacy Setup
         </Button>
       </div>
@@ -606,10 +626,10 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {editingItem?.name ? `Edit ${currentSection}` : `Add ${currentSection}`}
+              {editingItem?.name && !editingItem.doctype?.includes('Signature') ? `Edit ${currentSection}` : `Add ${currentSection}`}
             </DialogTitle>
           </DialogHeader>
-          {renderForm()}
+          {renderFormDialogContent()}
         </DialogContent>
       </Dialog>
     </div>

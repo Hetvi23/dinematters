@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Plus, User, Shield, UserCheck } from 'lucide-react'
+import { User, Shield, UserCheck } from 'lucide-react'
 import DynamicForm from './DynamicForm'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -20,7 +20,7 @@ export default function StaffMembersList({ restaurantId, onAdd }: StaffMembersLi
     'Restaurant User',
     {
       fields: ['name', 'user', 'restaurant', 'role', 'is_default', 'is_active', 'creation'],
-      filters: { restaurant: restaurantId },
+      filters: [['restaurant', '=', restaurantId]],
       orderBy: { field: 'creation', order: 'desc' }
     },
     restaurantId ? `restaurant-users-${restaurantId}` : null
@@ -102,7 +102,7 @@ export default function StaffMembersList({ restaurantId, onAdd }: StaffMembersLi
                         size="sm"
                         onClick={() => {
                           // Navigate to edit
-                          window.location.href = `/dinematters/modules/Restaurant User/${member.name}`
+                          window.location.href = `/dinematters/Restaurant User/${member.name}`
                         }}
                       >
                         Edit
@@ -127,7 +127,7 @@ export default function StaffMembersList({ restaurantId, onAdd }: StaffMembersLi
                 doctype="Restaurant User"
                 mode="create"
                 initialData={{ restaurant: restaurantId }}
-                onSave={(data) => {
+                onSave={() => {
                   setShowAddForm(false)
                   mutate()
                   toast.success('Staff member added successfully')

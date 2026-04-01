@@ -227,6 +227,11 @@ def refund_coins(restaurant, amount, description="", ref_doctype=None, ref_name=
 @frappe.whitelist(allow_guest=False)
 def get_coin_billing_info(restaurant):
     """Returns the restaurant's coin balance and billing settings."""
+    from dinematters.dinematters.tasks.subscription_tasks import sync_restaurant_subscription
+    
+    # Fail-safe: Check for overdue plan switches before returning info
+    sync_restaurant_subscription(restaurant)
+    
     res = frappe.get_doc("Restaurant", restaurant)
     return {
         "coins_balance": res.coins_balance or 0,

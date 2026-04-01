@@ -34,4 +34,8 @@ def get_pos_provider(restaurant_doc):
         from dinematters.dinematters.pos.petpooja import PetpoojaProvider
         return PetpoojaProvider(restaurant_doc)
     
+    if restaurant_doc.pos_provider == "UrbanPiper":
+        from dinematters.dinematters.pos.urbanpiper import UrbanPiperProvider
+        return UrbanPiperProvider(restaurant_doc)
+    
     return None
