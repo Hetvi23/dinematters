@@ -58,10 +58,7 @@ def process_media_asset(media_asset_name):
 		frappe.logger().info(f"Successfully processed media asset {asset.media_id}")
 		
 	except Exception as e:
-		frappe.log_error(
-			title="Media Processing Error",
-			message=f"Error processing media asset {media_asset_name}: {str(e)}"
-		)
+		frappe.log_error(f"Error processing media asset {media_asset_name}: {str(e)}", "Media Processing Error")
 		
 		# Mark as failed
 		try:
@@ -124,8 +121,8 @@ def sync_media_asset_to_owner(asset):
 	
 	except Exception as e:
 		frappe.log_error(
-			title="Media Owner Sync Error",
-			message=f"Failed to sync media asset {asset.name} to owner {asset.owner_doctype} {asset.owner_name}: {str(e)}"
+			f"Failed to sync media asset {asset.name} to owner {asset.owner_doctype} {asset.owner_name}: {str(e)}",
+			"Media Owner Sync Error",
 		)
 
 
@@ -208,7 +205,7 @@ def process_image_asset(asset, raw_file_path, temp_dir):
 	
 	# Get original dimensions
 	from PIL import Image
-	with Image.open(raw_file_path) as img:
+	with Image.open(source_path) as img:
 		asset.width, asset.height = img.size
 	
 	# Generate blur placeholder
@@ -347,10 +344,7 @@ def cleanup_deleted_media(media_asset_name):
 		frappe.logger().info(f"Cleaned up deleted media asset {asset.media_id}")
 		
 	except Exception as e:
-		frappe.log_error(
-			title="Media Cleanup Error",
-			message=f"Error cleaning up media asset {media_asset_name}: {str(e)}"
-		)
+		frappe.log_error(f"Error cleaning up media asset {media_asset_name}: {str(e)}", "Media Cleanup Error")
 
 
 def get_image_variant_configs(media_role):
