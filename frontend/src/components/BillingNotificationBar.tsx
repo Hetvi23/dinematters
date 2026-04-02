@@ -38,7 +38,7 @@ export const BillingNotificationBar: React.FC<BillingNotificationBarProps> = ({ 
       type: 'critical',
       icon: <ShieldAlert className="h-4 w-4" />,
       message: "Account suspended due to non-payment. Please recharge coins to resume services.",
-      action: { label: 'Recharge Now', onClick: () => navigate('/autopay-setup') }
+      action: { label: 'Recharge Now', onClick: () => navigate('/autopay-setup?buy=true') }
     })
   } else if (billingInfo.billing_status === 'overdue') {
     notifications.push({
@@ -46,7 +46,7 @@ export const BillingNotificationBar: React.FC<BillingNotificationBarProps> = ({ 
       type: 'critical',
       icon: <AlertCircle className="h-4 w-4" />,
       message: "Payment overdue! Your account is at risk of suspension shortly.",
-      action: { label: 'Pay Now', onClick: () => navigate('/autopay-setup') }
+      action: { label: 'Pay Now', onClick: () => navigate('/autopay-setup?buy=true') }
     })
   }
 
@@ -69,7 +69,7 @@ export const BillingNotificationBar: React.FC<BillingNotificationBarProps> = ({ 
       type: 'critical',
       icon: <ShieldAlert className="h-4 w-4" />,
       message: `Your account is at risk of being disabled due to negative balance. Recharge immediately.`,
-      action: { label: 'Pay Now', onClick: () => navigate('/autopay-setup') }
+      action: { label: 'Pay Now', onClick: () => navigate('/autopay-setup?buy=true') }
     })
   }
 
@@ -111,7 +111,7 @@ export const BillingNotificationBar: React.FC<BillingNotificationBarProps> = ({ 
       type: isAutopayComing ? 'info' : 'critical',
       icon: isAutopayComing ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : <ShieldAlert className="h-4 w-4" />,
       message: message,
-      action: { label: isAutopayComing ? 'Settings' : 'Recharge Now', onClick: () => navigate('/autopay-setup') }
+      action: { label: isAutopayComing ? 'Settings' : 'Recharge Now', onClick: () => navigate(isAutopayComing ? '/autopay-setup' : '/autopay-setup?buy=true') }
     })
   } else if (isPremium && billingInfo.coins_balance < 1000) {
     notifications.push({
@@ -119,7 +119,7 @@ export const BillingNotificationBar: React.FC<BillingNotificationBarProps> = ({ 
       type: 'warning',
       icon: <Coins className="h-4 w-4" />,
       message: `Maintain at least 1000 Coins to keep ${planType} enabled without interruption.`,
-      action: { label: 'Buy Coins', onClick: () => navigate('/autopay-setup') }
+      action: { label: 'Buy Coins', onClick: () => navigate('/autopay-setup?buy=true') }
     })
   }
 

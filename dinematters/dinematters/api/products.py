@@ -34,13 +34,14 @@ def get_top_picks(restaurant_id):
 		if cached_response:
 			return json.loads(cached_response)
 
-		# Validate restaurant
-		restaurant = validate_restaurant_for_api(restaurant_id)
+		# Strict media prioritization: 
+		# Only return non-media products if ABSOLUTELY no media products exist for this restaurant.
+		has_any_media = frappe.db.exists("Menu Product", {"restaurant": restaurant, "is_active": 1, "has_no_media": 0})
+		media_filter = " AND has_no_media = 0" if has_any_media else ""
 		
 		# Single prioritized query for all fallback logic
 		# 1. product_type == 'top-picks' gets highest priority (0)
-		# 2. has_no_media == 0 (with images) gets priority (0) over those without (1)
-		# 3. Stable order by display_order and creation date
+		# 2. Stable order by display_order and creation date
 		products = frappe.db.sql(f"""
 			SELECT 
 				name as docname, product_id as id, product_name as name, price, original_price,
@@ -50,10 +51,9 @@ def get_top_picks(restaurant_id):
 				recommendations
 			FROM `tabMenu Product`
 			WHERE 
-				restaurant = %s AND is_active = 1
+				restaurant = %s AND is_active = 1 {media_filter}
 			ORDER BY 
 				(CASE WHEN product_type = 'top-picks' THEN 0 ELSE 1 END) ASC,
-				has_no_media ASC,
 				display_order ASC,
 				creation DESC
 			LIMIT 10

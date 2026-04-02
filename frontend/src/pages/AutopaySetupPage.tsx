@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { useFrappePostCall } from '@/lib/frappe'
@@ -44,6 +44,7 @@ interface BillingInfo {
 
 export default function AutopaySetupPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { selectedRestaurant, restaurants, planType, refreshConfig } = useRestaurant()
 
   const [billingInfo, setBillingInfo] = useState<BillingInfo | null>(null)
@@ -97,6 +98,16 @@ export default function AutopaySetupPage() {
   useEffect(() => {
     loadInfo()
   }, [selectedRestaurant])
+  
+  // Auto-trigger recharge modal if buy=true is in the URL
+  useEffect(() => {
+    if (searchParams.get('buy') === 'true') {
+      setShowRecharge(true)
+      // Clean up the parameter so it doesn't re-trigger on fresh refresh
+      searchParams.delete('buy')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   const handlePlanToggle = async (newPlan: 'LITE' | 'PRO' | 'LUX') => {
     if (!selectedRestaurant || newPlan === planType) return
