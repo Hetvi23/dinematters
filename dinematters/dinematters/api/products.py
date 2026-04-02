@@ -28,6 +28,9 @@ def get_top_picks(restaurant_id):
 	Stable results (no randomness).
 	"""
 	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+
 		# Use cache for performance
 		cache_key = f"top_picks:{restaurant_id}"
 		cached_response = frappe.cache().get_value(cache_key)
@@ -57,7 +60,7 @@ def get_top_picks(restaurant_id):
 				display_order ASC,
 				creation DESC
 			LIMIT 10
-		""", (restaurant), as_dict=True)
+		""", (restaurant,), as_dict=True)
 
 		# Format products with media only (minimal payload for fast home page)
 		formatted_products = format_products_for_listing_minimal(products)
