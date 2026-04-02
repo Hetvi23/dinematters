@@ -26,13 +26,25 @@ def get_phone_variants_for_lookup(normalized: str):
 
 
 def _find_customer_by_normalized_phone(normalized: str):
-	"""Find Customer by phone (single source of truth). Tries normalized and common format variants."""
+	"""Find Customer by phone (single source of truth). Uses SQL fuzzy matching for robustness."""
 	if not frappe.db.has_column("Customer", "phone"):
 		return None
-	for v in _phone_variants(normalized):
-		existing = frappe.db.get_value("Customer", {"phone": v}, "name")
-		if existing:
-			return existing
+	
+	# Priority 1: Exact match on normalized (fastest)
+	existing = frappe.db.get_value("Customer", {"phone": normalized}, "name")
+	if existing:
+		return existing
+		
+	# Priority 2: Fuzzy match ignoring formatting characters (+, -, space, parens)
+	# This handles the duplicates shown in the dashboard screenshot.
+	res = frappe.db.sql("""
+		SELECT name FROM `tabCustomer` 
+		WHERE REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '+', ''), '-', ''), '(', '') LIKE %s
+		LIMIT 1
+	""", (f"%{normalized}",), as_dict=True)
+	
+	if res:
+		return res[0].name
 	return None
 
 

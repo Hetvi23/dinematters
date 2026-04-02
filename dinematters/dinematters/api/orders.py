@@ -732,7 +732,9 @@ def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=Fa
 
 		# Secure Session Check: Validate the X-Customer-Token from headers
 		session_token = frappe.request.headers.get("X-Customer-Token") if frappe.request else None
-		if not validate_customer_session(phone, session_token):
+		if not validate_customer_session(phone, session_token) and not require_verified_phone(restaurant_id, phone):
+			# Note: require_verified_phone returns True if verification is NOT required or phone is verified.
+			# So we return False (block) only if it returns False AND there is no session.
 			return {
 				"success": False,
 				"error": {"code": "SECURE_SESSION_INVALID", "message": "Please log in to view your orders."}

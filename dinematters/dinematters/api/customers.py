@@ -114,6 +114,24 @@ def update_customer_last_visited(doc, event=None):
 	frappe.db.commit()
 
 
+def normalize_customer_phone_on_save(doc, event=None):
+	"""
+	Hook to ensure customer phone is always stored in a normalized 10-digit format.
+	This prevents duplicates caused by +91, 0, spaces, etc.
+	"""
+	if doc.phone:
+		doc.phone = normalize_phone(doc.phone)
+
+
+def normalize_order_phone_on_save(doc, event=None):
+	"""
+	Hook to ensure Order.customer_phone is always stored in a normalized 10-digit format.
+	This ensures the customer dashboard remains clean.
+	"""
+	if doc.customer_phone:
+		doc.customer_phone = normalize_phone(doc.customer_phone)
+
+
 @frappe.whitelist()
 @require_plan('LUX')
 def get_customer_profile(customer_id):

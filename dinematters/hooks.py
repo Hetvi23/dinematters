@@ -173,7 +173,11 @@ has_permission = {
 # Hook on document methods and events
 
 doc_events = {
+	"Customer": {
+		"before_save": "dinematters.dinematters.api.customers.normalize_customer_phone_on_save",
+	},
 	"Order": {
+		"before_save": "dinematters.dinematters.api.customers.normalize_order_phone_on_save",
 		"after_insert": [
 			"dinematters.dinematters.api.customers.update_customer_last_visited",
 			"dinematters.dinematters.api.realtime.notify_order_update"
