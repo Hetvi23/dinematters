@@ -55,7 +55,7 @@ def load_customization_options(product_doc):
 
 @frappe.whitelist(allow_guest=True)
 @require_plan('LUX')
-def create_order(restaurant_id, items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None, table_number=None, coupon_code=None, payment_method=None, order_type=None, packaging_fee=None, pickup_time=None, loyalty_coins_redeemed=0, referral_id=None):
+def create_order(restaurant_id, items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None, table_number=None, coupon_code=None, payment_method=None, order_type=None, packaging_fee=None, delivery_fee=None, pickup_time=None, loyalty_coins_redeemed=0, referral_id=None, tax=None, cgst=None, sgst=None, tax_percent=None):
 	"""
 	POST /api/v1/orders
 	Place a new order
@@ -167,174 +167,91 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 		order_id = generate_order_id()
 		order_number = generate_order_number()
 		
-		# Calculate totals
-		subtotal = 0
-		discount = 0
-		
-		# Process order items
+		# Process order items to validate products and calculate base unit prices
 		order_items = []
 		for item in items:
 			dish_id = item.get("dishId")
 			quantity = cint(item.get("quantity", 1))
 			customizations = item.get("customizations", {})
 			
-			# Validate product exists
 			if not frappe.db.exists("Menu Product", dish_id):
-				return {
-					"success": False,
-					"error": {
-						"code": "PRODUCT_NOT_FOUND",
-						"message": f"Product {dish_id} not found"
-					}
-				}
+				return {"success": False, "error": {"code": "PRODUCT_NOT_FOUND", "message": f"Product {dish_id} not found"}}
 			
 			product = frappe.get_doc("Menu Product", dish_id)
 			load_customization_options(product)
 			
-			# Validate product belongs to restaurant
 			if product.restaurant != restaurant:
-				return {
-					"success": False,
-					"error": {
-						"code": "PRODUCT_NOT_FOUND",
-						"message": f"Product {dish_id} does not belong to restaurant {restaurant_id}"
-					}
-				}
+				return {"success": False, "error": {"code": "PRODUCT_NOT_FOUND", "message": f"Product {dish_id} invalid for restaurant"}}
 			
-			# Calculate unit price
+			# Calculate unit price (base + customizations)
 			unit_price = flt(product.price)
-			original_price = flt(product.original_price) if product.original_price else unit_price
-			
-			# Add customization prices
 			if customizations and product.customization_questions:
 				for question in product.customization_questions:
-					question_id = question.question_id
-					if question_id in customizations:
-						selected_options = customizations[question_id]
-						if isinstance(selected_options, str):
-							selected_options = [selected_options]
-						
-						for option_id in selected_options:
-							for option in question.options:
-								if option.option_id == option_id:
-									unit_price += flt(option.price) or 0
+					qid = question.question_id
+					if qid in customizations:
+						selected = customizations[qid]
+						if isinstance(selected, str): selected = [selected]
+						for opt_id in selected:
+							for opt in question.options:
+								if opt.option_id == opt_id:
+									unit_price += flt(opt.price) or 0
 									break
-			
-			total_price = unit_price * quantity
-			subtotal += total_price
-			
-			# Calculate discount if original price exists
-			if original_price > unit_price:
-				discount += (original_price - unit_price) * quantity
 			
 			order_items.append({
 				"product": dish_id,
 				"quantity": quantity,
 				"customizations": json.dumps(customizations) if customizations else None,
 				"unit_price": unit_price,
-				"original_price": original_price if original_price != unit_price else None,
-				"total_price": total_price
+				"total_price": unit_price * quantity
 			})
-		
-		# Calculate tax and delivery fee (can be configured)
-		tax = calculate_tax(subtotal)
-		delivery_fee = flt(delivery_info.get("deliveryFee", 0)) if order_type == "delivery" else 0
-		packaging_fee = flt(packaging_fee or 0)
 
-		if order_type == "delivery":
-			minimum_order_value = flt(restaurant_doc.get("minimum_order_value", 0))
-			if minimum_order_value and subtotal < minimum_order_value:
-				return {
-					"success": False,
-					"error": {
-						"code": "MINIMUM_ORDER_NOT_MET",
-						"message": f"Minimum order value for delivery is {minimum_order_value}"
-					}
-				}
+		# Use the NEW centralized pricing engine for production-level consistency
+		from dinematters.dinematters.utils.pricing import calculate_cart_totals
 		
-		# Apply coupon discount if provided, or detect auto-offers
-		coupon_discount = 0
-		applied_coupon = None
-		applied_coupon_code = None
-		
-		if coupon_code:
-			try:
-				# Validate coupon with enhanced validation
-				from dinematters.dinematters.api.coupons import validate_coupon
-				
-				# Prepare cart items for combo validation
-				cart_items_for_validation = [{"dishId": item.get("product")} for item in order_items]
-				
-				coupon_result = validate_coupon(
-					restaurant_id, 
-					coupon_code, 
-					subtotal,
-					customer_id=platform_customer,
-					cart_items=json.dumps(cart_items_for_validation)
-				)
-				
-				if coupon_result.get("success"):
-					coupon_data = coupon_result.get("data", {}).get("coupon", {})
-					coupon_discount = flt(coupon_data.get("discountAmount", 0))
-					applied_coupon = coupon_data.get("id")
-					applied_coupon_code = coupon_data.get("code")
-					discount += coupon_discount
-			except Exception as e:
-				frappe.log_error(f"Coupon validation error: {str(e)}")
-				# Continue without coupon if validation fails
-		else:
-			# No coupon code provided - check for auto-offers
-			try:
-				from dinematters.dinematters.api.coupons import get_applicable_offers
-				
-				# Prepare cart items for auto-offer detection
-				cart_items_for_offers = [{"dishId": item.get("product")} for item in order_items]
-				
-				offers_result = get_applicable_offers(
-					restaurant_id,
-					json.dumps(cart_items_for_offers),
-					subtotal,
-					customer_id=platform_customer
-				)
-				
-				if offers_result.get("success"):
-					best_offer = offers_result.get("data", {}).get("bestOffer")
-					if best_offer:
-						coupon_discount = flt(best_offer.get("discountAmount", 0))
-						applied_coupon = best_offer.get("id")
-						applied_coupon_code = best_offer.get("code")
-						discount += coupon_discount
-			except Exception as e:
-				frappe.log_error(f"Auto-offer detection error: {str(e)}")
-				# Continue without auto-offer if detection fails
-		
-		# Apply loyalty points redemption if provided
-		loyalty_discount = 0
-		loyalty_coins = cint(loyalty_coins_redeemed)
-		if loyalty_coins > 0 and platform_customer:
-			try:
-				from dinematters.dinematters.utils.loyalty import get_loyalty_balance
-				balance = get_loyalty_balance(platform_customer, restaurant)
-				if loyalty_coins > balance:
-					loyalty_coins = balance
-				
-				loyalty_prog = frappe.get_doc("Restaurant Loyalty Config", {"restaurant": restaurant, "is_active": 1})
-				if loyalty_prog:
-					loyalty_discount = flt(loyalty_coins * (loyalty_prog.coin_value_in_inr or 1))
-					# Ensure discount doesn't exceed 30% of billing amount
-					billing_amount = max(0, subtotal - discount)
-					max_loyalty_discount = billing_amount * 0.3
-					if loyalty_discount > max_loyalty_discount:
-						loyalty_discount = max_loyalty_discount
-						loyalty_coins = cint(loyalty_discount / (loyalty_prog.coin_value_in_inr or 1))
-					
-					discount += loyalty_discount
-			except Exception as e:
-				frappe.log_error(f"Loyalty redemption error: {str(e)}")
-				loyalty_coins = 0
-				loyalty_discount = 0
+		# Prepare items for pricing utility
+		pricing_items = []
+		for item in order_items:
+			pricing_items.append({
+				"quantity": item["quantity"],
+				"unitPrice": item["unit_price"],
+				"dishId": item["product"]
+			})
 
-		total = subtotal - discount + tax + delivery_fee + packaging_fee
+		# Accurate fulfillment mapping for core pricing engine
+		fulfillment_map = {
+			"dine_in": "Dine-in",
+			"takeaway": "Takeaway",
+			"delivery": "Delivery"
+		}
+		delivery_type = fulfillment_map.get(order_type, "Dine-in")
+
+		pricing_result = calculate_cart_totals(
+			restaurant=restaurant,
+			items=pricing_items,
+			coupon_code=coupon_code,
+			loyalty_coins=cint(loyalty_coins_redeemed),
+			customer=platform_customer,
+			delivery_type=delivery_type
+		)
+
+		# Map pricing results back to variables used in order_doc creation
+		subtotal = pricing_result["subtotal"]
+		discount = pricing_result["discount"]
+		tax = pricing_result["tax"]
+		cgst = pricing_result["cgst"]
+		sgst = pricing_result["sgst"]
+		tax_percent = pricing_result["taxRate"]
+		delivery_fee = pricing_result["deliveryFee"]
+		packaging_fee = pricing_result["packagingFee"]
+		total = pricing_result["total"]
+		
+		applied_coupon_code = pricing_result["appliedCoupon"]
+		applied_coupon = frappe.db.get_value("Coupon", {"code": applied_coupon_code, "restaurant": restaurant}, "name") if applied_coupon_code else None
+		coupon_discount = pricing_result["discount"]
+		loyalty_discount = pricing_result["loyaltyDiscount"]
+		loyalty_coins = cint(loyalty_discount) # ₹1 per coin
+
+
 		
 		# Parse table_number from QR code if provided
 		parsed_table_number = None
@@ -379,6 +296,9 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 			"subtotal": subtotal,
 			"discount": discount,
 			"tax": tax,
+			"cgst": cgst,
+			"sgst": sgst,
+			"tax_percent": tax_percent,
 			"order_type": order_type,
 			"packaging_fee": packaging_fee,
 			"delivery_fee": delivery_fee,
@@ -761,7 +681,7 @@ def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=Fa
 			where_sql += " AND creation >= %s"
 			params.append(twenty_four_hours_ago)
 
-		base_cols = "name, order_id, order_number, status, total, subtotal, discount, tax, packaging_fee, delivery_fee, payment_method, payment_status, creation, estimated_delivery, delivery_partner, delivery_id, delivery_status, delivery_eta, delivery_rider_name, delivery_rider_phone, delivery_tracking_url, order_type"
+		base_cols = "name, order_id, order_number, status, total, subtotal, discount, tax, cgst, sgst, tax_percent, packaging_fee, delivery_fee, payment_method, payment_status, creation, estimated_delivery, delivery_partner, delivery_id, delivery_status, delivery_eta, delivery_rider_name, delivery_rider_phone, delivery_tracking_url, order_type"
 		feedback_cols = ""
 		if frappe.db.has_column("Order", "customer_rating"):
 			feedback_cols = ", customer_rating, customer_feedback"
@@ -808,6 +728,10 @@ def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=Fa
 				"deliveryRiderName": o.get("delivery_rider_name"),
 				"deliveryRiderPhone": o.get("delivery_rider_phone"),
 				"deliveryTrackingUrl": o.get("delivery_tracking_url"),
+				"cgst": flt(o.get("cgst") or 0),
+				"sgst": flt(o.get("sgst") or 0),
+				"taxPercent": flt(o.get("tax_percent") or 0),
+				"billDetails": _get_bill_details(frappe._dict(o)),
 				"customerRating": cint(o.get("customer_rating")) if has_feedback_cols and o.get("customer_rating") is not None else None,
 				"customerFeedback": ((o.get("customer_feedback") or "").strip() or None) if has_feedback_cols else None,
 				"foodRating": cint(o.get("food_rating")) if o.get("food_rating") is not None else None,
@@ -1015,7 +939,11 @@ def format_order(order_doc):
 	currency_info = get_restaurant_currency_info(order_doc.restaurant)
 	
 	# Recalculate tax and total based on corrected subtotal
-	recalculated_tax = calculate_tax(recalculated_subtotal)
+	tax_info = calculate_tax(recalculated_subtotal, order_doc.restaurant, order_doc.discount)
+	recalculated_tax = tax_info.get("total_tax", 0)
+	cgst = tax_info.get("cgst", 0)
+	sgst = tax_info.get("sgst", 0)
+	
 	recalculated_total = recalculated_subtotal - flt(order_doc.discount) + recalculated_tax + flt(order_doc.delivery_fee) + flt(getattr(order_doc, "packaging_fee", 0) or 0)
 	
 	order_data = {
@@ -1026,6 +954,8 @@ def format_order(order_doc):
 		"subtotal": recalculated_subtotal,
 		"discount": flt(order_doc.discount),
 		"tax": recalculated_tax,
+		"cgst": cgst,
+		"sgst": sgst,
 		"packagingFee": flt(getattr(order_doc, "packaging_fee", 0) or 0),
 		"deliveryFee": flt(order_doc.delivery_fee),
 		"total": recalculated_total,
@@ -1045,6 +975,9 @@ def format_order(order_doc):
 		"currencySymbol": currency_info.get("symbol", "$"),
 		"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
 	}
+	
+	# Add modular billDetails for premium previews
+	order_data["billDetails"] = _get_bill_details(order_doc, recalculated_subtotal)
 	
 	# Add table_number if available
 	if order_doc.table_number:
@@ -1070,7 +1003,10 @@ def format_order(order_doc):
 			"instructions": order_doc.delivery_instructions
 		}
 	
-	# Add coupon info if available
+	# Add bill details breakdown
+	order_data["billDetails"] = _get_bill_details(order_doc)
+	
+	# Add coupon details if available
 	if order_doc.coupon:
 		try:
 			coupon_doc = frappe.get_doc("Coupon", order_doc.coupon)
@@ -1119,10 +1055,66 @@ def generate_order_number():
 	return f"ORD-{year}-{sequence}"
 
 
-def calculate_tax(subtotal):
-	"""Calculate tax (can be configured based on business rules)"""
-	# For now, return 0. Can be configured later
-	return 0
+def _get_bill_details(order_doc, recalculated_subtotal=None):
+	"""
+	Universal helper to generate modular billDetails array.
+	Used by format_order, get_customer_orders, etc.
+	"""
+	subtotal = recalculated_subtotal if recalculated_subtotal is not None else flt(order_doc.subtotal)
+	
+	bill_details = [
+		{"label": "Item Total", "value": subtotal, "type": "subtotal"}
+	]
+	
+	if flt(order_doc.discount) > 0:
+		bill_details.append({"label": "Item Discount", "value": -flt(order_doc.discount), "type": "discount"})
+	
+	if flt(getattr(order_doc, "loyalty_discount", 0)) > 0:
+		bill_details.append({"label": "Loyalty Discount", "value": -flt(order_doc.loyalty_discount), "type": "discount"})
+	
+	if flt(order_doc.cgst) > 0:
+		tax_rate_str = f"({flt(order_doc.tax_percent or 0)/2}%)" if order_doc.tax_percent else ""
+		bill_details.append({"label": f"CGST {tax_rate_str}", "value": flt(order_doc.cgst), "type": "tax"})
+		
+	if flt(order_doc.sgst) > 0:
+		tax_rate_str = f"({flt(order_doc.tax_percent or 0)/2}%)" if order_doc.tax_percent else ""
+		bill_details.append({"label": f"SGST {tax_rate_str}", "value": flt(order_doc.sgst), "type": "tax"})
+	
+	# Fallback if cgst/sgst missing but tax exists
+	if flt(order_doc.tax) > 0 and (flt(order_doc.cgst) == 0 or flt(order_doc.sgst) == 0):
+		bill_details.append({"label": "Taxes & Charges", "value": flt(order_doc.tax), "type": "tax"})
+		
+	if flt(getattr(order_doc, "packaging_fee", 0)) > 0:
+		bill_details.append({"label": "Packaging Charge", "value": flt(order_doc.packaging_fee), "type": "fee"})
+		
+	if flt(getattr(order_doc, "delivery_fee", 0)) > 0:
+		bill_details.append({"label": "Delivery Fee", "value": flt(order_doc.delivery_fee), "type": "fee"})
+	
+	bill_details.append({"label": "Total Payable", "value": flt(order_doc.total), "type": "total"})
+		
+	return bill_details
+
+
+def calculate_tax(subtotal, restaurant, discount=0):
+	"""
+	Internal helper to estimate tax based on restaurant settings.
+	Consistent with Order.before_save logic.
+	"""
+	tax_rate = frappe.db.get_value("Restaurant", restaurant, "tax_rate")
+	if tax_rate is None: tax_rate = 5.0
+	
+	taxable_amount = max(0, flt(subtotal) - flt(discount))
+	tax_amount = round(taxable_amount * (flt(tax_rate) / 100.0), 2)
+	
+	cgst = round(tax_amount / 2.0, 2)
+	sgst = round(tax_amount - cgst, 2)
+	
+	return {
+		"total_tax": tax_amount,
+		"cgst": cgst,
+		"sgst": sgst,
+		"tax_percent": flt(tax_rate)
+	}
 
 
 def cint(value):
@@ -1319,11 +1311,14 @@ def get_admin_orders(restaurant_id, status=None, page=1, limit=20, date_from=Non
 				"customer",
 				"customer_name",
 				"customer_phone",
-				"table_number",
-				"coupon",
-				"payment_method",
-				"delivery_type",
-				"estimated_delivery",
+				"subtotal",
+				"discount",
+				"tax",
+				"cgst",
+				"sgst",
+				"tax_percent",
+				"packaging_fee",
+				"delivery_fee",
 				"restaurant"
 			],
 			filters=filters,
@@ -1332,7 +1327,7 @@ def get_admin_orders(restaurant_id, status=None, page=1, limit=20, date_from=Non
 			order_by="creation desc"
 		)
 		
-		# Format dates
+		# Format dates and billing
 		for order in orders:
 			if order.get("creation"):
 				order["creation"] = get_datetime_str(order["creation"])
@@ -1340,6 +1335,9 @@ def get_admin_orders(restaurant_id, status=None, page=1, limit=20, date_from=Non
 				order["modified"] = get_datetime_str(order["modified"])
 			if order.get("estimated_delivery"):
 				order["estimated_delivery"] = get_datetime_str(order["estimated_delivery"])
+			
+			# Add modular billDetails
+			order["billDetails"] = _get_bill_details(frappe._dict(order))
 		
 		# Get total count
 		total = frappe.db.count("Order", filters=filters)

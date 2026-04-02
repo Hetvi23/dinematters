@@ -136,3 +136,11 @@ def require_verified_phone(restaurant_id: str, phone: str) -> bool:
 	if not config:
 		return True
 	return is_phone_verified(phone)
+
+
+def get_platform_customer_from_user(user_email: str):
+	"""Find Customer linked to a User email. Essential for loyalty points lookup."""
+	if not user_email or user_email == "Guest":
+		return None
+	return frappe.db.get_value("Customer", {"email": user_email}, "name")
+

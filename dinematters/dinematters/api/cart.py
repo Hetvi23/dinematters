@@ -196,47 +196,34 @@ def add_to_cart(restaurant_id, dish_id, quantity=1, customizations=None, session
 
 
 @frappe.whitelist(allow_guest=True)
-def get_cart(restaurant_id, session_id=None):
+def get_cart(restaurant_id, session_id=None, coupon_code=None, loyalty_coins=0, order_type=None):
 	"""
 	GET /api/v1/cart
-	Get current cart for restaurant
-	Requires restaurant_id for SaaS multi-tenancy
+	Get current cart with detailed pricing Breakdown
 	"""
 	try:
-		# Validate restaurant
 		restaurant = validate_restaurant_for_api(restaurant_id)
-		
-		# Get user or use session_id
 		user = frappe.session.user if frappe.session.user != "Guest" else None
 		if not user and not session_id:
 			session_id = frappe.session.get("session_id")
 		
-		# Build filters
 		filters = {"restaurant": restaurant}
-		if user:
-			filters["user"] = user
-		elif session_id:
-			filters["session_id"] = session_id
+		if user: filters["user"] = user
+		elif session_id: filters["session_id"] = session_id
 		
-		# Get cart entries for this restaurant
-		entries = frappe.get_all(
-			"Cart Entry",
-			fields=["*"],
-			filters=filters,
-			order_by="creation desc"
-		)
+		# Get cart entries
+		entries = frappe.get_all("Cart Entry", fields=["*"], filters=filters, order_by="creation desc")
 		
 		# Format cart items
 		items = []
 		from dinematters.dinematters.api.products import format_product
 		
 		for entry in entries:
-			if not frappe.db.exists("Menu Product", entry.product):
-				continue
+			if not frappe.db.exists("Menu Product", entry.product): continue
 			product = frappe.get_doc("Menu Product", entry.product)
 			customizations = json.loads(entry.customizations) if entry.customizations else {}
 			
-			item = {
+			items.append({
 				"entryId": entry.entry_id,
 				"dishId": entry.product,
 				"dish": format_product(product),
@@ -244,32 +231,25 @@ def get_cart(restaurant_id, session_id=None):
 				"customizations": customizations,
 				"unitPrice": flt(entry.unit_price),
 				"totalPrice": flt(entry.total_price)
-			}
-			
-			# Add table_number if available
-			if entry.get("table_number"):
-				item["tableNumber"] = entry.table_number
-			
-			items.append(item)
+			})
 		
-		# Calculate summary from all items
-		subtotal = sum(item["totalPrice"] for item in items)
-		total_items = len(items)
+		# Use the NEW pricing engine for the summary
+		from dinematters.dinematters.utils.pricing import calculate_cart_totals
 		
-		# Get currency info for restaurant
-		currency_info = get_restaurant_currency_info(restaurant)
-		
-		summary = {
-			"totalItems": total_items,
-			"subtotal": subtotal,
-			"discount": 0,
-			"tax": 0,
-			"deliveryFee": 0,
-			"total": subtotal,
-			"currency": currency_info.get("currency", "INR"),
-			"currencySymbol": currency_info.get("symbol", "₹"),
-			"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
-		}
+		# Find customer if possible (for loyalty and coupon limits)
+		customer_id = None
+		if user:
+			from dinematters.dinematters.utils.customer_helpers import get_platform_customer_from_user
+			customer_id = get_platform_customer_from_user(user)
+
+		summary = calculate_cart_totals(
+			restaurant=restaurant,
+			items=items,
+			coupon_code=coupon_code,
+			loyalty_coins=flt(loyalty_coins),
+			customer=customer_id,
+			delivery_type=order_type.capitalize() if order_type else None
+		)
 		
 		return {
 			"success": True,
@@ -280,13 +260,8 @@ def get_cart(restaurant_id, session_id=None):
 		}
 	except Exception as e:
 		frappe.log_error(f"Error in get_cart: {str(e)}")
-		return {
-			"success": False,
-			"error": {
-				"code": "CART_FETCH_ERROR",
-				"message": str(e)
-			}
-		}
+		return {"success": False, "error": {"code": "CART_FETCH_ERROR", "message": str(e)}}
+
 
 
 @frappe.whitelist(allow_guest=True)
@@ -468,40 +443,41 @@ def generate_session_id():
 	return ''.join(random.choices(string.ascii_letters + string.digits, k=32))
 
 
-def get_cart_summary(user, session_id, restaurant):
-	"""Calculate cart summary (subtotal, discount, tax, total) for restaurant"""
+def get_cart_summary(user, session_id, restaurant, coupon_code=None, loyalty_coins=0, order_type=None):
+	"""Calculate cart summary using centralized pricing engine."""
 	filters = {"restaurant": restaurant}
+	if user: filters["user"] = user
+	elif session_id: filters["session_id"] = session_id
+	
+	entries = frappe.get_all("Cart Entry", fields=["total_price", "unit_price", "quantity", "product"], filters=filters)
+	
+	# Prepare items for pricing utility
+	items = []
+	for entry in entries:
+		items.append({
+			"quantity": entry.quantity,
+			"unitPrice": entry.unit_price,
+			"dishId": entry.product
+		})
+	
+	# Use the pricing engine
+	from dinematters.dinematters.utils.pricing import calculate_cart_totals
+	
+	# Find customer if possible
+	customer_id = None
 	if user:
-		filters["user"] = user
-	elif session_id:
-		filters["session_id"] = session_id
-	
-	entries = frappe.get_all("Cart Entry", fields=["total_price", "unit_price"], filters=filters)
-	
-	subtotal = sum(flt(entry.total_price) for entry in entries)
-	total_items = sum(1 for entry in entries)
-	
-	# For now, discount, tax, delivery fee are 0
-	# Can be calculated based on business rules
-	discount = 0
-	tax = 0
-	delivery_fee = 0
-	total = subtotal - discount + tax + delivery_fee
-	
-	# Get currency info for restaurant
-	currency_info = get_restaurant_currency_info(restaurant)
-	
-	return {
-		"totalItems": total_items,
-		"subtotal": subtotal,
-		"discount": discount,
-		"tax": tax,
-		"deliveryFee": delivery_fee,
-		"total": total,
-		"currency": currency_info.get("currency", "USD"),
-		"currencySymbol": currency_info.get("symbol", "$"),
-		"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
-	}
+		from dinematters.dinematters.utils.customer_helpers import get_platform_customer_from_user
+		customer_id = get_platform_customer_from_user(user)
+
+	return calculate_cart_totals(
+		restaurant=restaurant,
+		items=items,
+		coupon_code=coupon_code,
+		loyalty_coins=loyalty_coins,
+		customer=customer_id,
+		delivery_type=order_type.capitalize() if order_type else None
+	)
+
 
 
 def cint(value):

@@ -55,7 +55,7 @@ def create_linked_account(*args, **kwargs):
 
 
 @frappe.whitelist(allow_guest=True)
-def create_payment_order(restaurant_id, order_items, total_amount, subtotal=None, packaging_fee=0, delivery_fee=0, customer_name=None, customer_email=None, customer_phone=None, table_number=None, existing_order_id=None, idempotency_key=None, order_type=None, coupon_code=None, loyalty_coins_redeemed=0, delivery_info=None, pickup_time=None):
+def create_payment_order(restaurant_id, order_items, total_amount, subtotal=None, packaging_fee=0, delivery_fee=0, customer_name=None, customer_email=None, customer_phone=None, table_number=None, existing_order_id=None, idempotency_key=None, order_type=None, coupon_code=None, loyalty_coins_redeemed=0, delivery_info=None, pickup_time=None, tax=None, cgst=None, sgst=None, tax_percent=None):
 	"""Create or update a Razorpay order for customer payment (SaaS model: no Route/transfers)."""
 	try:
 		_restaurant_name = validate_restaurant_for_api(restaurant_id)
@@ -152,7 +152,11 @@ def create_payment_order(restaurant_id, order_items, total_amount, subtotal=None
 			"delivery_instructions": delivery_info.get("instructions"),
 			"pickup_time": pickup_datetime,
 			"packaging_fee": float(packaging_fee or 0),
-			"delivery_fee": float(delivery_fee or 0)
+			"delivery_fee": float(delivery_fee or 0),
+			"tax": float(tax or 0),
+			"cgst": float(cgst or 0),
+			"sgst": float(sgst or 0),
+			"tax_percent": float(tax_percent or 0)
 		})
 
 		# total_amount from frontend is the final payable total

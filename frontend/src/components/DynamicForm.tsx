@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox'
 import { ColorPaletteSelector } from '@/components/ui/color-palette-selector'
 import { CityStateSelector } from '@/components/ui/CityStateSelector'
+import AddressAutocomplete from '@/components/ui/AddressAutocomplete'
 import { DatePicker } from '@/components/ui/date-picker'
 import { useFrappeGetDoc, useFrappePostCall, useFrappeGetDocList } from '@/lib/frappe'
 import { useRestaurant } from '@/contexts/RestaurantContext'
@@ -128,6 +129,8 @@ export default function DynamicForm({
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [saving, setSaving] = useState(false)
   const [progress, setProgress] = useState(0)
+  // Track if lat/lng were auto-filled from Google Places (makes them read-only)
+  const [addressLatLngLocked, setAddressLatLngLocked] = useState(false)
 
   const { call: insertDoc } = useFrappePostCall('dinematters.dinematters.api.documents.create_document')
   const { call: updateDoc } = useFrappePostCall('dinematters.dinematters.api.documents.update_document')
@@ -676,6 +679,33 @@ export default function DynamicForm({
           return null
         }
 
+        // Special handling for Address field in Restaurant doctype - Google Places Autocomplete
+        if (doctype === 'Restaurant' && field.fieldname === 'address') {
+          return (
+            <AddressAutocomplete
+              key={field.fieldname}
+              id={field.fieldname}
+              label={field.label}
+              value={value || ''}
+              onChange={(addr) => handleFieldChange('address', addr)}
+              onLocationSelect={({ address, latitude, longitude }) => {
+                handleFieldChange('address', address)
+                if (latitude !== null) {
+                  handleFieldChange('latitude', latitude)
+                }
+                if (longitude !== null) {
+                  handleFieldChange('longitude', longitude)
+                }
+                // Lock lat/lng fields since they were auto-filled from Google
+                setAddressLatLngLocked(true)
+              }}
+              required={field.required}
+              readOnly={isReadOnly}
+              description={getEnhancedDescription(field, doctype)}
+            />
+          )
+        }
+
         // Special handling for City & State in Restaurant doctype
         if (doctype === 'Restaurant' && field.fieldname === 'city') {
           return (
@@ -913,26 +943,40 @@ export default function DynamicForm({
 
       case 'Currency':
       case 'Float':
-      case 'Int':
+      case 'Int': {
+        // Make latitude/longitude read-only when auto-filled from Google Places
+        const isLatLngField = doctype === 'Restaurant' && (field.fieldname === 'latitude' || field.fieldname === 'longitude')
+        const isEffectivelyReadOnly = isReadOnly || (isLatLngField && addressLatLngLocked)
         return (
           <div key={field.fieldname} className="space-y-2">
-            <Label htmlFor={field.fieldname}>
+            <Label htmlFor={field.fieldname} className="flex items-center gap-1.5">
               {field.label}
               {field.required && <span className="text-destructive">*</span>}
+              {isLatLngField && addressLatLngLocked && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-2.5 h-2.5"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  Auto-filled
+                </span>
+              )}
             </Label>
             <Input
               id={field.fieldname}
               type="number"
               value={value}
               onChange={(e) => handleFieldChange(field.fieldname, parseFloat(e.target.value) || 0)}
-              readOnly={isReadOnly}
+              readOnly={isEffectivelyReadOnly}
               required={field.required}
+              className={isLatLngField && addressLatLngLocked ? 'bg-muted opacity-70 cursor-not-allowed' : ''}
             />
             {field.description && (
               <p className="text-xs text-muted-foreground">{getEnhancedDescription(field, doctype)}</p>
             )}
+            {isLatLngField && addressLatLngLocked && (
+              <p className="text-xs text-primary/70">Auto-populated from the selected address. Select a different address to update.</p>
+            )}
           </div>
         )
+      }
 
       case 'Date':
         return (

@@ -1,48 +1,51 @@
 import frappe
 from frappe.model.document import Document
+from frappe.utils import flt
 import math
+
 
 class Order(Document):
     def before_save(self):
-        # 1. Calculate Subtotal from items to ensure integrity
-        calculated_subtotal = sum(float(item.total_price or 0) for item in self.get("order_items"))
-        if calculated_subtotal > 0:
-            self.subtotal = calculated_subtotal
+        # Use the centralized pricing engine for production-level consistency
+        from dinematters.dinematters.utils.pricing import calculate_cart_totals
+        
+        # Prepare items in the format expected by the utility
+        pricing_items = []
+        for item in self.get("order_items"):
+            pricing_items.append({
+				"quantity": item.quantity or 1,
+				"unitPrice": item.unit_price,
+				"dishId": item.product
+			})
 
-        # 2. Fetch Tax Rate from Restaurant
-        tax_rate = 5.0
-        if self.restaurant:
-            tax_rate = frappe.db.get_value("Restaurant", self.restaurant, "tax_rate")
-            if tax_rate is None: tax_rate = 5.0
-        
-        self.tax_percent = tax_rate
+        # Calculate totals
+        result = calculate_cart_totals(
+            restaurant=self.restaurant,
+            items=pricing_items,
+            coupon_code=self.coupon,
+            loyalty_coins=flt(self.loyalty_coins_redeemed or 0),
+            customer=self.platform_customer,
+            delivery_type=self.order_type # Dine-in, Delivery, Takeaway
+        )
 
-        # 3. Calculate Taxes on (Subtotal - Discount)
-        # Standard F&B: Tax is calculated on the amount after item/coupon discounts
-        discountable_amount = float(self.subtotal or 0) - float(self.discount or 0)
-        taxable_amount = max(0, discountable_amount)
-        
-        # Round to 2 decimal places for Currency fields
-        tax_amount = round(taxable_amount * (float(tax_rate) / 100.0), 2)
-        self.tax = tax_amount
-        
-        # Intra-state GST split (50/50)
-        self.cgst = round(tax_amount / 2.0, 2)
-        self.sgst = round(tax_amount - self.cgst, 2)
-
-        # 4. Update Final Total
-        # Total = (Subtotal - Discount) + Tax + Packaging + Delivery - Loyalty
-        pkg_fee = float(self.packaging_fee or 0)
-        del_fee = float(self.delivery_fee or 0)
-        loyalty_disc = float(self.loyalty_discount or 0)
-        
-        self.total = taxable_amount + tax_amount + pkg_fee + del_fee - loyalty_disc
+        # Update self with calculated values
+        self.subtotal = result["subtotal"]
+        self.discount = result["discount"]
+        self.loyalty_discount = result["loyaltyDiscount"]
+        self.tax = result["tax"]
+        self.cgst = result["cgst"]
+        self.sgst = result["sgst"]
+        self.tax_percent = result["taxRate"]
+        self.delivery_fee = result["deliveryFee"]
+        self.packaging_fee = result["packagingFee"]
+        self.total = result["total"]
 
         # 5. Update Platform Fee (Dynamic commission on GMV)
         # GMV = total amount paid by customer
         # Field is 'platform_fee_amount' (Int, Paise)
         rate = float(frappe.db.get_value("Restaurant", self.restaurant, "platform_fee_percent") or 1.5) / 100.0
         self.platform_fee_amount = int(math.floor(float(self.total or 0) * rate * 100))
+
 
     def on_update(self):
         """
