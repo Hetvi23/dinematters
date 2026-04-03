@@ -8,6 +8,8 @@ on:
     paths:
       - 'dinematters/**'
       - 'frontend/**'
+      - 'requirements.txt'
+      - 'pyproject.toml'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
     inputs:
@@ -18,32 +20,49 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to Production Server
+    name: Deploy to Production Server (backend.dinematters.com)
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
-      
+
       - name: Deploy to server
         env:
-          BRANCH: ${{ github.ref_name }}
+          BRANCH: ${{ github.event.inputs.branch || github.ref_name }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-            cd /home/frappe/frappe-bench
-            sudo -u frappe ./deploy.sh $BRANCH
-          EOF
-      
-      - name: Verify deployment
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-            supervisorctl status frappe-bench-web:* frappe-bench-workers:* || true
-          EOF
+          # Pass SITE_CONFIG_JSON securely via stdin to avoid shell escaping issues
+          ssh -o StrictHostKeyChecking=no $SSH_USER@$SERVER_HOST \
+            "cd /home/frappe/frappe-bench && \
+             export SITE_CONFIG_JSON=$(echo '${{ secrets.SITE_CONFIG_JSON }}' | base64 -d 2>/dev/null || echo '${{ secrets.SITE_CONFIG_JSON }}') && \
+             bash ./deploy.sh $BRANCH"
 
+      - name: Verify scheduler is active
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          SCHEDULER_STATUS=$(ssh -o StrictHostKeyChecking=no $SSH_USER@$SERVER_HOST \
+            "cd /home/frappe/frappe-bench && bench --site backend.dinematters.com scheduler status")
+          echo "Scheduler status: $SCHEDULER_STATUS"
+          if echo "$SCHEDULER_STATUS" | grep -q "disabled"; then
+            echo "ERROR: Scheduler is still disabled after deployment!"
+            exit 1
+          fi
+
+      - name: Verify web services
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          ssh -o StrictHostKeyChecking=no $SSH_USER@$SERVER_HOST \
+            "supervisorctl status frappe-bench-web:* frappe-bench-workers:* || true"
