@@ -30,6 +30,26 @@ def send_otp(restaurant_id, phone, purpose="verification", restaurant_name=None,
 	try:
 		config = frappe.db.get_value("Restaurant Config", {"restaurant": restaurant_id}, "verify_my_user")
 		if not config:
+			# verify_my_user is OFF — still issue a trust session token.
+			# Without this, the frontend has no X-Customer-Token for subsequent authenticated APIs
+			# (order history, loyalty balance) and will hit SECURE_SESSION_INVALID when the
+			# restaurant later enables verification.
+			normalized = normalize_phone(phone)
+			if normalized and len(normalized) == 10:
+				try:
+					customer = get_or_create_customer(normalized)
+					if customer:
+						session_token = frappe.generate_hash(length=48)
+						frappe.cache().set_value(
+							f"customer_session:{session_token}",
+							{"customer_id": customer.name, "phone": normalized},
+							expires_in_sec=30 * 24 * 60 * 60  # 30 days
+						)
+						frappe.db.commit()
+						return {"success": True, "skip_verification": True, "session_token": session_token}
+				except Exception as e:
+					frappe.log_error(f"send_otp skip_verification session error: {e}", "OTP_Skip_Session")
+					# Non-fatal: fall through to return without session token
 			return {"success": True, "skip_verification": True}
 
 		normalized = normalize_phone(phone)
@@ -98,9 +118,6 @@ def send_otp(restaurant_id, phone, purpose="verification", restaurant_name=None,
 			"channel": used_channel,
 			"message": "OTP sent successfully"
 		}
-	except Exception as e:
-		frappe.log_error(f"send_otp error: {e}", "OTP_Send_Error")
-		return {"success": False, "error": "INTERNAL_ERROR", "message": str(e)}
 	except Exception as e:
 		frappe.log_error(f"send_otp error: {e}", "OTP_Send_Error")
 		return {"success": False, "error": "INTERNAL_ERROR", "message": str(e)}

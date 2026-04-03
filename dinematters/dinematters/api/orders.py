@@ -19,6 +19,7 @@ from dinematters.dinematters.utils.customer_helpers import (
 	normalize_phone,
 	_find_customer_by_normalized_phone,
 	get_phone_variants_for_lookup,
+	is_phone_verified,
 )
 import json
 import random
@@ -650,15 +651,21 @@ def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=Fa
 				"error": {"code": "INVALID_PHONE", "message": "Invalid phone number"}
 			}
 
-		# Secure Session Check: Validate the X-Customer-Token from headers
+		# Production-ready auth gate:
+		# - When verify_my_user=ON: require a valid session token OR a DB-verified phone.
+		#   The DB check acts as a grace fallback for expired tokens (e.g. after Redis restart).
+		#   This prevents the "keeps verifying my user" loop while maintaining security.
+		# - When verify_my_user=OFF: skip auth entirely — any phone can retrieve their order history.
 		session_token = frappe.request.headers.get("X-Customer-Token") if frappe.request else None
-		if not validate_customer_session(phone, session_token) and not require_verified_phone(restaurant_id, phone):
-			# Note: require_verified_phone returns True if verification is NOT required or phone is verified.
-			# So we return False (block) only if it returns False AND there is no session.
-			return {
-				"success": False,
-				"error": {"code": "SECURE_SESSION_INVALID", "message": "Please log in to view your orders."}
-			}
+		verify_required = frappe.db.get_value("Restaurant Config", {"restaurant": restaurant_id}, "verify_my_user")
+		if verify_required:
+			has_valid_session = validate_customer_session(phone, session_token)
+			has_verified_phone = is_phone_verified(phone)
+			if not has_valid_session and not has_verified_phone:
+				return {
+					"success": False,
+					"error": {"code": "SECURE_SESSION_INVALID", "message": "Please log in to view your orders."}
+				}
 
 		customer_id = _find_customer_by_normalized_phone(normalized)
 		phone_variants = get_phone_variants_for_lookup(normalized)

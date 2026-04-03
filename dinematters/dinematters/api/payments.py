@@ -9,7 +9,7 @@ import math
 from datetime import datetime
 from frappe import _
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
-from dinematters.dinematters.utils.customer_helpers import require_verified_phone, get_or_create_customer
+from dinematters.dinematters.utils.customer_helpers import require_verified_phone, get_or_create_customer, validate_customer_session, is_phone_verified, normalize_phone
 
 
 
@@ -77,11 +77,18 @@ def create_payment_order(restaurant_id, order_items, total_amount, subtotal=None
 			except Exception:
 				pickup_datetime = None
 
-		# OTP gate: require verified phone when verify_my_user is on
+		# Auth gate: when verify_my_user is ON, require a valid session token OR a DB-verified phone.
+		# Session token is preferred (X-Customer-Token header); DB verified_at is the grace fallback.
+		# This prevents forced re-auth while keeping payment creation secure.
 		if customer_phone:
 			config = frappe.db.get_value("Restaurant Config", {"restaurant": _restaurant_name}, "verify_my_user")
-			if config and not require_verified_phone(restaurant_id, customer_phone):
-				return {"success": False, "error": {"code": "PHONE_NOT_VERIFIED", "message": "Please verify your phone with OTP first"}}
+			if config:
+				session_token = frappe.request.headers.get("X-Customer-Token") if frappe.request else None
+				normalized = normalize_phone(customer_phone)
+				has_valid_session = validate_customer_session(normalized, session_token) if session_token else False
+				has_verified_phone = is_phone_verified(normalized)
+				if not has_valid_session and not has_verified_phone:
+					return {"success": False, "error": {"code": "PHONE_NOT_VERIFIED", "message": "Please verify your phone with OTP first"}}
 
 		# Get platform customer for linking
 		platform_customer = None

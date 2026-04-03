@@ -1,72 +1,54 @@
 # Copyright (c) 2025, Dinematters and contributors
 # For license information, please see license.txt
 
-"""
-Customer helpers for platform-wide customer records.
-"""
-
 import frappe
 import re
 
+SESSION_TTL_SECONDS = 30 * 24 * 60 * 60
+_SESSION_DOCTYPE = "Customer Session"
+
 
 def normalize_phone(phone: str) -> str:
-	"""Extract 10-digit India number."""
 	digits = re.sub(r"\D", "", str(phone or ""))
 	return digits[-10:] if len(digits) >= 10 else digits
 
 
 def _phone_variants(normalized: str):
-	"""Return normalized and common format variants for lookup."""
 	return [normalized, f"0{normalized}", f"+91{normalized}", f"+91 {normalized}", f"91{normalized}"]
 
 
 def get_phone_variants_for_lookup(normalized: str):
-	"""Public helper for matching phone in Order.customer_phone etc. Returns list of variants."""
 	return _phone_variants(normalized)
 
 
 def _find_customer_by_normalized_phone(normalized: str):
-	"""Find Customer by phone (single source of truth). Uses SQL fuzzy matching for robustness."""
 	if not frappe.db.has_column("Customer", "phone"):
 		return None
-	
-	# Priority 1: Exact match on normalized (fastest)
 	existing = frappe.db.get_value("Customer", {"phone": normalized}, "name")
 	if existing:
 		return existing
-		
-	# Priority 2: Fuzzy match ignoring formatting characters (+, -, space, parens)
-	# This handles the duplicates shown in the dashboard screenshot.
 	res = frappe.db.sql("""
-		SELECT name FROM `tabCustomer` 
-		WHERE REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '+', ''), '-', ''), '(', '') LIKE %s
+		SELECT name FROM `tabCustomer`
+		WHERE REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '+ ', ''), '-', ''), '(', '') LIKE %s
 		LIMIT 1
 	""", (f"%{normalized}",), as_dict=True)
-	
-	if res:
-		return res[0].name
-	return None
+	return res[0].name if res else None
 
 
 def get_or_create_customer(phone: str, name: str = None, email: str = None):
-	"""Get or create Customer by phone. Phone is the unique identifier - no duplicates."""
 	normalized = normalize_phone(phone)
 	if not normalized or len(normalized) != 10:
 		return None
-
 	existing = _find_customer_by_normalized_phone(normalized)
 	if existing:
-		# Update via db to avoid attr errors when ERPNext Customer lacks fields
 		if name:
 			frappe.db.set_value("Customer", existing, "customer_name", name)
 		if email is not None:
 			frappe.db.set_value("Customer", existing, "email", email or "")
 		frappe.db.set_value("Customer", existing, "phone", normalized)
 		frappe.db.commit()
-		# Re-fetch by phone in case ERPNext renamed doc when customer_name changed
 		current = _find_customer_by_normalized_phone(normalized)
 		return frappe.get_doc("Customer", current or existing)
-
 	try:
 		return frappe.get_doc({
 			"doctype": "Customer",
@@ -88,50 +70,164 @@ def get_or_create_customer(phone: str, name: str = None, email: str = None):
 
 
 def is_phone_verified(phone: str) -> bool:
-	"""Platform-wide: check if phone is verified (Customer exists with verified_at)."""
 	normalized = normalize_phone(phone)
 	if not normalized or len(normalized) != 10:
 		return False
 	if not frappe.db.has_column("Customer", "verified_at"):
 		return False
 	for v in _phone_variants(normalized):
-		val = frappe.db.get_value("Customer", {"phone": v}, "verified_at")
-		if val:
+		if frappe.db.get_value("Customer", {"phone": v}, "verified_at"):
 			return True
 	return False
 
 
-def validate_customer_session(phone: str, session_token: str) -> bool:
-	"""
-	Verify that the provided session_token is valid and belongs to the phone number.
-	Essential for securing sensitive APIs like create_order.
-	"""
+def _session_doctype_exists() -> bool:
+	try:
+		return bool(frappe.db.table_exists(f"tab{_SESSION_DOCTYPE}"))
+	except Exception:
+		return False
+
+
+def create_customer_session(phone: str, customer_id: str, session_token: str = None) -> str:
+	normalized = normalize_phone(phone)
+	if not normalized or len(normalized) != 10:
+		raise ValueError(f"Invalid phone: {phone!r}")
+	if not session_token:
+		session_token = frappe.generate_hash(length=48)
+	session_data = {"customer_id": customer_id, "phone": normalized}
+	try:
+		frappe.cache().set_value(
+			f"customer_session:{session_token}",
+			session_data,
+			expires_in_sec=SESSION_TTL_SECONDS
+		)
+	except Exception as e:
+		frappe.log_error(f"Redis session write failed: {e}", "Session_Redis")
+	if _session_doctype_exists():
+		try:
+			expires_at = frappe.utils.add_to_date(frappe.utils.now_datetime(), seconds=SESSION_TTL_SECONDS)
+			frappe.get_doc({
+				"doctype": _SESSION_DOCTYPE,
+				"session_token": session_token,
+				"customer": customer_id,
+				"phone": normalized,
+				"revoked": 0,
+				"expires_at": expires_at,
+				"last_used_at": frappe.utils.now_datetime(),
+			}).insert(ignore_permissions=True)
+			frappe.db.commit()
+		except Exception as e:
+			frappe.log_error(f"DB session write failed: {e}", "Session_DB")
+	return session_token
+
+
+def _restore_session_from_db(session_token: str):
+	if not _session_doctype_exists():
+		return None
+	try:
+		rec = frappe.db.get_value(
+			_SESSION_DOCTYPE,
+			{"session_token": session_token, "revoked": 0},
+			["customer", "phone", "expires_at"],
+			as_dict=True
+		)
+		if not rec:
+			return None
+		if rec.expires_at and frappe.utils.now_datetime() > rec.expires_at:
+			frappe.db.set_value(_SESSION_DOCTYPE, {"session_token": session_token}, "revoked", 1)
+			frappe.db.commit()
+			return None
+		session_data = {"customer_id": rec.customer, "phone": rec.phone}
+		try:
+			remaining = int((rec.expires_at - frappe.utils.now_datetime()).total_seconds())
+			frappe.cache().set_value(
+				f"customer_session:{session_token}", session_data,
+				expires_in_sec=max(remaining, 3600)
+			)
+		except Exception:
+			pass
+		return session_data
+	except Exception as e:
+		frappe.log_error(f"DB session restore failed: {e}", "Session_DB_Restore")
+		return None
+
+
+def validate_customer_session(phone: str, session_token: str, slide_expiry: bool = True) -> bool:
 	try:
 		if not session_token or not phone:
 			return False
-		
 		normalized = normalize_phone(phone)
-		session = frappe.cache().get_value(f"customer_session:{session_token}")
-		
-		if not session:
+		if not normalized:
 			return False
-		
-		# Check if token belongs to this normalized phone
+		session = frappe.cache().get_value(f"customer_session:{session_token}")
+		if not session:
+			session = _restore_session_from_db(session_token)
+			if not session:
+				return False
 		if session.get("phone") != normalized:
 			return False
-			
-		# Check if customer doc exists
 		customer_id = session.get("customer_id")
 		if not customer_id or not frappe.db.exists("Customer", customer_id):
+			_hard_revoke(session_token)
 			return False
-			
+		if slide_expiry:
+			try:
+				frappe.cache().set_value(
+					f"customer_session:{session_token}", session,
+					expires_in_sec=SESSION_TTL_SECONDS
+				)
+				if _session_doctype_exists():
+					new_exp = frappe.utils.add_to_date(frappe.utils.now_datetime(), seconds=SESSION_TTL_SECONDS)
+					frappe.db.set_value(
+						_SESSION_DOCTYPE, {"session_token": session_token},
+						{"expires_at": new_exp, "last_used_at": frappe.utils.now_datetime()}
+					)
+					frappe.db.commit()
+			except Exception:
+				pass
 		return True
 	except Exception:
 		return False
 
 
+def _hard_revoke(session_token: str):
+	try:
+		frappe.cache().delete_value(f"customer_session:{session_token}")
+	except Exception:
+		pass
+	if _session_doctype_exists():
+		try:
+			frappe.db.set_value(_SESSION_DOCTYPE, {"session_token": session_token}, "revoked", 1)
+			frappe.db.commit()
+		except Exception:
+			pass
+
+
+def revoke_customer_session(session_token: str) -> bool:
+	if not session_token:
+		return False
+	existed = False
+	try:
+		if frappe.cache().get_value(f"customer_session:{session_token}"):
+			existed = True
+		frappe.cache().delete_value(f"customer_session:{session_token}")
+	except Exception as e:
+		frappe.log_error(f"Redis revoke failed: {e}", "Session_Revoke")
+	if _session_doctype_exists():
+		try:
+			if frappe.db.exists(_SESSION_DOCTYPE, {"session_token": session_token, "revoked": 0}):
+				existed = True
+				frappe.db.set_value(
+					_SESSION_DOCTYPE, {"session_token": session_token},
+					{"revoked": 1, "last_used_at": frappe.utils.now_datetime()}
+				)
+				frappe.db.commit()
+		except Exception as e:
+			frappe.log_error(f"DB revoke failed: {e}", "Session_Revoke_DB")
+	return existed
+
+
 def require_verified_phone(restaurant_id: str, phone: str) -> bool:
-	"""Returns True if restaurant has verify_my_user OFF, or if phone is verified."""
 	config = frappe.db.get_value("Restaurant Config", {"restaurant": restaurant_id}, "verify_my_user")
 	if not config:
 		return True
@@ -139,8 +235,6 @@ def require_verified_phone(restaurant_id: str, phone: str) -> bool:
 
 
 def get_platform_customer_from_user(user_email: str):
-	"""Find Customer linked to a User email. Essential for loyalty points lookup."""
 	if not user_email or user_email == "Guest":
 		return None
 	return frappe.db.get_value("Customer", {"email": user_email}, "name")
-
