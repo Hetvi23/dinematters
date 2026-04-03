@@ -82,6 +82,14 @@ def get_top_picks(restaurant_id):
 		frappe.cache().set_value(cache_key, json.dumps(result), expires_in_sec=3600)
 		
 		return result
+	except (frappe.DoesNotExistError, frappe.ValidationError) as e:
+		return {
+			"success": False,
+			"error": {
+				"code": "RESTAURANT_NOT_FOUND" if isinstance(e, frappe.DoesNotExistError) else "VALIDATION_ERROR",
+				"message": str(e)
+			}
+		}
 	except Exception as e:
 		frappe.log_error(f"Error in get_top_picks: {str(e)}")
 		return {
@@ -190,6 +198,14 @@ def get_products(restaurant_id, category=None, type=None, vegetarian=None, searc
 				"currency": currency_info.get("currency", "INR"),
 				"currencySymbol": currency_info.get("symbol", "₹"),
 				"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
+			}
+		}
+	except (frappe.DoesNotExistError, frappe.ValidationError) as e:
+		return {
+			"success": False,
+			"error": {
+				"code": "RESTAURANT_NOT_FOUND" if isinstance(e, frappe.DoesNotExistError) else "VALIDATION_ERROR",
+				"message": str(e)
 			}
 		}
 	except Exception as e:
@@ -518,6 +534,14 @@ def get_product(restaurant_id, product_id):
 				"currency": currency_info.get("currency", "INR"),
 				"currencySymbol": currency_info.get("symbol", "₹"),
 				"currencySymbolOnRight": currency_info.get("symbolOnRight", False)
+			}
+		}
+	except (frappe.DoesNotExistError, frappe.ValidationError) as e:
+		return {
+			"success": False,
+			"error": {
+				"code": "RESTAURANT_NOT_FOUND" if isinstance(e, frappe.DoesNotExistError) else "VALIDATION_ERROR",
+				"message": str(e)
 			}
 		}
 	except Exception as e:

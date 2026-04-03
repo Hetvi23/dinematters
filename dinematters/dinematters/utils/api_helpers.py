@@ -10,6 +10,15 @@ from frappe import _
 from dinematters.dinematters.utils.permissions import validate_restaurant_access, get_user_restaurant_ids
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 
+# Common metadata paths that should be ignored early
+RESERVED_RESTAURANT_IDS = {
+	"robots.txt",
+	"favicon.ico",
+	"sitemap.xml",
+	"ads.txt",
+	".well-known",
+}
+
 
 def get_restaurant_from_id(restaurant_id):
 	"""Get restaurant name from restaurant_id"""
@@ -33,6 +42,13 @@ def validate_restaurant_for_api(restaurant_id, user=None):
 	"""
 	if not restaurant_id:
 		frappe.throw(_("restaurant_id is required"), exc=frappe.ValidationError)
+	
+	# Skip reserved IDs early
+	if any(reserved in str(restaurant_id).lower() for reserved in RESERVED_RESTAURANT_IDS):
+		frappe.throw(
+			_("Restaurant {0} not found").format(restaurant_id),
+			exc=frappe.DoesNotExistError
+		)
 	
 	# Get restaurant name
 	restaurant = get_restaurant_from_id(restaurant_id)

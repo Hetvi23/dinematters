@@ -125,6 +125,14 @@ def get_restaurant_info(restaurant_id):
 			"success": True,
 			"data": restaurant_context
 		}
+	except (frappe.DoesNotExistError, frappe.ValidationError) as e:
+		return {
+			"success": False,
+			"error": {
+				"code": "RESTAURANT_NOT_FOUND" if isinstance(e, frappe.DoesNotExistError) else "VALIDATION_ERROR",
+				"message": str(e)
+			}
+		}
 	except Exception as e:
 		frappe.log_error(f"Error in get_restaurant_info: {str(e)}")
 		return {
@@ -183,6 +191,14 @@ def get_restaurant_tables(restaurant_id):
 			"success": True,
 			"data": {
 				"tables": tables
+			}
+		}
+	except (frappe.DoesNotExistError, frappe.ValidationError) as e:
+		return {
+			"success": False,
+			"error": {
+				"code": "RESTAURANT_NOT_FOUND" if isinstance(e, frappe.DoesNotExistError) else "VALIDATION_ERROR",
+				"message": str(e)
 			}
 		}
 	except Exception as e:

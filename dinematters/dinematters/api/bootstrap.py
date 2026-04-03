@@ -51,6 +51,14 @@ def get_restaurant_bootstrap(restaurant_id):
                 "site": frappe.local.site
             }
         }
+    except (frappe.DoesNotExistError, frappe.ValidationError) as e:
+        return {
+            "success": False,
+            "error": {
+                "code": "RESTAURANT_NOT_FOUND" if isinstance(e, frappe.DoesNotExistError) else "VALIDATION_ERROR",
+                "message": str(e)
+            }
+        }
     except Exception as e:
         frappe.log_error(f"Error in get_restaurant_bootstrap: {str(e)}")
         return {
