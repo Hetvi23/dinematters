@@ -70,3 +70,25 @@ def notify_cart_update(doc, method=None):
 			)
 	except Exception as e:
 		frappe.log_error(f"Error in notify_cart_update: {str(e)}", "Realtime Update Error")
+
+def notify_whatsapp_intent(doc):
+	"""
+	Publishes real-time update to the restaurant dashboard when a WhatsApp order 
+	intent is captured (shadow order).
+	Event: 'whatsapp_intent'
+	Room: Restaurant-specific
+	"""
+	try:
+		frappe.publish_realtime(
+			event='whatsapp_intent',
+			message={
+				'name': doc.name,
+				'order_number': doc.order_number,
+				'customer_name': doc.customer_name,
+				'total': doc.total,
+				'creation': doc.creation
+			},
+			room=f"restaurant:{doc.restaurant}"
+		)
+	except Exception as e:
+		frappe.log_error(f"Error in notify_whatsapp_intent: {str(e)}", "Realtime Update Error")

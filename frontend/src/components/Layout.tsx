@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, Coins, Crown, CreditCard, Settings } from 'lucide-react'
+import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, Coins, Crown, CreditCard, Settings, MessageSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetCall, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
 import { AiRechargeModal } from '@/components/AiRechargeModal'
@@ -103,7 +103,7 @@ type NavGroup = {
 type NavItem = NavLink | NavGroup
 
 const LUX_ONLY_FEATURES = ['ordering', 'loyalty', 'coupons', 'pos_integration', 'customer', 'order_settings', 'customer_pay_and_usage']
-const PRO_FEATURES = ['analytics', 'ai_recommendations', 'custom_branding', 'table_booking', 'games', 'events', 'offers', 'experience_lounge', 'video_upload', 'branding']
+const PRO_FEATURES = ['analytics', 'ai_recommendations', 'custom_branding', 'table_booking', 'games', 'events', 'offers', 'experience_lounge', 'video_upload', 'branding', 'whatsapp_orders']
 
 const navigation: NavItem[] = [
   { type: 'link', name: 'Dashboard', href: '/dashboard', icon: Home },
@@ -132,6 +132,7 @@ const navigation: NavItem[] = [
       { name: 'Past and Billed Orders', href: '/past-orders', icon: Clock, feature: 'ordering' },
     ],
   },
+  { type: 'link', name: 'WhatsApp Orders', href: '/whatsapp-orders', icon: MessageSquare, badgeHref: '/whatsapp-orders', feature: 'whatsapp_orders' },
   { type: 'link', name: 'Table Bookings', href: '/bookings', icon: Calendar, feature: 'table_booking' },
   { type: 'link', name: 'POS Integration', href: '/pos-integration', icon: Settings, feature: 'pos_integration' },
   { type: 'link', name: 'Customers', href: '/customers', icon: Users, feature: 'customer' },
@@ -433,7 +434,7 @@ export default function Layout({ children }: LayoutProps) {
 
   // Fetch orders for analytics - filter by selected restaurant
   const { data: orders } = useFrappeGetDocList('Order', {
-    fields: ['name', 'status', 'total', 'creation', 'restaurant', 'is_tokenization'],
+    fields: ['name', 'status', 'total', 'creation', 'restaurant', 'is_tokenization', 'is_whatsapp_order', 'payment_method'],
     filters: selectedRestaurant ? ({ restaurant: selectedRestaurant, "is_tokenization": ["!=", 1] } as any) : undefined,
     limit: 200,
     orderBy: { field: 'creation', order: 'desc' }
@@ -539,6 +540,26 @@ export default function Layout({ children }: LayoutProps) {
       const paymentMethod = String(order.payment_method || '').trim().toLowerCase()
 
       return status === 'pending_verification' && paymentMethod === 'pay_at_counter'
+    }).length
+  }, [orders])
+
+  const whatsappPendingOrders = useMemo(() => {
+    if (!orders || orders.length === 0) return 0
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    return orders.filter((order: any) => {
+      if (!order?.creation) return false
+      const createdAt = new Date(order.creation)
+      if (Number.isNaN(createdAt.getTime()) || createdAt < today) return false
+
+      const status = String(order.status || '').trim().toLowerCase()
+      const isWhatsApp = Boolean(order.is_whatsapp_order)
+
+      // Only count 'Pending Verification' (Awaiting Msg) as actionable badge alerts
+      // Using .toLowerCase() means we check for 'pending verification'
+      return status === 'pending verification' && isWhatsApp
     }).length
   }, [orders])
 
@@ -744,6 +765,10 @@ export default function Layout({ children }: LayoutProps) {
                 if (item.adminOnly && !isAdmin) {
                   return false
                 }
+                // WhatsApp Orders visibility: only PRO (Active) and LITE (Locked), hidden for LUX
+                if (item.feature === 'whatsapp_orders' && isLux) {
+                  return false
+                }
                 if (item.type === 'group') {
                   const filteredChildren = item.children.filter((child) => !child.adminOnly || isAdmin)
                   return filteredChildren.length > 0
@@ -759,7 +784,9 @@ export default function Layout({ children }: LayoutProps) {
                     ? pendingOrders
                     : item.badgeHref === '/accept-orders'
                       ? acceptPendingOrders
-                      : 0
+                      : item.badgeHref === '/whatsapp-orders'
+                        ? whatsappPendingOrders
+                        : 0
                   const showBadge = badgeCount > 0
                   // Unified locking logic
                   const featureStatus = getFeatureStatus(item.feature)
@@ -835,6 +862,7 @@ export default function Layout({ children }: LayoutProps) {
                 const groupBadgeCount = filteredChildren.reduce((sum, child) => {
                   if (child.badgeHref === '/orders') return sum + pendingOrders
                   if (child.badgeHref === '/accept-orders') return sum + acceptPendingOrders
+                  if (child.badgeHref === '/whatsapp-orders') return sum + whatsappPendingOrders
                   return sum
                 }, 0)
                 const showBadge = groupBadgeCount > 0
@@ -919,6 +947,11 @@ export default function Layout({ children }: LayoutProps) {
                                       {acceptPendingOrders > 9 ? '9+' : acceptPendingOrders}
                                     </span>
                                   )}
+                                  {!isChildLocked && child.badgeHref === '/whatsapp-orders' && whatsappPendingOrders > 0 && (
+                                    <span className="ml-auto bg-destructive text-white text-xs px-1.5 rounded-full">
+                                      {whatsappPendingOrders > 9 ? '9+' : whatsappPendingOrders}
+                                    </span>
+                                  )}
                                 </Link>
                               </DropdownMenuItem>
                             )
@@ -985,12 +1018,14 @@ export default function Layout({ children }: LayoutProps) {
                             const ChildIcon = child.icon || group.icon
                             const isChildActive = location.pathname === child.href ||
                               (child.href !== '/dashboard' && location.pathname.startsWith(child.href))
-                            const childBadgeCount = child.badgeHref === '/orders'
-                              ? pendingOrders
-                              : child.badgeHref === '/accept-orders'
-                                ? acceptPendingOrders
-                                : 0
-                            const showChildBadge = childBadgeCount > 0
+                              const childBadgeCount = child.badgeHref === '/orders'
+                                ? pendingOrders
+                                : child.badgeHref === '/accept-orders'
+                                  ? acceptPendingOrders
+                                  : child.badgeHref === '/whatsapp-orders'
+                                    ? whatsappPendingOrders
+                                    : 0
+                              const showChildBadge = childBadgeCount > 0
                             
                             // Unified child locking logic (Expanded View)
                             const childStatus = getFeatureStatus(child.feature)

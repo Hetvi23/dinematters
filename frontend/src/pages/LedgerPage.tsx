@@ -205,11 +205,12 @@ export default function LedgerPage() {
     if (type.includes('Commission')) return <ShoppingCart className="h-4 w-4 text-blue-500" />
     if (type.includes('Purchase') || type.includes('Recharge')) return <TrendingUp className="h-4 w-4 text-emerald-500" />
     if (type.includes('Refund')) return <RefreshCcw className="h-4 w-4 text-orange-500" />
+    if (type === 'Lead Unlock') return <Zap className="h-4 w-4 text-amber-500" />
     return <Zap className="h-4 w-4 text-amber-500" />
   }
 
   const getTxnColor = (type: string) => {
-    if (type.includes('Deduction')) return 'text-destructive'
+    if (type.includes('Deduction') || type === 'Lead Unlock') return 'text-destructive'
     if (type.includes('Purchase') || type.includes('Recharge') || type.includes('Refund') || type.includes('Free')) return 'text-emerald-500'
     return 'text-foreground'
   }

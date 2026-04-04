@@ -9,14 +9,23 @@ class Order(Document):
         # Use the centralized pricing engine for production-level consistency
         from dinematters.dinematters.utils.pricing import calculate_cart_totals
         
+        # 2. Preparation: Determine if we should recalculate
+        # For WhatsApp orders, we trust the frontend's calculated totals if provided,
+        # otherwise we fallback to the central pricing engine.
+        if getattr(self, "is_whatsapp_order", 0) and flt(self.total) > 0:
+            # Update Platform Fee only
+            rate = float(frappe.db.get_value("Restaurant", self.restaurant, "platform_fee_percent") or 1.5) / 100.0
+            self.platform_fee_amount = int(math.floor(float(self.total or 0) * rate * 100))
+            return
+
         # Prepare items in the format expected by the utility
         pricing_items = []
         for item in self.get("order_items"):
             pricing_items.append({
-				"quantity": item.quantity or 1,
-				"unitPrice": item.unit_price,
-				"dishId": item.product
-			})
+                "quantity": item.quantity or 1,
+                "unitPrice": item.unit_price,
+                "dishId": item.product
+            })
 
         # Calculate totals
         result = calculate_cart_totals(

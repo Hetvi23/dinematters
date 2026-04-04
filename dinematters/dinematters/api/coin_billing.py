@@ -36,8 +36,9 @@ def record_transaction(restaurant, txn_type, amount, description="", payment_id=
     )
     current_balance = (balance_info[0][0] if balance_info and balance_info[0][0] is not None else 0.0)
 
-    # In Coins, we treat 'amount' as absolute for deductions/purchases and signed for adjustments
-    if txn_type in ["AI Deduction", "Commission Deduction", "Daily Pro Floor", "Daily PRO Floor", "Daily LUX Floor", "Daily PRO Subscription"]:
+    is_deduction = txn_type in ["AI Deduction", "Commission Deduction", "Daily Pro Floor", "Daily PRO Floor", "Daily LUX Floor", "Daily PRO Subscription", "Lead Unlock"]
+    
+    if is_deduction:
         new_balance = current_balance - abs(amount)
     elif txn_type in ["Purchase", "Free Coins", "Refund", "Autopay Recharge"]:
         new_balance = current_balance + abs(amount)
@@ -61,7 +62,7 @@ def record_transaction(restaurant, txn_type, amount, description="", payment_id=
         "doctype": "Coin Transaction",
         "restaurant": restaurant,
         "transaction_type": txn_type,
-        "amount": amount,
+        "amount": -abs(amount) if is_deduction else abs(amount),
         "gst_amount": gst_amount,
         "total_paid_inr": total_paid or (amount + gst_amount),
         "balance_after": new_balance,
@@ -232,6 +233,7 @@ def get_coin_billing_info(restaurant):
     # Fail-safe: Check for overdue plan switches before returning info
     sync_restaurant_subscription(restaurant)
     
+    res = frappe.get_doc("Restaurant", restaurant)
     settings = frappe.get_single("Dinematters Settings")
     
     return {

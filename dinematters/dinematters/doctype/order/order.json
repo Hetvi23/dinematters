@@ -48,6 +48,7 @@
   "razorpay_order_id",
   "razorpay_payment_id",
   "is_tokenization",
+  "is_whatsapp_order",
   "platform_fee_amount",
   "restaurant_transfer_amount",
   "section_break_delivery",
@@ -338,6 +339,14 @@
    "default": 0,
    "in_list_view": 0,
    "description": "Flag indicating this order was created for tokenization (system use only)"
+  },
+  {
+   "fieldname": "is_whatsapp_order",
+   "fieldtype": "Check",
+   "label": "Is WhatsApp Order",
+   "default": 0,
+   "in_list_view": 1,
+   "description": "Flag indicating this order was created via WhatsApp redirect (PRO plan)"
   },
   {
    "fieldname": "platform_fee_amount",

@@ -49,6 +49,7 @@ const CustomerInsights = lazy(() => import('./pages/CustomerInsights'))
 const PaymentConfiguration = lazy(() => import('./pages/PaymentConfiguration'))
 const POSIntegration = lazy(() => import('./pages/POSIntegration'))
 const LedgerPage = lazy(() => import('./pages/LedgerPage'))
+const WhatsAppOrders = lazy(() => import('./pages/WhatsAppOrders'))
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -105,6 +106,10 @@ function AppContent() {
 
 							<Route element={<FeatureProtectedRoute feature="aiRecommendations" />}>
 								<Route path="/recommendations-engine" element={<Layout><RecommendationsEngine /></Layout>} />
+							</Route>
+
+							<Route element={<FeatureProtectedRoute requirePro />}>
+								<Route path="/whatsapp-orders" element={<Layout><WhatsAppOrders /></Layout>} />
 							</Route>
 
 							<Route path="/billing" element={<Layout><PaymentSettings /></Layout>} />

@@ -222,7 +222,6 @@ def get_coupon_details(restaurant, coupon_code, cart_total=0, customer_id=None, 
 	}
 
 @frappe.whitelist(allow_guest=True)
-@require_plan('LUX')
 def validate_coupon(restaurant_id, coupon_code, cart_total=0, customer_id=None, cart_items=None):
 	"""API wrapper for get_coupon_details"""
 	try:
@@ -262,7 +261,6 @@ def validate_coupon(restaurant_id, coupon_code, cart_total=0, customer_id=None, 
 
 
 @frappe.whitelist(allow_guest=True)
-@require_plan('LUX')
 def get_applicable_offers(restaurant_id, cart_items, cart_total, customer_id=None):
 	"""
 	POST /api/method/dinematters.dinematters.api.coupons.get_applicable_offers

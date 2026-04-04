@@ -438,12 +438,12 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 
 
 @frappe.whitelist(allow_guest=True)
-@require_plan('LUX')
-def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None, admin_mode=False, date_from=None, date_to=None, search_query=None, recent_only=False):
+def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None, admin_mode=False, date_from=None, date_to=None, search_query=None, recent_only=False, phone=None):
 	"""
 	GET /api/v1/orders
 	Get user's orders for restaurant
 	Requires restaurant_id for SaaS multi-tenancy
+	Optional: phone — for PRO WhatsApp guest orders (no OTP), filter by customer_phone
 	"""
 	try:
 		# Validate restaurant
@@ -453,6 +453,11 @@ def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None, ad
 		if not user and not session_id:
 			session_id = frappe.session.get("session_id")
 		
+		# Normalize phone if provided
+		if phone:
+			from dinematters.dinematters.utils.customer_helpers import normalize_phone
+			phone = normalize_phone(str(phone))
+		
 		# Build filters
 		filters = {"restaurant": restaurant}
 		
@@ -461,13 +466,16 @@ def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None, ad
 		
 		# In admin mode, don't filter by customer
 		if not admin_mode:
-			if user:
+			if phone:
+				# PRO WhatsApp guest: filter by phone number captured at checkout
+				filters["customer_phone"] = phone
+			elif user:
 				filters["customer"] = user
 			elif session_id:
 				# For guest users, track by session ID
 				filters["session_id"] = session_id
 			else:
-				# If no user and no session_id provided, return empty list for security
+				# If no identifier provided, return empty list for security
 				return {
 					"success": True,
 					"data": {
@@ -477,6 +485,7 @@ def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None, ad
 						"currencySymbol": "₹"
 					}
 				}
+
 		else:
 			# Admin mode - add additional filters
 			if date_from:
@@ -658,15 +667,27 @@ def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=Fa
 		# - When verify_my_user=OFF: skip auth entirely — any phone can retrieve their order history.
 		session_token = frappe.request.headers.get("X-Customer-Token") if frappe.request else None
 		verify_required = frappe.db.get_value("Restaurant Config", {"restaurant": restaurant_id}, "verify_my_user")
+		
+		# Bypass strict auth for recent WhatsApp shadow orders to allow guest tracking
+		is_shadow_request = recent_only or (frappe.request.headers.get("X-Shadow-Request") == "true") if frappe.request else recent_only
+		
 		if verify_required:
 			has_valid_session = validate_customer_session(phone, session_token)
 			has_verified_phone = is_phone_verified(phone)
+			
+			# If no valid session/verified phone, only allow if this is a recent shadow order request
 			if not has_valid_session and not has_verified_phone:
-				return {
-					"success": False,
-					"error": {"code": "SECURE_SESSION_INVALID", "message": "Please log in to view your orders."}
-				}
+				if not is_shadow_request:
+					return {
+						"success": False,
+						"error": {"code": "SECURE_SESSION_INVALID", "message": "Please log in to view your orders."}
+					}
+				# For shawdow/recent requests, the query below will naturally filter to <= 24h
+				# We just need to make sure we also filter for is_whatsapp_order if it's a guest
+				pass
 
+		is_authenticated = has_valid_session or has_verified_phone if verify_required else True
+		
 		customer_id = _find_customer_by_normalized_phone(normalized)
 		phone_variants = get_phone_variants_for_lookup(normalized)
 
@@ -687,6 +708,10 @@ def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=Fa
 			twenty_four_hours_ago = add_to_date(now_datetime(), hours=-24)
 			where_sql += " AND creation >= %s"
 			params.append(twenty_four_hours_ago)
+
+		# Security: If guest is not authenticated, strictly only allow fetching WhatsApp orders
+		if not is_authenticated:
+			where_sql += " AND is_whatsapp_order = 1"
 
 		base_cols = "name, order_id, order_number, status, total, subtotal, discount, tax, cgst, sgst, tax_percent, packaging_fee, delivery_fee, payment_method, payment_status, creation, estimated_delivery, delivery_partner, delivery_id, delivery_status, delivery_eta, delivery_rider_name, delivery_rider_phone, delivery_tracking_url, order_type"
 		feedback_cols = ""
