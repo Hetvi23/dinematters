@@ -87,7 +87,6 @@
   "section_break_ai_metrics",
   "total_ai_generations",
   "total_ai_cost",
-  "ai_credits",
   "section_break_pos",
   "pos_provider",
   "pos_enabled",
@@ -656,13 +655,6 @@
    "fieldtype": "Float",
    "label": "Total AI Cost (₹)",
    "default": "0",
-   "read_only": 1
-  },
-  {
-   "fieldname": "ai_credits",
-   "fieldtype": "Int",
-   "label": "Legacy AI Credits",
-   "hidden": 1,
    "read_only": 1
   },
   {

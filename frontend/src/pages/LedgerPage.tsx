@@ -251,7 +251,7 @@ export default function LedgerPage() {
                 <span className="text-2xl font-black tabular-nums">{balance.toLocaleString()}</span>
                 <span className="text-[10px] font-bold text-muted-foreground uppercase">Coins</span>
              </div>
-             <p className="text-[10px] text-muted-foreground font-medium">Approx. {formatAmountNoDecimals(balance)} credits.</p>
+             <p className="text-[10px] text-muted-foreground font-medium">Fiscal value: {formatAmountNoDecimals(balance)}</p>
           </div>
         </Card>
 

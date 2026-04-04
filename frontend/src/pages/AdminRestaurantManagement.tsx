@@ -10,7 +10,7 @@ import { getFrappeError, cn } from '@/lib/utils'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Shield, Users, Crown, Star, RefreshCw, Power, PowerOff, Trash2, TrendingUp, Activity, AlertTriangle, Coins, Settings, IndianRupee, Zap } from 'lucide-react'
+import { Shield, Users, Crown, Star, RefreshCw, Power, PowerOff, Trash2, TrendingUp, Activity, Coins, Settings, Zap } from 'lucide-react'
 
 interface Restaurant {
   name: string
@@ -500,7 +500,7 @@ export default function AdminRestaurantManagement() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Grant Coins</DialogTitle>
-            <DialogDescription>Grant manual credits to {selectedRestaurant?.restaurant_name}</DialogDescription>
+            <DialogDescription>Grant manual coins to {selectedRestaurant?.restaurant_name}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">

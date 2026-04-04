@@ -87,7 +87,8 @@ def get_events(restaurant_id, featured=None, category=None, upcoming_only=True):
 				"location": event.get("location", ""),
 				"category": event.get("category", ""),
 				"featured": bool(event.get("featured", False)),
-				"status": event.get("status", "upcoming")
+				"status": event.get("status", "upcoming"),
+				"image_src": event.get("image_src", "")
 			}
 			
 			# Add recurring event information if applicable
@@ -124,7 +125,7 @@ def get_events(restaurant_id, featured=None, category=None, upcoming_only=True):
 			}
 			
 			# Use centralized media fetcher for CDN URLs and blur placeholders
-			format_media_field(event_data, "image_src", "Event", event.get("name"), "event_image", "imageSrc")
+			format_media_field(event_data, "image_src", "Event", event.get("id"), "event_image", "imageSrc")
 			
 			if event.get("image_alt"):
 				event_data["imageAlt"] = event["image_alt"]

@@ -320,7 +320,7 @@ export default function TieredSetupWizard() {
                         'razorpay_kyc_status', 'razorpay_customer_id', 'razorpay_token_id', 
                         'razorpay_merchant_key_id', 'razorpay_keys_updated_at', 'razorpay_keys_updated_by', 
                         'max_images_lite', 'total_orders', 'total_revenue', 
-                        'commission_earned', 'ai_credits', 'total_ai_generations', 
+                        'commission_earned', 'total_ai_generations', 
                         'total_ai_cost', 'tax_rate', 'gst_number', 'enable_takeaway', 'enable_delivery', 
                         'no_ordering', 'default_delivery_fee', 'default_packaging_fee', 'minimum_order_value', 
                         'estimated_prep_time', 'restaurant_config', 'qr_codes_pdf_url',

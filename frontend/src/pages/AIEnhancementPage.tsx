@@ -33,9 +33,9 @@ export default function AIEnhancementPage() {
   const [preview, setPreview] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
 
-  // Credit state
-  const [creditBalance, setCreditBalance] = useState(0)
-  const [creditLoading, setCreditLoading] = useState(false)
+  // Coin state
+  const [coinBalance, setCoinBalance] = useState(0)
+  const [coinLoading, setCoinLoading] = useState(false)
   const [showRechargeModal, setShowRechargeModal] = useState(false)
 
   // Product Selection
@@ -56,7 +56,7 @@ export default function AIEnhancementPage() {
   const { call: getStatus } = useFrappePostCall('dinematters.dinematters.api.ai_media.get_enhancement_status')
   const { call: applyToProduct } = useFrappePostCall('dinematters.dinematters.api.ai_media.apply_to_product')
   const { call: uploadFile } = useFrappePostCall('dinematters.dinematters.api.ai_media.upload_base64_image')
-  const { call: getBillingInfo } = useFrappePostCall('dinematters.dinematters.api.ai_billing.get_ai_billing_info')
+  const { call: getBillingInfo } = useFrappePostCall('dinematters.dinematters.api.coin_billing.get_coin_billing_info')
 
   const [variantCount, setVariantCount] = useState<string>('1')
   const [generationIds, setGenerationIds] = useState<string[]>([])
@@ -64,45 +64,45 @@ export default function AIEnhancementPage() {
   const [activeSlide, setActiveSlide] = useState(0)
   const [isPolling, setIsPolling] = useState(false)
 
-  const BASE_CREDITS = aiMode === 'generate' ? 8 : 5
-  const CREDITS_PER_VARIANT = BASE_CREDITS + (includeBranding ? 2 : 0)
+  const BASE_COINS = aiMode === 'generate' ? 16 : 10
+  const COINS_PER_VARIANT = BASE_COINS + (includeBranding ? 4 : 0)
   const numVariants = parseInt(variantCount, 10)
   const [isApplying, setIsApplying] = useState(false)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
 
-  // Fetch credit balance
-  const fetchCredits = useCallback(async () => {
+  // Fetch coin balance
+  const fetchCoins = useCallback(async () => {
     if (!selectedRestaurant) return
-    setCreditLoading(true)
+    setCoinLoading(true)
     try {
       const res = await getBillingInfo({ restaurant: selectedRestaurant })
       if (res.message) {
-        const balance = res.message.ai_credits ?? 0
-        setCreditBalance(balance)
-        // Notify other components (like Layout) that credits have been updated
-        window.dispatchEvent(new CustomEvent('ai-credits-updated', { detail: { balance } }))
+        const balance = res.message.coins_balance ?? 0
+        setCoinBalance(balance)
+        // Notify other components (like Layout) that balance has been updated
+        window.dispatchEvent(new CustomEvent('coins-updated', { detail: { balance } }))
       }
     } catch (err) {
-      console.error('Failed to load credits:', err)
+      console.error('Failed to load coins:', err)
     } finally {
-      setCreditLoading(false)
+      setCoinLoading(false)
     }
   }, [selectedRestaurant])
 
-  // Sync credits when updated from other components (like global recharge)
+  // Sync coins when updated from other components (like global recharge)
   useEffect(() => {
-    const handleCreditsUpdate = (e: any) => {
+    const handleCoinsUpdate = (e: any) => {
       if (typeof e.detail?.balance === 'number') {
-        setCreditBalance(e.detail.balance)
+        setCoinBalance(e.detail.balance)
       }
     }
-    window.addEventListener('ai-credits-updated', handleCreditsUpdate)
-    return () => window.removeEventListener('ai-credits-updated', handleCreditsUpdate)
+    window.addEventListener('coins-updated', handleCoinsUpdate)
+    return () => window.removeEventListener('coins-updated', handleCoinsUpdate)
   }, [])
 
   useEffect(() => {
-    fetchCredits()
-  }, [fetchCredits])
+    fetchCoins()
+  }, [fetchCoins])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -125,10 +125,10 @@ export default function AIEnhancementPage() {
       return
     }
 
-    const creditsRequired = numVariants * CREDITS_PER_VARIANT
-    if (creditBalance < creditsRequired) {
-      toast.error('Insufficient credits!', {
-        description: `You need ${creditsRequired} credits but have ${creditBalance}.`,
+    const coinsRequired = numVariants * COINS_PER_VARIANT
+    if (coinBalance < coinsRequired) {
+      toast.error('Insufficient Coins!', {
+        description: `You need ${coinsRequired} coins but have ${coinBalance}.`,
         action: { label: 'Recharge', onClick: () => setShowRechargeModal(true) }
       })
       return
@@ -164,8 +164,8 @@ export default function AIEnhancementPage() {
           } catch (err: any) {
             const errorMsg = getFrappeError(err)
             if (errorMsg.toLowerCase().includes('insufficient')) {
-              toast.error('Insufficient credits!', {
-                description: 'Please recharge your AI credit wallet.',
+              toast.error('Insufficient Coins!', {
+                description: 'Please recharge your DineMatters coin wallet.',
                 action: { label: 'Recharge', onClick: () => setShowRechargeModal(true) }
               })
               break
@@ -224,8 +224,8 @@ export default function AIEnhancementPage() {
     } catch (err: any) {
       toast.error('Failed to start AI job', { description: getFrappeError(err) })
     } finally {
-      // Refresh credits after deduction
-      fetchCredits()
+      // Refresh balance after deduction
+      fetchCoins()
       if (newGenIds.length > 0) {
         setGenerationIds(newGenIds)
         setGenerationStatuses(initialStatus)
@@ -283,11 +283,11 @@ export default function AIEnhancementPage() {
         setGenerationStatuses(newStatuses)
         if (justCompleted > 0) {
           toast.success(`${justCompleted} variant(s) completed!`)
-          fetchCredits() // Refresh balance after successful credits deduction
+          fetchCoins() // Refresh balance after successful deduction
         }
         if (justFailed > 0) {
           toast.error(`${justFailed} variant(s) failed`)
-          fetchCredits() // Refresh balance to ensure accuracy
+          fetchCoins() // Refresh balance to ensure accuracy
         }
       }
     }, 3000)
@@ -376,13 +376,13 @@ export default function AIEnhancementPage() {
         </Link>
       </div>
 
-      {/* ── Low credit warning banner ── */}
-      {!creditLoading && creditBalance < 5 && (
+      {/* ── Low balance warning banner ── */}
+      {!coinLoading && coinBalance < COINS_PER_VARIANT && (
         <div className="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/20 px-4 py-3">
           <div className="flex items-center gap-3">
             <AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />
             <p className="text-sm text-red-700 dark:text-red-400">
-              <strong>Credit balance too low!</strong> You need at least {CREDITS_PER_VARIANT} credits to run this operation.
+              <strong>Coin balance too low!</strong> You need at least {COINS_PER_VARIANT} coins to run this operation.
             </p>
           </div>
           <Button size="sm" className="bg-red-500 hover:bg-red-600 text-white shrink-0" onClick={() => setShowRechargeModal(true)}>
@@ -413,16 +413,16 @@ export default function AIEnhancementPage() {
                 <SelectContent>
                   <SelectItem value="enhance">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      Enhance my Photo <span className="text-muted-foreground text-xs ml-1">(5 credits)</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="generate">
-                    <div className="flex items-center gap-2">
-                      <Camera className="h-4 w-4 text-primary" />
-                      Generate Photo for my Food <span className="text-muted-foreground text-xs ml-1">(8 credits)</span>
-                    </div>
-                  </SelectItem>
+                       <Sparkles className="h-4 w-4 text-primary" />
+                       Enhance my Photo <span className="text-muted-foreground text-xs ml-1">(10 coins)</span>
+                     </div>
+                   </SelectItem>
+                   <SelectItem value="generate">
+                     <div className="flex items-center gap-2">
+                       <Camera className="h-4 w-4 text-primary" />
+                       Generate Photo for my Food <span className="text-muted-foreground text-xs ml-1">(16 coins)</span>
+                     </div>
+                   </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -470,7 +470,7 @@ export default function AIEnhancementPage() {
                   Include {restaurants.find(r => r.restaurant_id === selectedRestaurant)?.restaurant_name || 'Restaurant'} branding
                 </label>
                 <p className="text-[10px] text-muted-foreground">
-                  Adds 2 credits per variant.
+                  Adds 4 coins per variant.
                 </p>
               </div>
             </div>
@@ -515,13 +515,13 @@ export default function AIEnhancementPage() {
             )}
 
 
-            {/* Action Button with credit cost hint */}
+            {/* Action Button with coin cost hint */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
                 <span className="flex items-center gap-1">
-                  <Coins className="h-3 w-3" /> Cost: <strong>{numVariants * CREDITS_PER_VARIANT} credits</strong>
+                  <Coins className="h-3 w-3" /> Cost: <strong>{numVariants * COINS_PER_VARIANT} coins</strong>
                 </span>
-                <span>Balance: <strong>{creditBalance}</strong></span>
+                <span>Balance: <strong>{coinBalance}</strong></span>
               </div>
               <Button
                 onClick={handleEnhanceClick}
@@ -730,8 +730,7 @@ export default function AIEnhancementPage() {
         open={showRechargeModal}
         onClose={() => setShowRechargeModal(false)}
         restaurant={selectedRestaurant}
-        currentBalance={creditBalance}
-        onSuccess={fetchCredits}
+        onSuccess={fetchCoins}
       />
 
       {/* Preview Modal */}

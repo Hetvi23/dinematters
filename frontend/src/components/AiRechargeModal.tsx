@@ -160,7 +160,7 @@ export function AiRechargeModal({ open, onClose, restaurant, onSuccess }: CoinRe
 
               if (verifyRes.message?.success) {
                 toast.success(`✅ Success! ${selectedCoins} coins added to your account.`)
-                window.dispatchEvent(new CustomEvent('ai-credits-updated', { detail: { refresh: true } }))
+                window.dispatchEvent(new CustomEvent('coins-updated', { detail: { refresh: true } }))
                 onSuccess()
                 resolve()
               } else {

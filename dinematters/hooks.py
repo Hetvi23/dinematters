@@ -215,7 +215,7 @@ scheduler_events = {
 		"dinematters.dinematters.tasks.monthly_reconciliation.reconcile_transfers"
 	],
 	"monthly": [
-		"dinematters.dinematters.api.ai_billing.process_monthly_pro_refill"
+		"dinematters.dinematters.api.coin_billing.process_monthly_pro_coin_refill"
 	],
 	"hourly": [
 		"dinematters.dinematters.api.payments.process_retry_charges"

@@ -183,10 +183,14 @@ class Restaurant(Document):
 			self.auto_assign_owner()
 		
 		# Auto-create Restaurant Config for new restaurants
-		self.create_restaurant_config()
+		create_restaurant_config(self)
 		
 		# Auto-create default Home Features for new restaurants
-		self.create_default_home_features()
+		create_default_home_features(self)
+		
+		# Initialize free signup coins (60 coins)
+		from dinematters.dinematters.api.coin_billing import initialize_free_coins
+		initialize_free_coins(self.name)
 		
 		# Generate QR codes if tables field is set
 		if hasattr(self, "_generate_qr_codes") and self._generate_qr_codes:

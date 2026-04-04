@@ -199,8 +199,8 @@ export default function Layout({ children }: LayoutProps) {
          refreshConfig()
       }
     }
-    window.addEventListener('ai-credits-updated', handleBalanceUpdate)
-    return () => window.removeEventListener('ai-credits-updated', handleBalanceUpdate)
+    window.addEventListener('coins-updated', handleBalanceUpdate)
+    return () => window.removeEventListener('coins-updated', handleBalanceUpdate)
   }, [selectedRestaurant, refreshConfig])
 
   // Expanded nav groups (persisted in localStorage)

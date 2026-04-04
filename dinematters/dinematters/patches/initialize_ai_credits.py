@@ -9,13 +9,8 @@ def execute():
     restaurants = frappe.get_all("Restaurant", pluck="name")
     total = 0
     for r in restaurants:
-        existing = frappe.db.count("AI Credit Transaction", {
-            "restaurant": r,
-            "transaction_type": "Free Credits",
-        })
-        if not existing:
-            from dinematters.dinematters.api.ai_billing import initialize_free_credits
-            initialize_free_credits(r)
+        from dinematters.dinematters.api.coin_billing import initialize_free_coins
+        if initialize_free_coins(r):
             total += 1
-            print(f"  ✓ Initialized free credits for {r}")
-    print(f"Done. Gave free credits to {total} restaurant(s).")
+            print(f"  ✓ Initialized free coins for {r}")
+    print(f"Done. Gave free coins to {total} restaurant(s).")

@@ -8,7 +8,7 @@ import random
 from PIL import Image, ImageFilter, ImageOps
 from dinematters.dinematters.media.storage import upload_object, get_cdn_url, generate_object_key
 
-MENU_THEME_CREDITS = 15
+MENU_THEME_COINS = 30
 MENU_THEME_OUTPUT_SIZE = (1080, 1920)
 
 
@@ -213,8 +213,8 @@ def upload_base64_image(filename, filedata):
 def enqueue_enhancement(restaurant, owner_doctype, owner_name, original_image_url=None, mode="enhance", include_branding=False):
     """
     Creates an AI Image Generation record and enqueues a job.
-    mode="enhance" costs 5 credits and requires original_image_url.
-    mode="generate" costs 8 credits and uses only product info + reference image.
+    mode="enhance" costs 10 coins and requires original_image_url.
+    mode="generate" costs 16 coins and uses only product info + reference image.
     """
     from dinematters.dinematters.api.coin_billing import deduct_coins
 
@@ -722,7 +722,7 @@ def set_menu_theme_background_enabled(restaurant, enabled):
     """
     Toggles the Menu Theme Background feature.
     - PRO: Free.
-    - LITE: 50 credits / 30 days.
+    - LITE: 100 coins / 30 days.
     """
     config_name = _get_restaurant_config_name(restaurant)
     config_doc = frappe.get_doc("Restaurant Config", config_name)

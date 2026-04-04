@@ -376,7 +376,7 @@ def delete_restaurant(restaurant_id):
             "Order", "Order Item", "Table Booking", "Banquet Booking", "Restaurant Table", 
             "Cart Entry", "Restaurant User", "Coupon", "Coupon Usage", "Offer", "Auto Offer", "Combo Offer", "Promo",
             "Game", "Event", "Home Feature", "Media Asset", "Media Upload Session", "Media Variant", "Product Media",
-            "AI Credit Transaction", "Monthly Billing Ledger", "Monthly Revenue Ledger", "Razorpay Webhook Log",
+            "Coin Transaction", "Monthly Billing Ledger", "Monthly Revenue Ledger", "Razorpay Webhook Log",
             "Plan Change Log", "Referral Link", "Referral Visit", "Otp Verification Log",
             "Tokenization Attempt", "Menu Recommendation", "Menu Image Extractor", "Menu Image Item",
             "Extracted Category", "Extracted Dish",
@@ -479,24 +479,14 @@ def admin_give_coins(restaurant_id, amount, reason="Admin Grant"):
         if not restaurant:
             return {'success': False, 'error': 'Restaurant not found'}
             
-        # Update balance
-        current_bal = float(restaurant.coins_balance or 0)
-        new_bal = current_bal + amount
-        
-        frappe.db.set_value('Restaurant', restaurant.name, 'coins_balance', new_bal)
-        
-        # Log the transaction (audit trail)
-        frappe.get_doc({
-            "doctype": "AI Credit Transaction",
-            "restaurant": restaurant.name,
-            "amount": amount,
-            "type": "Credit",
-            "remarks": f"Admin: {reason} (+{amount} coins)",
-            "transaction_date": frappe.utils.now(),
-            "status": "Success"
-        }).insert(ignore_permissions=True)
-        
-        frappe.db.commit()
+        # Update balance and log the transaction (audit trail)
+        from dinematters.dinematters.api.coin_billing import record_transaction
+        new_bal = record_transaction(
+            restaurant=restaurant.name,
+            txn_type="Admin Adjustment",
+            amount=amount,
+            description=f"Admin Grant: {reason}"
+        )
         
         return {
             'success': True,

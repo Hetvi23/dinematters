@@ -104,8 +104,10 @@ def get_restaurant_context(restaurant_id):
 		"currencySymbol": currency_info.get("symbol", "₹"),
 		"currencySymbolOnRight": currency_info.get("symbolOnRight", False),
 		"timezone": restaurant_doc.timezone,
-		"google_map_url": restaurant_doc.google_map_url
+		"google_map_url": restaurant_doc.google_map_url,
+		"plan_type": restaurant_doc.plan_type or "LITE"
 	}
+
 
 
 def validate_product_belongs_to_restaurant(product_id, restaurant_id):

@@ -13,7 +13,10 @@ class Event(Document):
 	"""
 	
 	def validate(self):
-		"""Validate recurring event settings."""
+		"""Validate event settings."""
+		if not self.image_src:
+			frappe.throw(_("Image is mandatory for all events."))
+			
 		if self.repeat_this_event:
 			if not self.repeat_on:
 				frappe.throw(_("Please select 'Repeat On' for recurring events."))
