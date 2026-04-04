@@ -9,7 +9,7 @@ from dinematters.dinematters.api.coin_billing import deduct_coins
 
 def process_daily_subscription_floors():
     """
-    Nightly task (23:59) to ensure PRO restaurants meet the daily minimum floor of ₹33.30.
+    Nightly task (23:59) to ensure PRO (₹33.30 flat) and LUX (₹43.30 min) restaurants are billed correctly.
     """
     today = getdate()
     
@@ -57,16 +57,19 @@ def process_daily_subscription_floors():
                 AND creation >= %s AND creation < %s
             """, (res.name, start_utc, end_utc))[0][0] or 0.0
             
-            # Floor target is monthly minimum / 30 days
-            floor_target = float(res.monthly_minimum or 999.0) / 30.0
+            # 5. Determine Floor Target
+            # Dynamic floor target from Restaurant record (e.g. ₹999 or ₹1299 / 30)
+            # This is now plan-aware since Restaurant.validate automatically sets these defaults.
+            floor_target = float(res.monthly_minimum or 0.0) / 30.0
+            
             shortfall = max(0, floor_target - abs(float(daily_commissions)))
             
             if shortfall > 0:
                 deduct_coins(
                     restaurant=res.name,
                     amount=shortfall,
-                    type=f"Daily {res.plan_type} Floor",
-                    description=f"Daily Minimum Floor Recovery (Target: ₹{floor_target:.2f}, Commissions Paid: ₹{abs(float(daily_commissions)):.2f})"
+                    type=f"Daily {res.plan_type} {'Subscription' if res.plan_type == 'PRO' else 'Floor'}",
+                    description=f"Daily {res.plan_type} {'Fee' if res.plan_type == 'PRO' else 'Minimum Floor Recovery'} (Target: ₹{floor_target:.2f}, Commissions Paid: ₹{abs(float(daily_commissions)):.2f})"
                 )
         except Exception as e:
             frappe.log_error(f"Daily floor recovery failed for {res.name}: {str(e)}", "Billing Task Error")

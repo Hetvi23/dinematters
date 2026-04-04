@@ -33,7 +33,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Transaction Type",
-   "options": "Purchase\nAI Deduction\nCommission Deduction\nRefund\nAdmin Adjustment\nFree Coins\nAutopay Recharge\nDaily Pro Floor",
+   "options": "Purchase\nAI Deduction\nCommission Deduction\nRefund\nAdmin Adjustment\nFree Coins\nAutopay Recharge\nDaily PRO Floor\nDaily LUX Floor\nDaily PRO Subscription",
    "reqd": 1
   },
   {

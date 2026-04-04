@@ -207,7 +207,9 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
     current_daily_vol: restaurantConfig.subscription.currentDailyVol,
     billing_status: restaurantConfig.subscription.billingStatus,
     onboarding_date: restaurantConfig.subscription.onboardingDate,
-    last_auto_recharge_date: restaurantConfig.subscription.lastAutoRechargeDate
+    last_auto_recharge_date: restaurantConfig.subscription.lastAutoRechargeDate,
+    monthly_minimum: restaurantConfig.subscription.monthly_minimum,
+    platform_fee_percent: restaurantConfig.subscription.platform_fee_percent
   } : null
 
   return (

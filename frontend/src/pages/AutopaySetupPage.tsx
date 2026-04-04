@@ -40,6 +40,14 @@ interface BillingInfo {
   current_daily_vol: number
   deferred_plan_type?: 'LITE' | 'PRO' | 'LUX' | null
   plan_change_date?: string | null
+  monthly_minimum: number
+  platform_fee_percent: number
+  plan_defaults: {
+    pro_monthly: number
+    lux_monthly: number
+    lux_commission: number
+    lux_barrier: number
+  }
 }
 
 export default function AutopaySetupPage() {
@@ -119,17 +127,20 @@ export default function AutopaySetupPage() {
     }
 
     // 2. Entrance Barrier Check
-    if (newPlan === 'PRO' && (billingInfo?.coins_balance || 0) < 999) {
+    const proMin = billingInfo?.plan_defaults?.pro_monthly || 999;
+    const luxBarrier = billingInfo?.plan_defaults?.lux_barrier || 2499;
+
+    if (newPlan === 'PRO' && (billingInfo?.coins_balance || 0) < proMin) {
       toast.error('Insufficient Coins', {
-        description: 'You need at least 999 coins in your wallet to upgrade to PRO.'
+        description: `You need at least ${proMin} coins in your wallet to upgrade to PRO.`
       })
       setShowRecharge(true)
       return
     }
     
-    if (newPlan === 'LUX' && (billingInfo?.coins_balance || 0) < 2499) {
+    if (newPlan === 'LUX' && (billingInfo?.coins_balance || 0) < luxBarrier) {
       toast.error('Insufficient Coins', {
-        description: 'You need at least 2499 coins in your wallet to upgrade to LUX.'
+        description: `You need at least ${luxBarrier} coins in your wallet to upgrade to LUX.`
       })
       setShowRecharge(true)
       return
@@ -318,7 +329,7 @@ export default function AutopaySetupPage() {
                        <p className="text-sm font-black uppercase tracking-tight">PRO PLAN</p>
                        <Badge className="bg-primary/20 text-primary text-[8px] h-4 hover:bg-primary/20">POPULAR</Badge>
                    </div>
-                   <p className="text-[10px] font-medium opacity-70">Min 999 / month • Pro Features</p>
+                   <p className="text-[10px] font-medium opacity-70">Min {billingInfo?.plan_defaults?.pro_monthly || 999} / month • Pro Features</p>
                 </div>
                 {planType === 'PRO' && <CheckCircle2 className="h-4 w-4 text-primary ml-auto" />}
              </button>
@@ -341,7 +352,7 @@ export default function AutopaySetupPage() {
                        <p className="text-sm font-black uppercase tracking-tight">LUX PLAN</p>
                        <Badge className="bg-indigo-500 text-white text-[8px] h-4 hover:bg-indigo-600">ELITE</Badge>
                    </div>
-                   <p className="text-[10px] font-medium opacity-70">Min 2499 / month • Full Ordering</p>
+                   <p className="text-[10px] font-medium opacity-70">Min {billingInfo?.plan_defaults?.lux_monthly || 1299} / month • Full Ordering</p>
                 </div>
                 {planType === 'LUX' && <CheckCircle2 className="h-4 w-4 text-indigo-500 ml-auto" />}
              </button>

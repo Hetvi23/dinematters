@@ -37,7 +37,7 @@ def record_transaction(restaurant, txn_type, amount, description="", payment_id=
     current_balance = (balance_info[0][0] if balance_info and balance_info[0][0] is not None else 0.0)
 
     # In Coins, we treat 'amount' as absolute for deductions/purchases and signed for adjustments
-    if txn_type in ["AI Deduction", "Commission Deduction", "Daily Pro Floor"]:
+    if txn_type in ["AI Deduction", "Commission Deduction", "Daily Pro Floor", "Daily PRO Floor", "Daily LUX Floor", "Daily PRO Subscription"]:
         new_balance = current_balance - abs(amount)
     elif txn_type in ["Purchase", "Free Coins", "Refund", "Autopay Recharge"]:
         new_balance = current_balance + abs(amount)
@@ -73,7 +73,7 @@ def record_transaction(restaurant, txn_type, amount, description="", payment_id=
     txn.insert(ignore_permissions=True)
     
     # Trigger auto-recharge check if balance falls below threshold
-    if txn_type in ["AI Deduction", "Commission Deduction", "Daily Pro Floor"]:
+    if txn_type in ["AI Deduction", "Commission Deduction", "Daily Pro Floor", "Daily PRO Floor", "Daily LUX Floor", "Daily PRO Subscription"]:
         check_and_trigger_auto_recharge(restaurant, new_balance)
 
         # Check for system suspension (-300 grace limit)
@@ -232,7 +232,8 @@ def get_coin_billing_info(restaurant):
     # Fail-safe: Check for overdue plan switches before returning info
     sync_restaurant_subscription(restaurant)
     
-    res = frappe.get_doc("Restaurant", restaurant)
+    settings = frappe.get_single("Dinematters Settings")
+    
     return {
         "coins_balance": res.coins_balance or 0,
         "auto_recharge_enabled": res.auto_recharge_enabled,
@@ -245,7 +246,14 @@ def get_coin_billing_info(restaurant):
         "plan_change_date": res.plan_change_date,
         "billing_status": res.billing_status or "active",
         "onboarding_date": res.onboarding_date,
-        "last_auto_recharge_date": res.last_auto_recharge_date
+        "last_auto_recharge_date": res.last_auto_recharge_date,
+        # Plan Defaults for Upgrade UI
+        "plan_defaults": {
+            "pro_monthly": settings.pro_monthly_fee or 999.0,
+            "lux_monthly": settings.lux_monthly_floor or 1299.0,
+            "lux_commission": settings.lux_commission_percent or 1.5,
+            "lux_barrier": settings.lux_upgrade_barrier or 2499.0
+        }
     }
 
 @frappe.whitelist(allow_guest=False)
@@ -265,13 +273,17 @@ def update_subscription_plan(restaurant, plan_type):
     res_info = frappe.db.get_value("Restaurant", restaurant, ["coins_balance", "monthly_minimum"], as_dict=True)
     balance = float(res_info.coins_balance or 0.0)
 
+    settings = frappe.get_single("Dinematters Settings")
+
     if plan_type == "PRO":
-        min_required = float(res_info.monthly_minimum if res_info.monthly_minimum is not None else 999.0)
+        # Check against restaurant's own minimum, fallback to global default
+        min_required = float(res_info.monthly_minimum if res_info.monthly_minimum else (settings.pro_monthly_fee or 999.0))
         if balance < min_required:
             frappe.throw(_(f"Insufficient balance to upgrade to PRO. Minimum {min_required} Coins required. Current: {balance}"), frappe.ValidationError)
     
     if plan_type == "LUX":
-        min_required = 2499.0
+        # LUX upgrade barrier is a platform-wide constant (manageable in Settings)
+        min_required = float(settings.lux_upgrade_barrier or 2499.0)
         if balance < min_required:
             frappe.throw(_(f"Insufficient balance to upgrade to LUX. Minimum {min_required} Coins required. Current: {balance}"), frappe.ValidationError)
 

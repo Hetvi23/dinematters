@@ -55,7 +55,7 @@ class Order(Document):
         if self.status in ["confirmed", "completed", "billed"] or self.payment_status == "completed":
             # 1. Plan Awareness: Only PRO restaurants pay 1.5% commission
             plan_type = frappe.db.get_value("Restaurant", self.restaurant, "plan_type")
-            if plan_type != "PRO":
+            if plan_type != "LUX":
                 return
 
             # Avoid duplicate deductions

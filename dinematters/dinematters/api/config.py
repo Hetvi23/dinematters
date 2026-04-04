@@ -240,6 +240,8 @@ def get_restaurant_config(restaurant_id):
 				"currentDailyVol": float(restaurant_doc.daily_auto_recharge_count or 0),
 				"onboardingDate": restaurant_doc.onboarding_date,
 				"lastAutoRechargeDate": restaurant_doc.last_auto_recharge_date,
+				"monthly_minimum": float(restaurant_doc.monthly_minimum or 0),
+				"platform_fee_percent": float(restaurant_doc.platform_fee_percent or 0),
 				"features": {
 					# Transactional (LUX only)
 					"ordering": restaurant_doc.plan_type == "LUX",

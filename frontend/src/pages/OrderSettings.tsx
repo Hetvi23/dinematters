@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 import { Truck, ShoppingBag, Clock, DollarSign, Settings, Percent, FileText } from 'lucide-react'
 
 export default function OrderSettings() {
-  const { selectedRestaurant } = useRestaurant()
+  const { selectedRestaurant, billingInfo } = useRestaurant()
   const [saving, setSaving] = useState(false)
   const [settings, setSettings] = useState({
     enable_takeaway: 1,
@@ -148,7 +148,7 @@ export default function OrderSettings() {
           </div>
           {settings.no_ordering === 1 && (
             <div className="mt-4 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-600 text-sm font-medium">
-              Note: A fixed monthly fee of 999 will be applied as revenue-based royalty cannot be calculated.
+              Note: A fixed daily fee (₹{((billingInfo?.plan_defaults?.pro_monthly || 999) / 30).toFixed(2)} for PRO, ₹{((billingInfo?.plan_defaults?.lux_monthly || 1299) / 30).toFixed(2)} for LUX) will be applied as revenue-based commission cannot be calculated.
             </div>
           )}
         </CardContent>

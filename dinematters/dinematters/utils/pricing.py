@@ -50,7 +50,8 @@ def calculate_cart_totals(restaurant, items, coupon_code=None, loyalty_coins=0, 
 	# 4. Calculate Tax (on Subtotal - Item/Coupon Discounts)
 	# Loyalty is usually a "payment method" discount, but in many F&B systems 
 	# tax is calculated on the amount BEFORE loyalty redemption.
-	tax_rate = flt(frappe.db.get_value("Restaurant", restaurant, "tax_rate") or 5.0)
+	tax_rate_val = frappe.db.get_value("Restaurant", restaurant, "tax_rate")
+	tax_rate = flt(tax_rate_val if tax_rate_val is not None else 5.0)
 	taxable_amount = max(0, subtotal - discount_amount)
 	tax_amount = round(taxable_amount * (tax_rate / 100.0), 2)
 	

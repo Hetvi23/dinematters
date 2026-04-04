@@ -21,6 +21,7 @@ interface Restaurant {
   plan_type: 'LITE' | 'PRO' | 'LUX'
   coins_balance: number
   platform_fee_percent: number
+  monthly_minimum: number
   creation: string
   modified: string
 }
@@ -44,6 +45,7 @@ export default function AdminRestaurantManagement() {
 
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
   const [editPlatformFee, setEditPlatformFee] = useState('')
+  const [editMonthlyMinimum, setEditMonthlyMinimum] = useState('')
   const [editName, setEditName] = useState('')
   const [editEmail, setEditEmail] = useState('')
 
@@ -157,6 +159,7 @@ export default function AdminRestaurantManagement() {
         restaurant_id: selectedRestaurant.restaurant_id,
         updates: {
           platform_fee_percent: editPlatformFee,
+          monthly_minimum: editMonthlyMinimum,
           restaurant_name: editName,
           owner_email: editEmail
         }
@@ -386,6 +389,7 @@ export default function AdminRestaurantManagement() {
                             onClick={() => {
                               setSelectedRestaurant(restaurant)
                               setEditPlatformFee(String(restaurant.platform_fee_percent))
+                              setEditMonthlyMinimum(String(restaurant.monthly_minimum))
                               setEditName(restaurant.restaurant_name)
                               setEditEmail(restaurant.owner_email || '')
                               setIsSettingsModalOpen(true)
@@ -534,10 +538,24 @@ export default function AdminRestaurantManagement() {
               <Label>Owner Email</Label>
               <Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
             </div>
+            
+            {/* Subscription Settings */}
+            {selectedRestaurant?.plan_type !== 'LITE' && (
+              <div className="space-y-2">
+                <Label>
+                  {selectedRestaurant?.plan_type === 'PRO' ? 'Monthly Subscription Fee' : 'Monthly Minimum Floor'}
+                </Label>
+                <Input type="number" value={editMonthlyMinimum} onChange={(e) => setEditMonthlyMinimum(e.target.value)} />
+                <p className="text-[10px] text-muted-foreground italic">
+                  Default for {selectedRestaurant?.plan_type} plan.
+                </p>
+              </div>
+            )}
+            
             <div className="space-y-2">
-              <Label>Platform Fee %</Label>
+              <Label>Platform Fee (Commission) %</Label>
               <Input type="number" value={editPlatformFee} onChange={(e) => setEditPlatformFee(e.target.value)} />
-              <p className="text-[10px] text-muted-foreground italic">Restricted for restaurant owners.</p>
+              <p className="text-[10px] text-muted-foreground italic">Percentage commission for {selectedRestaurant?.plan_type === 'LUX' ? 'LUX (Default 1.5%)' : 'orders'}.</p>
             </div>
           </div>
           <DialogFooter>

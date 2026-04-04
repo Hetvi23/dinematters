@@ -20,7 +20,12 @@
   "borzo_api_token",
   "borzo_webhook_token",
   "borzo_mode",
-  "google_maps_api_key"
+  "google_maps_api_key",
+  "section_subscription_defaults",
+  "pro_monthly_fee",
+  "lux_monthly_floor",
+  "lux_commission_percent",
+  "lux_upgrade_barrier"
  ],
  "fields": [
   {
@@ -114,6 +119,35 @@
    "fieldtype": "Password",
    "label": "Google Maps API Key",
    "description": "API key for Google Maps integration (must have Places and Roads API enabled)"
+  },
+  {
+   "fieldname": "section_subscription_defaults",
+   "fieldtype": "Section Break",
+   "label": "Subscription Defaults"
+  },
+  {
+   "default": "999",
+   "fieldname": "pro_monthly_fee",
+   "fieldtype": "Float",
+   "label": "PRO Monthly Fee"
+  },
+  {
+   "default": "1299",
+   "fieldname": "lux_monthly_floor",
+   "fieldtype": "Float",
+   "label": "LUX Monthly Floor"
+  },
+  {
+   "default": "1.5",
+   "fieldname": "lux_commission_percent",
+   "fieldtype": "Percent",
+   "label": "LUX Commission Percent"
+  },
+  {
+   "default": "2499",
+   "fieldname": "lux_upgrade_barrier",
+   "fieldtype": "Float",
+   "label": "LUX Upgrade Barrier (Coins)"
   }
  ],
  "index_web_pages_for_search": 1,

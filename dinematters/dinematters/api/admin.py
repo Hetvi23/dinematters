@@ -22,7 +22,7 @@ def check_admin_access():
             }
         }
     except Exception as e:
-        frappe.log_error(f"Error checking admin access: {str(e)}", "Admin API Error")
+        frappe.log_error("Admin API Error", f"Error checking admin access: {str(e)}")
         return {
             'success': False,
             'error': str(e)
@@ -59,6 +59,7 @@ def get_all_restaurants():
                     r.modified,
                     COALESCE(r.coins_balance, 0) as coins_balance,
                     COALESCE(r.platform_fee_percent, 1.5) as platform_fee_percent,
+                    COALESCE(r.monthly_minimum, 999) as monthly_minimum,
                     COALESCE(rc.subscription_plan, r.plan_type, 'LITE') as plan_type
                 FROM `tabRestaurant` r
                 LEFT JOIN `tabRestaurantConfig` rc ON r.name = rc.parent
@@ -77,6 +78,7 @@ def get_all_restaurants():
                     r.modified,
                     COALESCE(r.coins_balance, 0) as coins_balance,
                     COALESCE(r.platform_fee_percent, 1.5) as platform_fee_percent,
+                    COALESCE(r.monthly_minimum, 999) as monthly_minimum,
                     COALESCE(r.plan_type, 'LITE') as plan_type
                 FROM `tabRestaurant` r
                 ORDER BY r.creation DESC
@@ -97,7 +99,7 @@ def get_all_restaurants():
         }
         
     except Exception as e:
-        frappe.log_error(f"Error getting all restaurants: {str(e)}", "Admin API Error")
+        frappe.log_error("Admin API Error", f"Error getting all restaurants: {str(e)}")
         return {
             'success': False,
             'error': str(e)
@@ -155,7 +157,7 @@ def update_restaurant_plan(restaurant_id, plan_type):
                     }
                 }
             except Exception as e:
-                frappe.log_error(f"Error updating restaurant plan: {str(e)}", "Plan Update Error")
+                frappe.log_error("Plan Update Error", f"Error updating restaurant plan: {str(e)}")
                 return {
                     'success': False,
                     'error': f'Failed to update plan: {str(e)}'
@@ -233,7 +235,7 @@ def update_restaurant_plan(restaurant_id, plan_type):
         }
         
     except Exception as e:
-        frappe.log_error(f"Error updating restaurant plan: {str(e)}", "Admin API Error")
+        frappe.log_error("Admin API Error", f"Error updating restaurant plan: {str(e)}")
         frappe.db.rollback()
         return {
             'success': False,
@@ -286,14 +288,14 @@ def toggle_restaurant_status(restaurant_id, is_active):
                 }
             }
         except Exception as e:
-            frappe.log_error(f"Error updating restaurant status: {str(e)}", "Status Update Error")
+            frappe.log_error("Status Update Error", f"Error updating restaurant status: {str(e)}")
             return {
                 'success': False,
                 'error': f'Failed to update status: {str(e)}'
             }
         
     except Exception as e:
-        frappe.log_error(f"Error in toggle_restaurant_status: {str(e)}", "Admin API Error")
+        frappe.log_error("Admin API Error", f"Error in toggle_restaurant_status: {str(e)}")
         return {
             'success': False,
             'error': str(e)
@@ -339,7 +341,7 @@ def toggle_restaurant_status(restaurant_id, is_active):
             }
         
     except Exception as e:
-        frappe.log_error(f"Error getting subscription stats: {str(e)}", "Admin API Error")
+        frappe.log_error("Admin API Error", f"Error getting subscription stats: {str(e)}")
         return {
             'success': False,
             'error': str(e)
@@ -377,7 +379,8 @@ def delete_restaurant(restaurant_id):
             "Cart Entry", "Restaurant User", "Coupon", "Coupon Usage", "Offer", "Auto Offer", "Combo Offer", "Promo",
             "Game", "Event", "Home Feature", "Media Asset", "Media Upload Session", "Media Variant", "Product Media",
             "Coin Transaction", "Monthly Billing Ledger", "Monthly Revenue Ledger", "Razorpay Webhook Log",
-            "Plan Change Log", "Referral Link", "Referral Visit", "Otp Verification Log",
+            "Plan Change Log", "Referral Link", "Referral Visit", "OTP Verification Log",
+            "AI Credit Transaction",
             "Tokenization Attempt", "Menu Recommendation", "Menu Image Extractor", "Menu Image Item",
             "Extracted Category", "Extracted Dish",
             "Restaurant Loyalty Config", "Restaurant Loyalty Entry",
@@ -406,7 +409,7 @@ def delete_restaurant(restaurant_id):
                     cleanup_report.append(f"Deleted {len(records)} records from {dt}")
                     
             except Exception as inner_e:
-                frappe.log_error(f"Error deleting from {dt}: {str(inner_e)}", "Restaurant Delete Error")
+                frappe.log_error("Restaurant Delete Error", f"Error deleting from {dt}: {str(inner_e)}")
                 # Continue with others even if one fails
                 cleanup_report.append(f"FAILED to delete from {dt}: {str(inner_e)}")
 
@@ -419,7 +422,7 @@ def delete_restaurant(restaurant_id):
                 if configs:
                     cleanup_report.append(f"Deleted {len(configs)} RestaurantConfig records")
             except Exception as e:
-                frappe.log_error(f"Error deleting RestaurantConfig: {str(e)}", "Restaurant Delete Error")
+                frappe.log_error("Restaurant Delete Error", f"Error deleting RestaurantConfig: {str(e)}")
 
         # Delete any associated files in tabFile that were attached to these record types
         # Note: This is partly handled by frappe.delete_doc if files are linked via fields,
@@ -431,7 +434,7 @@ def delete_restaurant(restaurant_id):
                 WHERE (attached_to_doctype = 'Restaurant' AND attached_to_name = %s)
             """, (restaurant.name,))
         except Exception as e:
-            frappe.log_error(f"Error cleaning up files: {str(e)}", "Restaurant Delete Error")
+            frappe.log_error("Restaurant Delete Error", f"Error cleaning up files: {str(e)}")
 
         # Finally, delete the Restaurant record itself
         restaurant_name = restaurant.name
@@ -448,7 +451,7 @@ def delete_restaurant(restaurant_id):
         }
 
     except Exception as e:
-        frappe.log_error(f"Error in delete_restaurant API: {str(e)}", "Admin API Error")
+        frappe.log_error("Admin API Error", f"Error in delete_restaurant API: {str(e)}")
         frappe.db.rollback()
         return {
             'success': False,
@@ -494,7 +497,7 @@ def admin_give_coins(restaurant_id, amount, reason="Admin Grant"):
             'new_balance': new_bal
         }
     except Exception as e:
-        frappe.log_error(f"Error in admin_give_coins: {str(e)}", "Admin API Error")
+        frappe.log_error("Admin API Error", f"Error in admin_give_coins: {str(e)}")
         frappe.db.rollback()
         return {'success': False, 'error': str(e)}
 
@@ -521,11 +524,11 @@ def admin_update_restaurant_settings(restaurant_id, updates):
             
         # Prevent non-admin fields from being updated here if needed, 
         # but for now we follow the user's request for platform_fee_percent
-        allowed_fields = ['platform_fee_percent', 'is_active', 'restaurant_name', 'owner_email']
+        allowed_fields = ['platform_fee_percent', 'monthly_minimum', 'is_active', 'restaurant_name', 'owner_email']
         
         for field, value in updates.items():
             if field in allowed_fields:
-                if field == 'platform_fee_percent':
+                if field in ['platform_fee_percent', 'monthly_minimum']:
                     try:
                         value = float(value)
                     except:
@@ -544,7 +547,7 @@ def admin_update_restaurant_settings(restaurant_id, updates):
             }
         }
     except Exception as e:
-        frappe.log_error(f"Error in admin_update_restaurant_settings: {str(e)}", "Admin API Error")
+        frappe.log_error("Admin API Error", f"Error in admin_update_restaurant_settings: {str(e)}")
         frappe.db.rollback()
         return {'success': False, 'error': str(e)}
 

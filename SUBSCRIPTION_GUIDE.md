@@ -8,7 +8,7 @@ Welcome to the definitive guide for the **DineMatters Lifecycle Journey**. This 
 
 | Feature Category | Feature | 🆓 LITE | 💎 PRO | 👑 LUX |
 | :--- | :--- | :---: | :---: | :---: |
-| **Pricing** | Monthly Cost | **Free** | **₹999** | **₹999 (Floor)** |
+| **Pricing** | Monthly Cost | **Free** | **₹999** | **₹1299 (Min)** |
 | | Commission Rate | 0% | 0% | **1.5%** |
 | **Branding** | QR Code Logo | Watermarked | Custom Logo | Custom Logo |
 | | Landing Page | Standard | Premium | White-labeled (Subtle) |
@@ -94,9 +94,9 @@ FEATURE_PLAN_MAP = {
 The billing engine runs via **Frappe Scheduled Tasks** to handle charges in **DineMatters Coins** (1 Coin = ₹1).
 
 #### **Daily Floor Recovery (23:59)**
-For **PRO** and **LUX** tiers, the system ensures a minimum daily revenue of **₹33.30** (₹999 / 30 days).
-- **PRO**: Deducts ₹33.30 daily.
-- **LUX**: Deducts `max(0, 33.30 - commissions_paid_today)`.
+For **PRO** and **LUX** tiers, the system ensures a minimum daily platform revenue.
+- **PRO**: Flat ₹33.30 daily subscription fee (₹999 / 30 days).
+- **LUX**: Minimum ₹43.30 daily floor (₹1299 / 30 days). Deducts `max(0, 43.30 - commissions_paid_today)`.
 
 #### **Deferred Plan Transitions (00:01)**
 Handles upgrades/downgrades at midnight to maintain clean financial boundaries and prevent pro-rata complexity.
@@ -125,7 +125,7 @@ if (!hasAccess) {
 
 > [!CAUTION]
 > **The LUX Upgrade Guardrail**
-> To prevent restaurants from immediately falling into debt during an upgrade, a wallet balance of **2499 Coins** is required to switch to **LUX**. This ensures at least 2.5 months of floor coverage or initial commission liquidity.
+> To prevent restaurants from immediately falling into debt during an upgrade, a wallet balance of **2499 Coins** is required to switch to **LUX**. This ensures nearly 2 months of floor coverage or initial commission liquidity.
 
 > [!TIP]
 > **LITE Standalone Add-ons**
@@ -133,6 +133,6 @@ if (!hasAccess) {
 
 ---
 
-**Version:** 1.2  
+**Version:** 1.3  
 **Owner:** DineMatters Core Team  
 **Last Updated:** April 2026

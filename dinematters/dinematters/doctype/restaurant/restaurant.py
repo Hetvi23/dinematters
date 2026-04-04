@@ -60,6 +60,18 @@ class Restaurant(Document):
 			# Set plan metadata
 			self.plan_changed_by = frappe.session.user
 			self.plan_activated_on = frappe.utils.now()
+
+			# Auto-set billing defaults for the new plan
+			settings = frappe.get_single("Dinematters Settings")
+			if self.plan_type == "LUX":
+				self.monthly_minimum = settings.lux_monthly_floor or 1299.0
+				self.platform_fee_percent = settings.lux_commission_percent or 1.5
+			elif self.plan_type == "PRO":
+				self.monthly_minimum = settings.pro_monthly_fee or 999.0
+				self.platform_fee_percent = 0.0
+			elif self.plan_type == "LITE":
+				self.monthly_minimum = 0.0
+				self.platform_fee_percent = 0.0
 			
 			# Log the change (will be created in on_update)
 			self._plan_changed = True
@@ -98,11 +110,17 @@ class Restaurant(Document):
 				'reason': self.plan_change_reason or ''
 			}
 			
+			import json
 			if isinstance(self.plan_change_history, str):
-				import json
-				self.plan_change_history = json.loads(self.plan_change_history)
+				self.plan_change_history = json.loads(self.plan_change_history or '[]')
+			
+			if not self.plan_change_history:
+				self.plan_change_history = []
 			
 			self.plan_change_history.append(history_entry)
+			
+			# Use db_set to avoid recursion in on_update and bypass strict list validation if it occurs
+			self.db_set('plan_change_history', json.dumps(self.plan_change_history), update_modified=False)
 			
 			frappe.msgprint(
 				_('Subscription plan changed from {0} to {1}').format(previous_plan, self.plan_type),
