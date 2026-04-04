@@ -73,6 +73,10 @@ class Restaurant(Document):
 				self.monthly_minimum = 0.0
 				self.platform_fee_percent = 0.0
 			
+			# Waiver individual feature fees for PRO/LUX (they are included)
+			if self.plan_type in ["PRO", "LUX"]:
+				frappe.db.set_value("Restaurant Config", {"restaurant": self.name}, "menu_theme_paid_until", None)
+			
 			# Log the change (will be created in on_update)
 			self._plan_changed = True
 	

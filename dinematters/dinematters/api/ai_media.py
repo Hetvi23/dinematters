@@ -731,6 +731,9 @@ def set_menu_theme_background_enabled(restaurant, enabled):
     # Monetization Logic: Only when enabling
     if enabled_value:
         plan_type = frappe.db.get_value("Restaurant", restaurant, "plan_type") or "LITE"
+        
+        # PRO and LUX have this feature included for free.
+        # Only LITE restaurants pay the activation/renewal fee.
         if plan_type == "LITE":
             from dinematters.dinematters.api.coin_billing import deduct_coins
             from frappe.utils import getdate, add_days, today
@@ -741,6 +744,11 @@ def set_menu_theme_background_enabled(restaurant, enabled):
                 deduct_coins(restaurant, 100, "AI Deduction", "Menu Theme Background activation fee (30 days)")
                 # Extends for 30 days
                 config_doc.menu_theme_paid_until = add_days(today(), 30)
+                config_doc.save(ignore_permissions=True)
+        else:
+            # For PRO/LUX, ensure paid_until is cleared to avoid unnecessary renewal checks
+            if config_doc.menu_theme_paid_until:
+                config_doc.menu_theme_paid_until = None
                 config_doc.save(ignore_permissions=True)
 
     config_doc.db_set("menu_theme_background_enabled", enabled_value, update_modified=False)

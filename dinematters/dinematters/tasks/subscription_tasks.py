@@ -158,6 +158,13 @@ def process_lite_feature_renewals():
 
     for config in lite_configs:
         try:
+            # Double-check plan type just in case of a race condition or stale cache
+            actual_plan = frappe.db.get_value("Restaurant", config.restaurant, "plan_type")
+            if actual_plan != 'LITE':
+                # Skip and clear the paid_until since it shouldn't apply to premium tiers
+                frappe.db.set_value("Restaurant Config", config.name, "menu_theme_paid_until", None)
+                continue
+                
             # Attempt to deduct 100 coins
             deduct_coins(
                 restaurant=config.restaurant,

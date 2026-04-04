@@ -1,6 +1,6 @@
 import frappe
-from dinematters.dinematters.tasks.subscription_tasks import process_daily_subscription_floors
-from frappe.utils import getdate, now_datetime, add_days
+from dinematters.dinematters.tasks.subscription_tasks import process_daily_subscription_floors, process_lite_feature_renewals
+from frappe.utils import getdate, now_datetime, add_days, today
 
 def test_it():
     print("--- 🚀 STARTING SUBSCRIPTION E2E TESTING ---")
@@ -193,5 +193,59 @@ def test_it():
     settings.pro_monthly_fee = original_pro_fee
     settings.save()
 
-    print("\n✅ ALL DYNAMIC SUBSCRIPTION E2E TESTS PASSED!")
+    print("\n[SCENARIO 5: FEATURE FEE TIER GATING TEST]")
+    # 1. Setup LITE restaurant with menu theme enabled
+    res_lite_name = "test-fee-lite"
+    if not frappe.db.exists("Restaurant", res_lite_name):
+        frappe.get_doc({"doctype": "Restaurant", "restaurant_id": res_lite_name, "restaurant_name": "LITE Fee Test", "plan_type": "LITE", "coins_balance": 500, "is_active": 1}).insert(ignore_permissions=True)
+    
+    # Reset balance and clear transactions for isolation
+    frappe.db.set_value("Restaurant", res_lite_name, "coins_balance", 500.0)
+    frappe.db.delete("Coin Transaction", {"restaurant": res_lite_name})
+    
+    config_lite = frappe.get_doc("Restaurant Config", {"restaurant": res_lite_name})
+    config_lite.menu_theme_background_enabled = 1
+    config_lite.menu_theme_paid_until = None
+    config_lite.save()
+
+    # 2. Setup PRO restaurant test (transition from LITE to PRO)
+    res_pro_name = "test-fee-pro"
+    if not frappe.db.exists("Restaurant", res_pro_name):
+        frappe.get_doc({"doctype": "Restaurant", "restaurant_id": res_pro_name, "restaurant_name": "PRO Fee Test", "plan_type": "LITE", "coins_balance": 500, "is_active": 1}).insert(ignore_permissions=True)
+    
+    # Reset to LITE first
+    res_pro = frappe.get_doc("Restaurant", res_pro_name)
+    res_pro.plan_type = "LITE"
+    res_pro.coins_balance = 500.0
+    res_pro.save()
+    frappe.db.delete("Coin Transaction", {"restaurant": res_pro_name})
+    
+    config_pro = frappe.get_doc("Restaurant Config", {"restaurant": res_pro_name})
+    config_pro.menu_theme_background_enabled = 1
+    config_pro.menu_theme_paid_until = add_days(today(), -5) # Expired 5 days ago
+    config_pro.save()
+
+    # Now upgrade to PRO - this should trigger the cleanup in restaurant.py
+    res_pro.plan_type = "PRO"
+    res_pro.save()
+
+    # 3. Run renewal task
+    process_lite_feature_renewals()
+
+    # 4. Verify results
+    lite_bal = frappe.db.get_value("Restaurant", res_lite_name, "coins_balance")
+    pro_bal = frappe.db.get_value("Restaurant", res_pro_name, "coins_balance")
+    
+    print(f"LITE Balance after renewal task: {lite_bal} (Expected: 400)")
+    print(f"PRO Balance after renewal task: {pro_bal} (Expected: 500)")
+    
+    assert abs(lite_bal - 400.0) < 0.01, f"LITE was not charged or charged wrong! Bal: {lite_bal}"
+    assert abs(pro_bal - 500.0) < 0.01, f"PRO was incorrectly charged! Bal: {pro_bal}"
+    
+    # Also verify PRO's paid_until is cleared (due to our fix)
+    new_pro_paid_until = frappe.db.get_value("Restaurant Config", {"restaurant": res_pro_name}, "menu_theme_paid_until")
+    print(f"PRO Paid Until after task: {new_pro_paid_until} (Expected: None)")
+    assert new_pro_paid_until is None, "PRO paid_until was not cleared!"
+
+    print("\n✅ ALL DYNAMIC SUBSCRIPTION & FEATURE GATING E2E TESTS PASSED!")
     frappe.db.rollback() 
