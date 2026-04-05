@@ -10,19 +10,30 @@ from frappe import _
 from dinematters.dinematters.utils.permissions import validate_restaurant_access, get_user_restaurant_ids
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 
-# Common metadata paths that should be ignored early
+# Common metadata paths and scanner targets that should be ignored early
 RESERVED_RESTAURANT_IDS = {
 	"robots.txt",
 	"favicon.ico",
 	"sitemap.xml",
 	"ads.txt",
 	".well-known",
+	"webroot",
+	"wp-admin",
+	"wp-content",
+	"cgi-bin",
+	".env",
+	"administrator",
+	"login",
 }
 
 
 def get_restaurant_from_id(restaurant_id):
 	"""Get restaurant name from restaurant_id"""
 	if not restaurant_id:
+		return None
+	
+	# Skip checks for suspiciously long IDs (likely bot probes)
+	if len(str(restaurant_id)) > 50:
 		return None
 	
 	# Try to get by restaurant_id field first
@@ -41,23 +52,20 @@ def validate_restaurant_for_api(restaurant_id, user=None):
 	Returns restaurant name if valid, raises exception if not
 	"""
 	if not restaurant_id:
-		frappe.throw(_("restaurant_id is required"), exc=frappe.ValidationError)
+		# Use generic message to prevent log title explosion
+		frappe.throw(_("Restaurant not found"), exc=frappe.DoesNotExistError)
 	
 	# Skip reserved IDs early
-	if any(reserved in str(restaurant_id).lower() for reserved in RESERVED_RESTAURANT_IDS):
-		frappe.throw(
-			_("Restaurant {0} not found").format(restaurant_id),
-			exc=frappe.DoesNotExistError
-		)
+	id_clean = str(restaurant_id).lower()
+	if any(reserved in id_clean for reserved in RESERVED_RESTAURANT_IDS):
+		# Silently return a 404 for known scanners/bots
+		frappe.throw(_("Restaurant not found"), exc=frappe.DoesNotExistError)
 	
 	# Get restaurant name
 	restaurant = get_restaurant_from_id(restaurant_id)
 	
 	if not restaurant:
-		frappe.throw(
-			_("Restaurant {0} not found").format(restaurant_id),
-			exc=frappe.DoesNotExistError
-		)
+		frappe.throw(_("Restaurant not found"), exc=frappe.DoesNotExistError)
 	
 	# Check if restaurant is active
 	if not frappe.db.get_value("Restaurant", restaurant, "is_active"):
