@@ -265,3 +265,151 @@ def get_coupon_performance(restaurant_id, coupon_id):
 				"message": str(e)
 			}
 		}
+
+
+@frappe.whitelist(allow_guest=True)
+def log_event(restaurant_id, event_type, event_value=None, session_id=None, platform="web"):
+	"""
+	Logs a guest interaction event. Whitelisted for guests.
+	"""
+	try:
+		if not restaurant_id or not event_type:
+			return {"success": False, "message": "Missing required fields"}
+
+		# Validate restaurant exists
+		if not frappe.db.exists("Restaurant", restaurant_id):
+			return {"success": False, "message": "Invalid restaurant"}
+
+		doc = frappe.get_doc({
+			"doctype": "Analytics Event",
+			"restaurant": restaurant_id,
+			"event_type": event_type,
+			"event_value": event_value,
+			"session_id": session_id or "anonymous",
+			"platform": platform
+		})
+		doc.insert(ignore_permissions=True)
+		frappe.db.commit()
+
+		return {"success": True}
+	except Exception as e:
+		frappe.log_error(f"Error in log_event: {str(e)}")
+		return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist()
+def get_dashboard_summary(restaurant_id):
+	"""
+	Returns a tiered summary of analytics for the merchant dashboard.
+	"""
+	try:
+		# Validate restaurant & check subscription tier
+		restaurant = frappe.get_doc("Restaurant", restaurant_id)
+		# Assume plan is stored on Restaurant or available via a helper
+		from dinematters.dinematters.utils.feature_gate import get_restaurant_plan
+		plan = get_restaurant_plan(restaurant_id) # Returns 'LITE', 'PRO', or 'LUX'
+
+		end_date = today()
+		start_date_7d = add_days(end_date, -7)
+
+		# 1. Traffic Stats (Always available, but LITE leads with this)
+		traffic_stats = frappe.db.sql("""
+			SELECT 
+				COUNT(*) as total_views,
+				COUNT(DISTINCT session_id) as unique_visitors
+			FROM `tabAnalytics Event`
+			WHERE restaurant = %s 
+			AND event_type = 'menu_view'
+			AND creation BETWEEN %s AND %s
+		""", (restaurant_id, start_date_7d, end_date), as_dict=True)[0]
+
+		# Calculate growth (current 7d vs previous 7d)
+		start_date_prev = add_days(start_date_7d, -7)
+		prev_traffic = frappe.db.sql("""
+			SELECT COUNT(*) as total_views
+			FROM `tabAnalytics Event`
+			WHERE restaurant = %s 
+			AND event_type = 'menu_view'
+			AND creation BETWEEN %s AND %s
+		""", (restaurant_id, start_date_prev, start_date_7d), as_dict=True)[0]
+
+		growth = 0
+		if prev_traffic.total_views > 0:
+			growth = ((traffic_stats.total_views - prev_traffic.total_views) / prev_traffic.total_views) * 100
+
+		summary = {
+			"success": True,
+			"tier": plan,
+			"traffic": {
+				"totalViews": traffic_stats.total_views,
+				"uniqueVisitors": traffic_stats.unique_visitors,
+				"growth": round(growth, 1)
+			}
+		}
+
+		# 1.1 Calculate Peak Hour (Production Insight)
+		peak_hour_data = frappe.db.sql("""
+			SELECT HOUR(creation) as hour, COUNT(*) as count
+			FROM `tabAnalytics Event`
+			WHERE restaurant = %s AND event_type = 'menu_view'
+			AND creation BETWEEN %s AND %s
+			GROUP BY hour ORDER BY count DESC LIMIT 1
+		""", (restaurant_id, start_date_7d, end_date), as_dict=True)
+		
+		if peak_hour_data:
+			h = peak_hour_data[0].hour
+			summary["traffic"]["peakHour"] = f"{h:02d}:00"
+			summary["traffic"]["peakHourLabel"] = "Most busy time"
+
+		# 1.2 Top Category by Scans (Tease for LITE, data for PRO)
+		# We'll use the 'Top Category' logic but specifically from analytics events if available, 
+		# otherwise fallback to Menu Category list
+		summary["traffic"]["topCategory"] = frappe.db.sql("""
+			SELECT event_value, COUNT(*) as count
+			FROM `tabAnalytics Event`
+			WHERE restaurant = %s AND event_type = 'category_view'
+			GROUP BY event_value ORDER BY count DESC LIMIT 1
+		""", (restaurant_id), as_dict=True)
+
+		# 2. PRO/LUX Features (Revenue, Conversion, etc.)
+		if plan in ['PRO', 'LUX']:
+			# Get order stats
+			order_stats = frappe.db.sql("""
+				SELECT 
+					COUNT(*) as total_orders,
+					SUM(total) as revenue
+				FROM `tabOrder`
+				WHERE restaurant = %s
+				AND creation BETWEEN %s AND %s
+			""", (restaurant_id, start_date_7d, end_date), as_dict=True)[0]
+
+			summary["enhanced"] = {
+				"totalOrders": order_stats.total_orders,
+				"revenue": flt(order_stats.revenue),
+				"conversionRate": round((order_stats.total_orders / traffic_stats.total_views * 100), 2) if traffic_stats.total_views > 0 else 0
+			}
+			
+			# Item views vs Orders (locked for LITE)
+			summary["topPerformers"] = frappe.db.sql("""
+				SELECT 
+					event_value as item_name,
+					COUNT(*) as views
+				FROM `tabAnalytics Event`
+				WHERE restaurant = %s AND event_type = 'item_view'
+				AND creation BETWEEN %s AND %s
+				GROUP BY event_value
+				ORDER BY views DESC
+				LIMIT 8
+			""", (restaurant_id, start_date_7d, end_date), as_dict=True)
+
+			# Engagement Metrics (Conversion)
+			order_stats = summary.get("enhanced", {})
+			scans = summary.get("traffic", {}).get("totalViews", 0)
+			
+			summary["enhanced"]["conversionRate"] = round((order_stats.get("total_orders", 0) / scans * 100), 2) if scans > 0 else 0
+			summary["enhanced"]["avgOrderValue"] = flt(order_stats.get("revenue", 0) / order_stats.get("total_orders", 1)) if order_stats.get("total_orders", 0) > 0 else 0
+
+		return summary
+	except Exception as e:
+		frappe.log_error(f"Error in get_dashboard_summary: {str(e)}")
+		return {"success": False, "error": str(e)}

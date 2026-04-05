@@ -244,3 +244,14 @@ def decrement_image_count(restaurant_id):
             current - 1
         )
         frappe.db.commit()
+
+
+def get_restaurant_plan(restaurant_id):
+	"""
+	Helper to get the current plan tier for a restaurant
+	"""
+	if not restaurant_id:
+		return "LITE"
+	
+	plan = frappe.db.get_value("Restaurant", restaurant_id, "plan_type")
+	return plan if plan else "LITE"
