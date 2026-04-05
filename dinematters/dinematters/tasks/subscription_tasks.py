@@ -37,13 +37,13 @@ def process_daily_subscription_floors():
             end_utc = end_of_day_local.astimezone(pytz.utc)
 
             # 3. Check for Idempotency: Has a floor recovery already been processed for this restaurant today?
-            # We search for 'Daily {PRO/LUX} Floor' in the local today's time range
-            already_processed = frappe.db.exists("Coin Transaction", {
-                "restaurant": res.name,
-                "transaction_type": ["in", ["Daily PRO Floor", "Daily LUX Floor"]],
-                "creation": [">=", start_utc.strftime("%Y-%m-%d %H:%M:%S")],
-                "creation": ["<", end_utc.strftime("%Y-%m-%d %H:%M:%S")]
-            })
+            # Use list of lists to avoid dictionary key overwrite bug (ensures both >= and < are applied)
+            already_processed = frappe.db.exists("Coin Transaction", [
+                ["restaurant", "=", res.name],
+                ["transaction_type", "in", ["Daily PRO Floor", "Daily LUX Floor", "Daily PRO Subscription"]],
+                ["creation", ">=", start_utc.strftime("%Y-%m-%d %H:%M:%S")],
+                ["creation", "<", end_utc.strftime("%Y-%m-%d %H:%M:%S")]
+            ])
             
             if already_processed:
                 continue
