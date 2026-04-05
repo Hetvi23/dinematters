@@ -39,11 +39,12 @@ jobs:
           BRANCH: ${{ github.event.inputs.branch || github.ref_name }}
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
+          RAW_JSON: ${{ secrets.SITE_CONFIG_JSON }}
         run: |
-          # Pass SITE_CONFIG_JSON securely via stdin to avoid shell escaping issues
-          ssh -o StrictHostKeyChecking=no $SSH_USER@$SERVER_HOST \
+          # Use a Base64 pipe to pass the JSON securely without shell escaping conflicts
+          echo "$RAW_JSON" | base64 -w 0 | ssh -o StrictHostKeyChecking=no $SSH_USER@$SERVER_HOST \
             "cd /home/frappe/frappe-bench && \
-             export SITE_CONFIG_JSON=\"\$(echo '${{ secrets.SITE_CONFIG_JSON }}' | base64 -d 2>/dev/null || echo '${{ secrets.SITE_CONFIG_JSON }}')\" && \
+             base64 -d > sites/backend.dinematters.com/site_config.json && \
              bash ./deploy.sh $BRANCH"
 
       - name: Verify scheduler is active
