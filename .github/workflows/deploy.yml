@@ -43,7 +43,7 @@ jobs:
           # Pass SITE_CONFIG_JSON securely via stdin to avoid shell escaping issues
           ssh -o StrictHostKeyChecking=no $SSH_USER@$SERVER_HOST \
             "cd /home/frappe/frappe-bench && \
-             export SITE_CONFIG_JSON=$(echo '${{ secrets.SITE_CONFIG_JSON }}' | base64 -d 2>/dev/null || echo '${{ secrets.SITE_CONFIG_JSON }}') && \
+             export SITE_CONFIG_JSON=\"\$(echo '${{ secrets.SITE_CONFIG_JSON }}' | base64 -d 2>/dev/null || echo '${{ secrets.SITE_CONFIG_JSON }}')\" && \
              bash ./deploy.sh $BRANCH"
 
       - name: Verify scheduler is active
