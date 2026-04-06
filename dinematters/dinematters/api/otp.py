@@ -14,6 +14,7 @@ from dinematters.dinematters.utils.otp_service import (
 	send_otp_via_sms,
 	send_otp_via_whatsapp,
 	send_otp_via_msg91_whatsapp,
+	send_otp_via_evolution_api,
 	OTP_LENGTH,
 	OTP_EXPIRY_MINUTES,
 	OTP_RESEND_COOLDOWN,
@@ -72,15 +73,24 @@ def send_otp(restaurant_id, phone, purpose="verification", restaurant_name=None,
 		otp = "".join(random.choices(string.digits, k=OTP_LENGTH))
 		used_channel = None
 
-		# 1. Try MSG91 WhatsApp if primary or channel='whatsapp'
+		# 1. Try Evolution API (Strategic Preference - Free/Dedicated)
 		if channel != "sms":
+			evo_url = settings.evolution_api_url
+			evo_key = settings.get_password("evolution_api_key")
+			evo_inst = settings.evolution_api_instance
+			if evo_url and evo_key and evo_inst:
+				if send_otp_via_evolution_api(evo_url, evo_key, evo_inst, normalized, otp, restaurant_name=restaurant_name or restaurant_id):
+					used_channel = "whatsapp"
+
+		# 2. Try MSG91 WhatsApp if primary or channel='whatsapp'
+		if not used_channel and channel != "sms":
 			msg91_key = settings.get_password("msg91_auth_key")
 			msg91_template = settings.msg91_whatsapp_template_id
 			if msg91_key and msg91_template:
 				if send_otp_via_msg91_whatsapp(msg91_key, normalized, otp, msg91_template, restaurant_name=restaurant_name or restaurant_id):
 					used_channel = "whatsapp"
 
-		# 2. Fallback to Fast2SMS (SMS) if WhatsApp failed or channel='sms'
+		# 3. Fallback to Fast2SMS (SMS) if WhatsApp failed or channel='sms'
 		if not used_channel:
 			api_key = settings.get_password("fast2sms_api_key")
 			if not api_key:

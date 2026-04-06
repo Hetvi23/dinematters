@@ -25,7 +25,11 @@
   "gold_monthly_fee",
   "diamond_monthly_floor",
   "diamond_commission_percent",
-  "diamond_upgrade_barrier"
+  "diamond_upgrade_barrier",
+  "section_evolution_api",
+  "evolution_api_url",
+  "evolution_api_key",
+  "evolution_api_instance"
  ],
  "fields": [
   {
@@ -148,6 +152,30 @@
    "fieldname": "diamond_upgrade_barrier",
    "fieldtype": "Float",
    "label": "DIAMOND Upgrade Barrier (Coins)"
+  },
+  {
+   "fieldname": "section_evolution_api",
+   "fieldtype": "Section Break",
+   "label": "WhatsApp OTP (Evolution API - Unlimited)"
+  },
+  {
+   "fieldname": "evolution_api_url",
+   "fieldtype": "Data",
+   "label": "Evolution API URL",
+   "description": "e.g. http://31.220.77.195:8080"
+  },
+  {
+   "fieldname": "evolution_api_key",
+   "fieldtype": "Password",
+   "label": "Evolution API Global Key",
+   "description": "The API_KEY set in docker-compose"
+  },
+  {
+   "fieldname": "evolution_api_instance",
+   "fieldtype": "Data",
+   "label": "Evolution API Instance Name",
+   "description": "The instance you created in the Evolution dashboard (e.g. DineMatters)",
+   "default": "DineMatters"
   }
  ],
  "index_web_pages_for_search": 1,

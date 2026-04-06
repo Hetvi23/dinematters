@@ -2,7 +2,7 @@
 # For license information, please see license.txt
 
 """
-Fast2SMS OTP service: SMS primary, WhatsApp fallback.
+Fast2SMS & Evolution API OTP service.
 """
 
 import re
@@ -168,4 +168,49 @@ def send_otp_via_msg91_whatsapp(auth_key: str, mobile: str, otp: str, template: 
 		return {"success": True, "message": "OTP sent successfully", "raw_response": data}
 	except Exception as e:
 		frappe.log_error(f"MSG91 WhatsApp failed: {e}", "OTP_MSG91_Failed")
+		return False
+
+
+def send_otp_via_evolution_api(url: str, api_key: str, instance: str, phone: str, otp: str, restaurant_name: str = None) -> bool:
+	"""Send OTP via Evolution API (WhatsApp). Returns True if successful."""
+	try:
+		if not url or not api_key or not instance:
+			return False
+
+		to = re.sub(r"\D", "", str(phone))
+		if len(to) == 10 and not to.startswith("91"):
+			to = "91" + to
+
+		# Ensure URL doesn't have trailing slash
+		url = url.rstrip("/")
+		endpoint = f"{url}/message/sendText/{instance}"
+		
+		headers = {
+			"apikey": api_key,
+			"Content-Type": "application/json"
+		}
+
+		label = (restaurant_name or "DineMatters").strip()[:25]
+		payload = {
+			"number": to,
+			"options": {
+				"delay": 1200,
+				"presence": "composing",
+				"linkPreview": False
+			},
+			"textMessage": {
+				"text": f"Your {label} verification code is: {otp}. Don't share this code with anyone."
+			}
+		}
+
+		resp = requests.post(endpoint, json=payload, headers=headers, timeout=12)
+		data = resp.json() if resp.text else {}
+		
+		success = resp.status_code in [200, 201] and data.get("key")
+		if not success:
+			frappe.log_error(f"Evolution API Failed: {resp.text}", "OTP_Evolution_Failed")
+			
+		return success
+	except Exception as e:
+		frappe.log_error(f"Evolution API failed: {e}", "OTP_Evolution_Error")
 		return False
