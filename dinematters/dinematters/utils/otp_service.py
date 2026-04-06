@@ -197,15 +197,10 @@ def send_otp_via_evolution_api(url: str, api_key: str, instance: str, phone: str
 		label = (restaurant_name or "DineMatters").strip()[:25]
 		payload = {
 			"number": to,
-			"text": f"Your {label} verification code is: {otp}. Don't share this code with anyone.",
-			"options": {
-				"delay": 1200,
-				"presence": "composing",
-				"linkPreview": False
-			}
+			"text": f"Your {label} verification code is: {otp}. Don't share this code with anyone."
 		}
 
-		resp = requests.post(endpoint, json=payload, headers=headers, timeout=12)
+		resp = requests.post(endpoint, json=payload, headers=headers, timeout=20)
 		print(f"📥 Status: {resp.status_code}")
 		print(f"📥 Response: {resp.text}")
 
