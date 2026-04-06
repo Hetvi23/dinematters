@@ -65,9 +65,9 @@ def resolve_qr_branding(restaurant_doc):
 	if not logo_url and restaurant_doc.logo:
 		logo_url = get_url(restaurant_doc.logo) if restaurant_doc.logo.startswith("/") else restaurant_doc.logo
 
-	# For LITE users, ALWAYS use Dinematters logo (override any custom logo)
-	if restaurant_doc.plan_type == 'LITE':
-		# Use Dinematters logo for LITE users (uploaded to CDN)
+	# For SILVER users, ALWAYS use Dinematters logo (override any custom logo)
+	if restaurant_doc.plan_type == 'SILVER':
+		# Use Dinematters logo for SILVER users (uploaded to CDN)
 		logo_url = "/files/dinematters-logoddffe5.svg"
 		# Fallback to local file if CDN file doesn't exist
 		if not frappe.db.exists("File", {"file_url": logo_url}):

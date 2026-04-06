@@ -313,9 +313,9 @@ def toggle_restaurant_status(restaurant_id, is_active):
         stats = frappe.db.sql("""
             SELECT 
                 COUNT(*) as total_restaurants,
-                SUM(CASE WHEN COALESCE(rc.subscription_plan, 'SILVER') = 'SILVER' THEN 1 ELSE 0 END) as lite_count,
-                SUM(CASE WHEN COALESCE(rc.subscription_plan, 'SILVER') = 'GOLD' THEN 1 ELSE 0 END) as pro_count,
-                SUM(CASE WHEN COALESCE(rc.subscription_plan, 'SILVER') = 'DIAMOND' THEN 1 ELSE 0 END) as lux_count,
+                SUM(CASE WHEN COALESCE(rc.subscription_plan, 'SILVER') = 'SILVER' THEN 1 ELSE 0 END) as silver_count,
+                SUM(CASE WHEN COALESCE(rc.subscription_plan, 'SILVER') = 'GOLD' THEN 1 ELSE 0 END) as gold_count,
+                SUM(CASE WHEN COALESCE(rc.subscription_plan, 'SILVER') = 'DIAMOND' THEN 1 ELSE 0 END) as diamond_count,
                 SUM(CASE WHEN r.is_active = 1 THEN 1 ELSE 0 END) as active_count,
                 SUM(CASE WHEN r.is_active = 0 THEN 1 ELSE 0 END) as inactive_count
             FROM `tabRestaurant` r
@@ -332,9 +332,9 @@ def toggle_restaurant_status(restaurant_id, is_active):
                 'success': True,
                 'data': {
                     'total_restaurants': 0,
-                    'lite_count': 0,
-                    'pro_count': 0,
-                    'lux_count': 0,
+                    'silver_count': 0,
+                    'gold_count': 0,
+                    'diamond_count': 0,
                     'active_count': 0,
                     'inactive_count': 0
                 }

@@ -307,12 +307,12 @@ def get_dashboard_summary(restaurant_id):
 		restaurant = frappe.get_doc("Restaurant", restaurant_id)
 		# Assume plan is stored on Restaurant or available via a helper
 		from dinematters.dinematters.utils.feature_gate import get_restaurant_plan
-		plan = get_restaurant_plan(restaurant_id) # Returns 'LITE', 'PRO', or 'LUX'
+		plan = get_restaurant_plan(restaurant_id) # Returns 'SILVER', 'GOLD', or 'DIAMOND'
 
 		end_date = today()
 		start_date_7d = add_days(end_date, -7)
 
-		# 1. Traffic Stats (Always available, but LITE leads with this)
+		# 1. Traffic Stats (Always available, but SILVER leads with this)
 		traffic_stats = frappe.db.sql("""
 			SELECT 
 				COUNT(*) as total_views,
@@ -361,7 +361,7 @@ def get_dashboard_summary(restaurant_id):
 			summary["traffic"]["peakHour"] = f"{h:02d}:00"
 			summary["traffic"]["peakHourLabel"] = "Most busy time"
 
-		# 1.2 Top Category by Scans (Tease for LITE, data for PRO)
+		# 1.2 Top Category by Scans (Tease for SILVER, data for GOLD)
 		# We'll use the 'Top Category' logic but specifically from analytics events if available, 
 		# otherwise fallback to Menu Category list
 		summary["traffic"]["topCategory"] = frappe.db.sql("""
@@ -371,8 +371,8 @@ def get_dashboard_summary(restaurant_id):
 			GROUP BY event_value ORDER BY count DESC LIMIT 1
 		""", (restaurant_id), as_dict=True)
 
-		# 2. PRO/LUX Features (Revenue, Conversion, etc.)
-		if plan in ['PRO', 'LUX']:
+		# 2. GOLD/DIAMOND Features (Revenue, Conversion, etc.)
+		if plan in ['GOLD', 'DIAMOND']:
 			# Get order stats
 			order_stats = frappe.db.sql("""
 				SELECT 
@@ -389,7 +389,7 @@ def get_dashboard_summary(restaurant_id):
 				"conversionRate": round((order_stats.total_orders / traffic_stats.total_views * 100), 2) if traffic_stats.total_views > 0 else 0
 			}
 			
-			# Item views vs Orders (locked for LITE)
+			# Item views vs Orders (locked for SILVER)
 			summary["topPerformers"] = frappe.db.sql("""
 				SELECT 
 					event_value as item_name,

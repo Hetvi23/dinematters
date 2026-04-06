@@ -215,7 +215,7 @@ scheduler_events = {
 		"dinematters.dinematters.tasks.monthly_reconciliation.reconcile_transfers"
 	],
 	"monthly": [
-		"dinematters.dinematters.api.coin_billing.process_monthly_pro_coin_refill"
+		"dinematters.dinematters.api.coin_billing.process_monthly_subscription_coin_refill"
 	],
 	"hourly": [
 		"dinematters.dinematters.api.payments.process_retry_charges"
@@ -223,7 +223,7 @@ scheduler_events = {
 	"cron": {
 		"59 23 * * *": [  # Run daily at 23:59 for floor recovery and lite renewals
 			"dinematters.dinematters.tasks.subscription_tasks.process_daily_subscription_floors",
-			"dinematters.dinematters.tasks.subscription_tasks.process_lite_feature_renewals",
+			"dinematters.dinematters.tasks.subscription_tasks.process_silver_feature_renewals",
 		],
 		"1 0 * * *": [    # Run daily at 00:01 for plan switches
 			"dinematters.dinematters.tasks.subscription_tasks.apply_deferred_plan_changes",

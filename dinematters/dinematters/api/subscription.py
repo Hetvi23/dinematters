@@ -149,7 +149,7 @@ def get_plan_comparison(restaurant_id=None):
             'commission': commission_rate,
             'features': {
                 'included': [
-                    'All PRO features',
+                    'All GOLD features',
                     'Online ordering & payments',
                     'Loyalty programs',
                     'Coupons & discounts',

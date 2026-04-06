@@ -55,7 +55,7 @@ def load_customization_options(product_doc):
 			question.options.append(option_obj)
 
 @frappe.whitelist(allow_guest=True)
-@require_plan('LUX')
+@require_plan('DIAMOND')
 def create_order(restaurant_id, items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None, table_number=None, coupon_code=None, payment_method=None, order_type=None, packaging_fee=None, delivery_fee=None, pickup_time=None, loyalty_coins_redeemed=0, referral_id=None, tax=None, cgst=None, sgst=None, tax_percent=None):
 	"""
 	POST /api/v1/orders
@@ -443,7 +443,7 @@ def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None, ad
 	GET /api/v1/orders
 	Get user's orders for restaurant
 	Requires restaurant_id for SaaS multi-tenancy
-	Optional: phone — for PRO WhatsApp guest orders (no OTP), filter by customer_phone
+	Optional: phone — for GOLD WhatsApp guest orders (no OTP), filter by customer_phone
 	"""
 	try:
 		# Validate restaurant
@@ -467,7 +467,7 @@ def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None, ad
 		# In admin mode, don't filter by customer
 		if not admin_mode:
 			if phone:
-				# PRO WhatsApp guest: filter by phone number captured at checkout
+				# GOLD WhatsApp guest: filter by phone number captured at checkout
 				filters["customer_phone"] = phone
 			elif user:
 				filters["customer"] = user

@@ -2,7 +2,7 @@
 # For license information, please see license.txt
 
 """
-WhatsApp Shadow Ordering API — PRO Plan Feature
+WhatsApp Shadow Ordering API — GOLD/DIAMOND Plan Feature
 
 Captures customer intent-to-order data when the customer redirects to WhatsApp.
 Creates a shadow Order record for analytics and CRM purposes.
@@ -11,8 +11,8 @@ Design decisions:
   - payment_method = "pay_at_counter"  (restaurant handles payment manually)
   - status         = "confirmed"       (immediately visible in analytics dashboard)
   - payment_status = "pending"         (honest — we don't know if WA message was sent)
-  - order_type     = "dine_in"         (PRO is dine-in only)
-  - No loyalty, no coupons, no delivery — PRO feature boundary strictly enforced here.
+  - order_type     = "dine_in"         (GOLD is dine-in only)
+  - No loyalty, no coupons, no delivery — GOLD feature boundary strictly enforced here.
   - Fire-and-forget design: any failure is swallowed and logged so the WA redirect
     is NEVER blocked by a backend error.
 """
@@ -241,12 +241,12 @@ def log_whatsapp_order(
         restaurant = validate_restaurant_for_api(restaurant_id)
         plan_type = frappe.db.get_value("Restaurant", restaurant, "plan_type")
 
-        if plan_type not in ("PRO", "LUX"):
+        if plan_type not in ("GOLD", "DIAMOND"):
             return {
                 "success": False,
                 "error": {
                     "code": "PLAN_NOT_ELIGIBLE",
-                    "message": "WhatsApp ordering is available for PRO and LUX plans only.",
+                    "message": "WhatsApp ordering is available for GOLD and DIAMOND plans only.",
                 },
             }
 
@@ -377,7 +377,7 @@ def log_whatsapp_order(
             "customer_name":    customer_name,
             "customer_phone":   normalized_phone,
             "platform_customer": platform_customer,
-            # PRO is dine-in only — hardcoded here as a contract
+            # GOLD is dine-in only — hardcoded here as a contract
             "order_type":       "dine_in",
             "table_number":     parsed_table,
             # Shadow order semantics:

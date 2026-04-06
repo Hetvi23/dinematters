@@ -59,12 +59,12 @@ class Order(Document):
     def on_update(self):
         """
         Trigger commission deduction when order is confirmed/paid.
-        Only applicable for PRO restaurants.
+        Only applicable for DIAMOND restaurants.
         """
         if self.status in ["confirmed", "completed", "billed"] or self.payment_status == "completed":
-            # 1. Plan Awareness: Only PRO restaurants pay 1.5% commission
+            # 1. Plan Awareness: Only DIAMOND restaurants pay commission per transaction
             plan_type = frappe.db.get_value("Restaurant", self.restaurant, "plan_type")
-            if plan_type != "LUX":
+            if plan_type != "DIAMOND":
                 return
 
             # Avoid duplicate deductions

@@ -12,7 +12,7 @@ from dinematters.dinematters.utils.customer_helpers import normalize_phone
 from dinematters.dinematters.utils.feature_gate import require_plan
 
 @frappe.whitelist()
-@require_plan('LUX')
+@require_plan('DIAMOND')
 def get_customer_by_phone(phone, restaurant_id):
 	"""
 	Fetch customer details by phone and restaurant.
@@ -133,7 +133,7 @@ def normalize_order_phone_on_save(doc, event=None):
 
 
 @frappe.whitelist()
-@require_plan('LUX')
+@require_plan('DIAMOND')
 def get_customer_profile(customer_id):
 	"""
 	Admin: Get customer profile with all restaurants visited, orders, bookings.
@@ -221,7 +221,7 @@ def get_customer_profile(customer_id):
 
 
 @frappe.whitelist()
-@require_plan('LUX')
+@require_plan('DIAMOND')
 def get_restaurant_customers(restaurant_id, search=None, page=1, page_size=20):
 	"""
 	Restaurant: Get customers who have orders/bookings at this restaurant only. Supports search (name, phone), pagination.

@@ -136,7 +136,7 @@ def apply_deferred_plan_changes():
 
     frappe.db.commit()
 
-def process_lite_feature_renewals():
+def process_silver_feature_renewals():
     """
     Daily task to renew premium features for SILVER restaurants (e.g., Menu Theme Background).
     Deducts 100 coins every 30 days if feature is enabled.
@@ -144,7 +144,7 @@ def process_lite_feature_renewals():
     from frappe.utils import today, add_days, getdate
     
     # 1. Find all SILVER restaurants with Menu Theme Background enabled
-    gold_configs = frappe.db.sql("""
+    silver_configs = frappe.db.sql("""
         SELECT 
             rc.name, rc.restaurant, rc.menu_theme_paid_until 
         FROM 
@@ -157,7 +157,7 @@ def process_lite_feature_renewals():
             AND (rc.menu_theme_paid_until IS NULL OR rc.menu_theme_paid_until <= %s)
     """, (today(),), as_dict=1)
 
-    for config in gold_configs:
+    for config in silver_configs:
         try:
             # Double-check plan type just in case of a race condition or stale cache
             actual_plan = frappe.db.get_value("Restaurant", config.restaurant, "plan_type")

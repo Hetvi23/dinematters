@@ -113,7 +113,7 @@ def get_restaurant_context(restaurant_id):
 		"currencySymbolOnRight": currency_info.get("symbolOnRight", False),
 		"timezone": restaurant_doc.timezone,
 		"google_map_url": restaurant_doc.google_map_url,
-		"plan_type": restaurant_doc.plan_type or "LITE"
+		"plan_type": restaurant_doc.plan_type or "SILVER"
 	}
 
 

@@ -15,7 +15,7 @@ def test_it():
             "doctype": "Restaurant",
             "restaurant_id": temp_res_name,
             "restaurant_name": "Temp Restaurant",
-            "plan_type": "LITE",
+            "plan_type": "SILVER",
             "is_active": 1
         }).insert(ignore_permissions=True)
 
@@ -35,13 +35,13 @@ def test_it():
     else:
         product_link = existing_product
 
-    pro_name = "test-pro-res-e2e"
-    if not frappe.db.exists("Restaurant", pro_name):
-        pro_res = frappe.get_doc({
+    gold_name = "test-gold-res-e2e"
+    if not frappe.db.exists("Restaurant", gold_name):
+        gold_res = frappe.get_doc({
             "doctype": "Restaurant",
-            "restaurant_id": pro_name,
-            "restaurant_name": "Test Pro Restaurant E2E",
-            "plan_type": "PRO",
+            "restaurant_id": gold_name,
+            "restaurant_name": "Test Gold Restaurant E2E",
+            "plan_type": "GOLD",
             "is_active": 1,
             "coins_balance": 5000,
             "timezone": "UTC",
@@ -49,15 +49,15 @@ def test_it():
             "tax_rate": 0.0
         }).insert(ignore_permissions=True)
     else:
-        frappe.db.set_value("Restaurant", pro_name, {"plan_type": "PRO", "coins_balance": 5000, "monthly_minimum": 999, "tax_rate": 0.0})
+        frappe.db.set_value("Restaurant", gold_name, {"plan_type": "GOLD", "coins_balance": 5000, "monthly_minimum": 999, "tax_rate": 0.0})
     
-    lux_name = "test-lux-res-e2e"
-    if not frappe.db.exists("Restaurant", lux_name):
-        lux_res = frappe.get_doc({
+    diamond_name = "test-diamond-res-e2e"
+    if not frappe.db.exists("Restaurant", diamond_name):
+        diamond_res = frappe.get_doc({
             "doctype": "Restaurant",
-            "restaurant_id": lux_name,
-            "restaurant_name": "Test Lux Restaurant E2E",
-            "plan_type": "LUX",
+            "restaurant_id": diamond_name,
+            "restaurant_name": "Test Diamond Restaurant E2E",
+            "plan_type": "DIAMOND",
             "is_active": 1,
             "coins_balance": 5000,
             "timezone": "UTC",
@@ -65,20 +65,20 @@ def test_it():
             "tax_rate": 0.0
         }).insert(ignore_permissions=True)
     else:
-        frappe.db.set_value("Restaurant", lux_name, {"plan_type": "LUX", "coins_balance": 5000, "monthly_minimum": 1299, "tax_rate": 0.0})
+        frappe.db.set_value("Restaurant", diamond_name, {"plan_type": "DIAMOND", "coins_balance": 5000, "monthly_minimum": 1299, "tax_rate": 0.0})
 
     # Clear today's data to start fresh
     today_start = getdate().strftime("%Y-%m-%d 00:00:00")
-    frappe.db.delete("Coin Transaction", {"restaurant": ["in", [pro_name, lux_name]], "creation": [">=", today_start]})
-    frappe.db.delete("Order", {"restaurant": ["in", [pro_name, lux_name]], "creation": [">=", today_start]})
+    frappe.db.delete("Coin Transaction", {"restaurant": ["in", [gold_name, diamond_name]], "creation": [">=", today_start]})
+    frappe.db.delete("Order", {"restaurant": ["in", [gold_name, diamond_name]], "creation": [">=", today_start]})
 
-    print("\n[SCENARIO 1: LUX ORDER COMMISSION]")
-    # Create LUX order for ₹1000. Commission should be ₹15 (1.5%)
-    lux_order = frappe.get_doc({
+    print("\n[SCENARIO 1: DIAMOND ORDER COMMISSION]")
+    # Create DIAMOND order for ₹3000. Commission should be ₹45 (1.5%)
+    diamond_order = frappe.get_doc({
         "doctype": "Order",
-        "restaurant": lux_name,
-        "order_id": f"TEST-LUX-{frappe.generate_hash(length=8)}",
-        "order_number": f"LUX-{frappe.generate_hash(length=4)}",
+        "restaurant": diamond_name,
+        "order_id": f"TEST-DIAMOND-{frappe.generate_hash(length=8)}",
+        "order_number": f"DIAMOND-{frappe.generate_hash(length=4)}",
         "total": 3000.0,
         "subtotal": 3000.0,
         "status": "Accepted",
@@ -93,25 +93,25 @@ def test_it():
     }).insert(ignore_permissions=True)
     
     # Complete/Bill it to trigger commission
-    lux_order.status = "billed"
-    lux_order.save() # Triggers on_update -> commission deduction
+    diamond_order.status = "billed"
+    diamond_order.save() # Triggers on_update -> commission deduction
     
     commission = frappe.db.get_value("Coin Transaction", {
-        "restaurant": lux_name,
+        "restaurant": diamond_name,
         "transaction_type": "Commission Deduction",
-        "reference_name": lux_order.name
+        "reference_name": diamond_order.name
     }, "amount") or 0.0
     
-    print(f"LUX Order (₹3000) Commission: ₹{abs(commission)} (Expected: 45.0)")
-    assert abs(abs(commission) - 45.0) < 0.01, f"LUX Commission mismatch! Got {abs(commission)}"
+    print(f"DIAMOND Order (₹3000) Commission: ₹{abs(commission)} (Expected: 45.0)")
+    assert abs(abs(commission) - 45.0) < 0.01, f"DIAMOND Commission mismatch! Got {abs(commission)}"
 
-    print("\n[SCENARIO 2: PRO ORDER COMMISSION]")
-    # Create PRO order for ₹1000. Commission should be ₹0 (Fixed Tier)
-    pro_order = frappe.get_doc({
+    print("\n[SCENARIO 2: GOLD ORDER COMMISSION]")
+    # Create GOLD order for ₹1000. Commission should be ₹0 (Fixed Tier)
+    gold_order = frappe.get_doc({
         "doctype": "Order",
-        "restaurant": pro_name,
-        "order_id": f"TEST-PRO-{frappe.generate_hash(length=8)}",
-        "order_number": f"PRO-{frappe.generate_hash(length=4)}",
+        "restaurant": gold_name,
+        "order_id": f"TEST-GOLD-{frappe.generate_hash(length=8)}",
+        "order_number": f"GOLD-{frappe.generate_hash(length=4)}",
         "total": 1000.0,
         "subtotal": 1000.0,
         "status": "Accepted",
@@ -125,127 +125,127 @@ def test_it():
         }]
     }).insert(ignore_permissions=True)
     
-    pro_order.status = "billed"
-    pro_order.save()
+    gold_order.status = "billed"
+    gold_order.save()
     
-    pro_comm = frappe.db.get_value("Coin Transaction", {
-        "restaurant": pro_name,
+    gold_comm = frappe.db.get_value("Coin Transaction", {
+        "restaurant": gold_name,
         "transaction_type": "Commission Deduction",
-        "reference_name": pro_order.name
+        "reference_name": gold_order.name
     }, "amount") or 0.0
     
-    print(f"PRO Order (₹1000) Commission: ₹{abs(pro_comm)} (Expected: 0.0)")
-    assert abs(pro_comm) < 0.01, f"PRO should not pay order commission! Got {abs(pro_comm)}"
+    print(f"GOLD Order (₹1000) Commission: ₹{abs(gold_comm)} (Expected: 0.0)")
+    assert abs(gold_comm) < 0.01, f"GOLD should not pay order commission! Got {abs(gold_comm)}"
 
     print("\n[SCENARIO 3: DAILY FLOOR RECOVERY]")
-    # LUX has paid ₹15 commission. Daily target is ₹43.30 (1299/30). 
-    # Floor Recovery should be 43.30 - 15.00 = 28.30
-    # PRO daily target is flat ₹33.30 (999/30). 
+    # DIAMOND has paid ₹45 commission. Daily target is ₹43.30 (1299/30). 
+    # Floor Recovery should be 43.30 - 45.00 = 0 (No negative recovery)
+    # GOLD daily target is flat ₹33.30 (999/30). 
     
     process_daily_subscription_floors()
     
-    lux_floor = frappe.db.get_value("Coin Transaction", {
-        "restaurant": lux_name,
-        "transaction_type": "Daily LUX Floor"
+    diamond_floor = frappe.db.get_value("Coin Transaction", {
+        "restaurant": diamond_name,
+        "transaction_type": "Daily DIAMOND Floor"
     }, "amount") or 0.0
     
-    pro_floor = frappe.db.get_value("Coin Transaction", {
-        "restaurant": pro_name,
-        "transaction_type": "Daily PRO Subscription"
+    gold_floor = frappe.db.get_value("Coin Transaction", {
+        "restaurant": gold_name,
+        "transaction_type": "Daily GOLD Floor"
     }, "amount") or 0.0
     
-    print(f"LUX Floor Recovery: ₹{abs(lux_floor)} (Expected: 0.0)")
-    print(f"PRO Fixed Fee: ₹{abs(pro_floor)} (Expected: 33.30)")
+    print(f"DIAMOND Floor Recovery: ₹{abs(diamond_floor)} (Expected: 0.0)")
+    print(f"GOLD Fixed Fee: ₹{abs(gold_floor)} (Expected: 33.30)")
     
-    assert abs(lux_floor) < 0.01, f"LUX Floor calculation wrong! Got {lux_floor}"
-    assert abs(abs(pro_floor) - 33.30) < 0.01, f"PRO Flat fee calculation wrong! Got {pro_floor}"
+    assert abs(diamond_floor) < 0.01, f"DIAMOND Floor calculation wrong! Got {diamond_floor}"
+    assert abs(abs(gold_floor) - 33.30) < 0.01, f"GOLD Flat fee calculation wrong! Got {gold_floor}"
 
     print("\n[SCENARIO 4: DYNAMIC SETTINGS TEST]")
-    # Change global PRO fee to ₹450 (Daily: ₹15)
+    # Change global GOLD fee to ₹450 (Daily: ₹15)
     settings = frappe.get_single("Dinematters Settings")
-    original_pro_fee = settings.pro_monthly_fee
-    settings.pro_monthly_fee = 450.0
+    original_gold_fee = settings.gold_monthly_fee
+    settings.gold_monthly_fee = 450.0
     settings.save()
     
     # Also update the restaurant record as if an admin just saved it (triggering the new controller logic)
-    res_pro = frappe.get_doc("Restaurant", pro_name)
-    res_pro.plan_type = "LITE" # Change and then change back to trigger validate_plan_change
-    res_pro.save()
-    res_pro.plan_type = "PRO"
-    res_pro.save()
+    res_gold = frappe.get_doc("Restaurant", gold_name)
+    res_gold.plan_type = "SILVER" # Change and then change back to trigger validate_plan_change
+    res_gold.save()
+    res_gold.plan_type = "GOLD"
+    res_gold.save()
     
-    # Clear previous PRO floor for today
-    frappe.db.delete("Coin Transaction", {"restaurant": pro_name, "transaction_type": "Daily PRO Subscription", "creation": [">=", today_start]})
+    # Clear previous GOLD floor for today
+    frappe.db.delete("Coin Transaction", {"restaurant": gold_name, "transaction_type": "Daily GOLD Floor", "creation": [">=", today_start]})
     
     # Process again
     process_daily_subscription_floors()
     
-    new_pro_floor = frappe.db.get_value("Coin Transaction", {
-        "restaurant": pro_name,
-        "transaction_type": "Daily PRO Subscription",
+    new_gold_floor = frappe.db.get_value("Coin Transaction", {
+        "restaurant": gold_name,
+        "transaction_type": "Daily GOLD Floor",
         "creation": [">=", today_start]
     }, "amount") or 0.0
     
-    print(f"New PRO Fixed Fee (after settings change to ₹450): ₹{abs(new_pro_floor)} (Expected: 15.0)")
-    assert abs(abs(new_pro_floor) - 15.0) < 0.01, f"Dynamic PRO fee failed! Got {abs(new_pro_floor)}"
+    print(f"New GOLD Fixed Fee (after settings change to ₹450): ₹{abs(new_gold_floor)} (Expected: 15.0)")
+    assert abs(abs(new_gold_floor) - 15.0) < 0.01, f"Dynamic GOLD fee failed! Got {abs(new_gold_floor)}"
 
     # RESTORE ORIGINAL SETTINGS (though we rollback eventually, it's good practice)
-    settings.pro_monthly_fee = original_pro_fee
+    settings.gold_monthly_fee = original_gold_fee
     settings.save()
 
     print("\n[SCENARIO 5: FEATURE FEE TIER GATING TEST]")
-    # 1. Setup LITE restaurant with menu theme enabled
-    res_lite_name = "test-fee-lite"
-    if not frappe.db.exists("Restaurant", res_lite_name):
-        frappe.get_doc({"doctype": "Restaurant", "restaurant_id": res_lite_name, "restaurant_name": "LITE Fee Test", "plan_type": "LITE", "coins_balance": 500, "is_active": 1}).insert(ignore_permissions=True)
+    # 1. Setup SILVER restaurant with menu theme enabled
+    res_silver_name = "test-fee-silver"
+    if not frappe.db.exists("Restaurant", res_silver_name):
+        frappe.get_doc({"doctype": "Restaurant", "restaurant_id": res_silver_name, "restaurant_name": "SILVER Fee Test", "plan_type": "SILVER", "coins_balance": 500, "is_active": 1}).insert(ignore_permissions=True)
     
     # Reset balance and clear transactions for isolation
-    frappe.db.set_value("Restaurant", res_lite_name, "coins_balance", 500.0)
-    frappe.db.delete("Coin Transaction", {"restaurant": res_lite_name})
+    frappe.db.set_value("Restaurant", res_silver_name, "coins_balance", 500.0)
+    frappe.db.delete("Coin Transaction", {"restaurant": res_silver_name})
     
-    config_lite = frappe.get_doc("Restaurant Config", {"restaurant": res_lite_name})
-    config_lite.menu_theme_background_enabled = 1
-    config_lite.menu_theme_paid_until = None
-    config_lite.save()
+    config_silver = frappe.get_doc("Restaurant Config", {"restaurant": res_silver_name})
+    config_silver.menu_theme_background_enabled = 1
+    config_silver.menu_theme_paid_until = None
+    config_silver.save()
 
-    # 2. Setup PRO restaurant test (transition from LITE to PRO)
-    res_pro_name = "test-fee-pro"
-    if not frappe.db.exists("Restaurant", res_pro_name):
-        frappe.get_doc({"doctype": "Restaurant", "restaurant_id": res_pro_name, "restaurant_name": "PRO Fee Test", "plan_type": "LITE", "coins_balance": 500, "is_active": 1}).insert(ignore_permissions=True)
+    # 2. Setup GOLD restaurant test (transition from SILVER to GOLD)
+    res_gold_name = "test-fee-gold"
+    if not frappe.db.exists("Restaurant", res_gold_name):
+        frappe.get_doc({"doctype": "Restaurant", "restaurant_id": res_gold_name, "restaurant_name": "GOLD Fee Test", "plan_type": "SILVER", "coins_balance": 500, "is_active": 1}).insert(ignore_permissions=True)
     
-    # Reset to LITE first
-    res_pro = frappe.get_doc("Restaurant", res_pro_name)
-    res_pro.plan_type = "LITE"
-    res_pro.coins_balance = 500.0
-    res_pro.save()
-    frappe.db.delete("Coin Transaction", {"restaurant": res_pro_name})
+    # Reset to SILVER first
+    res_gold = frappe.get_doc("Restaurant", res_gold_name)
+    res_gold.plan_type = "SILVER"
+    res_gold.coins_balance = 500.0
+    res_gold.save()
+    frappe.db.delete("Coin Transaction", {"restaurant": res_gold_name})
     
-    config_pro = frappe.get_doc("Restaurant Config", {"restaurant": res_pro_name})
-    config_pro.menu_theme_background_enabled = 1
-    config_pro.menu_theme_paid_until = add_days(today(), -5) # Expired 5 days ago
-    config_pro.save()
+    config_gold = frappe.get_doc("Restaurant Config", {"restaurant": res_gold_name})
+    config_gold.menu_theme_background_enabled = 1
+    config_gold.menu_theme_paid_until = add_days(today(), -5) # Expired 5 days ago
+    config_gold.save()
 
-    # Now upgrade to PRO - this should trigger the cleanup in restaurant.py
-    res_pro.plan_type = "PRO"
-    res_pro.save()
+    # Now upgrade to GOLD - this should trigger the cleanup in restaurant.py
+    res_gold.plan_type = "GOLD"
+    res_gold.save()
 
     # 3. Run renewal task
     process_lite_feature_renewals()
 
     # 4. Verify results
-    lite_bal = frappe.db.get_value("Restaurant", res_lite_name, "coins_balance")
-    pro_bal = frappe.db.get_value("Restaurant", res_pro_name, "coins_balance")
+    silver_bal = frappe.db.get_value("Restaurant", res_silver_name, "coins_balance")
+    gold_bal = frappe.db.get_value("Restaurant", res_gold_name, "coins_balance")
     
-    print(f"LITE Balance after renewal task: {lite_bal} (Expected: 400)")
-    print(f"PRO Balance after renewal task: {pro_bal} (Expected: 500)")
+    print(f"SILVER Balance after renewal task: {silver_bal} (Expected: 400)")
+    print(f"GOLD Balance after renewal task: {gold_bal} (Expected: 500)")
     
-    assert abs(lite_bal - 400.0) < 0.01, f"LITE was not charged or charged wrong! Bal: {lite_bal}"
-    assert abs(pro_bal - 500.0) < 0.01, f"PRO was incorrectly charged! Bal: {pro_bal}"
+    assert abs(silver_bal - 400.0) < 0.01, f"SILVER was not charged or charged wrong! Bal: {silver_bal}"
+    assert abs(gold_bal - 500.0) < 0.01, f"GOLD was incorrectly charged! Bal: {gold_bal}"
     
-    # Also verify PRO's paid_until is cleared (due to our fix)
-    new_pro_paid_until = frappe.db.get_value("Restaurant Config", {"restaurant": res_pro_name}, "menu_theme_paid_until")
-    print(f"PRO Paid Until after task: {new_pro_paid_until} (Expected: None)")
-    assert new_pro_paid_until is None, "PRO paid_until was not cleared!"
+    # Also verify GOLD's paid_until is cleared (due to our fix)
+    new_gold_paid_until = frappe.db.get_value("Restaurant Config", {"restaurant": res_gold_name}, "menu_theme_paid_until")
+    print(f"GOLD Paid Until after task: {new_gold_paid_until} (Expected: None)")
+    assert new_gold_paid_until is None, "GOLD paid_until was not cleared!"
 
     print("\n✅ ALL DYNAMIC SUBSCRIPTION & FEATURE GATING E2E TESTS PASSED!")
-    frappe.db.rollback() 
+    frappe.db.rollback()

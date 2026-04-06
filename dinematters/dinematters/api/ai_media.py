@@ -721,8 +721,8 @@ def get_menu_theme_background_status(restaurant):
 def set_menu_theme_background_enabled(restaurant, enabled):
     """
     Toggles the Menu Theme Background feature.
-    - PRO: Free.
-    - LITE: 100 coins / 30 days.
+    - GOLD: Free.
+    - SILVER: 100 coins / 30 days.
     """
     config_name = _get_restaurant_config_name(restaurant)
     config_doc = frappe.get_doc("Restaurant Config", config_name)
@@ -730,11 +730,11 @@ def set_menu_theme_background_enabled(restaurant, enabled):
 
     # Monetization Logic: Only when enabling
     if enabled_value:
-        plan_type = frappe.db.get_value("Restaurant", restaurant, "plan_type") or "LITE"
+        plan_type = frappe.db.get_value("Restaurant", restaurant, "plan_type") or "SILVER"
         
-        # PRO and LUX have this feature included for free.
-        # Only LITE restaurants pay the activation/renewal fee.
-        if plan_type == "LITE":
+        # GOLD and DIAMOND have this feature included for free.
+        # Only SILVER restaurants pay the activation/renewal fee.
+        if plan_type == "SILVER":
             from dinematters.dinematters.api.coin_billing import deduct_coins
             from frappe.utils import getdate, add_days, today
             
@@ -746,7 +746,7 @@ def set_menu_theme_background_enabled(restaurant, enabled):
                 config_doc.menu_theme_paid_until = add_days(today(), 30)
                 config_doc.save(ignore_permissions=True)
         else:
-            # For PRO/LUX, ensure paid_until is cleared to avoid unnecessary renewal checks
+            # For GOLD/DIAMOND, ensure paid_until is cleared to avoid unnecessary renewal checks
             if config_doc.menu_theme_paid_until:
                 config_doc.menu_theme_paid_until = None
                 config_doc.save(ignore_permissions=True)

@@ -11,9 +11,9 @@ def sync_menu(restaurant_id):
     """
     restaurant = frappe.get_doc("Restaurant", restaurant_id)
     
-    # 10/10 Tier Check: POS is a LUX feature
-    if restaurant.plan_type != "LUX":
-        frappe.throw(_("POS Integration is a premium feature available only on the LUX plan."), frappe.PermissionError)
+    # 10/10 Tier Check: POS is a DIAMOND feature
+    if restaurant.plan_type != "DIAMOND":
+        frappe.throw(_("POS Integration is a premium feature available only on the DIAMOND plan."), frappe.PermissionError)
         
     provider = get_pos_provider(restaurant)
     

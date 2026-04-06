@@ -22,27 +22,27 @@ class MonthlyBillingLedger(Document):
             # Fetch commission settings and plan type from Restaurant
             platform_fee_percent = 1.5
             monthly_min = 999
-            plan_type = "PRO"
+            plan_type = "GOLD"
             if self.restaurant:
                 res_info = frappe.db.get_value("Restaurant", self.restaurant, 
                     ["platform_fee_percent", "monthly_minimum", "plan_type"], as_dict=True)
                 if res_info:
                     platform_fee_percent = float(res_info.platform_fee_percent if res_info.platform_fee_percent is not None else 1.5)
                     monthly_min = float(res_info.monthly_minimum if res_info.monthly_minimum is not None else 999)
-                    plan_type = res_info.plan_type or "PRO"
+                    plan_type = res_info.plan_type or "GOLD"
 
             # 1. Calculate Base Commission based on Plan Type
             min_amt_paise = int(monthly_min * 100)
             
-            if plan_type == "PRO":
-                # PRO is fixed SaaS fee (Floor only)
+            if plan_type == "GOLD":
+                # GOLD is fixed SaaS fee (Floor only)
                 base_commission = min_amt_paise
-                self.notes = f"PRO Plan Fixed SaaS Fee: ₹{monthly_min:.2f}"
+                self.notes = f"GOLD Plan Fixed SaaS Fee: ₹{monthly_min:.2f}"
             else:
-                # LUX (or others) is transactional (max of floor vs commission)
+                # DIAMOND (or others) is transactional (max of floor vs commission)
                 calculated_fee = int(math.floor(total_gmv * (platform_fee_percent / 100.0)))
                 base_commission = max(min_amt_paise, calculated_fee)
-                self.notes = f"LUX Plan Commission: ₹{calculated_fee/100:.2f} (Floor: ₹{monthly_min:.2f})"
+                self.notes = f"DIAMOND Plan Commission: ₹{calculated_fee/100:.2f} (Floor: ₹{monthly_min:.2f})"
             
             # 2. GST Compliance (18% SaaS tax)
             tax_rate = float(self.tax_percent or 18.0)

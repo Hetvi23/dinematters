@@ -36,7 +36,7 @@ def record_transaction(restaurant, txn_type, amount, description="", payment_id=
     )
     current_balance = (balance_info[0][0] if balance_info and balance_info[0][0] is not None else 0.0)
 
-    is_deduction = txn_type in ["AI Deduction", "Commission Deduction", "Daily SILVER Floor", "Daily GOLD Floor", "Daily DIAMOND Floor", "Daily GOLD Subscription", "Daily DIAMOND Subscription", "Daily PRO Floor", "Daily LUX Floor", "Daily PRO Subscription", "Lead Unlock"]
+    is_deduction = txn_type in ["AI Deduction", "Commission Deduction", "Daily SILVER Floor", "Daily GOLD Floor", "Daily DIAMOND Floor", "Daily GOLD Subscription", "Daily DIAMOND Subscription", "Lead Unlock"]
     
     if is_deduction:
         new_balance = current_balance - abs(amount)
@@ -74,7 +74,7 @@ def record_transaction(restaurant, txn_type, amount, description="", payment_id=
     txn.insert(ignore_permissions=True)
     
     # Trigger auto-recharge check if balance falls below threshold
-    if txn_type in ["AI Deduction", "Commission Deduction", "Daily SILVER Floor", "Daily GOLD Floor", "Daily DIAMOND Floor", "Daily GOLD Subscription", "Daily DIAMOND Subscription", "Daily PRO Floor", "Daily LUX Floor", "Daily PRO Subscription"]:
+    if txn_type in ["AI Deduction", "Commission Deduction", "Daily SILVER Floor", "Daily GOLD Floor", "Daily DIAMOND Floor", "Daily GOLD Subscription", "Daily DIAMOND Subscription"]:
         check_and_trigger_auto_recharge(restaurant, new_balance)
 
         # Check for system suspension (-300 grace limit)
@@ -155,6 +155,7 @@ def trigger_auto_recharge(restaurant):
                 "type": "auto_recharge",
                 "debt_cleared": debt_to_clear,
                 "topup_added": actual_top_up
+                # GOLD WhatsApp guest: filter by phone number captured at checkout
             }
         }
         
@@ -262,7 +263,7 @@ def get_coin_billing_info(restaurant):
 @frappe.whitelist(allow_guest=False)
 def update_subscription_plan(restaurant, plan_type):
     """
-    Schedule a restaurant subscription tier update (LITE/PRO).
+    Schedule a restaurant subscription tier update (SILVER/GOLD/DIAMOND).
     All plan changes follow the 'Tomorrow Rule' (effective at 00:00).
     """
     if plan_type not in ["SILVER", "GOLD", "DIAMOND"]:
@@ -272,7 +273,7 @@ def update_subscription_plan(restaurant, plan_type):
     if current_plan == plan_type:
         return {"success": True, "message": f"Already on {plan_type} plan."}
 
-    # 1. Entrance Barrier Check (Monthly Minimum Coins for PRO/LUX)
+    # 1. Entrance Barrier Check (Monthly Minimum Coins for GOLD/DIAMOND)
     res_info = frappe.db.get_value("Restaurant", restaurant, ["coins_balance", "monthly_minimum"], as_dict=True)
     balance = float(res_info.coins_balance or 0.0)
 
@@ -448,7 +449,7 @@ def initialize_free_coins(restaurant):
     return False
 
 @frappe.whitelist(allow_guest=False)
-def process_monthly_pro_coin_refill():
+def process_monthly_subscription_coin_refill():
     """
     Cron job: Grant 60 free coins to all active GOLD/DIAMOND restaurants monthly.
     """

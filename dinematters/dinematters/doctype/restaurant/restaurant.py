@@ -739,7 +739,7 @@ def create_default_home_features(self):
 		for idx, feat in enumerate(default_features, 1):
 			# Features enabled logic:
 			# - Mandatory features (menu, legacy) are always enabled.
-			# - Transactional features (book-table, offers, lounge) are LUX only.
+			# - Transactional features (book-table, offers, lounge) are DIAMOND only.
 			if feat["is_mandatory"] == 1:
 				is_enabled = True
 			else:

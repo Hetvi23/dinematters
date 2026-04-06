@@ -346,7 +346,7 @@
    "label": "Is WhatsApp Order",
    "default": 0,
    "in_list_view": 1,
-   "description": "Flag indicating this order was created via WhatsApp redirect (PRO plan)"
+   "description": "Flag indicating this order was created via WhatsApp redirect (GOLD plan)"
   },
   {
    "fieldname": "platform_fee_amount",

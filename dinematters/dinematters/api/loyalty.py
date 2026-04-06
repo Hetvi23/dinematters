@@ -12,7 +12,7 @@ import random
 import string
 
 @frappe.whitelist(allow_guest=True)
-@require_plan('LUX')
+@require_plan('DIAMOND')
 def get_loyalty_summary(restaurant_id, phone):
 	"""
 	GET /api/method/dinematters.dinematters.api.loyalty.get_loyalty_summary
@@ -49,7 +49,7 @@ def get_loyalty_summary(restaurant_id, phone):
 		return {"success": False, "error": {"code": "LOYALTY_FETCH_ERROR", "message": str(e)}}
 
 @frappe.whitelist(allow_guest=True)
-@require_plan('LUX')
+@require_plan('DIAMOND')
 def generate_referral_link(restaurant_id, phone, platform="WhatsApp"):
 	"""
 	POST /api/method/dinematters.dinematters.api.loyalty.generate_referral_link
@@ -312,7 +312,7 @@ def get_loyalty_config(restaurant_id):
 		return {"success": False, "error": str(e)}
 
 @frappe.whitelist()
-@require_plan('LUX')
+@require_plan('DIAMOND')
 def update_loyalty_config(restaurant_id, config, enable_loyalty=None):
 	"""Update loyalty configurations for admin"""
 	try:
@@ -348,7 +348,7 @@ def update_loyalty_config(restaurant_id, config, enable_loyalty=None):
 		frappe.log_error("Loyalty Save Error", frappe.get_traceback())
 		return {"success": False, "error": str(e)}
 @frappe.whitelist()
-@require_plan('LUX')
+@require_plan('DIAMOND')
 def get_customer_insights(restaurant_id, search_query=None):
 	"""
 	Get list of customers with their points for a restaurant.
@@ -435,7 +435,7 @@ def get_customer_insights(restaurant_id, search_query=None):
 		return {"success": False, "error": str(e)}
 
 @frappe.whitelist()
-@require_plan('LUX')
+@require_plan('DIAMOND')
 def get_customer_transactions(restaurant_id, customer_id):
 	"""
 	Get all loyalty transactions for a specific customer and restaurant
@@ -457,7 +457,7 @@ def get_customer_transactions(restaurant_id, customer_id):
 		return {"success": False, "error": str(e)}
 
 @frappe.whitelist()
-@require_plan('LUX')
+@require_plan('DIAMOND')
 def adjust_customer_points(restaurant_id, customer_id, coins, reason, transaction_type="Earn"):
 	"""
 	Manually adjust customer points (for admin use).
