@@ -69,7 +69,7 @@ interface CustomerProfileData {
 }
 
 export default function Customers() {
-  const { selectedRestaurant, isLux } = useRestaurant()
+  const { selectedRestaurant, isDiamond } = useRestaurant()
   const { formatAmountNoDecimals } = useCurrency()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [profileCustomerId, setProfileCustomerId] = useState<string | null>(null)
@@ -80,7 +80,7 @@ export default function Customers() {
   const [page, setPage] = useState(1)
   const pageSize = 20
 
-  if (!isLux) {
+  if (!isDiamond) {
     return <LockedFeature feature="customer" />
   }
 

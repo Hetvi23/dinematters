@@ -38,7 +38,7 @@ interface BillingInfo {
   mandate_active: boolean
   daily_limit: number
   current_daily_vol: number
-  deferred_plan_type?: 'LITE' | 'PRO' | 'LUX' | null
+  deferred_plan_type?: 'SILVER' | 'GOLD' | 'DIAMOND' | null
   plan_change_date?: string | null
   monthly_minimum: number
   platform_fee_percent: number
@@ -68,7 +68,7 @@ export default function AutopaySetupPage() {
 
   // Plan change confirmation state
   const [showConfirm, setShowConfirm] = useState(false)
-  const [newPlanSelection, setNewPlanSelection] = useState<'LITE' | 'PRO' | 'LUX' | null>(null)
+  const [newPlanSelection, setNewPlanSelection] = useState<'SILVER' | 'GOLD' | 'DIAMOND' | null>(null)
 
   const { call: getInfo } = useFrappePostCall<any>(
     'dinematters.dinematters.api.coin_billing.get_coin_billing_info'
@@ -117,7 +117,7 @@ export default function AutopaySetupPage() {
     }
   }, [searchParams, setSearchParams])
 
-  const handlePlanToggle = async (newPlan: 'LITE' | 'PRO' | 'LUX') => {
+  const handlePlanToggle = async (newPlan: 'SILVER' | 'GOLD' | 'DIAMOND') => {
     if (!selectedRestaurant || newPlan === planType) return
     
     // 1. Check for pending changes
@@ -130,17 +130,17 @@ export default function AutopaySetupPage() {
     const proMin = billingInfo?.plan_defaults?.pro_monthly || 999;
     const luxBarrier = billingInfo?.plan_defaults?.lux_barrier || 2499;
 
-    if (newPlan === 'PRO' && (billingInfo?.coins_balance || 0) < proMin) {
+    if (newPlan === 'GOLD' && (billingInfo?.coins_balance || 0) < proMin) {
       toast.error('Insufficient Coins', {
-        description: `You need at least ${proMin} coins in your wallet to upgrade to PRO.`
+        description: `You need at least ${proMin} coins in your wallet to upgrade to GOLD.`
       })
       setShowRecharge(true)
       return
     }
     
-    if (newPlan === 'LUX' && (billingInfo?.coins_balance || 0) < luxBarrier) {
+    if (newPlan === 'DIAMOND' && (billingInfo?.coins_balance || 0) < luxBarrier) {
       toast.error('Insufficient Coins', {
-        description: `You need at least ${luxBarrier} coins in your wallet to upgrade to LUX.`
+        description: `You need at least ${luxBarrier} coins in your wallet to upgrade to DIAMOND.`
       })
       setShowRecharge(true)
       return
@@ -277,7 +277,7 @@ export default function AutopaySetupPage() {
                  <h4 className="text-sm font-black uppercase tracking-tight text-primary">Plan switch scheduled</h4>
                   <p className="text-xs text-muted-foreground">
                     Your {billingInfo.deferred_plan_type} plan will be effective from <b>{format(new Date(billingInfo.plan_change_date!), 'do MMMM')} at 12:00 AM</b>. 
-                    {(billingInfo.deferred_plan_type === 'PRO' || billingInfo.deferred_plan_type === 'LUX') && " Premium features will unlock then."}
+                    {(billingInfo.deferred_plan_type === 'GOLD' || billingInfo.deferred_plan_type === 'DIAMOND') && " Premium features will unlock then."}
                   </p>
               </div>
               <Badge variant="outline" className="border-primary/30 text-primary">
@@ -292,69 +292,69 @@ export default function AutopaySetupPage() {
         <CardContent className="p-1">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-1">
              <button
-              onClick={() => handlePlanToggle('LITE')}
+              onClick={() => handlePlanToggle('SILVER')}
               disabled={isChangingPlan}
               className={cn(
                 "flex items-center justify-center gap-3 py-4 px-6 rounded-xl transition-all",
-                planType === 'LITE' 
+                planType === 'SILVER' 
                   ? "bg-background shadow-sm border border-border/50" 
                   : "hover:bg-primary/5 text-muted-foreground opacity-60"
               )}
              >
-                <div className={cn("p-2 rounded-lg", planType === 'LITE' ? "bg-primary/10 text-primary" : "bg-muted")}>
+                <div className={cn("p-2 rounded-lg", planType === 'SILVER' ? "bg-primary/10 text-primary" : "bg-muted")}>
                    <Smartphone className="h-5 w-5" />
                 </div>
                 <div className="text-left">
-                   <p className="text-sm font-black uppercase tracking-tight">LITE PLAN</p>
+                   <p className="text-sm font-black uppercase tracking-tight">SILVER PLAN</p>
                    <p className="text-[10px] font-medium opacity-70">Free • Basic Features</p>
                 </div>
-                {planType === 'LITE' && <CheckCircle2 className="h-4 w-4 text-primary ml-auto" />}
+                {planType === 'SILVER' && <CheckCircle2 className="h-4 w-4 text-primary ml-auto" />}
              </button>
 
              <button
-              onClick={() => handlePlanToggle('PRO')}
+              onClick={() => handlePlanToggle('GOLD')}
               disabled={isChangingPlan}
               className={cn(
                 "flex items-center justify-center gap-3 py-4 px-6 rounded-xl transition-all",
-                planType === 'PRO' 
+                planType === 'GOLD' 
                   ? "bg-background shadow-sm border border-border/50" 
                   : "hover:bg-primary/5 text-muted-foreground opacity-60"
               )}
              >
-                <div className={cn("p-2 rounded-lg", planType === 'PRO' ? "bg-primary/10 text-primary" : "bg-muted")}>
+                <div className={cn("p-2 rounded-lg", planType === 'GOLD' ? "bg-primary/10 text-primary" : "bg-muted")}>
                    {isChangingPlan ? <Loader2 className="h-5 w-5 animate-spin" /> : <Crown className="h-5 w-5" />}
                 </div>
                 <div className="text-left">
                    <div className="flex items-center gap-2">
-                       <p className="text-sm font-black uppercase tracking-tight">PRO PLAN</p>
+                       <p className="text-sm font-black uppercase tracking-tight">GOLD PLAN</p>
                        <Badge className="bg-primary/20 text-primary text-[8px] h-4 hover:bg-primary/20">POPULAR</Badge>
                    </div>
-                   <p className="text-[10px] font-medium opacity-70">Min {billingInfo?.plan_defaults?.pro_monthly || 999} / month • Pro Features</p>
+                   <p className="text-[10px] font-medium opacity-70">Min {billingInfo?.plan_defaults?.pro_monthly || 999} / month • Gold Features</p>
                 </div>
-                {planType === 'PRO' && <CheckCircle2 className="h-4 w-4 text-primary ml-auto" />}
+                {planType === 'GOLD' && <CheckCircle2 className="h-4 w-4 text-primary ml-auto" />}
              </button>
 
              <button
-              onClick={() => handlePlanToggle('LUX')}
+              onClick={() => handlePlanToggle('DIAMOND')}
               disabled={isChangingPlan}
               className={cn(
                 "flex items-center justify-center gap-3 py-4 px-6 rounded-xl transition-all",
-                planType === 'LUX' 
+                planType === 'DIAMOND' 
                   ? "bg-background shadow-sm border border-border/50" 
                   : "hover:bg-indigo-500/5 text-muted-foreground opacity-60"
               )}
              >
-                <div className={cn("p-2 rounded-lg", planType === 'LUX' ? "bg-indigo-500/10 text-indigo-500" : "bg-muted")}>
+                <div className={cn("p-2 rounded-lg", planType === 'DIAMOND' ? "bg-indigo-500/10 text-indigo-500" : "bg-muted")}>
                    {isChangingPlan ? <Loader2 className="h-5 w-5 animate-spin" /> : <Crown className="h-5 w-5" />}
                 </div>
                 <div className="text-left">
                    <div className="flex items-center gap-2">
-                       <p className="text-sm font-black uppercase tracking-tight">LUX PLAN</p>
+                       <p className="text-sm font-black uppercase tracking-tight">DIAMOND PLAN</p>
                        <Badge className="bg-indigo-500 text-white text-[8px] h-4 hover:bg-indigo-600">ELITE</Badge>
                    </div>
                    <p className="text-[10px] font-medium opacity-70">Min {billingInfo?.plan_defaults?.lux_monthly || 1299} / month • Full Ordering</p>
                 </div>
-                {planType === 'LUX' && <CheckCircle2 className="h-4 w-4 text-indigo-500 ml-auto" />}
+                {planType === 'DIAMOND' && <CheckCircle2 className="h-4 w-4 text-indigo-500 ml-auto" />}
              </button>
           </div>
         </CardContent>

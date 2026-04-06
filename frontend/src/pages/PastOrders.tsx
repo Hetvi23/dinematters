@@ -36,12 +36,12 @@ export default function PastOrders() {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
 
-  const { selectedRestaurant, isLoading: contextLoading, isLux, restaurantConfig } = useRestaurant()
+  const { selectedRestaurant, isLoading: contextLoading, isDiamond, restaurantConfig } = useRestaurant()
   
   console.log('📊 PastOrders Initial State:', {
     selectedRestaurant,
     isLoading: contextLoading,
-    isLux,
+    isDiamond,
     planType: restaurantConfig?.subscription?.planType,
     searchQuery,
     statusFilter,
@@ -193,8 +193,8 @@ export default function PastOrders() {
     return filtered
   }, [orders, selectedRestaurant, tableFilter]) || []
 
-  if (!isLux) {
-    return <LockedFeature feature="ordering" requiredPlan={['LUX']} />
+  if (!isDiamond) {
+    return <LockedFeature feature="ordering" requiredPlan={['DIAMOND']} />
   }
 
   return (

@@ -5,7 +5,7 @@
 Migration Script: Add Subscription Fields to Restaurant
 
 This script migrates existing restaurants to the new subscription model:
-1. Sets all existing restaurants to PRO plan (to avoid disruption)
+1. Sets all existing restaurants to GOLD plan (to avoid disruption)
 2. Initializes subscription fields with default values
 3. Sets plan activation date to current date
 """
@@ -36,18 +36,18 @@ def execute():
 				plan_change_history = json.dumps([{
 					'date': now,
 					'from': None,
-					'to': 'PRO',
+					'to': 'GOLD',
 					'by': 'Administrator',
-					'reason': 'Initial migration - all existing restaurants set to PRO plan'
+					'reason': 'Initial migration - all existing restaurants set to GOLD plan'
 				}])
 				
 				frappe.db.sql("""
 					UPDATE `tabRestaurant`
 					SET 
-						plan_type = 'PRO',
+						plan_type = 'GOLD',
 						plan_activated_on = %s,
 						plan_changed_by = 'Administrator',
-						max_images_lite = 200,
+						max_images_silver = 200,
 						current_image_count = 0,
 						total_orders = 0,
 						total_revenue = 0,
@@ -66,10 +66,10 @@ def execute():
 						'doctype': 'Plan Change Log',
 						'restaurant': restaurant.name,
 						'previous_plan': '',
-						'new_plan': 'PRO',
+						'new_plan': 'GOLD',
 						'changed_by': 'Administrator',
 						'changed_on': now,
-						'change_reason': 'Initial migration - all existing restaurants set to PRO plan',
+						'change_reason': 'Initial migration - all existing restaurants set to GOLD plan',
 						'ip_address': 'Migration Script'
 					})
 					plan_log.flags.ignore_permissions = True
@@ -94,7 +94,7 @@ def execute():
 		print(f"✅ Subscription model migration completed successfully!")
 		print(f"   - Migrated: {migrated_count} restaurants")
 		print(f"   - Errors: {error_count}")
-		print(f"   - All existing restaurants set to PRO plan")
+		print(f"   - All existing restaurants set to GOLD plan")
 		
 	except Exception as e:
 		frappe.logger().error(f"Fatal error during migration: {str(e)}")

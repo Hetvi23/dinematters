@@ -108,7 +108,7 @@ function AppContent() {
 								<Route path="/recommendations-engine" element={<Layout><RecommendationsEngine /></Layout>} />
 							</Route>
 
-							<Route element={<FeatureProtectedRoute requirePro />}>
+							<Route element={<FeatureProtectedRoute requireGold />}>
 								<Route path="/whatsapp-orders" element={<Layout><WhatsAppOrders /></Layout>} />
 							</Route>
 

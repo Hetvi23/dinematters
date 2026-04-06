@@ -34,13 +34,13 @@ export function LockedFeature({ feature }: LockedFeatureProps) {
   const featureLabel = FEATURE_LABELS[feature] || feature;
   const description = FEATURE_DESCRIPTIONS[feature] || "Unlock this premium feature to automate your restaurant and grow your revenue.";
   
-  const isLuxOnly = ['ordering', 'loyalty', 'coupons', 'pos_integration', 'customer', 'order_settings', 'customer_pay_and_usage'].includes(feature);
-  const requiredTier = isLuxOnly ? 'LUX' : 'PRO';
+  const isDiamondOnly = ['ordering', 'loyalty', 'coupons', 'pos_integration', 'customer', 'order_settings', 'customer_pay_and_usage'].includes(feature);
+  const requiredTier = isDiamondOnly ? 'DIAMOND' : 'GOLD';
 
   return (
     <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-gray-200 shadow-sm max-w-2xl mx-auto my-8">
-      <div className={`flex items-center justify-center w-20 h-20 ${isLuxOnly ? 'bg-amber-50/50' : 'bg-gray-50'} rounded-full mb-6 relative`}>
-        {isLuxOnly ? (
+      <div className={`flex items-center justify-center w-20 h-20 ${isDiamondOnly ? 'bg-amber-50/50' : 'bg-gray-50'} rounded-full mb-6 relative`}>
+        {isDiamondOnly ? (
           <div className="relative">
             <Lock className="w-10 h-10 text-muted-foreground/40" />
             <Star className="w-6 h-6 text-amber-500 absolute -top-1 -right-1 fill-amber-500 stroke-white stroke-2" />
@@ -50,8 +50,8 @@ export function LockedFeature({ feature }: LockedFeatureProps) {
         )}
       </div>
       
-      <div className={`inline-flex items-center space-x-2 px-3 py-1 ${isLuxOnly ? 'bg-indigo-100/50 text-indigo-700' : 'bg-gray-100 text-gray-700'} rounded-full text-xs font-bold uppercase tracking-wider mb-4`}>
-        {isLuxOnly ? <Star className="w-3 h-3 text-amber-500" /> : <Lock className="w-3 h-3 text-gray-500" />}
+      <div className={`inline-flex items-center space-x-2 px-3 py-1 ${isDiamondOnly ? 'bg-indigo-100/50 text-indigo-700' : 'bg-gray-100 text-gray-700'} rounded-full text-xs font-bold uppercase tracking-wider mb-4`}>
+        {isDiamondOnly ? <Star className="w-3 h-3 text-amber-500" /> : <Lock className="w-3 h-3 text-gray-500" />}
         <span>{requiredTier} Feature</span>
       </div>
 
@@ -68,7 +68,7 @@ export function LockedFeature({ feature }: LockedFeatureProps) {
           onClick={() => {
             window.location.href = '/billing';
           }}
-          className={`w-full px-8 py-4 ${isLuxOnly ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-900 hover:bg-black'} text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center justify-center space-x-2`}
+          className={`w-full px-8 py-4 ${isDiamondOnly ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-900 hover:bg-black'} text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center justify-center space-x-2`}
         >
           <span>Upgrade to {requiredTier} Plan</span>
         </button>

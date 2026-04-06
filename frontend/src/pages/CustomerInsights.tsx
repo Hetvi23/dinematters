@@ -20,7 +20,7 @@ import {
 import { Label } from '@/components/ui/label'
 
 export default function CustomerInsights() {
-  const { selectedRestaurant, isLux } = useRestaurant()
+  const { selectedRestaurant, isDiamond } = useRestaurant()
   const [loading, setLoading] = useState(false)
   const [customers, setCustomers] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -110,8 +110,8 @@ export default function CustomerInsights() {
     }
   }
 
-  if (!isLux) {
-    return <LockedFeature feature="loyalty" requiredPlan={['LUX']} />
+  if (!isDiamond) {
+    return <LockedFeature feature="loyalty" requiredPlan={['DIAMOND']} />
   }
 
   return (

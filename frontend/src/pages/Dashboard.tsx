@@ -33,7 +33,7 @@ function StatCard({
   icon: Icon, 
   trend, 
   trendValue, 
-  isPro, 
+  isGold, 
   gradient 
 }: { 
   title: string, 
@@ -42,24 +42,24 @@ function StatCard({
   icon: any, 
   trend?: 'up' | 'down', 
   trendValue?: string,
-  isPro?: boolean,
+  isGold?: boolean,
   gradient?: string
 }) {
   return (
     <Card className={cn(
       "relative overflow-hidden transition-all duration-300 hover:shadow-lg border-none bg-card shadow-sm",
-      isPro && gradient && `bg-gradient-to-br ${gradient} text-white`
+      isGold && gradient && `bg-gradient-to-br ${gradient} text-white`
     )}>
-      {isPro && (
+      {isGold && (
         <div className="absolute top-0 right-0 p-3 opacity-10">
           <Icon className="h-16 w-16" />
         </div>
       )}
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-        <CardTitle className={cn("text-xs font-medium uppercase tracking-wider", isPro ? "text-white/80" : "text-muted-foreground")}>
+        <CardTitle className={cn("text-xs font-medium uppercase tracking-wider", isGold ? "text-white/80" : "text-muted-foreground")}>
           {title}
         </CardTitle>
-        {!isPro && <Icon className="h-4 w-4 text-primary" />}
+        {!isGold && <Icon className="h-4 w-4 text-primary" />}
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold tracking-tight">
@@ -70,14 +70,14 @@ function StatCard({
             <span className={cn(
               "flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-full",
               trend === 'up' 
-                ? (isPro ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400")
-                : (isPro ? "bg-white/10 text-white/80" : "bg-rose-100 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400")
+                ? (isGold ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400")
+                : (isGold ? "bg-white/10 text-white/80" : "bg-rose-100 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400")
             )}>
               {trend === 'up' ? <TrendingUp className="h-2.5 w-2.5 mr-1" /> : <TrendingUp className="h-2.5 w-2.5 mr-1 rotate-180" />}
               {trendValue}
             </span>
           )}
-          <p className={cn("text-[11px]", isPro ? "text-white/70" : "text-muted-foreground")}>
+          <p className={cn("text-[11px]", isGold ? "text-white/70" : "text-muted-foreground")}>
             {subtext}
           </p>
         </div>
@@ -174,7 +174,7 @@ function LockedInsight({ title, description, children, isUnlocked }: { title: st
         >
           <Link to="/billing">
             <Crown className="h-4 w-4 mr-2" />
-            Unlock Pro Insights
+            Unlock Gold Insights
           </Link>
         </Button>
       </div>
@@ -184,8 +184,8 @@ function LockedInsight({ title, description, children, isUnlocked }: { title: st
 
 // Main Dashboard Component
 export default function Dashboard() {
-  const { selectedRestaurant, isPro, isLux } = useRestaurant()
-  const isAtLeastPro = isPro || isLux
+  const { selectedRestaurant, isGold, isDiamond } = useRestaurant()
+  const isAtLeastGold = isGold || isDiamond
   const { formatAmountNoDecimals } = useCurrency()
   const navigate = useNavigate()
   
@@ -281,7 +281,7 @@ export default function Dashboard() {
         </div>
 
         {/* Dynamic Upgrade Banner */}
-        {!isAtLeastPro && (
+        {!isAtLeastGold && (
            <div 
              className="flex items-center gap-4 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 p-4 rounded-xl border border-orange-100 dark:border-orange-900/30 group cursor-pointer hover:shadow-md transition-all duration-300" 
              onClick={() => navigate('/billing')}
@@ -315,34 +315,34 @@ export default function Dashboard() {
               icon={QrCode}
               trend={analyticsData?.traffic?.growth >= 0 ? 'up' : 'down'}
               trendValue={`${Math.abs(analyticsData?.traffic?.growth || 0)}%`}
-              isPro={false}
+              isGold={false}
             />
             <StatCard 
               title="Unique Guests"
               value={analyticsData?.traffic?.uniqueVisitors || 0}
               subtext="Unique brand reach (7D)"
               icon={Users}
-              isPro={false}
+              isGold={false}
             />
             <StatCard 
               title="Peak Discovery"
               value={analyticsData?.traffic?.peakHour || "00:00"}
               subtext="Busiest time for menu scans"
               icon={Clock}
-              isPro={false}
+              isGold={false}
             />
             <StatCard 
               title="Menu Health"
               value={`${products?.length || 0} Items`}
               subtext={`${analyticsData?.traffic?.totalViews || 0} impressions served`}
               icon={Package}
-              isPro={false}
+              isGold={false}
             />
           </div>
         </div>
 
-        {/* Layer 2: Business Performance (Impact - For PRO/LUX) */}
-        {isAtLeastPro && (
+        {/* Layer 2: Business Performance (Impact - For GOLD/DIAMOND) */}
+        {isAtLeastGold && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className="flex items-center gap-2 mb-4">
                <div className="h-1 w-8 bg-indigo-500 rounded-full" />
@@ -356,7 +356,7 @@ export default function Dashboard() {
                 icon={TrendingUp}
                 trend="up"
                 trendValue="10%"
-                isPro={true}
+                isGold={true}
                 gradient="from-indigo-600 to-blue-500"
               />
               <StatCard 
@@ -364,7 +364,7 @@ export default function Dashboard() {
                 value={totalOrders}
                 subtext={`${Math.round(totalOrders / 7)} orders daily average`}
                 icon={ShoppingCart}
-                isPro={true}
+                isGold={true}
                 gradient="from-emerald-600 to-teal-500"
               />
               <StatCard 
@@ -372,7 +372,7 @@ export default function Dashboard() {
                 value={`${analyticsData?.enhanced?.conversionRate || 0}%`}
                 subtext="Scans to Order success"
                 icon={Zap}
-                isPro={true}
+                isGold={true}
                 gradient="from-amber-500 to-orange-500"
               />
               <StatCard 
@@ -380,7 +380,7 @@ export default function Dashboard() {
                 value={formatAmountNoDecimals(analyticsData?.enhanced?.avgOrderValue || 0)}
                 subtext="Spend per customer visit"
                 icon={Activity}
-                isPro={true}
+                isGold={true}
                 gradient="from-rose-500 to-pink-500"
               />
             </div>
@@ -396,14 +396,14 @@ export default function Dashboard() {
             <div className="space-y-1">
               <CardTitle className="text-lg font-bold flex items-center gap-2">
                  Growth Intelligence
-                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">PRO</span>
+                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">GOLD</span>
               </CardTitle>
               <CardDescription>Visualizing revenue vs guest discovery paths</CardDescription>
             </div>
           </CardHeader>
           <CardContent>
             <LockedInsight 
-              isUnlocked={isAtLeastPro} 
+              isUnlocked={isAtLeastGold} 
               title="Trend Analysis" 
               description="See how your scans drive orders across the week."
             >
@@ -445,7 +445,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <LockedInsight 
-              isUnlocked={isAtLeastPro} 
+              isUnlocked={isAtLeastGold} 
               title="Engagement Insights" 
               description="Learn which dishes attract eyes and which ones attract cash."
             >

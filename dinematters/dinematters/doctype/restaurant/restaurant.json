@@ -64,7 +64,7 @@
   "plan_changed_by",
   "plan_change_reason",
   "section_break_subscription_limits",
-  "max_images_lite",
+  "max_images_silver",
   "current_image_count",
   "column_break_subscription_metrics",
   "total_orders",
@@ -469,12 +469,12 @@
   {
    "fieldname": "plan_type",
    "fieldtype": "Select",
-   "label": "Plan Type",
-   "options": "\nLITE\nPRO\nLUX",
-   "default": "LITE",
+   "label": "Plan Tier",
+   "options": "\nSILVER\nGOLD\nDIAMOND",
+   "default": "SILVER",
    "in_list_view": 1,
    "reqd": 1,
-   "description": "Subscription plan tier (LITE: Free, PRO: Digital Menu \u20b9999/mo, LUX: Full Automation 1.5% Commission)"
+   "description": "Subscription plan tier (SILVER: Digital Menu, GOLD: Premium Digital + Tables \u20b9999/mo, DIAMOND: Full Automation 1.5% Commission)"
   },
   {
    "fieldname": "plan_activated_on",
@@ -507,11 +507,11 @@
    "label": "Subscription Limits & Metrics"
   },
   {
-   "fieldname": "max_images_lite",
+   "fieldname": "max_images_silver",
    "fieldtype": "Int",
-   "label": "Max Images (Lite)",
+   "label": "Max Images (Silver)",
    "default": "200",
-   "description": "Maximum number of images allowed for LITE plan"
+   "description": "Maximum number of images allowed for SILVER plan"
   },
   {
    "fieldname": "current_image_count",
@@ -531,7 +531,7 @@
    "label": "Total Orders",
    "default": "0",
    "read_only": 1,
-   "description": "Total number of orders processed (PRO tier)"
+   "description": "Total number of orders processed (DIAMOND tier)"
   },
   {
    "fieldname": "total_revenue",
@@ -539,7 +539,7 @@
    "label": "Total Revenue",
    "default": "0",
    "read_only": 1,
-   "description": "Total revenue from orders (PRO tier)"
+   "description": "Total revenue from orders (DIAMOND tier)"
   },
   {
    "fieldname": "commission_earned",
@@ -553,7 +553,7 @@
    "fieldname": "deferred_plan_type",
    "fieldtype": "Select",
    "label": "Deferred Plan Type",
-   "options": "\nLITE\nPRO\nLUX",
+   "options": "\nSILVER\nGOLD\nDIAMOND",
    "description": "The plan that will be activated at midnight"
   },
   {

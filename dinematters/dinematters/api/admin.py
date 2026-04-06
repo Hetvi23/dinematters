@@ -60,7 +60,7 @@ def get_all_restaurants():
                     COALESCE(r.coins_balance, 0) as coins_balance,
                     COALESCE(r.platform_fee_percent, 1.5) as platform_fee_percent,
                     COALESCE(r.monthly_minimum, 999) as monthly_minimum,
-                    COALESCE(rc.subscription_plan, r.plan_type, 'LITE') as plan_type
+                    COALESCE(rc.subscription_plan, r.plan_type, 'SILVER') as plan_type
                 FROM `tabRestaurant` r
                 LEFT JOIN `tabRestaurantConfig` rc ON r.name = rc.parent
                 ORDER BY r.creation DESC
@@ -79,7 +79,7 @@ def get_all_restaurants():
                     COALESCE(r.coins_balance, 0) as coins_balance,
                     COALESCE(r.platform_fee_percent, 1.5) as platform_fee_percent,
                     COALESCE(r.monthly_minimum, 999) as monthly_minimum,
-                    COALESCE(r.plan_type, 'LITE') as plan_type
+                    COALESCE(r.plan_type, 'SILVER') as plan_type
                 FROM `tabRestaurant` r
                 ORDER BY r.creation DESC
             """, as_dict=True)
@@ -88,8 +88,8 @@ def get_all_restaurants():
         for restaurant in restaurants:
             restaurant['is_active'] = int(restaurant['is_active'] or 0)
             # Ensure plan_type is valid
-            if restaurant['plan_type'] not in ['LITE', 'PRO', 'LUX']:
-                restaurant['plan_type'] = 'LITE'
+            if restaurant['plan_type'] not in ['SILVER', 'GOLD', 'DIAMOND']:
+                restaurant['plan_type'] = 'SILVER'
         
         return {
             'success': True,
@@ -121,10 +121,10 @@ def update_restaurant_plan(restaurant_id, plan_type):
             }
         
         # Validate plan_type
-        if plan_type not in ['LITE', 'PRO', 'LUX']:
+        if plan_type not in ['SILVER', 'GOLD', 'DIAMOND']:
             return {
                 'success': False,
-                'error': 'Invalid plan type. Must be LITE, PRO or LUX'
+                'error': 'Invalid plan type. Must be SILVER, GOLD or DIAMOND'
             }
         
         # Get restaurant record
@@ -177,7 +177,7 @@ def update_restaurant_plan(restaurant_id, plan_type):
         config.subscription_plan = plan_type
         
         # Update subscription features based on plan
-        if plan_type == 'LUX':
+        if plan_type == 'DIAMOND':
              config.subscription_features = {
                 'ordering': True,
                 'videoUpload': True,
@@ -190,7 +190,7 @@ def update_restaurant_plan(restaurant_id, plan_type):
                 'table_booking': True,
                 'experience_lounge': True
             }
-        elif plan_type == 'PRO':
+        elif plan_type == 'GOLD':
             config.subscription_features = {
                 'ordering': True,
                 'videoUpload': True,
@@ -203,7 +203,7 @@ def update_restaurant_plan(restaurant_id, plan_type):
                 'table_booking': True,
                 'experience_lounge': False
             }
-        else:  # LITE
+        else:  # SILVER
             config.subscription_features = {
                 'ordering': False,
                 'videoUpload': False,
@@ -313,9 +313,9 @@ def toggle_restaurant_status(restaurant_id, is_active):
         stats = frappe.db.sql("""
             SELECT 
                 COUNT(*) as total_restaurants,
-                SUM(CASE WHEN COALESCE(rc.subscription_plan, 'LITE') = 'LITE' THEN 1 ELSE 0 END) as lite_count,
-                SUM(CASE WHEN COALESCE(rc.subscription_plan, 'LITE') = 'PRO' THEN 1 ELSE 0 END) as pro_count,
-                SUM(CASE WHEN COALESCE(rc.subscription_plan, 'LITE') = 'LUX' THEN 1 ELSE 0 END) as lux_count,
+                SUM(CASE WHEN COALESCE(rc.subscription_plan, 'SILVER') = 'SILVER' THEN 1 ELSE 0 END) as lite_count,
+                SUM(CASE WHEN COALESCE(rc.subscription_plan, 'SILVER') = 'GOLD' THEN 1 ELSE 0 END) as pro_count,
+                SUM(CASE WHEN COALESCE(rc.subscription_plan, 'SILVER') = 'DIAMOND' THEN 1 ELSE 0 END) as lux_count,
                 SUM(CASE WHEN r.is_active = 1 THEN 1 ELSE 0 END) as active_count,
                 SUM(CASE WHEN r.is_active = 0 THEN 1 ELSE 0 END) as inactive_count
             FROM `tabRestaurant` r

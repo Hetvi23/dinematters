@@ -11,7 +11,7 @@ import { Coins, Share2, TrendingUp, Gift, Info, Trophy, Settings } from 'lucide-
 import { LockedFeature } from '@/components/FeatureGate/LockedFeature'
 
 export default function LoyaltySettings() {
-  const { selectedRestaurant, isLux } = useRestaurant()
+  const { selectedRestaurant, isDiamond } = useRestaurant()
   const [saving, setSaving] = useState(false)
   const [programName, setProgramName] = useState('')
   const [enableLoyalty, setEnableLoyalty] = useState(false)
@@ -116,8 +116,8 @@ export default function LoyaltySettings() {
     }
   }
 
-  if (!isLux) {
-    return <LockedFeature feature="loyalty" requiredPlan={['LUX']} />
+  if (!isDiamond) {
+    return <LockedFeature feature="loyalty" requiredPlan={['DIAMOND']} />
   }
 
   return (
@@ -129,7 +129,7 @@ export default function LoyaltySettings() {
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Loyalty & Growth</h1>
           </div>
           <p className="text-muted-foreground mt-2">
-            Professional reward and referral engine to drive repeat business and viral growth.
+            Goldfessional reward and referral engine to drive repeat business and viral growth.
           </p>
         </div>
         <div className="flex items-center gap-3 bg-muted/50 p-2 px-4 rounded-lg border h-11">

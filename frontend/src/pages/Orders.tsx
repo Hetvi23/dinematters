@@ -27,7 +27,7 @@ import { useCurrency } from '@/hooks/useCurrency'
 type ViewType = 'kanban' | 'list' | 'modern'
 
 export default function Orders() {
-  const { isLux } = useRestaurant()
+  const { isDiamond } = useRestaurant()
   const { formatAmountNoDecimals } = useCurrency()
 
   const getOrderTypeBadgeClass = (orderType?: string) => {
@@ -422,8 +422,8 @@ export default function Orders() {
     setIsDialogOpen(true)
   }
 
-  if (!isLux) {
-    return <LockedFeature feature="ordering" requiredPlan={['LUX']} />
+  if (!isDiamond) {
+    return <LockedFeature feature="ordering" requiredPlan={['DIAMOND']} />
   }
 
   return (

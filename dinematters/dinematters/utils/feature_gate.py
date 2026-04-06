@@ -5,7 +5,7 @@
 Feature Gate System for Subscription-based Access Control
 
 This module provides decorators and utilities to restrict feature access
-based on restaurant subscription plans (LITE vs PRO).
+based on restaurant subscription plans (SILVER vs GOLD).
 """
 
 import frappe
@@ -17,26 +17,26 @@ from functools import wraps
 # Feature to Plan Mapping
 # Features listed here require specific plan types
 FEATURE_PLAN_MAP = {
-    # LUX Only features (Transactional/Full Automation)
-    'ordering': ['LUX'],
-    'loyalty': ['LUX'],
-    'pos_integration': ['LUX'],
-    'coupons': ['LUX'],
-    'data_export': ['LUX'],
-    'customer': ['LUX'],
-    'order_settings': ['LUX'],
-    'customer_pay_and_usage': ['LUX'],
+    # DIAMOND Only features (Transactional/Full Automation)
+    'ordering': ['DIAMOND'],
+    'loyalty': ['DIAMOND'],
+    'pos_integration': ['DIAMOND'],
+    'coupons': ['DIAMOND'],
+    'data_export': ['DIAMOND'],
+    'customer': ['DIAMOND'],
+    'order_settings': ['DIAMOND'],
+    'customer_pay_and_usage': ['DIAMOND'],
     
-    # PRO & LUX features (Digital/Branding/Analytics/Table/Games)
-    'games': ['PRO', 'LUX'],
-    'video_upload': ['PRO', 'LUX'],
-    'analytics': ['PRO', 'LUX'],
-    'ai_recommendations': ['PRO', 'LUX'],
-    'custom_branding': ['PRO', 'LUX'],
-    'table_booking': ['PRO', 'LUX'],
-    'events': ['PRO', 'LUX'],
-    'offers': ['PRO', 'LUX'],
-    'experience_lounge': ['PRO', 'LUX'],
+    # GOLD & DIAMOND features (Digital/Branding/Analytics/Table/Games)
+    'games': ['GOLD', 'DIAMOND'],
+    'video_upload': ['GOLD', 'DIAMOND'],
+    'analytics': ['GOLD', 'DIAMOND'],
+    'ai_recommendations': ['GOLD', 'DIAMOND'],
+    'custom_branding': ['GOLD', 'DIAMOND'],
+    'table_booking': ['GOLD', 'DIAMOND'],
+    'events': ['GOLD', 'DIAMOND'],
+    'offers': ['GOLD', 'DIAMOND'],
+    'experience_lounge': ['GOLD', 'DIAMOND'],
 }
 
 
@@ -46,14 +46,14 @@ def require_plan(*required_plans):
     
     Usage:
         @frappe.whitelist()
-        @require_plan('PRO')
+        @require_plan('GOLD')
         def create_order(restaurant_id, order_data):
-            # This endpoint is only accessible to PRO plan restaurants
+            # This endpoint is only accessible to GOLD plan restaurants
             ...
     
     Args:
         *required_plans: Variable number of plan types that can access this feature
-                        (e.g., 'PRO', 'LITE')
+                        (e.g., 'GOLD', 'SILVER')
     
     Raises:
         PermissionError: If restaurant's plan is not in required_plans
@@ -84,7 +84,7 @@ def require_plan(*required_plans):
                 frappe.throw(
                     _('This feature requires {0} plan. Your current plan is {1}. Please upgrade to access this feature.').format(
                         ' or '.join(required_plans),
-                        restaurant.plan_type or 'LITE'
+                        restaurant.plan_type or 'SILVER'
                     ),
                     PermissionError
                 )
@@ -123,14 +123,14 @@ def check_feature_access(restaurant_id, feature_name):
         frappe.throw(_('Restaurant {0} does not exist').format(restaurant_id))
     
     # Get required plans for this feature. Fallback to all plans if not mapped.
-    required_plans = FEATURE_PLAN_MAP.get(feature_name, ['LITE', 'PRO', 'LUX'])
+    required_plans = FEATURE_PLAN_MAP.get(feature_name, ['SILVER', 'GOLD', 'DIAMOND'])
     
     # Check if current plan has access
     has_access = restaurant.plan_type in required_plans
     
     return {
         'has_access': has_access,
-        'current_plan': restaurant.plan_type or 'LITE',
+        'current_plan': restaurant.plan_type or 'SILVER',
         'required_plans': required_plans,
         'feature': feature_name
     }
@@ -141,28 +141,28 @@ def get_plan_features(plan_type):
     Get list of all features available for a specific plan
     
     Args:
-        plan_type (str): Plan type ('LITE', 'PRO', or 'LUX')
+        plan_type (str): Plan type ('SILVER', 'GOLD', or 'DIAMOND')
     
     Returns:
         list: List of feature names available for this plan
     """
     base_features = ['basic_menu', 'qr_code', 'website']
     
-    if plan_type == 'LUX':
-        # LUX has access to everything
+    if plan_type == 'DIAMOND':
+        # DIAMOND has access to everything
         return list(FEATURE_PLAN_MAP.keys()) + base_features
-    elif plan_type == 'PRO':
-        # PRO has access to digital/branding features but no transactional ones
-        pro_features = [f for f, plans in FEATURE_PLAN_MAP.items() if 'PRO' in plans]
-        return pro_features + base_features
+    elif plan_type == 'GOLD':
+        # GOLD has access to digital/branding features but no transactional ones
+        gold_features = [f for f, plans in FEATURE_PLAN_MAP.items() if 'GOLD' in plans]
+        return gold_features + base_features
     else:
-        # LITE only has access to base features
+        # SILVER only has access to base features
         return base_features
 
 
 def check_image_upload_limit(restaurant_id):
     """
-    Check if restaurant has reached image upload limit (LITE plan only)
+    Check if restaurant has reached image upload limit (SILVER plan only)
     
     Args:
         restaurant_id (str): Restaurant ID
@@ -176,12 +176,12 @@ def check_image_upload_limit(restaurant_id):
         }
     
     Raises:
-        PermissionError: If LITE plan has reached image limit
+        PermissionError: If SILVER plan has reached image limit
     """
     restaurant = frappe.get_doc('Restaurant', restaurant_id)
     
-    # PRO and LUX plans have unlimited images
-    if restaurant.plan_type in ['PRO', 'LUX']:
+    # GOLD and DIAMOND plans have unlimited images
+    if restaurant.plan_type in ['GOLD', 'DIAMOND']:
         return {
             'can_upload': True,
             'current_count': restaurant.current_image_count or 0,
@@ -189,15 +189,15 @@ def check_image_upload_limit(restaurant_id):
             'plan_type': restaurant.plan_type
         }
     
-    # LITE plan has limit
+    # SILVER plan has limit
     current_count = restaurant.current_image_count or 0
-    max_limit = restaurant.max_images_lite or 200
+    max_limit = restaurant.max_images_silver or 200
     
     can_upload = current_count < max_limit
     
     if not can_upload:
         frappe.throw(
-            _('Image upload limit reached ({0}/{1}). Upgrade to PRO for unlimited images.').format(
+            _('Image upload limit reached ({0}/{1}). Upgrade to GOLD or DIAMOND for unlimited images.').format(
                 current_count,
                 max_limit
             ),
@@ -208,7 +208,7 @@ def check_image_upload_limit(restaurant_id):
         'can_upload': can_upload,
         'current_count': current_count,
         'max_limit': max_limit,
-        'plan_type': 'LITE'
+        'plan_type': 'SILVER'
     }
 
 
@@ -251,7 +251,7 @@ def get_restaurant_plan(restaurant_id):
 	Helper to get the current plan tier for a restaurant
 	"""
 	if not restaurant_id:
-		return "LITE"
+		return "SILVER"
 	
 	plan = frappe.db.get_value("Restaurant", restaurant_id, "plan_type")
-	return plan if plan else "LITE"
+	return plan if plan else "SILVER"

@@ -7,7 +7,7 @@ import { useRestaurant } from '@/contexts/RestaurantContext'
 export default function FeatureLocked() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isPro, isLux, planType } = useRestaurant()
+  const { isGold, isDiamond, planType } = useRestaurant()
 
   // Get the attempted path from location state or current path
   const attemptedPath = (location.state?.from || location.pathname).replace('/dinematters', '')
@@ -26,7 +26,7 @@ export default function FeatureLocked() {
     navigate('/billing')
   }
 
-  const isUpgradeToLux = requiredPlan === 'LUX' && isPro
+  const isUpgradeToDiamond = requiredPlan === 'DIAMOND' && isGold
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
@@ -47,7 +47,7 @@ export default function FeatureLocked() {
           <CardContent className="space-y-6">
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
               <p className="text-sm text-blue-800 dark:text-blue-200">
-                You're currently on the <span className="font-semibold">{planType || 'LITE'}</span> plan. 
+                You're currently on the <span className="font-semibold">{planType || 'SILVER'}</span> plan. 
                 Upgrade to {requiredPlan} to unlock this feature and more.
               </p>
             </div>
@@ -92,7 +92,7 @@ export default function FeatureLocked() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {isUpgradeToLux ? (
+            {isUpgradeToDiamond ? (
               <div className="space-y-3">
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
@@ -162,37 +162,37 @@ export default function FeatureLocked() {
 }
 
 // Helper function to get feature name and required plan from path
-function getFeatureDetails(path: string): { featureName: string; requiredPlan: 'PRO' | 'LUX' } {
+function getFeatureDetails(path: string): { featureName: string; requiredPlan: 'GOLD' | 'DIAMOND' } {
   // Normalize path by removing leading/trailing slashes and decoding
   const cleanPath = decodeURIComponent(path.replace(/^\/+|\/+$/g, ''))
 
-  const featureMap: Record<string, { name: string; plan: 'PRO' | 'LUX' }> = {
-    'orders': { name: 'Real-time Orders', plan: 'LUX' },
-    'accept-orders': { name: 'Accept Orders', plan: 'LUX' },
-    'past-orders': { name: 'Past Orders', plan: 'LUX' },
-    'bookings': { name: 'Table Bookings', plan: 'PRO' },
-    'customers': { name: 'Customer Management', plan: 'LUX' },
-    'coupons': { name: 'Coupons Management', plan: 'LUX' },
-    'loyalty-settings': { name: 'Loyalty Program', plan: 'LUX' },
-    'loyalty-insights': { name: 'Loyalty Insights', plan: 'LUX' },
-    'pos-integration': { name: 'POS Integration', plan: 'LUX' },
-    'recommendations-engine': { name: 'AI Recommendations', plan: 'PRO' },
-    'payment-stats': { name: 'Payment Analytics', plan: 'PRO' },
+  const featureMap: Record<string, { name: string; plan: 'GOLD' | 'DIAMOND' }> = {
+    'orders': { name: 'Real-time Orders', plan: 'DIAMOND' },
+    'accept-orders': { name: 'Accept Orders', plan: 'DIAMOND' },
+    'past-orders': { name: 'Past Orders', plan: 'DIAMOND' },
+    'bookings': { name: 'Table Bookings', plan: 'GOLD' },
+    'customers': { name: 'Customer Management', plan: 'DIAMOND' },
+    'coupons': { name: 'Coupons Management', plan: 'DIAMOND' },
+    'loyalty-settings': { name: 'Loyalty Program', plan: 'DIAMOND' },
+    'loyalty-insights': { name: 'Loyalty Insights', plan: 'DIAMOND' },
+    'pos-integration': { name: 'POS Integration', plan: 'DIAMOND' },
+    'recommendations-engine': { name: 'AI Recommendations', plan: 'GOLD' },
+    'payment-stats': { name: 'Payment Analytics', plan: 'GOLD' },
     
     // DocType mappings (ModuleList)
-    'Order': { name: 'Ordering Dashboard', plan: 'LUX' },
-    'Coupon': { name: 'Coupon Management', plan: 'LUX' },
-    'Coupon Usage': { name: 'Coupon Analytics', plan: 'LUX' },
-    'Customer': { name: 'CRM & Loyalty', plan: 'LUX' },
-    'Restaurant Loyalty Config': { name: 'Loyalty Setup', plan: 'LUX' },
-    'Restaurant Loyalty Entry': { name: 'Loyalty Transactions', plan: 'LUX' },
-    'Pos Integration': { name: 'POS Automation', plan: 'LUX' },
-    'Table Booking': { name: 'Reservations', plan: 'PRO' },
-    'Banquet Booking': { name: 'Event Bookings', plan: 'PRO' },
-    'Game': { name: 'Interactive Games', plan: 'PRO' },
-    'Event': { name: 'Events Manager', plan: 'PRO' },
-    'Offer': { name: 'Promotions', plan: 'PRO' },
-    'Home Feature': { name: 'Homepage Design', plan: 'PRO' },
+    'Order': { name: 'Ordering Dashboard', plan: 'DIAMOND' },
+    'Coupon': { name: 'Coupon Management', plan: 'DIAMOND' },
+    'Coupon Usage': { name: 'Coupon Analytics', plan: 'DIAMOND' },
+    'Customer': { name: 'CRM & Loyalty', plan: 'DIAMOND' },
+    'Restaurant Loyalty Config': { name: 'Loyalty Setup', plan: 'DIAMOND' },
+    'Restaurant Loyalty Entry': { name: 'Loyalty Transactions', plan: 'DIAMOND' },
+    'Pos Integration': { name: 'POS Automation', plan: 'DIAMOND' },
+    'Table Booking': { name: 'Reservations', plan: 'GOLD' },
+    'Banquet Booking': { name: 'Event Bookings', plan: 'GOLD' },
+    'Game': { name: 'Interactive Games', plan: 'GOLD' },
+    'Event': { name: 'Events Manager', plan: 'GOLD' },
+    'Offer': { name: 'Promotions', plan: 'GOLD' },
+    'Home Feature': { name: 'Homepage Design', plan: 'GOLD' },
   }
 
   // Check direct matches
@@ -208,5 +208,5 @@ function getFeatureDetails(path: string): { featureName: string; requiredPlan: '
   }
   
   // Default fallback
-  return { featureName: 'This Premium Feature', requiredPlan: 'PRO' }
+  return { featureName: 'This Premium Feature', requiredPlan: 'GOLD' }
 }

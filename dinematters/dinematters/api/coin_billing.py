@@ -36,7 +36,7 @@ def record_transaction(restaurant, txn_type, amount, description="", payment_id=
     )
     current_balance = (balance_info[0][0] if balance_info and balance_info[0][0] is not None else 0.0)
 
-    is_deduction = txn_type in ["AI Deduction", "Commission Deduction", "Daily Pro Floor", "Daily PRO Floor", "Daily LUX Floor", "Daily PRO Subscription", "Lead Unlock"]
+    is_deduction = txn_type in ["AI Deduction", "Commission Deduction", "Daily SILVER Floor", "Daily GOLD Floor", "Daily DIAMOND Floor", "Daily GOLD Subscription", "Daily DIAMOND Subscription", "Daily PRO Floor", "Daily LUX Floor", "Daily PRO Subscription", "Lead Unlock"]
     
     if is_deduction:
         new_balance = current_balance - abs(amount)
@@ -74,7 +74,7 @@ def record_transaction(restaurant, txn_type, amount, description="", payment_id=
     txn.insert(ignore_permissions=True)
     
     # Trigger auto-recharge check if balance falls below threshold
-    if txn_type in ["AI Deduction", "Commission Deduction", "Daily Pro Floor", "Daily PRO Floor", "Daily LUX Floor", "Daily PRO Subscription"]:
+    if txn_type in ["AI Deduction", "Commission Deduction", "Daily SILVER Floor", "Daily GOLD Floor", "Daily DIAMOND Floor", "Daily GOLD Subscription", "Daily DIAMOND Subscription", "Daily PRO Floor", "Daily LUX Floor", "Daily PRO Subscription"]:
         check_and_trigger_auto_recharge(restaurant, new_balance)
 
         # Check for system suspension (-300 grace limit)
@@ -251,10 +251,11 @@ def get_coin_billing_info(restaurant):
         "last_auto_recharge_date": res.last_auto_recharge_date,
         # Plan Defaults for Upgrade UI
         "plan_defaults": {
-            "pro_monthly": settings.pro_monthly_fee or 999.0,
-            "lux_monthly": settings.lux_monthly_floor or 1299.0,
-            "lux_commission": settings.lux_commission_percent or 1.5,
-            "lux_barrier": settings.lux_upgrade_barrier or 2499.0
+            "silver_monthly": 0.0,
+            "gold_monthly": settings.gold_monthly_fee or 999.0,
+            "diamond_monthly": settings.diamond_monthly_floor or 1299.0,
+            "diamond_commission": settings.diamond_commission_percent or 1.5,
+            "diamond_barrier": settings.diamond_upgrade_barrier or 2499.0
         }
     }
 
@@ -264,8 +265,8 @@ def update_subscription_plan(restaurant, plan_type):
     Schedule a restaurant subscription tier update (LITE/PRO).
     All plan changes follow the 'Tomorrow Rule' (effective at 00:00).
     """
-    if plan_type not in ["LITE", "PRO", "LUX"]:
-        frappe.throw(_("Invalid plan type. Options: LITE, PRO, LUX"))
+    if plan_type not in ["SILVER", "GOLD", "DIAMOND"]:
+        frappe.throw(_("Invalid plan type. Options: SILVER, GOLD, DIAMOND"))
     
     current_plan = frappe.db.get_value("Restaurant", restaurant, "plan_type")
     if current_plan == plan_type:
@@ -277,17 +278,17 @@ def update_subscription_plan(restaurant, plan_type):
 
     settings = frappe.get_single("Dinematters Settings")
 
-    if plan_type == "PRO":
+    if plan_type == "GOLD":
         # Check against restaurant's own minimum, fallback to global default
-        min_required = float(res_info.monthly_minimum if res_info.monthly_minimum else (settings.pro_monthly_fee or 999.0))
+        min_required = float(res_info.monthly_minimum if res_info.monthly_minimum else (settings.gold_monthly_fee or 999.0))
         if balance < min_required:
-            frappe.throw(_(f"Insufficient balance to upgrade to PRO. Minimum {min_required} Coins required. Current: {balance}"), frappe.ValidationError)
+            frappe.throw(_(f"Insufficient balance to upgrade to GOLD. Minimum {min_required} Coins required. Current: {balance}"), frappe.ValidationError)
     
-    if plan_type == "LUX":
-        # LUX upgrade barrier is a platform-wide constant (manageable in Settings)
-        min_required = float(settings.lux_upgrade_barrier or 2499.0)
+    if plan_type == "DIAMOND":
+        # DIAMOND upgrade barrier is a platform-wide constant (manageable in Settings)
+        min_required = float(settings.diamond_upgrade_barrier or 2499.0)
         if balance < min_required:
-            frappe.throw(_(f"Insufficient balance to upgrade to LUX. Minimum {min_required} Coins required. Current: {balance}"), frappe.ValidationError)
+            frappe.throw(_(f"Insufficient balance to upgrade to DIAMOND. Minimum {min_required} Coins required. Current: {balance}"), frappe.ValidationError)
 
     # 2. Defer activation to Tomorrow 00:00
     from frappe.utils import add_days, getdate
@@ -449,13 +450,13 @@ def initialize_free_coins(restaurant):
 @frappe.whitelist(allow_guest=False)
 def process_monthly_pro_coin_refill():
     """
-    Cron job: Grant 60 free coins to all active PRO/LUX restaurants monthly.
+    Cron job: Grant 60 free coins to all active GOLD/DIAMOND restaurants monthly.
     """
     from frappe.utils import now
     
-    # We target PRO and LUX plans
+    # We target GOLD and DIAMOND plans
     restaurants = frappe.get_all("Restaurant", 
-        filters={"plan_type": ["in", ["PRO", "LUX"]], "is_active": 1},
+        filters={"plan_type": ["in", ["GOLD", "DIAMOND"]], "is_active": 1},
         pluck="name"
     )
     

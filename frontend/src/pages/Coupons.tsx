@@ -26,7 +26,7 @@ import { toast } from 'sonner'
 import { getFrappeError } from '@/lib/utils'
 
 export default function Coupons() {
-  const { selectedRestaurant, isLux } = useRestaurant()
+  const { selectedRestaurant, isDiamond } = useRestaurant()
   const { formatAmountNoDecimals } = useCurrency()
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editingCoupon, setEditingCoupon] = useState<any>(null)
@@ -144,8 +144,8 @@ export default function Coupons() {
     )
   }
 
-  if (!isLux) {
-    return <LockedFeature feature="coupons" requiredPlan={['LUX']} />
+  if (!isDiamond) {
+    return <LockedFeature feature="coupons" requiredPlan={['DIAMOND']} />
   }
 
   return (

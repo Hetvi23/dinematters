@@ -62,7 +62,7 @@ interface SetupProgressResponse {
 export default function TieredSetupWizard() {
   const { stepId: urlSlug } = useParams<{ stepId?: string }>()
   const navigate = useNavigate()
-  const { selectedRestaurant, setSelectedRestaurant, planType, isLite, isPro, isLux, isLoading: contextLoading } = useRestaurant()
+  const { selectedRestaurant, setSelectedRestaurant, planType, isSilver, isGold, isDiamond, isLoading: contextLoading } = useRestaurant()
 
   // Define All Possible Steps
   const allPotentialSteps: WizardStep[] = [
@@ -143,9 +143,9 @@ export default function TieredSetupWizard() {
 
   // Plan Badge UI
   const PlanBadge = () => {
-    if (isLux) return <Badge className="bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white border-none shadow-lg gap-1 px-3 py-1"><Crown className="w-3.5 h-3.5" /> LUXury Experience</Badge>
-    if (isPro) return <Badge className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white border-none shadow-lg gap-1 px-3 py-1"><Zap className="w-3.5 h-3.5" /> PRO Growth</Badge>
-    return <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-none shadow-lg gap-1 px-3 py-1"><Star className="w-3.5 h-3.5" /> LITE Foundation</Badge>
+    if (isDiamond) return <Badge className="bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white border-none shadow-lg gap-1 px-3 py-1"><Crown className="w-3.5 h-3.5" /> Luxury Experience</Badge>
+    if (isGold) return <Badge className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white border-none shadow-lg gap-1 px-3 py-1"><Zap className="w-3.5 h-3.5" /> GOLD Growth</Badge>
+    return <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-none shadow-lg gap-1 px-3 py-1"><Star className="w-3.5 h-3.5" /> SILVER Foundation</Badge>
   }
 
   if (contextLoading || !steps.length) {
@@ -346,9 +346,9 @@ export default function TieredSetupWizard() {
                         'qr_code', 'brand_logo', 'hero_image', 'menu_theme', 'custom_css', 'verify_my_user'
                       ]
                       // Hide high-tier features based on plan
-                      if (isLite) {
+                      if (isSilver) {
                         hidden.push('enable_loyalty', 'enable_coupons')
-                      } else if (isPro) {
+                      } else if (isGold) {
                          hidden.push('enable_loyalty', 'enable_coupons')
                       }
                       return hidden

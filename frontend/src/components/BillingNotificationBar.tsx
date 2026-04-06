@@ -7,7 +7,7 @@ import { format } from 'date-fns'
 interface BillingNotificationBarProps {
   billingInfo: {
     coins_balance: number
-    deferred_plan_type?: 'LITE' | 'PRO' | null
+    deferred_plan_type?: 'SILVER' | 'GOLD' | null
     plan_change_date?: string | null
     mandate_active: boolean
     auto_recharge_enabled: boolean
@@ -19,13 +19,13 @@ interface BillingNotificationBarProps {
     onboarding_date?: string | null
     last_auto_recharge_date?: string | null
   } | null
-  planType: 'LITE' | 'PRO' | 'LUX'
+  planType: 'SILVER' | 'GOLD' | 'DIAMOND'
 }
 
 export const BillingNotificationBar: React.FC<BillingNotificationBarProps> = ({ billingInfo, planType }) => {
-  const isPro = planType === 'PRO'
-  const isLux = planType === 'LUX'
-  const isPremium = isPro || isLux
+  const isGold = planType === 'GOLD'
+  const isDiamond = planType === 'DIAMOND'
+  const isPremium = isGold || isDiamond
   const navigate = useNavigate()
   if (!billingInfo) return null
 

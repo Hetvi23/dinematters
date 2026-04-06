@@ -18,7 +18,7 @@ import {
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
-interface LiteMediaUploadProps {
+interface SilverMediaUploadProps {
   onUpload: (files: File[]) => Promise<void>
   currentImageCount?: number
   maxImages?: number
@@ -26,14 +26,14 @@ interface LiteMediaUploadProps {
   className?: string
 }
 
-export default function LiteMediaUpload({ 
+export default function SilverMediaUpload({ 
   onUpload, 
   currentImageCount = 0, 
   maxImages = 200, 
   disabled = false,
   className 
-}: LiteMediaUploadProps) {
-  const { isLite, isPro, selectedRestaurant } = useRestaurant()
+}: SilverMediaUploadProps) {
+  const { isSilver, isGold, selectedRestaurant } = useRestaurant()
   const [uploading, setUploading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
 
@@ -42,9 +42,9 @@ export default function LiteMediaUpload({
 
     const fileArray = Array.from(files)
     
-    // Lite restrictions
-    if (isLite) {
-      // Check for video files (not allowed in Lite)
+    // Silver restrictions
+    if (isSilver) {
+      // Check for video files (not allowed in Silver)
       const videoFiles = fileArray.filter(file => 
         file.type.startsWith('video/') || 
         ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.flv', '.wmv'].some(ext => 
@@ -53,7 +53,7 @@ export default function LiteMediaUpload({
       )
 
       if (videoFiles.length > 0) {
-        toast.error('Video uploads require Pro plan. Upgrade to unlock video features.', {
+        toast.error('Video uploads require Gold plan. Upgrade to unlock video features.', {
           duration: 5000,
           action: {
             label: 'Upgrade',
@@ -73,7 +73,7 @@ export default function LiteMediaUpload({
         toast.error(`Image limit exceeded. You can upload ${maxImages - currentImageCount} more images.`, {
           duration: 5000,
           action: {
-            label: 'Upgrade to Pro',
+            label: 'Upgrade to Gold',
             onClick: () => {
               // TODO: Navigate to upgrade page
             }
@@ -132,15 +132,15 @@ export default function LiteMediaUpload({
 
   return (
     <div className={cn("space-y-4", className)}>
-      {/* Usage indicator for Lite restaurants */}
-      {isLite && (
+      {/* Usage indicator for Silver restaurants */}
+      {isSilver && (
         <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Star className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 <div className="text-sm">
-                  <span className="font-semibold text-blue-900 dark:text-blue-100">Lite Plan Usage:</span>
+                  <span className="font-semibold text-blue-900 dark:text-blue-100">Silver Plan Usage:</span>
                   <span className="text-blue-700 dark:text-blue-300 ml-2">
                     {currentImageCount}/{maxImages} images
                   </span>
@@ -202,7 +202,7 @@ export default function LiteMediaUpload({
                 {uploading ? 'Uploading...' : 'Upload Media'}
               </h3>
               <p className="text-sm text-muted-foreground">
-                {isLite ? (
+                {isSilver ? (
                   <>Drag and drop images here, or <label htmlFor="media-upload" className="text-primary hover:underline cursor-pointer">browse files</label></>
                 ) : (
                   <>Drag and drop images and videos here, or <label htmlFor="media-upload" className="text-primary hover:underline cursor-pointer">browse files</label></>
@@ -212,7 +212,7 @@ export default function LiteMediaUpload({
 
             {/* Plan-specific information */}
             <div className="flex flex-col gap-2 text-xs">
-              {isLite ? (
+              {isSilver ? (
                 <div className="flex items-center justify-center gap-2 text-blue-600 dark:text-blue-400">
                   <Star className="h-3 w-3" />
                   <span>Images only • {maxImages - currentImageCount} remaining</span>
@@ -230,14 +230,14 @@ export default function LiteMediaUpload({
               <Button 
                 variant="outline" 
                 size="sm"
-                disabled={disabled || uploading || (isLite && currentImageCount >= maxImages)}
+                disabled={disabled || uploading || (isSilver && currentImageCount >= maxImages)}
                 onClick={() => document.getElementById('media-upload')?.click()}
               >
                 <ImageIcon className="h-4 w-4 mr-2" />
                 Choose Images
               </Button>
               
-              {isPro && (
+              {isGold && (
                 <Button 
                   variant="outline" 
                   size="sm"
@@ -257,8 +257,8 @@ export default function LiteMediaUpload({
               )}
             </div>
 
-            {/* Upgrade prompt for Lite users at limit */}
-            {isLite && currentImageCount >= maxImages && (
+            {/* Upgrade prompt for Silver users at limit */}
+            {isSilver && currentImageCount >= maxImages && (
               <Card className="border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-950/20 mt-4">
                 <CardContent className="p-3">
                   <div className="flex items-center gap-3">
@@ -266,7 +266,7 @@ export default function LiteMediaUpload({
                     <div className="text-sm">
                       <span className="font-semibold text-orange-900 dark:text-orange-100">Image limit reached</span>
                       <span className="text-orange-700 dark:text-orange-300 block">
-                        Upgrade to Pro for unlimited images and video uploads
+                        Upgrade to Gold for unlimited images and video uploads
                       </span>
                     </div>
                   </div>
@@ -278,7 +278,7 @@ export default function LiteMediaUpload({
                     }}
                   >
                     <ArrowUp className="h-4 w-4 mr-2" />
-                    Upgrade to Pro
+                    Upgrade to Gold
                   </Button>
                 </CardContent>
               </Card>
@@ -288,12 +288,12 @@ export default function LiteMediaUpload({
       </Card>
 
       {/* Feature comparison */}
-      {isLite && (
+      {isSilver && (
         <Card className="border-muted">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <Crown className="h-4 w-4" />
-              Pro Features
+              Gold Features
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-xs">

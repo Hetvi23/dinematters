@@ -31,21 +31,21 @@ def get_restaurant_plan(restaurant_id):
     return {
         'restaurant_id': restaurant.name,
         'restaurant_name': restaurant.restaurant_name,
-        'plan_type': restaurant.plan_type or 'LITE',
+        'plan_type': restaurant.plan_type or 'SILVER',
         'plan_activated_on': restaurant.plan_activated_on,
         'plan_changed_by': restaurant.plan_changed_by,
-        'features': get_plan_features(restaurant.plan_type or 'LITE'),
+        'features': get_plan_features(restaurant.plan_type or 'SILVER'),
         'limits': {
-            'max_images': restaurant.max_images_lite if restaurant.plan_type == 'LITE' else -1,
+            'max_images': restaurant.max_images_silver if restaurant.plan_type == 'SILVER' else -1,
             'current_images': restaurant.current_image_count or 0,
-            'video_upload': restaurant.plan_type in ['PRO', 'LUX'],
-            'ordering': restaurant.plan_type == 'LUX',
+            'video_upload': restaurant.plan_type in ['GOLD', 'DIAMOND'],
+            'ordering': restaurant.plan_type == 'DIAMOND',
         },
         'metrics': {
             'total_orders': restaurant.total_orders or 0,
             'total_revenue': restaurant.total_revenue or 0,
             'commission_earned': restaurant.commission_earned or 0,
-        } if restaurant.plan_type == 'LUX' else None
+        } if restaurant.plan_type == 'DIAMOND' else None
     }
 
 
@@ -67,7 +67,7 @@ def check_access(restaurant_id, feature_name):
 @frappe.whitelist()
 def get_plan_comparison(restaurant_id=None):
     """
-    Get feature comparison between LITE and PRO plans
+    Get feature comparison between SILVER and GOLD plans
     
     Args:
         restaurant_id (str, optional): Restaurant ID to show personalized rates
@@ -85,8 +85,8 @@ def get_plan_comparison(restaurant_id=None):
             pass
 
     return {
-        'LITE': {
-            'name': 'DineMatters Lite',
+        'SILVER': {
+            'name': 'DineMatters Silver',
             'price': 'Free',
             'commission': '0%',
             'features': {
@@ -115,13 +115,13 @@ def get_plan_comparison(restaurant_id=None):
                 'qr_logo': 'DineMatters logo watermark on QR codes'
             }
         },
-        'PRO': {
-            'name': 'DineMatters Pro (Digital)',
+        'GOLD': {
+            'name': 'DineMatters Gold (Digital)',
             'price': '₹999 / mo',
             'commission': '0%',
             'features': {
                 'included': [
-                    'All LITE features',
+                    'All SILVER features',
                     'Video content support',
                     'AI-powered recommendations',
                     'Analytics dashboard',
@@ -143,8 +143,8 @@ def get_plan_comparison(restaurant_id=None):
                 'qr_logo': 'Your custom restaurant logo on QR codes'
             }
         },
-        'LUX': {
-            'name': 'DineMatters Lux (Automation)',
+        'DIAMOND': {
+            'name': 'DineMatters Diamond (Automation)',
             'price': '₹999 Floor / mo',
             'commission': commission_rate,
             'features': {
@@ -179,11 +179,11 @@ def get_upgrade_benefits(restaurant_id):
     restaurant = frappe.get_doc('Restaurant', restaurant_id)
     
     return {
-        'already_lux': False,
+        'already_diamond': False,
         'current_plan': restaurant.plan_type,
         'benefits': [
             {
-                'category': 'Revenue Generation (LUX Only)',
+                'category': 'Revenue Generation (DIAMOND Only)',
                 'items': [
                     'Accept online orders and payments',
                     'Loyalty programs to retain customers',
@@ -192,7 +192,7 @@ def get_upgrade_benefits(restaurant_id):
                 ]
             },
             {
-                'category': 'Digital Excellence (PRO & LUX)',
+                'category': 'Digital Excellence (GOLD & DIAMOND)',
                 'items': [
                     'AI-powered menu recommendations',
                     'Unlimited high-quality image uploads',
@@ -204,10 +204,10 @@ def get_upgrade_benefits(restaurant_id):
                 'category': 'Business Intelligence',
                 'items': [
                     'Real-time analytics dashboard',
-                    'Customer behavior insights (LUX)',
-                    'POS integration (LUX)',
+                    'Customer behavior insights (DIAMOND)',
+                    'POS integration (DIAMOND)',
                 ]
             },
         ],
-        'cta': 'Upgrade to LUX for Full Automation' if restaurant.plan_type == 'PRO' else 'Upgrade to PRO for Digital Power'
+        'cta': 'Upgrade to DIAMOND for Full Automation' if restaurant.plan_type == 'GOLD' else 'Upgrade to GOLD for Digital Power'
     }

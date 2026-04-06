@@ -9,17 +9,17 @@ from dinematters.dinematters.api.coin_billing import deduct_coins
 
 def process_daily_subscription_floors():
     """
-    Nightly task (23:59) to ensure PRO (₹33.30 flat) and LUX (₹43.30 min) restaurants are billed correctly.
+    Nightly task (23:59) to ensure GOLD (₹33.30 flat) and DIAMOND (₹43.30 min) restaurants are billed correctly.
     """
     today = getdate()
     
-    # 1. Fetch all paid restaurants (PRO and LUX)
-    pro_lux_restaurants = frappe.get_all("Restaurant", 
-        filters={"plan_type": ["in", ["PRO", "LUX"]], "is_active": 1}, 
+    # 1. Fetch all paid restaurants (GOLD and DIAMOND)
+    gold_diamond_restaurants = frappe.get_all("Restaurant", 
+        filters={"plan_type": ["in", ["GOLD", "DIAMOND"]], "is_active": 1}, 
         fields=["name", "plan_type", "coins_balance", "timezone", "monthly_minimum"]
     )
     
-    for res in pro_lux_restaurants:
+    for res in gold_diamond_restaurants:
         try:
             from datetime import datetime, time, timedelta
             import pytz
@@ -38,9 +38,10 @@ def process_daily_subscription_floors():
 
             # 3. Check for Idempotency: Has a floor recovery already been processed for this restaurant today?
             # Use list of lists to avoid dictionary key overwrite bug (ensures both >= and < are applied)
+            # We check for both old names (PRO/LUX) and new names (GOLD/DIAMOND) for safety during transition
             already_processed = frappe.db.exists("Coin Transaction", [
                 ["restaurant", "=", res.name],
-                ["transaction_type", "in", ["Daily PRO Floor", "Daily LUX Floor", "Daily PRO Subscription"]],
+                ["transaction_type", "in", ["Daily SILVER Floor", "Daily GOLD Floor", "Daily DIAMOND Floor", "Daily GOLD Subscription", "Daily PRO Floor", "Daily LUX Floor", "Daily PRO Subscription"]],
                 ["creation", ">=", start_utc.strftime("%Y-%m-%d %H:%M:%S")],
                 ["creation", "<", end_utc.strftime("%Y-%m-%d %H:%M:%S")]
             ])
@@ -68,8 +69,8 @@ def process_daily_subscription_floors():
                 deduct_coins(
                     restaurant=res.name,
                     amount=shortfall,
-                    type=f"Daily {res.plan_type} {'Subscription' if res.plan_type == 'PRO' else 'Floor'}",
-                    description=f"Daily {res.plan_type} {'Fee' if res.plan_type == 'PRO' else 'Minimum Floor Recovery'} (Target: ₹{floor_target:.2f}, Commissions Paid: ₹{abs(float(daily_commissions)):.2f})"
+                    type=f"Daily {res.plan_type} {'Subscription' if res.plan_type == 'GOLD' else 'Floor'}",
+                    description=f"Daily {res.plan_type} {'Fee' if res.plan_type == 'GOLD' else 'Minimum Floor Recovery'} (Target: ₹{floor_target:.2f}, Commissions Paid: ₹{abs(float(daily_commissions)):.2f})"
                 )
         except Exception as e:
             frappe.log_error(f"Daily floor recovery failed for {res.name}: {str(e)}", "Billing Task Error")
@@ -137,13 +138,13 @@ def apply_deferred_plan_changes():
 
 def process_lite_feature_renewals():
     """
-    Daily task to renew premium features for LITE restaurants (e.g., Menu Theme Background).
+    Daily task to renew premium features for SILVER restaurants (e.g., Menu Theme Background).
     Deducts 100 coins every 30 days if feature is enabled.
     """
     from frappe.utils import today, add_days, getdate
     
-    # 1. Find all LITE restaurants with Menu Theme Background enabled
-    lite_configs = frappe.db.sql("""
+    # 1. Find all SILVER restaurants with Menu Theme Background enabled
+    gold_configs = frappe.db.sql("""
         SELECT 
             rc.name, rc.restaurant, rc.menu_theme_paid_until 
         FROM 
@@ -151,16 +152,16 @@ def process_lite_feature_renewals():
         JOIN 
             `tabRestaurant` r ON r.name = rc.restaurant
         WHERE 
-            r.plan_type = 'LITE' 
+            r.plan_type = 'SILVER' 
             AND rc.menu_theme_background_enabled = 1
             AND (rc.menu_theme_paid_until IS NULL OR rc.menu_theme_paid_until <= %s)
     """, (today(),), as_dict=1)
 
-    for config in lite_configs:
+    for config in gold_configs:
         try:
             # Double-check plan type just in case of a race condition or stale cache
             actual_plan = frappe.db.get_value("Restaurant", config.restaurant, "plan_type")
-            if actual_plan != 'LITE':
+            if actual_plan != 'SILVER':
                 # Skip and clear the paid_until since it shouldn't apply to premium tiers
                 frappe.db.set_value("Restaurant Config", config.name, "menu_theme_paid_until", None)
                 continue

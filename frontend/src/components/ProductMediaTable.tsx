@@ -10,7 +10,7 @@ import { Trash2, Upload, Image as ImageIcon, Video, Edit2, X, Check } from 'luci
 import { toast } from 'sonner'
 import { cn, getFrappeError } from '@/lib/utils'
 import { uploadToR2, getMediaType } from '@/lib/r2Upload'
-import LiteMediaUpload from './LiteMediaUpload'
+import SilverMediaUpload from './SilverMediaUpload'
 
 interface ProductMediaItem {
   name?: string
@@ -31,7 +31,7 @@ interface ProductMediaTableProps {
 }
 
 export default function ProductMediaTable({ value = [], onChange, required, disabled, productName }: ProductMediaTableProps) {
-  const { isLite } = useRestaurant()
+  const { isSilver } = useRestaurant()
   const [uploading, setUploading] = useState(false)
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [editData, setEditData] = useState<Partial<ProductMediaItem>>({})
@@ -39,7 +39,7 @@ export default function ProductMediaTable({ value = [], onChange, required, disa
   // Ensure value is always an array
   const currentValue = Array.isArray(value) ? value : []
 
-  const handleLiteUpload = async (files: File[]) => {
+  const handleSilverUpload = async (files: File[]) => {
     if (!productName) {
       throw new Error('Product must be saved before uploading media')
     }
@@ -200,14 +200,14 @@ export default function ProductMediaTable({ value = [], onChange, required, disa
         </div>
       </div>
 
-      {/* File Upload - Lite uses LiteMediaUpload, Pro uses regular upload */}
+      {/* File Upload - Silver uses SilverMediaUpload, Gold uses regular upload */}
       {!disabled && canAddMore && (
         <>
-          {isLite ? (
-            <LiteMediaUpload
-              onUpload={handleLiteUpload}
+          {isSilver ? (
+            <SilverMediaUpload
+              onUpload={handleSilverUpload}
               currentImageCount={imageCount}
-              maxImages={200} // Lite plan limit
+              maxImages={200} // Silver plan limit
               disabled={disabled}
             />
           ) : (

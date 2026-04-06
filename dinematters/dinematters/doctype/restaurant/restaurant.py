@@ -63,18 +63,18 @@ class Restaurant(Document):
 
 			# Auto-set billing defaults for the new plan
 			settings = frappe.get_single("Dinematters Settings")
-			if self.plan_type == "LUX":
-				self.monthly_minimum = settings.lux_monthly_floor or 1299.0
-				self.platform_fee_percent = settings.lux_commission_percent or 1.5
-			elif self.plan_type == "PRO":
-				self.monthly_minimum = settings.pro_monthly_fee or 999.0
+			if self.plan_type == "DIAMOND":
+				self.monthly_minimum = settings.diamond_monthly_floor or 1299.0
+				self.platform_fee_percent = settings.diamond_commission_percent or 1.5
+			elif self.plan_type == "GOLD":
+				self.monthly_minimum = settings.gold_monthly_fee or 999.0
 				self.platform_fee_percent = 0.0
-			elif self.plan_type == "LITE":
+			elif self.plan_type == "SILVER":
 				self.monthly_minimum = 0.0
 				self.platform_fee_percent = 0.0
 			
-			# Waiver individual feature fees for PRO/LUX (they are included)
-			if self.plan_type in ["PRO", "LUX"]:
+			# Waiver individual feature fees for GOLD/DIAMOND (they are included)
+			if self.plan_type in ["GOLD", "DIAMOND"]:
 				frappe.db.set_value("Restaurant Config", {"restaurant": self.name}, "menu_theme_paid_until", None)
 			
 			# Log the change (will be created in on_update)
@@ -692,13 +692,13 @@ def create_restaurant_config(self):
 			"apple_touch_icon": "",
 			"currency": self.currency or "INR",
 			"menu_layout": "2 Columns",
-			# Enable transactional features only for LUX subscription plan
-			"enable_table_booking": 1 if self.plan_type == "LUX" else 0,
-			"enable_banquet_booking": 1 if self.plan_type == "LUX" else 0,
-			"enable_events": 1 if self.plan_type == "LUX" else 0,
-			"enable_offers": 1 if self.plan_type == "LUX" else 0,
-			"enable_coupons": 1 if self.plan_type == "LUX" else 0,
-			"enable_experience_lounge": 1 if self.plan_type == "LUX" else 0,
+			# Enable transactional features only for DIAMOND subscription plan
+			"enable_table_booking": 1 if self.plan_type == "DIAMOND" else 0,
+			"enable_banquet_booking": 1 if self.plan_type == "DIAMOND" else 0,
+			"enable_events": 1 if self.plan_type == "DIAMOND" else 0,
+			"enable_offers": 1 if self.plan_type == "DIAMOND" else 0,
+			"enable_coupons": 1 if self.plan_type == "DIAMOND" else 0,
+			"enable_experience_lounge": 1 if self.plan_type == "DIAMOND" else 0,
 			"verify_my_user": 0,
 			"google_review_link": "",
 			"instagram_profile_link": "",
@@ -744,7 +744,7 @@ def create_default_home_features(self):
 				is_enabled = True
 			else:
 				# These are the premium transactional features
-				is_enabled = (self.plan_type == "LUX")
+				is_enabled = (self.plan_type == "DIAMOND")
 			
 			feat_doc = frappe.get_doc({
 				"doctype": "Home Feature",

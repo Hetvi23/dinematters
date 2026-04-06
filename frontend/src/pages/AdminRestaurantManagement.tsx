@@ -18,7 +18,7 @@ interface Restaurant {
   restaurant_name: string
   owner_email?: string
   is_active: number
-  plan_type: 'LITE' | 'PRO' | 'LUX'
+  plan_type: 'SILVER' | 'GOLD' | 'DIAMOND'
   coins_balance: number
   platform_fee_percent: number
   monthly_minimum: number
@@ -99,7 +99,7 @@ export default function AdminRestaurantManagement() {
     }
   }
 
-  const handlePlanChange = async (restaurantName: string, newPlan: 'LITE' | 'PRO' | 'LUX') => {
+  const handlePlanChange = async (restaurantName: string, newPlan: 'SILVER' | 'GOLD' | 'DIAMOND') => {
     try {
       setUpdating(restaurantName)
       const result = await updateRestaurantPlan({ restaurant_id: restaurantName, plan_type: newPlan }) as any
@@ -267,8 +267,8 @@ export default function AdminRestaurantManagement() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-indigo-600 mb-1">LUX Plans</p>
-                  <p className="text-3xl font-bold text-indigo-700">{restaurants.filter(r => r.plan_type === 'LUX').length}</p>
+                  <p className="text-sm font-medium text-indigo-600 mb-1">DIAMOND Plans</p>
+                  <p className="text-3xl font-bold text-indigo-700">{restaurants.filter(r => r.plan_type === 'DIAMOND').length}</p>
                 </div>
                 <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-600">
                   <Zap className="h-6 w-6" />
@@ -281,8 +281,8 @@ export default function AdminRestaurantManagement() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">PRO Plans</p>
-                  <p className="text-3xl font-bold">{restaurants.filter(r => r.plan_type === 'PRO').length}</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">GOLD Plans</p>
+                  <p className="text-3xl font-bold">{restaurants.filter(r => r.plan_type === 'GOLD').length}</p>
                 </div>
                 <div className="p-3 bg-purple-500/10 rounded-xl text-purple-600">
                   <Star className="h-6 w-6" />
@@ -295,8 +295,8 @@ export default function AdminRestaurantManagement() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">LITE Plans</p>
-                  <p className="text-3xl font-bold">{restaurants.filter(r => r.plan_type === 'LITE').length}</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">SILVER Plans</p>
+                  <p className="text-3xl font-bold">{restaurants.filter(r => r.plan_type === 'SILVER').length}</p>
                 </div>
                 <div className="p-3 bg-orange-500/10 rounded-xl text-orange-600">
                   <Shield className="h-6 w-6" />
@@ -359,8 +359,8 @@ export default function AdminRestaurantManagement() {
                           variant="outline"
                           className={cn(
                             "shadow-none",
-                            restaurant.plan_type === 'LUX' ? "bg-indigo-500/10 text-indigo-600 border-indigo-200" :
-                            restaurant.plan_type === 'PRO' ? "bg-primary/10 text-primary border-primary/20" : "bg-muted/50 text-muted-foreground border-transparent"
+                            restaurant.plan_type === 'DIAMOND' ? "bg-indigo-500/10 text-indigo-600 border-indigo-200" :
+                            restaurant.plan_type === 'GOLD' ? "bg-primary/10 text-primary border-primary/20" : "bg-muted/50 text-muted-foreground border-transparent"
                           )}
                         >
                           {restaurant.plan_type}
@@ -410,16 +410,16 @@ export default function AdminRestaurantManagement() {
 
                           <Select
                             value={restaurant.plan_type}
-                            onValueChange={(value: 'LITE' | 'PRO' | 'LUX') => handlePlanChange(restaurant.name, value)}
+                            onValueChange={(value: 'SILVER' | 'GOLD' | 'DIAMOND') => handlePlanChange(restaurant.name, value)}
                             disabled={updating === restaurant.name}
                           >
                             <SelectTrigger className="h-8 w-20 text-[10px] font-bold">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="LITE">LITE</SelectItem>
-                              <SelectItem value="PRO">PRO</SelectItem>
-                              <SelectItem value="LUX">LUX</SelectItem>
+                              <SelectItem value="SILVER">SILVER</SelectItem>
+                              <SelectItem value="GOLD">GOLD</SelectItem>
+                              <SelectItem value="DIAMOND">DIAMOND</SelectItem>
                             </SelectContent>
                           </Select>
 
@@ -456,21 +456,21 @@ export default function AdminRestaurantManagement() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-muted-foreground flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-indigo-500" /> LUX Plans
+                    <div className="h-2 w-2 rounded-full bg-indigo-500" /> DIAMOND Plans
                   </span>
-                  <span className="font-bold">{restaurants.filter(r => r.plan_type === 'LUX').length}</span>
+                  <span className="font-bold">{restaurants.filter(r => r.plan_type === 'DIAMOND').length}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-muted-foreground flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-primary" /> PRO Plans
+                    <div className="h-2 w-2 rounded-full bg-primary" /> GOLD Plans
                   </span>
-                  <span className="font-bold">{restaurants.filter(r => r.plan_type === 'PRO').length}</span>
+                  <span className="font-bold">{restaurants.filter(r => r.plan_type === 'GOLD').length}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-muted-foreground flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-orange-400" /> LITE Plans
+                    <div className="h-2 w-2 rounded-full bg-orange-400" /> SILVER Plans
                   </span>
-                  <span className="font-bold">{restaurants.filter(r => r.plan_type === 'LITE').length}</span>
+                  <span className="font-bold">{restaurants.filter(r => r.plan_type === 'SILVER').length}</span>
                 </div>
               </div>
             </CardContent>
@@ -540,10 +540,10 @@ export default function AdminRestaurantManagement() {
             </div>
             
             {/* Subscription Settings */}
-            {selectedRestaurant?.plan_type !== 'LITE' && (
+            {selectedRestaurant?.plan_type !== 'SILVER' && (
               <div className="space-y-2">
                 <Label>
-                  {selectedRestaurant?.plan_type === 'PRO' ? 'Monthly Subscription Fee' : 'Monthly Minimum Floor'}
+                  {selectedRestaurant?.plan_type === 'GOLD' ? 'Monthly Subscription Fee' : 'Monthly Minimum Floor'}
                 </Label>
                 <Input type="number" value={editMonthlyMinimum} onChange={(e) => setEditMonthlyMinimum(e.target.value)} />
                 <p className="text-[10px] text-muted-foreground italic">
@@ -555,7 +555,7 @@ export default function AdminRestaurantManagement() {
             <div className="space-y-2">
               <Label>Platform Fee (Commission) %</Label>
               <Input type="number" value={editPlatformFee} onChange={(e) => setEditPlatformFee(e.target.value)} />
-              <p className="text-[10px] text-muted-foreground italic">Percentage commission for {selectedRestaurant?.plan_type === 'LUX' ? 'LUX (Default 1.5%)' : 'orders'}.</p>
+              <p className="text-[10px] text-muted-foreground italic">Percentage commission for {selectedRestaurant?.plan_type === 'DIAMOND' ? 'DIAMOND (Default 1.5%)' : 'orders'}.</p>
             </div>
           </div>
           <DialogFooter>

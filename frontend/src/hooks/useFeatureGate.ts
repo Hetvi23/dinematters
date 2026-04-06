@@ -33,8 +33,8 @@ export function useFeatureGate(feature: FeatureKey, restaurantId?: string) {
         if (mounted) {
           setAccess({
             hasAccess: false,
-            currentPlan: 'LITE',
-            requiredPlans: ['PRO', 'LUX'],
+            currentPlan: 'SILVER',
+            requiredPlans: ['GOLD', 'DIAMOND'],
             feature,
           });
         }
@@ -56,7 +56,7 @@ export function useFeatureGate(feature: FeatureKey, restaurantId?: string) {
 }
 
 export function usePlanType(restaurantId?: string) {
-  const [planType, setPlanType] = useState<'LITE' | 'PRO' | 'LUX' | null>(null);
+  const [planType, setPlanType] = useState<'SILVER' | 'GOLD' | 'DIAMOND' | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -83,12 +83,12 @@ export function usePlanType(restaurantId?: string) {
 
         const data = await response.json();
         if (mounted) {
-          setPlanType(data.message?.plan_type || 'LITE');
+          setPlanType(data.message?.plan_type || 'SILVER');
         }
       } catch (error) {
         console.error('Error fetching plan type:', error);
         if (mounted) {
-          setPlanType('LITE');
+          setPlanType('SILVER');
         }
       } finally {
         if (mounted) {
@@ -104,5 +104,5 @@ export function usePlanType(restaurantId?: string) {
     };
   }, [restaurantId]);
 
-  return { planType, isLux: planType === 'LUX', isPro: planType === 'PRO', isLite: planType === 'LITE', loading };
+  return { planType, isDiamond: planType === 'DIAMOND', isGold: planType === 'GOLD', isSilver: planType === 'SILVER', loading };
 }

@@ -102,8 +102,8 @@ type NavGroup = {
 }
 type NavItem = NavLink | NavGroup
 
-const LUX_ONLY_FEATURES = ['ordering', 'loyalty', 'coupons', 'pos_integration', 'customer', 'order_settings', 'customer_pay_and_usage']
-const PRO_FEATURES = ['analytics', 'ai_recommendations', 'custom_branding', 'table_booking', 'games', 'events', 'offers', 'experience_lounge', 'video_upload', 'branding', 'whatsapp_orders']
+const DIAMOND_ONLY_FEATURES = ['ordering', 'loyalty', 'coupons', 'pos_integration', 'customer', 'order_settings', 'customer_pay_and_usage']
+const GOLD_FEATURES = ['analytics', 'ai_recommendations', 'custom_branding', 'table_booking', 'games', 'events', 'offers', 'experience_lounge', 'video_upload', 'branding', 'whatsapp_orders']
 
 const navigation: NavItem[] = [
   { type: 'link', name: 'Dashboard', href: '/dashboard', icon: Home },
@@ -177,7 +177,7 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
-  const { selectedRestaurant, setSelectedRestaurant, setRestaurantsData, isPro, isLux, planType, coinsBalance, billingStatus, isActive, refreshConfig, billingInfo } = useRestaurant()
+  const { selectedRestaurant, setSelectedRestaurant, setRestaurantsData, isGold, isDiamond, planType, coinsBalance, billingStatus, isActive, refreshConfig, billingInfo } = useRestaurant()
   const { formatAmountNoDecimals } = useCurrency()
   const [sidebarOpen, setSidebarOpen] = useState(false) // Mobile sidebar
   const [sidebarExpanded, setSidebarExpanded] = useState(true) // Desktop sidebar expanded/collapsed
@@ -251,14 +251,14 @@ export default function Layout({ children }: LayoutProps) {
   // Helper to determine feature locking and required plan
   const getFeatureStatus = (feature?: string) => {
     if (!feature) return { isLocked: false, requiredTier: null }
-    if (isLux) return { isLocked: false, requiredTier: null }
+    if (isDiamond) return { isLocked: false, requiredTier: null }
     
-    if (LUX_ONLY_FEATURES.includes(feature)) {
-       return { isLocked: true, requiredTier: 'LUX' }
+    if (DIAMOND_ONLY_FEATURES.includes(feature)) {
+       return { isLocked: true, requiredTier: 'DIAMOND' }
     }
     
-    if (PRO_FEATURES.includes(feature)) {
-       return { isLocked: !isPro, requiredTier: 'PRO' }
+    if (GOLD_FEATURES.includes(feature)) {
+       return { isLocked: !isGold, requiredTier: 'GOLD' }
     }
     
     return { isLocked: false, requiredTier: null }
@@ -634,19 +634,19 @@ export default function Layout({ children }: LayoutProps) {
                                 <span className="inline-block truncate whitespace-nowrap overflow-hidden text-ellipsis">
                                   {restaurantDoc?.restaurant_name || currentRestaurant?.restaurant_name || restaurants[0]?.restaurant_name || 'Select Restaurant'}
                                 </span>
-                                {isLux ? (
+                                {isDiamond ? (
                                   <span className="inline-flex items-center px-1.5 py-0 text-[10px] font-black bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-md border border-white/20 rounded-full flex-shrink-0 animate-pulse-subtle">
                                     <Crown className="h-2.5 w-2.5 mr-1 text-white" />
-                                    LUX
+                                    DIAMOND
                                   </span>
-                                ) : isPro ? (
+                                ) : isGold ? (
                                   <span className="inline-flex items-center px-1.5 py-0 text-[9px] font-bold bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-sm rounded-full flex-shrink-0">
                                     <Crown className="h-2.5 w-2.5 mr-1" />
-                                    PRO
+                                    GOLD
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center px-1.5 py-0 text-[9px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 rounded-full flex-shrink-0">
-                                    LITE
+                                    SILVER
                                   </span>
                                 )}
                               </div>
@@ -765,8 +765,8 @@ export default function Layout({ children }: LayoutProps) {
                 if (item.adminOnly && !isAdmin) {
                   return false
                 }
-                // WhatsApp Orders visibility: only PRO (Active) and LITE (Locked), hidden for LUX
-                if (item.feature === 'whatsapp_orders' && isLux) {
+                // WhatsApp Orders visibility: only GOLD (Active) and SILVER (Locked), hidden for DIAMOND
+                if (item.feature === 'whatsapp_orders' && isDiamond) {
                   return false
                 }
                 if (item.type === 'group') {
@@ -792,7 +792,7 @@ export default function Layout({ children }: LayoutProps) {
                   const featureStatus = getFeatureStatus(item.feature)
                   const isLocked = featureStatus.isLocked
 
-                  const LockIcon = (item.feature && LUX_ONLY_FEATURES.includes(item.feature)) 
+                  const LockIcon = (item.feature && DIAMOND_ONLY_FEATURES.includes(item.feature)) 
                     ? (
                       <div className="flex items-center gap-0.5 flex-shrink-0">
                         <Lock className="h-3 w-3 text-muted-foreground/60" />
@@ -875,7 +875,7 @@ export default function Layout({ children }: LayoutProps) {
                 const allChildrenLocked = filteredChildren.length > 0 && filteredChildren.every(child => getFeatureStatus(child.feature).isLocked)
                 const isGroupFullyLocked = isGroupLocked || allChildrenLocked
 
-                const GroupLockIcon = (group.feature && LUX_ONLY_FEATURES.includes(group.feature)) 
+                const GroupLockIcon = (group.feature && DIAMOND_ONLY_FEATURES.includes(group.feature)) 
                   ? (
                     <div className="flex items-center gap-0.5 flex-shrink-0">
                       <Lock className="h-3 w-3 text-muted-foreground/60" />
@@ -921,7 +921,7 @@ export default function Layout({ children }: LayoutProps) {
                             const childStatus = getFeatureStatus(child.feature)
                             const isChildLocked = childStatus.isLocked
 
-                            const ChildLockIcon = (child.feature && LUX_ONLY_FEATURES.includes(child.feature)) 
+                            const ChildLockIcon = (child.feature && DIAMOND_ONLY_FEATURES.includes(child.feature)) 
                               ? <Star className="h-3 w-3 text-amber-500 flex-shrink-0 ml-auto" />
                               : <Lock className="h-3 w-3 text-muted-foreground/60 flex-shrink-0 ml-auto" />
                             return (
@@ -1031,7 +1031,7 @@ export default function Layout({ children }: LayoutProps) {
                             const childStatus = getFeatureStatus(child.feature)
                             const isChildLocked = childStatus.isLocked
 
-                            const ChildLockIcon = (child.feature && LUX_ONLY_FEATURES.includes(child.feature)) 
+                            const ChildLockIcon = (child.feature && DIAMOND_ONLY_FEATURES.includes(child.feature)) 
                               ? (
                                 <div className="flex items-center gap-0.5 flex-shrink-0">
                                   <Lock className="h-3 w-3 text-muted-foreground/60" />

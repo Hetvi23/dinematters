@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react'
 
 interface FeatureProtectedRouteProps {
   feature?: string
-  requirePro?: boolean
+  requireGold?: boolean
 }
 
-export default function FeatureProtectedRoute({ feature, requirePro = false }: FeatureProtectedRouteProps) {
-  const { isPro, isLux, features, isLoading } = useRestaurant()
+export default function FeatureProtectedRoute({ feature, requireGold = false }: FeatureProtectedRouteProps) {
+  const { isGold, isDiamond, features, isLoading } = useRestaurant()
   const [hasTimedOut, setHasTimedOut] = useState(false)
 
   useEffect(() => {
@@ -29,10 +29,10 @@ export default function FeatureProtectedRoute({ feature, requirePro = false }: F
 
   // Simple access determination
   const hasAccess = Boolean(
-    isLux || 
-    (requirePro && (isPro || isLux)) ||
+    isDiamond || 
+    (requireGold && (isGold || isDiamond)) ||
     (feature && (features as any)?.[feature]) ||
-    (!requirePro && !feature) ||
+    (!requireGold && !feature) ||
     hasTimedOut
   )
 

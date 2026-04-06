@@ -22,10 +22,10 @@
   "borzo_mode",
   "google_maps_api_key",
   "section_subscription_defaults",
-  "pro_monthly_fee",
-  "lux_monthly_floor",
-  "lux_commission_percent",
-  "lux_upgrade_barrier"
+  "gold_monthly_fee",
+  "diamond_monthly_floor",
+  "diamond_commission_percent",
+  "diamond_upgrade_barrier"
  ],
  "fields": [
   {
@@ -127,27 +127,27 @@
   },
   {
    "default": "999",
-   "fieldname": "pro_monthly_fee",
+   "fieldname": "gold_monthly_fee",
    "fieldtype": "Float",
-   "label": "PRO Monthly Fee"
+   "label": "GOLD Monthly Fee"
   },
   {
    "default": "1299",
-   "fieldname": "lux_monthly_floor",
+   "fieldname": "diamond_monthly_floor",
    "fieldtype": "Float",
-   "label": "LUX Monthly Floor"
+   "label": "DIAMOND Monthly Floor"
   },
   {
    "default": "1.5",
-   "fieldname": "lux_commission_percent",
+   "fieldname": "diamond_commission_percent",
    "fieldtype": "Percent",
-   "label": "LUX Commission Percent"
+   "label": "DIAMOND Commission Percent"
   },
   {
    "default": "2499",
-   "fieldname": "lux_upgrade_barrier",
+   "fieldname": "diamond_upgrade_barrier",
    "fieldtype": "Float",
-   "label": "LUX Upgrade Barrier (Coins)"
+   "label": "DIAMOND Upgrade Barrier (Coins)"
   }
  ],
  "index_web_pages_for_search": 1,

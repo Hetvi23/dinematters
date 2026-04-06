@@ -1,7 +1,7 @@
 /**
  * UpgradeButton Component
  * 
- * CTA button for upgrading to PRO plan
+ * CTA button for upgrading to GOLD plan
  */
 
 import { ArrowUpRight } from 'lucide-react';
@@ -36,7 +36,7 @@ export function UpgradeButton({ size = 'md', variant = 'primary', className = ''
         ${className}
       `}
     >
-      Upgrade to PRO
+      Upgrade to GOLD
       <ArrowUpRight className="w-4 h-4" />
     </button>
   );
