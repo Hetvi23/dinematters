@@ -72,25 +72,32 @@ def require_plan(*required_plans):
             
             # Get restaurant document
             try:
-                restaurant = frappe.get_doc('Restaurant', restaurant_id)
-            except frappe.DoesNotExistError:
+                # We use db.get_value to avoid permission checks on get_doc for Guest users
+                plan_type = frappe.db.get_value('Restaurant', restaurant_id, 'plan_type') or 'SILVER'
+            except Exception:
                 frappe.throw(
-                    _('Restaurant {0} does not exist').format(restaurant_id),
-                    frappe.DoesNotExistError
+                    _('Restaurant {0} does not exist or access denied').format(restaurant_id),
+                    frappe.exceptions.DoesNotExistError
                 )
             
             # Check if restaurant's plan is in required plans
-            if restaurant.plan_type not in required_plans:
+            if plan_type not in required_plans:
                 frappe.throw(
                     _('This feature requires {0} plan. Your current plan is {1}. Please upgrade to access this feature.').format(
                         ' or '.join(required_plans),
-                        restaurant.plan_type or 'SILVER'
+                        plan_type
                     ),
                     PermissionError
                 )
             
             # Plan check passed, execute the function
             return func(*args, **kwargs)
+        
+        # Ensure Frappe whitelisting attributes are preserved if applied to the inner function
+        if hasattr(func, 'whitelisted'):
+            wrapper.whitelisted = func.whitelisted
+        if hasattr(func, 'allow_guest'):
+            wrapper.allow_guest = func.allow_guest
         
         return wrapper
     return decorator

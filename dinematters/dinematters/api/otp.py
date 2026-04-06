@@ -9,7 +9,12 @@ SMS primary, WhatsApp fallback. Platform-wide verification.
 import random
 import string
 import frappe
-from dinematters.dinematters.utils.customer_helpers import normalize_phone, get_or_create_customer, is_phone_verified
+from dinematters.dinematters.utils.customer_helpers import (
+	normalize_phone,
+	get_or_create_customer,
+	is_phone_verified,
+	create_customer_session
+)
 from dinematters.dinematters.utils.otp_service import (
 	send_otp_via_sms,
 	send_otp_via_whatsapp,
@@ -40,12 +45,8 @@ def send_otp(restaurant_id, phone, purpose="verification", restaurant_name=None,
 				try:
 					customer = get_or_create_customer(normalized)
 					if customer:
-						session_token = frappe.generate_hash(length=48)
-						frappe.cache().set_value(
-							f"customer_session:{session_token}",
-							{"customer_id": customer.name, "phone": normalized},
-							expires_in_sec=30 * 24 * 60 * 60  # 30 days
-						)
+						# Generate session token using specialized helper (ensures DB persistence)
+						session_token = create_customer_session(phone=normalized, customer_id=customer.name)
 						frappe.db.commit()
 						return {"success": True, "skip_verification": True, "session_token": session_token}
 				except Exception as e:
@@ -183,13 +184,8 @@ def verify_otp(restaurant_id, phone, otp, token, name=None, email=None, referral
 			from dinematters.dinematters.api.loyalty import process_referral_welcome_bonus
 			process_referral_welcome_bonus(customer.name, restaurant_id, referral_id)
 
-		# Generate session token for production-ready secure login
-		session_token = frappe.generate_hash(length=48)
-		frappe.cache().set_value(
-			f"customer_session:{session_token}",
-			{"customer_id": customer.name, "phone": normalized},
-			expires_in_sec=30 * 24 * 60 * 60  # 30 days
-		)
+		# Generate session token using specialized helper (ensures DB persistence)
+		session_token = create_customer_session(phone=normalized, customer_id=customer.name)
 
 		return {
 			"success": True,

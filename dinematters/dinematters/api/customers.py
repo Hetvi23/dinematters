@@ -11,23 +11,42 @@ from dinematters.dinematters.utils.permission_helpers import get_user_restaurant
 from dinematters.dinematters.utils.customer_helpers import normalize_phone
 from dinematters.dinematters.utils.feature_gate import require_plan
 
-@frappe.whitelist()
 @require_plan('DIAMOND')
+@frappe.whitelist(allow_guest=True)
 def get_customer_by_phone(phone, restaurant_id):
 	"""
 	Fetch customer details by phone and restaurant.
-	Returns customer info (id, phone, name, email, verified, lastVisited at this restaurant)
-	if the customer has orders/bookings at this restaurant, or exists and user has access.
+	Returns customer info (id, phone, name, email, verified, lastVisited at this restaurant).
+	Secure access: 
+	- Admin/Staff with restaurant access
+	- Customers with valid X-Customer-Token matching the phone number
 	"""
 	try:
-		restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user)
-		restaurant_ids = get_user_restaurant_ids(frappe.session.user)
-		if "System Manager" not in frappe.get_roles() and restaurant not in restaurant_ids:
-			return {"success": False, "error": "Permission denied"}
-
 		normalized = normalize_phone(phone)
 		if not normalized or len(normalized) != 10:
 			return {"success": False, "error": "Invalid phone number"}
+
+		# 1. Authorization Check
+		is_authorized = False
+		
+		# Check if User is a System User (Admin/Staff)
+		if frappe.session.user != "Guest":
+			restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user)
+			restaurant_ids = get_user_restaurant_ids(frappe.session.user)
+			if "System Manager" in frappe.get_roles() or restaurant in restaurant_ids:
+				is_authorized = True
+		
+		# If Guest, check X-Customer-Token
+		if not is_authorized:
+			customer_token = frappe.get_request_header("X-Customer-Token")
+			if customer_token:
+				from dinematters.dinematters.api.otp import check_session
+				session_res = check_session(customer_token)
+				if session_res.get("success") and normalize_phone(session_res.get("phone")) == normalized:
+					is_authorized = True
+
+		if not is_authorized:
+			return {"success": False, "error": "Permission denied. Valid session required."}
 
 		# Find customer by phone (try normalized and common variants)
 		customer_id = frappe.db.get_value("Customer", {"phone": normalized}, "name")
