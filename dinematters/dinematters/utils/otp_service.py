@@ -175,6 +175,7 @@ def send_otp_via_evolution_api(url: str, api_key: str, instance: str, phone: str
 	"""Send OTP via Evolution API (WhatsApp). Returns True if successful."""
 	try:
 		if not url or not api_key or not instance:
+			print("❌ Evolution API Error: Missing URL, API_KEY or Instance in Settings.")
 			return False
 
 		to = re.sub(r"\D", "", str(phone))
@@ -185,6 +186,9 @@ def send_otp_via_evolution_api(url: str, api_key: str, instance: str, phone: str
 		url = url.rstrip("/")
 		endpoint = f"{url}/message/sendText/{instance}"
 		
+		print(f"📡 Sending to Evolution API: {endpoint}")
+		print(f"📱 Phone: {to} | OTP: {otp}")
+
 		headers = {
 			"apikey": api_key,
 			"Content-Type": "application/json"
@@ -204,13 +208,19 @@ def send_otp_via_evolution_api(url: str, api_key: str, instance: str, phone: str
 		}
 
 		resp = requests.post(endpoint, json=payload, headers=headers, timeout=12)
+		print(f"📥 Status: {resp.status_code}")
+		print(f"📥 Response: {resp.text}")
+
 		data = resp.json() if resp.text else {}
 		
 		success = resp.status_code in [200, 201] and data.get("key")
 		if not success:
 			frappe.log_error(f"Evolution API Failed: {resp.text}", "OTP_Evolution_Failed")
+		else:
+			print("✅ Success: Message queued in Evolution API.")
 			
 		return success
 	except Exception as e:
+		print(f"🚨 Python Error during Evolution API call: {e}")
 		frappe.log_error(f"Evolution API failed: {e}", "OTP_Evolution_Error")
 		return False
