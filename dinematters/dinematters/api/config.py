@@ -213,6 +213,7 @@ def get_restaurant_config(restaurant_id):
 				"order_settings": {
 					"enable_takeaway": bool(restaurant_doc.get("enable_takeaway", 1)),
 					"enable_delivery": bool(restaurant_doc.get("enable_delivery", 0)),
+					"enable_dine_in": bool(restaurant_doc.get("enable_dine_in", 1)),
 					"no_ordering": bool(restaurant_doc.get("no_ordering", 0)),
 					"default_packaging_fee": flt(restaurant_doc.get("default_packaging_fee", 0)),
 					"minimum_order_value": flt(restaurant_doc.get("minimum_order_value", 0)),
@@ -244,7 +245,7 @@ def get_restaurant_config(restaurant_id):
 				"platform_fee_percent": float(restaurant_doc.platform_fee_percent or 0),
 				"features": {
 					# Transactional (DIAMOND only)
-					"ordering": restaurant_doc.plan_type == "DIAMOND",
+					"ordering": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
 					"loyalty": restaurant_doc.plan_type == "DIAMOND",
 					"coupons": restaurant_doc.plan_type == "DIAMOND",
 					"games": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
@@ -637,6 +638,7 @@ def update_order_settings(restaurant_id, settings):
 		allowed_fields = [
 			"enable_takeaway", 
 			"enable_delivery", 
+			"enable_dine_in",
 			"no_ordering",
 			"default_packaging_fee", 
 			"minimum_order_value", 
@@ -650,7 +652,7 @@ def update_order_settings(restaurant_id, settings):
 			if field in settings:
 				value = settings[field]
 				# Ensure correct type for Check fields
-				if field in ["enable_takeaway", "enable_delivery", "no_ordering"]:
+				if field in ["enable_takeaway", "enable_delivery", "enable_dine_in", "no_ordering"]:
 					value = 1 if value else 0
 				# Ensure correct type for Numeric fields
 				elif field in ["default_packaging_fee", "minimum_order_value", "default_delivery_fee"]:

@@ -33,7 +33,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Transaction Type",
-   "options": "Purchase\nAI Deduction\nCommission Deduction\nRefund\nAdmin Adjustment\nFree Coins\nAutopay Recharge\nDaily SILVER Floor\nDaily GOLD Floor\nDaily DIAMOND Floor\nDaily GOLD Subscription\nDaily DIAMOND Subscription\nDaily PRO Floor\nDaily LUX Floor\nDaily PRO Subscription\nLead Unlock",
+   "options": "Purchase\nAI Deduction\nCommission Deduction\nMarketing Deduction\nRefund\nAdmin Adjustment\nFree Coins\nAutopay Recharge\nDaily SILVER Floor\nDaily GOLD Floor\nDaily DIAMOND Floor\nDaily GOLD Subscription\nDaily DIAMOND Subscription\nDaily PRO Floor\nDaily LUX Floor\nDaily PRO Subscription\nLead Unlock",
    "reqd": 1
   },
   {

@@ -415,7 +415,13 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                       </div>
                       <div className="flex-1 space-y-1">
                         <p className="text-xs font-bold uppercase tracking-tighter text-muted-foreground">Drop Location</p>
-                        <p className="text-xs font-medium leading-relaxed">{[order.delivery_address, order.delivery_landmark, order.delivery_city, order.delivery_zip_code].filter(Boolean).join(', ')}</p>
+                        <p className="text-xs font-medium leading-relaxed">{[order.delivery_house_number ? `#${order.delivery_house_number}` : '', order.delivery_address, order.delivery_landmark, order.delivery_city, order.delivery_zip_code].filter(Boolean).join(', ')}</p>
+                        {order.delivery_instructions && (
+                          <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-800/50">
+                            <p className="text-[10px] font-black uppercase text-amber-600 mb-0.5">Instructions</p>
+                            <p className="text-xs font-medium italic">"{order.delivery_instructions}"</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

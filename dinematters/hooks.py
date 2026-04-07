@@ -180,7 +180,9 @@ doc_events = {
 		"before_save": "dinematters.dinematters.api.customers.normalize_order_phone_on_save",
 		"after_insert": [
 			"dinematters.dinematters.api.customers.update_customer_last_visited",
-			"dinematters.dinematters.api.realtime.notify_order_update"
+			"dinematters.dinematters.api.realtime.notify_order_update",
+			# Marketing Studio: fire 'On Order Complete' triggers
+			"dinematters.dinematters.tasks.marketing_tasks.fire_order_complete_triggers"
 		],
 		"on_update": [
 			"dinematters.dinematters.api.realtime.notify_order_update",
@@ -218,7 +220,9 @@ scheduler_events = {
 		"dinematters.dinematters.api.coin_billing.process_monthly_subscription_coin_refill"
 	],
 	"hourly": [
-		"dinematters.dinematters.api.payments.process_retry_charges"
+		"dinematters.dinematters.api.payments.process_retry_charges",
+		# Marketing Studio: check for campaign conversions every hour
+		"dinematters.dinematters.tasks.marketing_tasks.check_campaign_conversions",
 	],
 	"cron": {
 		"59 23 * * *": [  # Run daily at 23:59 for floor recovery and lite renewals
@@ -227,7 +231,15 @@ scheduler_events = {
 		],
 		"1 0 * * *": [    # Run daily at 00:01 for plan switches
 			"dinematters.dinematters.tasks.subscription_tasks.apply_deferred_plan_changes",
-		]
+		],
+		# Marketing Studio: dispatch scheduled campaigns every 15 minutes
+		"*/15 * * * *": [
+			"dinematters.dinematters.tasks.marketing_tasks.dispatch_scheduled_campaigns",
+		],
+		# Marketing Studio: fire event-based triggers every 30 minutes
+		"*/30 * * * *": [
+			"dinematters.dinematters.tasks.marketing_tasks.fire_triggers",
+		],
 	}
 }
 

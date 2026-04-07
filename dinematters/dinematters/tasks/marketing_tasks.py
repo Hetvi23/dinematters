@@ -1,0 +1,669 @@
+# Copyright (c) 2026, DineMatters and contributors
+# For license information, please see license.txt
+
+"""
+Marketing Tasks — Background Scheduler Jobs
+
+Schedule:
+  - dispatch_scheduled_campaigns  : */15 * * * *
+  - fire_triggers                 : */30 * * * *
+  - check_campaign_conversions    : hourly
+
+Design decisions:
+  - Batch sending (50/chunk) with 0.5s sleep to respect API rate limits
+  - Opt-out / TRAI DND compliance via Customer.opted_out_of_marketing
+  - Balance check before EACH batch — campaign pauses if coins run out
+  - Email subject support on all email sends
+  - 'On Order Complete' trigger fired from order hook (not scheduler)
+  - Custom SQL segment removed from dispatcher (SQL injection risk)
+"""
+
+import frappe
+import time
+from frappe.utils import now_datetime, getdate, add_days
+
+BATCH_SIZE = 50          # messages per batch to avoid API rate limits
+BATCH_SLEEP_SEC = 0.5    # seconds between batches
+
+
+# ═══════════════════════════════════════════════════════════════════
+# SCHEDULER ENTRY POINTS
+# ═══════════════════════════════════════════════════════════════════
+
+def dispatch_scheduled_campaigns():
+    """Every 15 min: pick up Scheduled campaigns whose time has arrived."""
+    now = now_datetime()
+    pending = frappe.get_all(
+        "Marketing Campaign",
+        filters={"status": "Scheduled", "scheduled_at": ["<=", now]},
+        pluck="name"
+    )
+    for campaign_id in pending:
+        frappe.db.set_value("Marketing Campaign", campaign_id, "status", "Sending")
+        frappe.enqueue(
+            "dinematters.dinematters.tasks.marketing_tasks.dispatch_campaign_task",
+            campaign_id=campaign_id,
+            queue="long",
+            timeout=7200
+        )
+    if pending:
+        frappe.db.commit()
+
+
+def fire_triggers():
+    """Every 30 min: fire scheduled-category triggers (birthday, win-back, milestone)."""
+    active_triggers = frappe.get_all(
+        "Marketing Trigger",
+        filters={"is_active": 1},
+        fields=["name", "trigger_name", "restaurant", "trigger_event", "channel",
+                "delay_hours", "days_since_visit", "loyalty_milestone_coins",
+                "message_template", "email_subject", "include_coupon", "coupon_code",
+                "total_fired"]
+    )
+
+    settings = frappe.get_single("Dinematters Settings")
+    restaurant_name_cache = {}
+
+    for trigger in active_triggers:
+        # Only scheduled-type triggers here; On Order Complete is handled via hook
+        if trigger.trigger_event in ("On Order Complete", "On Referral Signup"):
+            continue
+        try:
+            customers_to_fire = _get_trigger_customers(trigger)
+            for customer in customers_to_fire:
+                _fire_single_trigger(trigger, customer, settings, restaurant_name_cache)
+        except Exception as e:
+            frappe.log_error(f"Trigger fire failed for {trigger.name}: {str(e)}", "Marketing Task")
+
+    frappe.db.commit()
+
+
+def check_campaign_conversions():
+    """Every hour: attribute conversions to events sent in the last 24h."""
+    recent_events = frappe.get_all(
+        "Marketing Event",
+        filters={
+            "status": "Sent",
+            "sent_at": [">=", add_days(now_datetime(), -1)]
+        },
+        fields=["name", "campaign", "restaurant", "customer", "sent_at"]
+    )
+
+    campaign_deltas = {}
+
+    for event in recent_events:
+        if not event.customer or not event.restaurant:
+            continue
+        order = frappe.db.get_value(
+            "Order",
+            filters={
+                "platform_customer": event.customer,
+                "restaurant": event.restaurant,
+                "creation": [">=", event.sent_at],
+                "status": ["not in", ["cancelled", "draft"]]
+            },
+            fieldname=["name", "total"],
+            as_dict=True
+        )
+        if order:
+            frappe.db.set_value("Marketing Event", event.name, {
+                "status": "Converted",
+                "converted_at": now_datetime(),
+                "conversion_order": order.name
+            })
+            if event.campaign:
+                delta = campaign_deltas.setdefault(event.campaign, {"count": 0, "revenue": 0})
+                delta["count"] += 1
+                delta["revenue"] += float(order.total or 0)
+
+    for campaign_id, delta in campaign_deltas.items():
+        current = frappe.db.get_value(
+            "Marketing Campaign", campaign_id,
+            ["total_conversions", "revenue_attributed"], as_dict=True
+        )
+        frappe.db.set_value("Marketing Campaign", campaign_id, {
+            "total_conversions": (current.total_conversions or 0) + delta["count"],
+            "revenue_attributed": float(current.revenue_attributed or 0) + delta["revenue"]
+        })
+
+    frappe.db.commit()
+
+
+# ═══════════════════════════════════════════════════════════════════
+# CAMPAIGN DISPATCHER (background job)
+# ═══════════════════════════════════════════════════════════════════
+
+def dispatch_campaign_task(campaign_id):
+    """
+    Core dispatcher. Sends in batches of BATCH_SIZE with coin balance check each batch.
+    Skips opted-out customers.
+    """
+    try:
+        campaign = frappe.get_doc("Marketing Campaign", campaign_id)
+        settings = frappe.get_single("Dinematters Settings")
+        coins_per_msg = _get_coins_per_msg(settings, campaign.channel)
+
+        seg_doc = frappe.get_doc("Marketing Segment", campaign.target_segment)
+        customers = seg_doc.get_customer_list()
+
+        # Filter opted-out customers
+        opted_out = _get_opted_out_phones(campaign.restaurant)
+        customers = [c for c in customers if c.get("phone") not in opted_out]
+
+        restaurant_name = (
+            frappe.db.get_value("Restaurant", campaign.restaurant, "restaurant_name")
+            or campaign.restaurant
+        )
+
+        total_sent = 0
+        total_failed = 0
+        total_cost = 0.0
+        paused_reason = None
+
+        # Process in batches
+        for chunk_start in range(0, len(customers), BATCH_SIZE):
+            chunk = customers[chunk_start: chunk_start + BATCH_SIZE]
+
+            # ✅ FIX: Check balance BEFORE each batch
+            balance = float(frappe.db.get_value("Restaurant", campaign.restaurant, "coins_balance") or 0)
+            batch_cost = len(chunk) * coins_per_msg
+            if balance < batch_cost:
+                paused_reason = f"Paused: Insufficient Coins ({balance:.1f} available, need {batch_cost:.1f})"
+                frappe.log_error(
+                    f"Campaign {campaign_id} paused mid-send: {paused_reason}", "Marketing Task"
+                )
+                break
+
+            for customer in chunk:
+                try:
+                    message = _resolve_template(
+                        campaign.message_template,
+                        customer_name=customer.get("customer_name") or "Valued Customer",
+                        restaurant_name=restaurant_name,
+                        loyalty_balance=_get_loyalty_balance(customer.get("customer"), campaign.restaurant),
+                        coupon_code=campaign.coupon_code or ""
+                    )
+
+                    success, error = _send_message(
+                        channel=campaign.channel,
+                        phone=customer.get("phone", ""),
+                        message=message,
+                        settings=settings,
+                        subject=getattr(campaign, "email_subject", None)
+                    )
+
+                    event_doc = frappe.get_doc({
+                        "doctype": "Marketing Event",
+                        "campaign": campaign_id,
+                        "restaurant": campaign.restaurant,
+                        "customer": customer.get("customer"),
+                        "channel": campaign.channel,
+                        "phone": customer.get("phone"),
+                        "status": "Sent" if success else "Failed",
+                        "error_message": error if not success else None,
+                        "sent_at": now_datetime(),
+                        "coins_charged": coins_per_msg if success else 0
+                    })
+                    event_doc.insert(ignore_permissions=True)
+
+                    if success:
+                        _safe_deduct_coins(
+                            campaign.restaurant, coins_per_msg,
+                            f"Marketing {campaign.channel}: '{campaign.campaign_name}'",
+                            "Marketing Campaign", campaign_id
+                        )
+                        total_sent += 1
+                        total_cost += coins_per_msg
+                    else:
+                        total_failed += 1
+
+                except Exception as err:
+                    frappe.log_error(
+                        f"Campaign {campaign_id} → {customer.get('phone')}: {str(err)}",
+                        "Marketing Task"
+                    )
+                    total_failed += 1
+
+            frappe.db.commit()
+            time.sleep(BATCH_SLEEP_SEC)  # Rate limiting between batches
+
+        # Final stats update
+        frappe.db.set_value("Marketing Campaign", campaign_id, {
+            "status": "Sent" if not paused_reason else "Failed",
+            "sent_at": now_datetime(),
+            "total_sent": total_sent,
+            "total_failed": total_failed,
+            "total_cost_coins": total_cost,
+            "notes": paused_reason or (frappe.db.get_value("Marketing Campaign", campaign_id, "notes") or "")
+        })
+        frappe.db.commit()
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), f"Campaign Dispatch Failed: {campaign_id}")
+        frappe.db.set_value("Marketing Campaign", campaign_id, "status", "Failed")
+        frappe.db.commit()
+
+
+# ═══════════════════════════════════════════════════════════════════
+# ORDER COMPLETE TRIGGER — called from hooks
+# ═══════════════════════════════════════════════════════════════════
+
+def fire_order_complete_triggers(order_doc, method=None):
+    """
+    Called from doc_events -> Order -> after_insert.
+    Finds active 'On Order Complete' triggers for the restaurant and enqueues delayed sends.
+    """
+    restaurant = order_doc.restaurant
+    customer_id = order_doc.platform_customer
+    if not restaurant or not customer_id:
+        return
+
+    # Fast path: check if any active triggers exist for this restaurant
+    triggers = frappe.get_all(
+        "Marketing Trigger",
+        filters={"restaurant": restaurant, "trigger_event": "On Order Complete", "is_active": 1},
+        fields=["name", "delay_hours"]
+    )
+    if not triggers:
+        return
+
+    # Check opt-out
+    opted_out = frappe.db.get_value("Customer", customer_id, "opted_out_of_marketing")
+    if opted_out:
+        return
+
+    for trigger in triggers:
+        delay_seconds = int((trigger.delay_hours or 0) * 3600)
+        frappe.enqueue(
+            "dinematters.dinematters.tasks.marketing_tasks._fire_trigger_for_customer",
+            trigger_name=trigger.name,
+            customer_id=customer_id,
+            queue="default",
+            timeout=300,
+            is_async=True,
+            at_front=False,
+            enqueue_after_commit=True,
+            **{"eta": delay_seconds} if delay_seconds > 0 else {}
+        )
+
+
+def _fire_trigger_for_customer(trigger_name, customer_id):
+    """Background job: fire a single trigger for a single customer."""
+    trigger = frappe.get_doc("Marketing Trigger", trigger_name)
+    if not trigger.is_active:
+        return
+
+    customer = frappe.db.get_value(
+        "Customer", customer_id,
+        ["name", "phone", "customer_name", "opted_out_of_marketing"],
+        as_dict=True
+    )
+    if not customer or not customer.phone or customer.opted_out_of_marketing:
+        return
+
+    settings = frappe.get_single("Dinematters Settings")
+    _fire_single_trigger(trigger, customer, settings, {})
+    frappe.db.commit()
+
+
+# ═══════════════════════════════════════════════════════════════════
+# OPT-OUT HANDLER — WhatsApp/SMS reply webhook
+# ═══════════════════════════════════════════════════════════════════
+
+def handle_opt_out_reply(phone, keyword="STOP"):
+    """
+    Called when a customer replies with STOP / UNSUBSCRIBE via WhatsApp or SMS.
+    Sets opted_out_of_marketing = 1 and records the keyword.
+    TRAI DND compliance.
+    """
+    customer_name = frappe.db.get_value("Customer", {"phone": phone}, "name")
+    if not customer_name:
+        # Try normalised phone (strip +91)
+        phone_clean = phone.replace("+91", "").replace("+", "").strip()
+        phone_with_code = f"+91{phone_clean}"
+        customer_name = frappe.db.get_value("Customer", {"phone": phone_with_code}, "name")
+
+    if not customer_name:
+        return False
+
+    frappe.db.set_value("Customer", customer_name, {
+        "opted_out_of_marketing": 1,
+        "opted_out_at": now_datetime(),
+        "opted_out_keyword": (keyword or "STOP")[:50]
+    })
+
+    # Log as a Marketing Event for audit trail
+    try:
+        frappe.get_doc({
+            "doctype": "Marketing Event",
+            "restaurant": frappe.db.get_value("Customer", customer_name, "first_verified_at_restaurant"),
+            "customer": customer_name,
+            "channel": "WhatsApp",
+            "phone": phone,
+            "status": "OptedOut",
+            "sent_at": now_datetime(),
+            "coins_charged": 0,
+            "error_message": f"Customer opted out via keyword: {keyword}"
+        }).insert(ignore_permissions=True)
+    except Exception:
+        pass
+
+    frappe.db.commit()
+    return True
+
+
+# ═══════════════════════════════════════════════════════════════════
+# TRIGGER HELPERS
+# ═══════════════════════════════════════════════════════════════════
+
+def _get_trigger_customers(trigger):
+    """Return customers matching a scheduled trigger event."""
+    event = trigger.trigger_event
+
+    if event == "On Birthday":
+        return frappe.db.sql("""
+            SELECT DISTINCT c.name as customer, c.phone, c.customer_name
+            FROM `tabCustomer` c
+            JOIN `tabOrder` o ON o.platform_customer = c.name
+            WHERE o.restaurant = %s
+              AND c.date_of_birth IS NOT NULL
+              AND MONTH(c.date_of_birth) = MONTH(CURDATE())
+              AND DAY(c.date_of_birth) = DAY(CURDATE())
+              AND c.phone IS NOT NULL
+              AND (c.opted_out_of_marketing IS NULL OR c.opted_out_of_marketing = 0)
+        """, (trigger.restaurant,), as_dict=True)
+
+    elif event == "X Days After Last Visit":
+        days = trigger.days_since_visit or 30
+        return frappe.db.sql("""
+            SELECT c.name as customer, c.phone, c.customer_name
+            FROM `tabCustomer` c
+            JOIN `tabOrder` o ON o.platform_customer = c.name
+            WHERE o.restaurant = %s AND c.phone IS NOT NULL
+              AND (c.opted_out_of_marketing IS NULL OR c.opted_out_of_marketing = 0)
+            GROUP BY c.name, c.phone, c.customer_name
+            HAVING MAX(o.creation) BETWEEN
+                DATE_SUB(NOW(), INTERVAL %s DAY) AND
+                DATE_SUB(NOW(), INTERVAL %s DAY)
+        """, (trigger.restaurant, days + 1, days - 1), as_dict=True)
+
+    elif event == "On Loyalty Milestone":
+        milestone = trigger.loyalty_milestone_coins or 500
+        return frappe.db.sql("""
+            SELECT c.name as customer, c.phone, c.customer_name,
+                   SUM(CASE WHEN le.transaction_type = 'Earn' THEN le.coins ELSE -le.coins END) as balance
+            FROM `tabCustomer` c
+            JOIN `tabRestaurant Loyalty Entry` le ON le.customer = c.name
+            WHERE le.restaurant = %s AND c.phone IS NOT NULL
+              AND (c.opted_out_of_marketing IS NULL OR c.opted_out_of_marketing = 0)
+            GROUP BY c.name, c.phone, c.customer_name
+            HAVING balance >= %s
+        """, (trigger.restaurant, milestone), as_dict=True)
+
+    return []
+
+
+def _fire_single_trigger(trigger, customer, settings, restaurant_name_cache):
+    """
+    Sends one trigger message with full idempotency check.
+    Idempotency window: Birthday = 365 days, others = 30 days.
+    """
+    # Idempotency check
+    window_days = 365 if trigger.trigger_event == "On Birthday" else 30
+    already_fired = frappe.db.exists("Marketing Event", {
+        "trigger": trigger.name,
+        "customer": customer.get("customer"),
+        "sent_at": [">=", add_days(getdate(), -window_days)],
+        "status": ["not in", ["Failed", "OptedOut"]]
+    })
+    if already_fired:
+        return
+
+    # Coin balance check
+    settings_coins = _get_coins_per_msg(settings, trigger.channel)
+    balance = float(frappe.db.get_value("Restaurant", trigger.restaurant, "coins_balance") or 0)
+    if balance < settings_coins:
+        frappe.log_error(
+            f"Trigger {trigger.name}: Insufficient coins for {customer.get('phone')} (balance={balance:.1f})",
+            "Marketing Task"
+        )
+        return
+
+    # Resolve restaurant name
+    if trigger.restaurant not in restaurant_name_cache:
+        restaurant_name_cache[trigger.restaurant] = (
+            frappe.db.get_value("Restaurant", trigger.restaurant, "restaurant_name") or trigger.restaurant
+        )
+
+    message = _resolve_template(
+        trigger.message_template,
+        customer_name=customer.get("customer_name") or "Valued Customer",
+        restaurant_name=restaurant_name_cache[trigger.restaurant],
+        loyalty_balance=_get_loyalty_balance(customer.get("customer"), trigger.restaurant),
+        coupon_code=trigger.coupon_code or ""
+    )
+
+    success, error = _send_message(
+        channel=trigger.channel,
+        phone=customer.get("phone", ""),
+        message=message,
+        settings=settings,
+        subject=getattr(trigger, "email_subject", None)
+    )
+
+    frappe.get_doc({
+        "doctype": "Marketing Event",
+        "trigger": trigger.name,
+        "restaurant": trigger.restaurant,
+        "customer": customer.get("customer"),
+        "channel": trigger.channel,
+        "phone": customer.get("phone"),
+        "status": "Sent" if success else "Failed",
+        "error_message": error if not success else None,
+        "sent_at": now_datetime(),
+        "coins_charged": settings_coins if success else 0
+    }).insert(ignore_permissions=True)
+
+    if success:
+        _safe_deduct_coins(
+            trigger.restaurant, settings_coins,
+            f"Trigger: '{trigger.trigger_name}' → {customer.get('phone')}",
+            "Marketing Trigger", trigger.name
+        )
+        frappe.db.set_value("Marketing Trigger", trigger.name, "total_fired",
+                            (trigger.total_fired or 0) + 1)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# PRIVATE HELPERS
+# ═══════════════════════════════════════════════════════════════════
+
+def _get_opted_out_phones(restaurant):
+    """Returns a set of opted-out phone numbers for a restaurant's customers."""
+    rows = frappe.db.sql("""
+        SELECT DISTINCT c.phone
+        FROM `tabCustomer` c
+        JOIN `tabOrder` o ON o.platform_customer = c.name
+        WHERE o.restaurant = %s AND c.opted_out_of_marketing = 1 AND c.phone IS NOT NULL
+    """, (restaurant,))
+    return {r[0] for r in rows}
+
+
+def _safe_deduct_coins(restaurant, amount, description, ref_doctype, ref_name):
+    """Wrapper around deduct_coins — logs but never raises."""
+    try:
+        from dinematters.dinematters.api.coin_billing import deduct_coins
+        deduct_coins(
+            restaurant=restaurant,
+            amount=amount,
+            type="Marketing Deduction",
+            description=description,
+            ref_doctype=ref_doctype,
+            ref_name=ref_name
+        )
+    except Exception as e:
+        frappe.log_error(f"Coin deduction failed [{ref_name}]: {str(e)}", "Marketing Task")
+
+
+def _get_coins_per_msg(settings, channel):
+    if channel == "WhatsApp":
+        return float(getattr(settings, "marketing_whatsapp_coins_per_msg", None) or 1.00)
+    elif channel == "SMS":
+        return float(getattr(settings, "marketing_sms_coins_per_msg", None) or 0.25)
+    elif channel == "Email":
+        return float(getattr(settings, "marketing_email_coins_per_msg", None) or 0.05)
+    return 0.25
+
+
+def _resolve_template(template, **vars):
+    """Replace {{variable}} placeholders."""
+    result = str(template or "")
+    for key, value in vars.items():
+        result = result.replace(f"{{{{{key}}}}}", str(value or ""))
+    return result
+
+
+def _get_loyalty_balance(customer_id, restaurant):
+    if not customer_id:
+        return 0
+    try:
+        from dinematters.dinematters.utils.loyalty import get_loyalty_balance
+        return get_loyalty_balance(customer_id, restaurant)
+    except Exception:
+        return 0
+
+
+def _send_message(channel, phone, message, settings, subject=None):
+    """Route message to correct channel. Returns (success, error_or_None)."""
+    if not phone:
+        return False, "No phone number"
+    try:
+        if channel == "SMS":
+            return _send_sms(phone, message, settings)
+        elif channel == "WhatsApp":
+            return _send_whatsapp(phone, message, settings)
+        elif channel == "Email":
+            return _send_email(phone, message, settings, subject=subject)
+        return False, f"Unknown channel: {channel}"
+    except Exception as e:
+        return False, str(e)
+
+
+def _send_sms(phone, message, settings):
+    """Send via MSG91 (primary) or Fast2SMS (fallback). Max 160 chars recommended."""
+    auth_key = getattr(settings, "msg91_auth_key", None)
+    if not auth_key:
+        return _send_sms_fast2sms(phone, message, settings)
+
+    import requests
+    sender_id = getattr(settings, "marketing_msg91_sms_sender_id", None) or getattr(settings, "fast2sms_sender_id", "DINMAT")
+    template_id = getattr(settings, "marketing_msg91_campaign_template", None) or getattr(settings, "fast2sms_dlt_template_id", None)
+
+    phone_clean = phone.replace("+91", "").replace("+", "").strip()
+    payload = {
+        "sender": sender_id,
+        "route": "4",
+        "country": "91",
+        "sms": [{"message": message[:320], "to": [phone_clean]}]
+    }
+    if template_id:
+        payload["DLT_TE_ID"] = template_id
+
+    res = requests.post(
+        "https://api.msg91.com/api/v5/flow/",
+        headers={"authkey": auth_key, "Content-Type": "application/json"},
+        json=payload, timeout=10
+    )
+    data = res.json()
+    if data.get("type") == "success":
+        return True, None
+    return False, data.get("message", "MSG91 error")
+
+
+def _send_sms_fast2sms(phone, message, settings):
+    api_key = getattr(settings, "fast2sms_api_key", None)
+    if not api_key:
+        return False, "No SMS API key configured"
+    import requests
+    phone_clean = phone.replace("+91", "").replace("+", "").strip()
+    res = requests.get(
+        "https://www.fast2sms.com/dev/bulkV2",
+        params={"authorization": api_key, "message": message[:320], "numbers": phone_clean, "route": "q"},
+        timeout=10
+    )
+    data = res.json()
+    return (True, None) if data.get("return") else (False, str(data.get("message", "Fast2SMS error")))
+
+
+def _send_whatsapp(phone, message, settings):
+    """
+    Send via Evolution API.
+    NOTE: For Meta-compliant outbound marketing, configure a pre-approved
+    WhatsApp Business template name in Dinematters Settings.
+    Until templates are registered, uses free-text (works within 24h service window).
+    """
+    evolution_url = getattr(settings, "evolution_api_url", None)
+    evolution_key = getattr(settings, "evolution_api_key", None)
+    instance = getattr(settings, "evolution_api_instance", None) or "DineMatters"
+    wa_template_name = getattr(settings, "marketing_wa_template_name", None)
+
+    if not evolution_url or not evolution_key:
+        return False, "WhatsApp API not configured"
+
+    import requests
+    phone_clean = phone.replace("+", "").strip()
+
+    if wa_template_name:
+        # ✅ Template-based (Meta compliant for marketing window)
+        url = f"{evolution_url.rstrip('/')}/message/sendWhatsAppBusinessTemplate/{instance}"
+        payload = {
+            "number": phone_clean,
+            "template": {
+                "name": wa_template_name,
+                "language": {"code": "en"},
+                "components": [{"type": "body", "parameters": [{"type": "text", "text": message}]}]
+            }
+        }
+    else:
+        # Free-text (compliant within 24h customer-initiated window only)
+        url = f"{evolution_url.rstrip('/')}/message/sendText/{instance}"
+        payload = {"number": phone_clean, "text": message}
+
+    res = requests.post(
+        url,
+        headers={"apikey": evolution_key, "Content-Type": "application/json"},
+        json=payload, timeout=15
+    )
+    if res.status_code in [200, 201]:
+        return True, None
+    return False, f"Evolution API HTTP {res.status_code}: {res.text[:200]}"
+
+
+def _send_email(recipient_phone, message, settings, subject=None):
+    """Send via Resend.com with a real subject line."""
+    resend_key = getattr(settings, "marketing_resend_api_key", None)
+    from_email = getattr(settings, "marketing_from_email", None) or "noreply@dinematters.com"
+
+    if not resend_key:
+        return False, "Resend API key not configured"
+
+    email = frappe.db.get_value("Customer", {"phone": recipient_phone}, "email")
+    if not email:
+        return False, "No email address for customer"
+
+    import requests
+    res = requests.post(
+        "https://api.resend.com/emails",
+        headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+        json={
+            "from": from_email,
+            "to": [email],
+            "subject": subject or "A special message from your restaurant",
+            "text": message,
+            "html": f"<p>{message.replace(chr(10), '<br>')}</p>"
+        },
+        timeout=10
+    )
+    if res.status_code in [200, 201]:
+        return True, None
+    return False, f"Resend error: {res.text[:200]}"

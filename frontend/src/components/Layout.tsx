@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, Coins, Crown, CreditCard, Settings, MessageSquare } from 'lucide-react'
+import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, Coins, Crown, CreditCard, Settings, MessageSquare, Megaphone, Send, Zap, BarChart3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetCall, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
 import { AiRechargeModal } from '@/components/AiRechargeModal'
@@ -102,18 +102,21 @@ type NavGroup = {
 }
 type NavItem = NavLink | NavGroup
 
-const DIAMOND_ONLY_FEATURES = ['ordering', 'loyalty', 'coupons', 'pos_integration', 'customer', 'order_settings', 'customer_pay_and_usage']
-const GOLD_FEATURES = ['analytics', 'ai_recommendations', 'custom_branding', 'table_booking', 'games', 'events', 'offers', 'experience_lounge', 'video_upload', 'branding', 'whatsapp_orders']
+const DIAMOND_ONLY_FEATURES = ['loyalty', 'coupons', 'pos_integration', 'customer', 'customer_pay_and_usage', 'marketing_studio']
+const GOLD_FEATURES = ['ordering', 'order_settings', 'analytics', 'ai_recommendations', 'custom_branding', 'table_booking', 'games', 'events', 'offers', 'experience_lounge', 'video_upload', 'branding', 'whatsapp_orders']
 
 const navigation: NavItem[] = [
   { type: 'link', name: 'Dashboard', href: '/dashboard', icon: Home },
-  { type: 'link', name: 'Setup Wizard', href: '/setup', icon: Sparkles },
   {
     type: 'group',
-    id: 'dinematters-frontend',
-    name: 'Dinematters View',
+    id: 'setup-config',
+    name: 'Setup & Config',
     icon: Store,
     children: [
+      { name: 'Setup Wizard', href: '/setup', icon: Sparkles },
+      { name: 'POS Integration', href: '/pos-integration', icon: Settings, feature: 'pos_integration' },
+      { name: 'Manage Offer and Coupons', href: '/coupons', icon: Tag, feature: 'coupons' },
+      { name: 'Manage QR Code', href: '/qr-codes', icon: QrCode },
       { name: 'Home Features', href: '/home-features', icon: Grid3x3 },
       { name: 'Order settings', href: '/frontend-ordering', icon: Package, feature: 'ordering' },
       { name: 'AI Menu Background', href: '/ai-menu-theme-background', icon: Sparkles },
@@ -134,7 +137,6 @@ const navigation: NavItem[] = [
   },
   { type: 'link', name: 'WhatsApp Orders', href: '/whatsapp-orders', icon: MessageSquare, badgeHref: '/whatsapp-orders', feature: 'whatsapp_orders' },
   { type: 'link', name: 'Table Bookings', href: '/bookings', icon: Calendar, feature: 'table_booking' },
-  { type: 'link', name: 'POS Integration', href: '/pos-integration', icon: Settings, feature: 'pos_integration' },
   { type: 'link', name: 'Customers', href: '/customers', icon: Users, feature: 'customer' },
   {
     type: 'group',
@@ -159,8 +161,20 @@ const navigation: NavItem[] = [
       { name: 'Recommendations Engine', href: '/recommendations-engine', icon: FolderTree, feature: 'ai_recommendations' },
     ],
   },
-  { type: 'link', name: 'Manage Offers & Coupons', href: '/coupons', icon: Tag, feature: 'coupons' },
-  { type: 'link', name: 'Manage QR Codes', href: '/qr-codes', icon: QrCode },
+  {
+    type: 'group',
+    id: 'marketing-studio',
+    name: 'Marketing Studio',
+    icon: Megaphone,
+    feature: 'marketing_studio',
+    children: [
+      { name: 'Overview',    href: '/marketing',                icon: BarChart3,  feature: 'marketing_studio' },
+      { name: 'Campaigns',   href: '/marketing/campaigns',      icon: Send,       feature: 'marketing_studio' },
+      { name: 'Automation',  href: '/marketing/automation',     icon: Zap,        feature: 'marketing_studio' },
+      { name: 'Segments',    href: '/marketing/segments',       icon: Users,      feature: 'marketing_studio' },
+      { name: 'Analytics',   href: '/marketing/analytics',      icon: TrendingUp, feature: 'marketing_studio' },
+    ],
+  },
   // Admin-only link - will be filtered by admin check in render
   { type: 'link', name: 'Restaurant Management', href: '/admin/restaurants', icon: Shield, adminOnly: true },
 ]
@@ -1017,7 +1031,7 @@ export default function Layout({ children }: LayoutProps) {
                           .map((child) => {
                             const ChildIcon = child.icon || group.icon
                             const isChildActive = location.pathname === child.href ||
-                              (child.href !== '/dashboard' && location.pathname.startsWith(child.href))
+                              (child.href !== '/' && child.href !== '/dashboard' && child.href !== '/marketing' && location.pathname.startsWith(child.href + '/'))
                               const childBadgeCount = child.badgeHref === '/orders'
                                 ? pendingOrders
                                 : child.badgeHref === '/accept-orders'

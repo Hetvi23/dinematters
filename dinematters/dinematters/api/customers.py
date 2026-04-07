@@ -11,8 +11,8 @@ from dinematters.dinematters.utils.permission_helpers import get_user_restaurant
 from dinematters.dinematters.utils.customer_helpers import normalize_phone
 from dinematters.dinematters.utils.feature_gate import require_plan
 
-@require_plan('DIAMOND')
 @frappe.whitelist(allow_guest=True)
+@require_plan('DIAMOND')
 def get_customer_by_phone(phone, restaurant_id):
 	"""
 	Fetch customer details by phone and restaurant.
@@ -345,3 +345,77 @@ def get_restaurant_customers(restaurant_id, search=None, page=1, page_size=20):
 	except Exception as e:
 		frappe.log_error(f"get_restaurant_customers error: {e}", "Customer_API")
 		return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist(allow_guest=True)
+def update_customer_profile(phone, customer_name=None, email=None, date_of_birth=None):
+	"""
+	Called from ONO Menu Profile page. Lets a verified customer update their
+	own name, email and date_of_birth (for birthday marketing triggers).
+	Auth: X-Customer-Token session header must match the phone number.
+	"""
+	try:
+		from dinematters.dinematters.utils.customer_helpers import normalize_phone
+		normalized = normalize_phone(phone)
+		if not normalized:
+			return {"success": False, "error": "Invalid phone number"}
+
+		# Validate session
+		customer_token = frappe.get_request_header("X-Customer-Token")
+		if not customer_token:
+			return {"success": False, "error": "Authentication required"}
+
+		from dinematters.dinematters.api.otp import check_session
+		session_res = check_session(customer_token)
+		if not session_res.get("success") or normalize_phone(session_res.get("phone")) != normalized:
+			return {"success": False, "error": "Session invalid or phone mismatch"}
+
+		# Find customer
+		customer_id = frappe.db.get_value("Customer", {"phone": normalized}, "name")
+		if not customer_id:
+			# Try variants
+			for variant in [f"+91{normalized}", f"0{normalized}"]:
+				customer_id = frappe.db.get_value("Customer", {"phone": variant}, "name")
+				if customer_id:
+					break
+		if not customer_id:
+			return {"success": False, "error": "Customer not found. Please verify your phone first."}
+
+		# Build update dict (only update fields provided)
+		updates = {}
+		if customer_name is not None:
+			updates["customer_name"] = str(customer_name)[:100].strip()
+		if email is not None:
+			updates["email"] = str(email).strip() or None
+		if date_of_birth is not None:
+			# Accept YYYY-MM-DD or empty string (clear)
+			import re
+			dob = str(date_of_birth).strip()
+			if dob == "":
+				updates["date_of_birth"] = None
+			elif re.match(r"^\d{4}-\d{2}-\d{2}$", dob):
+				updates["date_of_birth"] = dob
+			else:
+				return {"success": False, "error": "date_of_birth must be YYYY-MM-DD format"}
+
+		if not updates:
+			return {"success": True, "message": "Nothing to update"}
+
+		frappe.db.set_value("Customer", customer_id, updates)
+		frappe.db.commit()
+
+		# Return updated fields
+		c = frappe.db.get_value("Customer", customer_id,
+			["customer_name", "email", "date_of_birth"], as_dict=True)
+		return {
+			"success": True,
+			"data": {
+				"customer_name": c.customer_name,
+				"email": c.email,
+				"date_of_birth": str(c.date_of_birth) if c.date_of_birth else None
+			}
+		}
+	except Exception as e:
+		frappe.log_error(f"update_customer_profile error: {e}", "Customer_API")
+		return {"success": False, "error": str(e)}
+

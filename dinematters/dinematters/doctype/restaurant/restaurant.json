@@ -37,6 +37,7 @@
   "default_delivery_fee",
   "enable_takeaway",
   "enable_delivery",
+  "enable_dine_in",
   "no_ordering",
   "default_packaging_fee",
   "minimum_order_value",
@@ -293,6 +294,12 @@
    "fieldtype": "Check",
    "label": "Enable Delivery",
    "default": "0"
+  },
+  {
+   "fieldname": "enable_dine_in",
+   "fieldtype": "Check",
+   "label": "Enable Dine-in",
+   "default": "1"
   },
   {
    "fieldname": "no_ordering",

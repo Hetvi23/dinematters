@@ -15,6 +15,7 @@ export default function OrderSettings() {
   const [settings, setSettings] = useState({
     enable_takeaway: 1,
     enable_delivery: 0,
+    enable_dine_in: 1,
     default_packaging_fee: 0,
     minimum_order_value: 0,
     estimated_prep_time: 30,
@@ -35,6 +36,7 @@ export default function OrderSettings() {
       setSettings({
         enable_takeaway: restaurantDoc.enable_takeaway ?? 1,
         enable_delivery: restaurantDoc.enable_delivery ?? 0,
+        enable_dine_in: restaurantDoc.enable_dine_in ?? 1,
         default_packaging_fee: restaurantDoc.default_packaging_fee ?? 0,
         minimum_order_value: restaurantDoc.minimum_order_value ?? 0,
         estimated_prep_time: restaurantDoc.estimated_prep_time ?? 30,
@@ -58,6 +60,7 @@ export default function OrderSettings() {
         settings: {
           enable_takeaway: settings.enable_takeaway,
           enable_delivery: settings.enable_delivery,
+          enable_dine_in: settings.enable_dine_in,
           default_packaging_fee: settings.default_packaging_fee,
           minimum_order_value: settings.minimum_order_value,
           estimated_prep_time: settings.estimated_prep_time,
@@ -176,6 +179,32 @@ export default function OrderSettings() {
               <Checkbox
                 checked={settings.enable_takeaway === 1}
                 onCheckedChange={() => handleToggle('enable_takeaway')}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" />
+              <CardTitle>Dine-in Options</CardTitle>
+            </div>
+            <CardDescription>
+              Allow customers to order for dining at the restaurant
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Enable Dine-in</Label>
+                <p className="text-sm text-muted-foreground">
+                  Show dine-in option on the ordering page
+                </p>
+              </div>
+              <Checkbox
+                checked={settings.enable_dine_in === 1}
+                onCheckedChange={() => handleToggle('enable_dine_in')}
               />
             </div>
           </CardContent>

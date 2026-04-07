@@ -9,10 +9,15 @@
   "phone",
   "customer_name",
   "email",
+  "date_of_birth",
   "column_break_1",
   "verified_at",
   "first_verified_at_restaurant",
-  "last_visited"
+  "last_visited",
+  "section_break_marketing",
+  "opted_out_of_marketing",
+  "opted_out_at",
+  "opted_out_keyword"
  ],
  "fields": [
   {
@@ -37,6 +42,12 @@
    "options": "Email"
   },
   {
+   "fieldname": "date_of_birth",
+   "fieldtype": "Date",
+   "label": "Date of Birth",
+   "description": "Used for Birthday Trigger campaigns. Collected optionally via ONO Menu profile."
+  },
+  {
    "fieldname": "column_break_1",
    "fieldtype": "Column Break"
   },
@@ -59,11 +70,37 @@
    "in_list_view": 1,
    "label": "Last Visited",
    "read_only": 1
+  },
+  {
+   "fieldname": "section_break_marketing",
+   "fieldtype": "Section Break",
+   "label": "Marketing Preferences"
+  },
+  {
+   "default": "0",
+   "fieldname": "opted_out_of_marketing",
+   "fieldtype": "Check",
+   "in_list_view": 0,
+   "label": "Opted Out of Marketing",
+   "description": "If checked, this customer will be excluded from all campaign blasts and trigger messages (TRAI DND compliance)."
+  },
+  {
+   "fieldname": "opted_out_at",
+   "fieldtype": "Datetime",
+   "label": "Opted Out At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "opted_out_keyword",
+   "fieldtype": "Data",
+   "label": "Opt-Out Keyword Received",
+   "read_only": 1,
+   "description": "The keyword the customer replied (e.g. STOP) that triggered the opt-out."
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-02-27 10:00:00.000000",
+ "modified": "2026-04-07 06:00:00.000000",
  "modified_by": "Administrator",
  "module": "Dinematters",
  "name": "Customer",

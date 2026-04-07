@@ -210,13 +210,14 @@ def check_session(session_token):
 		
 		session = frappe.cache().get_value(f"customer_session:{session_token}")
 		if not session:
-			return {"success": False, "verified": False}
+			# Return successful response but verified=False so frontend handles it cleanly
+			return {"success": True, "verified": False}
 		
 		# Confirm customer still exists
 		customer_id = session.get("customer_id")
 		if not customer_id or not frappe.db.exists("Customer", customer_id):
 			frappe.cache().delete_value(f"customer_session:{session_token}")
-			return {"success": False, "verified": False}
+			return {"success": True, "verified": False}
 
 		return {
 			"success": True,

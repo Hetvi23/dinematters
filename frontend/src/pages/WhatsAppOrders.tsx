@@ -391,12 +391,14 @@ export default function WhatsAppOrders() {
                           {formatAmountNoDecimals(order.total)}
                         </TableCell>
                         <TableCell className="text-center">
-                          {order.table_number ? (
+                          {order.order_type === 'dine_in' && order.table_number ? (
                             <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
                               Table {order.table_number}
                             </Badge>
                           ) : (
-                            <span className="text-xs text-muted-foreground italic">Dine-in</span>
+                            <Badge variant="outline" className="capitalize">
+                              {(order.order_type || 'dine_in').replace('_', ' ')}
+                            </Badge>
                           )}
                         </TableCell>
                         <TableCell>

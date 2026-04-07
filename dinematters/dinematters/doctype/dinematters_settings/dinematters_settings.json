@@ -29,7 +29,20 @@
   "section_evolution_api",
   "evolution_api_url",
   "evolution_api_key",
-  "evolution_api_instance"
+  "evolution_api_instance",
+  "section_marketing_costs",
+  "marketing_sms_cost_per_msg",
+  "marketing_sms_coins_per_msg",
+  "marketing_whatsapp_cost_per_msg",
+  "marketing_whatsapp_coins_per_msg",
+  "marketing_email_cost_per_msg",
+  "marketing_email_coins_per_msg",
+  "column_break_marketing_2",
+  "marketing_msg91_sms_sender_id",
+  "marketing_msg91_campaign_template",
+  "marketing_resend_api_key",
+  "marketing_from_email",
+  "marketing_wa_template_name"
  ],
  "fields": [
   {
@@ -176,12 +189,94 @@
    "label": "Evolution API Instance Name",
    "description": "The instance you created in the Evolution dashboard (e.g. DineMatters)",
    "default": "DineMatters"
+  },
+  {
+   "fieldname": "section_marketing_costs",
+   "fieldtype": "Section Break",
+   "label": "Marketing Studio \u2014 Channel Costs & Margins"
+  },
+  {
+   "default": "0.15",
+   "description": "Our actual bulk cost from MSG91/Fast2SMS per SMS. Update as volume scales.",
+   "fieldname": "marketing_sms_cost_per_msg",
+   "fieldtype": "Float",
+   "label": "SMS Cost to Platform (\u20b9)"
+  },
+  {
+   "default": "0.25",
+   "description": "Coins deducted from restaurant per SMS. Set higher than platform cost to earn margin.",
+   "fieldname": "marketing_sms_coins_per_msg",
+   "fieldtype": "Float",
+   "label": "SMS Coins Charged to Restaurant"
+  },
+  {
+   "default": "0.77",
+   "description": "Our actual cost per WhatsApp marketing conversation (Meta BSP + API overhead).",
+   "fieldname": "marketing_whatsapp_cost_per_msg",
+   "fieldtype": "Float",
+   "label": "WhatsApp Cost to Platform (\u20b9)"
+  },
+  {
+   "default": "1.00",
+   "description": "Coins deducted from restaurant per WhatsApp message. Current margin: \u20b90.23.",
+   "fieldname": "marketing_whatsapp_coins_per_msg",
+   "fieldtype": "Float",
+   "label": "WhatsApp Coins Charged to Restaurant"
+  },
+  {
+   "default": "0.005",
+   "description": "Our actual cost per email via Amazon SES or Resend.",
+   "fieldname": "marketing_email_cost_per_msg",
+   "fieldtype": "Float",
+   "label": "Email Cost to Platform (\u20b9)"
+  },
+  {
+   "default": "0.05",
+   "description": "Coins deducted per Email sent. High margin channel.",
+   "fieldname": "marketing_email_coins_per_msg",
+   "fieldtype": "Float",
+   "label": "Email Coins Charged to Restaurant"
+  },
+  {
+   "fieldname": "column_break_marketing_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "DLT-registered Sender ID for promotional SMS (separate from OTP sender).",
+   "fieldname": "marketing_msg91_sms_sender_id",
+   "fieldtype": "Data",
+   "label": "Campaign SMS Sender ID (DLT)"
+  },
+  {
+   "description": "DLT Template ID approved for generic promotional messages.",
+   "fieldname": "marketing_msg91_campaign_template",
+   "fieldtype": "Data",
+   "label": "Campaign SMS DLT Template ID"
+  },
+  {
+   "description": "API key from Resend.com for Email campaigns.",
+   "fieldname": "marketing_resend_api_key",
+   "fieldtype": "Password",
+   "label": "Resend API Key"
+  },
+  {
+   "default": "noreply@dinematters.com",
+   "description": "From address for all marketing emails sent via DineMatters.",
+   "fieldname": "marketing_from_email",
+   "fieldtype": "Data",
+   "label": "Campaign From Email"
+  },
+  {
+   "description": "Pre-approved WhatsApp Business Template name (e.g. restaurant_campaign_v1). Required for Meta-compliant outbound marketing.",
+   "fieldname": "marketing_wa_template_name",
+   "fieldtype": "Data",
+   "label": "WhatsApp Campaign Template Name (Meta BSP)"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-26 20:30:00.000000",
+ "modified": "2026-04-07 06:00:00.000000",
  "modified_by": "Administrator",
  "module": "Dinematters",
  "name": "Dinematters Settings",

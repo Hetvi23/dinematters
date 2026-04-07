@@ -55,7 +55,7 @@ def load_customization_options(product_doc):
 			question.options.append(option_obj)
 
 @frappe.whitelist(allow_guest=True)
-@require_plan('DIAMOND')
+@require_plan('GOLD', 'DIAMOND')
 def create_order(restaurant_id, items, cooking_requests=None, customer_info=None, delivery_info=None, session_id=None, table_number=None, coupon_code=None, payment_method=None, order_type=None, packaging_fee=None, delivery_fee=None, pickup_time=None, loyalty_coins_redeemed=0, referral_id=None, tax=None, cgst=None, sgst=None, tax_percent=None):
 	"""
 	POST /api/v1/orders

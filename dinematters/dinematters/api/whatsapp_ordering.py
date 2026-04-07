@@ -218,6 +218,16 @@ def log_whatsapp_order(
     sgst=0,
     tax_percent=0,
     table_number=None,
+    order_type=None,
+    delivery_address=None,
+    delivery_landmark=None,
+    delivery_city=None,
+    delivery_pin_code=None,
+    delivery_house_number=None,
+    delivery_instructions=None,
+    pickup_time=None,
+    packaging_fee=0,
+    delivery_fee=0,
 ):
     """
     POST /api/method/dinematters.dinematters.api.whatsapp_ordering.log_whatsapp_order
@@ -377,9 +387,19 @@ def log_whatsapp_order(
             "customer_name":    customer_name,
             "customer_phone":   normalized_phone,
             "platform_customer": platform_customer,
-            # GOLD is dine-in only — hardcoded here as a contract
-            "order_type":       "dine_in",
+            # Map order type from frontend, fallback to dine_in
+            "order_type":       order_type or "dine_in",
             "table_number":     parsed_table,
+            # Delivery details
+            "delivery_address": delivery_address,
+            "delivery_landmark": delivery_landmark,
+            "delivery_city": delivery_city,
+            "delivery_pin_code": delivery_pin_code,
+            "delivery_house_number": delivery_house_number,
+            "delivery_instructions": delivery_instructions,
+            "pickup_time": pickup_time,
+            "packaging_fee": flt(packaging_fee),
+            "delivery_fee": flt(delivery_fee),
             # Shadow order semantics:
             # - pay_at_counter: restaurant collects payment manually via WhatsApp confirmation
             # - status Pending Verification: signals merchant is waiting for WhatsApp msg

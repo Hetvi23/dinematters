@@ -12,21 +12,26 @@ import frappe
 from frappe import _
 from frappe.exceptions import PermissionError
 from functools import wraps
+import json
+import inspect
 
 
 # Feature to Plan Mapping
 # Features listed here require specific plan types
 FEATURE_PLAN_MAP = {
     # DIAMOND Only features (Transactional/Full Automation)
-    'ordering': ['DIAMOND'],
+    'ordering': ['GOLD', 'DIAMOND'],
     'loyalty': ['DIAMOND'],
     'pos_integration': ['DIAMOND'],
     'coupons': ['DIAMOND'],
     'data_export': ['DIAMOND'],
     'customer': ['DIAMOND'],
-    'order_settings': ['DIAMOND'],
+    'order_settings': ['GOLD', 'DIAMOND'],
     'customer_pay_and_usage': ['DIAMOND'],
     
+    # Marketing Studio (Campaigns, Automation, Segments) - DIAMOND only
+    'marketing_studio': ['DIAMOND'],
+
     # GOLD & DIAMOND features (Digital/Branding/Analytics/Table/Games)
     'games': ['GOLD', 'DIAMOND'],
     'video_upload': ['GOLD', 'DIAMOND'],
@@ -61,26 +66,98 @@ def require_plan(*required_plans):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # Extract restaurant_id from kwargs or first positional argument
-            restaurant_id = kwargs.get('restaurant_id') or kwargs.get('restaurant') or (args[0] if args else None)
+            # 1. Comprehensive argument extraction
+            # We look in kwargs, args, and frappe.form_dict (whitelisted fallback)
+            identifier = None
             
-            if not restaurant_id:
+            # Use inspect to handle positional and keyword arguments correctly
+            try:
+                sig = inspect.signature(func)
+                bound_args = sig.bind_partial(*args, **kwargs)
+                for key in ['restaurant_id', 'restaurant']:
+                    if key in bound_args.arguments:
+                        identifier = bound_args.arguments[key]
+                        break
+            except Exception:
+                pass
+
+            # Fallback to keys_to_check if inspect failed or didn't find specific restaurant keys
+            if not identifier:
+                keys_to_check = [
+                    'restaurant_id', 'restaurant', 
+                    'campaign_id', 'trigger_id', 'trigger_name', 
+                    'segment_id', 'segment_name', 'target_segment'
+                ]
+                
+                for key in keys_to_check:
+                    if kwargs.get(key):
+                        identifier = kwargs.get(key)
+                        break
+                
+                if not identifier and args:
+                    # Specific hack: if first arg is 10 digits, it's likely a phone, not a restaurant ID
+                    if not (isinstance(args[0], str) and len(args[0]) == 10 and args[0].isdigit()):
+                        identifier = args[0]
+                    elif len(args) > 1:
+                        identifier = args[1]
+                    
+                if not identifier and hasattr(frappe, 'form_dict'):
+                    for key in keys_to_check:
+                        if frappe.form_dict.get(key):
+                            identifier = frappe.form_dict.get(key)
+                            break
+
+            if not identifier:
+                # Log the error for production debugging
+                frappe.log_error(
+                    message=f"Function: {func.__name__}\nArgs: {args}\nKwargs: {kwargs}\nForm Dict: {getattr(frappe, 'form_dict', 'N/A')}",
+                    title="Feature Gate: Missing Identifier"
+                )
                 frappe.throw(
                     _('Restaurant ID is required for this operation'),
                     PermissionError
                 )
             
-            # Get restaurant document
+            # 2. Intelligent Restaurant Resolution
+            restaurant_id = identifier
+            
+            # If the identifier is NOT a Restaurant doc name, try resolving from sub-entities
+            if not frappe.db.exists("Restaurant", identifier):
+                resolved = None
+                
+                # Check Campaign
+                if not resolved:
+                    resolved = frappe.db.get_value("Marketing Campaign", identifier, "restaurant")
+                    if not resolved: # Try by campaign_name if ID match fails
+                        resolved = frappe.db.get_value("Marketing Campaign", {"campaign_name": identifier}, "restaurant")
+                
+                # Check Trigger
+                if not resolved:
+                    resolved = frappe.db.get_value("Marketing Trigger", identifier, "restaurant")
+                    if not resolved:
+                        resolved = frappe.db.get_value("Marketing Trigger", {"trigger_name": identifier}, "restaurant")
+                        
+                # Check Segment
+                if not resolved:
+                    resolved = frappe.db.get_value("Marketing Segment", identifier, "restaurant")
+                    if not resolved:
+                        resolved = frappe.db.get_value("Marketing Segment", {"segment_name": identifier}, "restaurant")
+                
+                if resolved:
+                    restaurant_id = resolved
+                else:
+                    # Final attempt: normalize via helper (handles restaurant_id vs name)
+                    # We avoid circular import by importing inside or using raw SQL
+                    from dinematters.dinematters.utils.api_helpers import get_restaurant_from_id
+                    restaurant_id = get_restaurant_from_id(identifier) or identifier
+
+            # 3. Plan Validation
             try:
                 # We use db.get_value to avoid permission checks on get_doc for Guest users
                 plan_type = frappe.db.get_value('Restaurant', restaurant_id, 'plan_type') or 'SILVER'
             except Exception:
-                frappe.throw(
-                    _('Restaurant {0} does not exist or access denied').format(restaurant_id),
-                    frappe.exceptions.DoesNotExistError
-                )
-            
-            # Check if restaurant's plan is in required plans
+                plan_type = 'SILVER' # Default to safest plan if fetch fails
+
             if plan_type not in required_plans:
                 frappe.throw(
                     _('This feature requires {0} plan. Your current plan is {1}. Please upgrade to access this feature.').format(
@@ -90,7 +167,6 @@ def require_plan(*required_plans):
                     PermissionError
                 )
             
-            # Plan check passed, execute the function
             return func(*args, **kwargs)
         
         # Ensure Frappe whitelisting attributes are preserved if applied to the inner function

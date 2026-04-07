@@ -73,6 +73,7 @@
   "delivery_city",
   "delivery_state",
   "delivery_zip_code",
+  "delivery_house_number",
   "delivery_instructions",
   "section_break_requests",
   "cooking_requests",
@@ -483,6 +484,11 @@
    "fieldname": "delivery_zip_code",
    "fieldtype": "Data",
    "label": "Zip Code"
+  },
+  {
+   "fieldname": "delivery_house_number",
+   "fieldtype": "Data",
+   "label": "House/Flat Number"
   },
   {
    "fieldname": "delivery_instructions",

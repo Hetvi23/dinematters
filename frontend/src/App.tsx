@@ -50,6 +50,11 @@ const PaymentConfiguration = lazy(() => import('./pages/PaymentConfiguration'))
 const POSIntegration = lazy(() => import('./pages/POSIntegration'))
 const LedgerPage = lazy(() => import('./pages/LedgerPage'))
 const WhatsAppOrders = lazy(() => import('./pages/WhatsAppOrders'))
+const MarketingOverview = lazy(() => import('./pages/MarketingOverview'))
+const MarketingCampaigns = lazy(() => import('./pages/MarketingCampaigns'))
+const MarketingAutomation = lazy(() => import('./pages/MarketingAutomation'))
+const MarketingSegments = lazy(() => import('./pages/MarketingSegments'))
+const MarketingAnalytics = lazy(() => import('./pages/MarketingAnalytics'))
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -110,6 +115,16 @@ function AppContent() {
 
 							<Route element={<FeatureProtectedRoute requireGold />}>
 								<Route path="/whatsapp-orders" element={<Layout><WhatsAppOrders /></Layout>} />
+							</Route>
+
+							{/* Marketing Studio (DIAMOND only) */}
+							<Route element={<FeatureProtectedRoute feature="marketing_studio" />}>
+								<Route path="/marketing" element={<Layout><MarketingOverview /></Layout>} />
+								<Route path="/marketing/campaigns" element={<Layout><MarketingCampaigns /></Layout>} />
+								<Route path="/marketing/campaigns/:id" element={<Layout><MarketingCampaigns /></Layout>} />
+								<Route path="/marketing/automation" element={<Layout><MarketingAutomation /></Layout>} />
+								<Route path="/marketing/segments" element={<Layout><MarketingSegments /></Layout>} />
+								<Route path="/marketing/analytics" element={<Layout><MarketingAnalytics /></Layout>} />
 							</Route>
 
 							<Route path="/billing" element={<Layout><PaymentSettings /></Layout>} />
