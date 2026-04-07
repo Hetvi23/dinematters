@@ -256,7 +256,7 @@ def get_coin_billing_info(restaurant):
             "gold_monthly": settings.gold_monthly_fee or 999.0,
             "diamond_monthly": settings.diamond_monthly_floor or 1299.0,
             "diamond_commission": settings.diamond_commission_percent or 1.5,
-            "diamond_barrier": settings.diamond_upgrade_barrier or 2499.0
+            "diamond_barrier": settings.diamond_upgrade_barrier or 1299.0
         }
     }
 
@@ -287,7 +287,7 @@ def update_subscription_plan(restaurant, plan_type):
     
     if plan_type == "DIAMOND":
         # DIAMOND upgrade barrier is a platform-wide constant (manageable in Settings)
-        min_required = float(settings.diamond_upgrade_barrier or 2499.0)
+        min_required = float(settings.diamond_upgrade_barrier or 1299.0)
         if balance < min_required:
             frappe.throw(_(f"Insufficient balance to upgrade to DIAMOND. Minimum {min_required} Coins required. Current: {balance}"), frappe.ValidationError)
 

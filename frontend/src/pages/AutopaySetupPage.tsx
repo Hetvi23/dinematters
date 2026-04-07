@@ -128,7 +128,7 @@ export default function AutopaySetupPage() {
 
     // 2. Entrance Barrier Check
     const proMin = billingInfo?.plan_defaults?.pro_monthly || 999;
-    const luxBarrier = billingInfo?.plan_defaults?.lux_barrier || 2499;
+    const luxBarrier = billingInfo?.plan_defaults?.lux_barrier || 1299;
 
     if (newPlan === 'GOLD' && (billingInfo?.coins_balance || 0) < proMin) {
       toast.error('Insufficient Coins', {

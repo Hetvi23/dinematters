@@ -280,7 +280,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "pending_verification\nPending Payment\nPending Verification\nAuto Accepted\nAccepted\nconfirmed\npreparing\nready\nIn Billing\ndelivered\nbilled\ncancelled",
+   "options": "pending_verification\nPending Payment\nPending Verification\nAuto Accepted\nAccepted\nconfirmed\npreparing\nready\nDispatched\nIn Billing\ndelivered\nbilled\ncancelled",
    "reqd": 1
   },
   {

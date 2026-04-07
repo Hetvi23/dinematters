@@ -53,33 +53,90 @@ class PetpoojaProvider(POSProvider):
 
     def handle_callback(self, data):
         """
-        Handle order status update from Petpooja
+        Handle order status update from Petpooja (Production Implementation)
         """
-        petpooja_status = data.get("status")
+        petpooja_status = str(data.get("status"))
         client_order_id = data.get("clientorderID")
+        pos_order_id = data.get("orderID")
+        app_key = data.get("app_key")
 
-        if not client_order_id:
+        # Production Security: Validate App Key if provided
+        if app_key and app_key != self.settings.get("app_key"):
+            frappe.log_error(f"Petpooja callback invalid app_key: {app_key}", "Petpooja Webhook Auth Error")
             return
 
-        order = frappe.get_doc("Order", client_order_id)
-        new_status = self.map_status(petpooja_status)
-        
-        if new_status and order.status != new_status:
-            order.status = new_status
-            order.save()
-            frappe.db.commit()
+        if not client_order_id:
+            frappe.log_error(f"Petpooja callback missing clientorderID: {json.dumps(data)}", "Petpooja Webhook Error")
+            return
+
+        try:
+            order = frappe.get_doc("Order", client_order_id)
+            
+            # Map Petpooja status to DineMatters status
+            new_status = self.map_status(petpooja_status)
+            if not new_status:
+                frappe.log_error(f"Received unknown Petpooja status: {petpooja_status} for order {client_order_id}", "Petpooja Sync Warning")
+                return
+
+            # Status Transition Safety: Don't move backwards
+            status_priority = {
+                "pending": 0,
+                "Accepted": 1,
+                "preparing": 2,
+                "ready": 3,
+                "Dispatched": 4,
+                "delivered": 5,
+                "cancelled": -1
+            }
+
+            current_priority = status_priority.get(order.status, 0)
+            new_priority = status_priority.get(new_status, 0)
+
+            if new_status == "cancelled":
+                # Cancellation is always valid unless already delivered
+                if order.status == "delivered":
+                    return 
+            elif new_priority <= current_priority:
+                # Ignore status updates that are older or the same as current
+                return
+
+            # Update Order
+            order.db_set("status", new_status)
+            if pos_order_id and not order.pos_order_id:
+                order.db_set("pos_order_id", pos_order_id)
+            
+            # Real-time update for ONO Menu (Frontend)
+            frappe.publish_realtime(
+                "order_update", 
+                {
+                    "order_id": order.name, 
+                    "status": new_status,
+                    "order_number": order.order_number,
+                    "restaurant_id": order.restaurant
+                },
+                after_commit=True
+            )
+
+            # Log for production audit
+            frappe.logger().info(f"Petpooja Sync: Order {order.name} status updated to {new_status} (Petpooja: {petpooja_status})")
+
+        except frappe.DoesNotExistError:
+            frappe.log_error(f"Petpooja callback for non-existent order: {client_order_id}", "Petpooja Webhook Error")
+        except Exception as e:
+            frappe.log_error(f"Error handling Petpooja status callback: {str(e)}\n{frappe.get_traceback()}", "Petpooja Sync Error")
 
     def map_status(self, provider_status):
         """
-        Map Petpooja status codes to Dinematters statuses
+        Map Petpooja status codes to Dinematters statuses (2026 Spec)
+        1: Accepted, 2: Preparing/Cooking, 3: Food Ready, 4: Dispatched, 5/10: Delivered, -1: Cancelled
         """
         mapping = {
             "1": "Accepted",      # Accepted
-            "2": "Accepted",      # Cooking
-            "3": "Accepted",      # Food Ready
-            "4": "Dispatched",    # Dispatched
-            "5": "ready",         # Ready
-            "10": "delivered",    # Delivered
+            "2": "preparing",     # Cooking
+            "3": "ready",         # Food Ready
+            "4": "Dispatched",    # Dispatched/On the way
+            "5": "delivered",     # Delivered
+            "10": "delivered",    # Delivered (Alternative)
             "-1": "cancelled"     # Cancelled
         }
         return mapping.get(str(provider_status))
@@ -87,6 +144,7 @@ class PetpoojaProvider(POSProvider):
     def _format_order(self, order_doc):
         """
         Map Dinematters Order to Petpooja 'Save Order' 2026 schema
+        Supports: Dine-In (1), Takeaway (2), Delivery (3)
         """
         order_items = []
         for item in order_doc.order_items:
@@ -100,6 +158,21 @@ class PetpoojaProvider(POSProvider):
                 "tax": "0" 
             })
 
+        # Determine Order Type
+        # 1: Dine-In, 2: Takeaway, 3: Delivery
+        order_type_map = {
+            "dine_in": "1",
+            "takeaway": "2",
+            "delivery": "3"
+        }
+        order_type = order_type_map.get(order_doc.order_type, "2")
+
+        # Construct Address for Delivery
+        # Petpooja expects a consolidated address or granular fields. 2026 spec prefers granular.
+        full_address = order_doc.delivery_address or ""
+        if order_doc.delivery_landmark:
+            full_address += f" (Landmark: {order_doc.delivery_landmark})"
+
         # Base payload with authentication
         payload = {
             "app_key": self.settings["app_key"],
@@ -112,23 +185,27 @@ class PetpoojaProvider(POSProvider):
                     "name": order_doc.customer_name or "Guest",
                     "phone": order_doc.customer_phone or "",
                     "email": order_doc.customer_email or "",
-                    "address": order_doc.address or ""
+                    "address": full_address,
+                    "city": order_doc.delivery_city or "",
+                    "zip": order_doc.delivery_zip_code or ""
                 },
                 "details": {
                     "order_number": order_doc.order_number,
                     "order_date": order_doc.creation.strftime("%Y-%m-%d %H:%M:%S"),
-                    "order_type": "1" if order_doc.order_type == "dine_in" else "2",
+                    "order_type": order_type,
                     "subtotal": str(order_doc.subtotal),
                     "tax": str(order_doc.tax),
                     "total": str(order_doc.total),
                     "payment_type": "1" if order_doc.payment_method == "online" else "0",
+                    "discount": str(order_doc.discount or 0.0),
+                    "instructions": order_doc.delivery_instructions or "",
                     "items": order_items
                 }
             }
         }
 
         # Add table info if dine-in
-        if order_doc.order_type == "dine_in" and order_doc.table_number:
+        if order_type == "1" and order_doc.table_number:
             payload["order"]["details"]["table_no"] = str(order_doc.table_number)
 
         return payload

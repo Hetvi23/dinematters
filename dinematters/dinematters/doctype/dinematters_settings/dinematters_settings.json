@@ -148,7 +148,7 @@
    "label": "DIAMOND Commission Percent"
   },
   {
-   "default": "2499",
+   "default": "1299",
    "fieldname": "diamond_upgrade_barrier",
    "fieldtype": "Float",
    "label": "DIAMOND Upgrade Barrier (Coins)"

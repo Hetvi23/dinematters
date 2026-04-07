@@ -126,7 +126,7 @@ if (!hasAccess) {
 
 > [!CAUTION]
 > **The DIAMOND Upgrade Guardrail**
-> To prevent restaurants from immediately falling into debt during an upgrade, a wallet balance of **2499 Coins** is required to switch to **DIAMOND**. This ensures nearly 2 months of floor coverage or initial commission liquidity.
+> To prevent restaurants from immediately falling into debt during an upgrade, a wallet balance of **1299 Coins** is required to switch to **DIAMOND**. This ensures nearly 2 months of floor coverage or initial commission liquidity.
 
 > [!TIP]
 > **SILVER Standalone Add-ons**
