@@ -667,3 +667,159 @@ def _send_email(recipient_phone, message, settings, subject=None):
     if res.status_code in [200, 201]:
         return True, None
     return False, f"Resend error: {res.text[:200]}"
+
+
+# ═══════════════════════════════════════════════════════════════════
+# SEO BLOG AUTOMATION
+# ═══════════════════════════════════════════════════════════════════
+
+def generate_daily_seo_blog():
+    """
+    Scheduled task to generate a unique SEO blog post daily at 9:00 AM IST.
+    Uses 'Dynamic Entity Injection' for Gold/Diamond restaurants.
+    """
+    from dinematters.dinematters.services.ai.seo_blog import ContentGenerator
+    import random
+    
+    try:
+        # 1. Target Selection: Filter for premium restaurants (Gold/Diamond)
+        restaurants = frappe.get_all("Restaurant", 
+            filters={"plan_type": ["in", ["Gold", "Diamond"]], "is_active": 1},
+            fields=["name", "restaurant_name", "description", "city", "subdomain"]
+        )
+        
+        if not restaurants:
+            # Fallback to any active restaurant if no premium ones exist
+            restaurants = frappe.get_all("Restaurant", filters={"is_active": 1}, 
+                                       fields=["name", "restaurant_name", "description", "city", "subdomain"])
+            
+        if not restaurants:
+            return {"success": False, "error": "No active restaurants found for blog generation"}
+
+        focus_res = random.choice(restaurants)
+        res_id = focus_res.name
+        res_name = focus_res.restaurant_name or res_id
+        res_city = focus_res.city or "Mumbai"
+        
+        # 2. Context Fetching: Real-time dishes and location
+        dishes = frappe.get_all("Menu Product", 
+            filters={"restaurant": res_id, "is_active": 1}, 
+            limit=20, fields=["name", "product_name", "description", "category_name"])
+        
+        # Neighborhood/City injection
+        neighborhoods = ["Bandra", "Juhu", "Colaba", "Powai", "Andheri", "Kolla", "Worli", "Lower Parel"]
+        neighborhood = random.choice(neighborhoods)
+        today_date = frappe.utils.today()
+        current_year = today_date.split("-")[0]
+        
+        context = f"Restaurant: {res_name} in {neighborhood}, {res_city}. Date: {today_date}.\n"
+        if focus_res.description:
+            context += f"About: {focus_res.description}\n"
+        
+        if dishes:
+            dish_list = ", ".join([d.product_name for d in dishes if d.product_name])
+            context += f"Signature Menu Items (Inject these naturally): {dish_list}."
+
+        # 3. Image Strategy: Fetch real random food images from ALL Diamond/Gold restaurants for variety
+        image_url = None
+        media_pool = []
+        
+        # Get all recent product media from ALL premium restaurants to ensure uniqueness
+        premium_res_ids = [r.name for r in restaurants]
+        product_media = frappe.get_all("Product Media", 
+            filters={
+                "parenttype": "Menu Product",
+                "media_type": ["like", "%image%"]
+            },
+            fields=["media_url", "parent"],
+            limit=100
+        )
+        
+        # Filter for only those belonging to premium restaurants
+        premium_dishes = frappe.get_all("Menu Product", 
+            filters={"restaurant": ["in", premium_res_ids]}, 
+            pluck="name"
+        )
+        
+        images = [m.media_url for m in product_media if m.parent in premium_dishes and not m.media_url.endswith(('.mp4', '.mov', '.avi'))]
+        
+        if images:
+            random.shuffle(images)
+            image_url = images[0] # Thumbnail
+            media_pool = images[1:6] # Up to 5 for in-content injection
+        
+        # Fallback to restaurant logo if no product images
+        if not image_url and hasattr(focus_res, 'logo') and focus_res.logo:
+            image_url = focus_res.logo
+        
+        # 4. Content Generation
+        gen = ContentGenerator()
+        keywords = [
+            f"best dining experience in {res_city} {current_year}", "future of restaurant technology",
+            "how to skyrocket restaurant revenue", "digital transformation in f&b mumbai",
+            "ultimate guide to qr code ordering", f"food trends {current_year}",
+            "improving customer loyalty in cafes", f"luxury dining in {neighborhood}"
+        ]
+        keyword = random.choice(keywords)
+        
+        article = gen.generate_article(
+            keyword=keyword,
+            length=2000, 
+            style="premium",
+            client_context=context,
+            media_urls=media_pool # Pass the pool for in-content injection
+        )
+        
+        meta = gen.generate_premium_metadata(article["content"], keyword)
+        
+        # 5. Database Storage: Save to native 'Blog Post'
+        blog_category = "industry-insights"
+        if not frappe.db.exists("Blog Category", blog_category):
+            frappe.get_doc({
+                "doctype": "Blog Category", 
+                "title": "Industry Insights", 
+                "name": blog_category
+            }).insert(ignore_permissions=True)
+            
+        # Get or create blogger
+        blogger_name = "Dinematters Team"
+        if not frappe.db.exists("Blogger", blogger_name):
+            frappe.get_doc({
+                "doctype": "Blogger",
+                "short_name": "Dinematters Team",
+                "full_name": "Dinematters Team",
+                "name": blogger_name
+            }).insert(ignore_permissions=True)
+            
+        blog_post = frappe.get_doc({
+            "doctype": "Blog Post",
+            "title": article["title"],
+            "blog_intro": article["excerpt"],
+            "content": article["content"],
+            "meta_description": meta.get("meta_description") or article["excerpt"],
+            "meta_title": meta.get("meta_title") or article["title"],
+            "published": 1,
+            "published_on": frappe.utils.today(),
+            "blogger": blogger_name,
+            "blog_category": blog_category,
+            "meta_image": image_url # Real restaurant/dish image for SEO rich snippets
+        })
+        
+        blog_post.insert(ignore_permissions=True)
+        
+        # ✅ FORCE SAVE TAGS: Use direct DB update because _user_tags is an internal field
+        if meta.get("tags"):
+            frappe.db.set_value("Blog Post", blog_post.name, "_user_tags", meta.get("tags"))
+        
+        frappe.db.commit()
+        
+        print(f"✓ Blog Post created: {blog_post.name} (Title: {article['title']})")
+        frappe.log_error(f"Daily SEO Blog Generated (10/10): {blog_post.name}", "Marketing AI Blog")
+        
+        return {"success": True, "blog_post": blog_post.name, "restaurant": res_name}
+
+    except Exception as e:
+        error_msg = f"Error generating daily SEO blog: {str(e)}\n{traceback.format_exc()}"
+        print(f"✗ ERROR: {error_msg}")
+        frappe.log_error(error_msg, "Marketing AI Blog Failure")
+        return {"success": False, "error": str(e)}

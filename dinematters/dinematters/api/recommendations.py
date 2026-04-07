@@ -9,7 +9,7 @@ from dinematters.dinematters.media.utils import get_media_asset_data
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
 
 
-RECOMMENDATIONS_API_URL = "https://api.dinematters.com/menu-extraction/api/v1/recommendations/generate"
+from dinematters.dinematters.services.ai.recommendations import get_recommendations
 MAX_RECOMMENDATIONS_PER_PRODUCT = 8
 
 
@@ -80,18 +80,15 @@ def _build_payload(restaurant_doc) -> Dict:
 
 
 def _call_recommendations_api(payload: Dict) -> Dict:
-	"""Call external recommendations API and return parsed JSON."""
-	response = requests.post(
-		RECOMMENDATIONS_API_URL,
-		json=payload,
-		headers={"Content-Type": "application/json"},
-		timeout=600,
+	"""Call internal recommendations service."""
+	data = get_recommendations(
+		dishes=payload.get("dishes", []),
+		categories=payload.get("categories", []),
+		min_recommendations=payload.get("min_recommendations", 9)
 	)
-	response.raise_for_status()
-	data = response.json()
 
 	if not data.get("success"):
-		frappe.throw(_("Recommendations API failed: {0}").format(data.get("message", "Unknown error")))
+		frappe.throw(_("Recommendations Service failed: {0}").format(data.get("error", "Unknown error")))
 
 	return data
 

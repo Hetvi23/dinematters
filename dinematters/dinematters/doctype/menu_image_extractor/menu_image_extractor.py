@@ -5,12 +5,13 @@ import frappe
 from frappe.model.document import Document
 from frappe import _
 from frappe.utils.file_manager import get_file_path
-import requests
 import json
 import time
 from datetime import datetime
 import os
 import re
+from dinematters.dinematters.services.ai.menu_extraction import MenuExtractor, extract_and_generate
+from dinematters.dinematters.services.ai.recommendations import RecommendationEngine
 
 
 class MenuImageExtractor(Document):
@@ -191,136 +192,60 @@ def _extract_batch_internal(docname, batch_images, batch_number, total_batches):
 		
 		start_time = time.time()
 		
-		# Prepare form data
-		form_data = {}
-		restaurant_name_for_api = doc.restaurant_name
-		if not restaurant_name_for_api and doc.restaurant:
-			restaurant_name_for_api = frappe.db.get_value("Restaurant", doc.restaurant, "restaurant_name")
-		
-		if restaurant_name_for_api:
-			form_data['restaurant_name'] = restaurant_name_for_api
-		
-		form_data['save_to_disk'] = 'false'
-		form_data['generate_descriptions'] = 'true' if doc.generate_descriptions else 'false'
-		
-		# Get image files for this batch
-		image_files = []
-		file_handles = []
-		
+		# Internal extraction logic
+		image_paths = []
 		for image_url in batch_images:
-			try:
-				file_path = get_file_path(image_url)
-				if not file_path or not os.path.exists(file_path):
-					if image_url.startswith('/'):
-						image_url = image_url[1:]
-					file_path = frappe.get_site_path('public', 'files', image_url)
-					if not os.path.exists(file_path):
-						file_path = frappe.get_site_path('private', 'files', image_url)
-					if not os.path.exists(file_path):
-						file_path = frappe.get_site_path('public', image_url)
-				
-				if not file_path or not os.path.exists(file_path):
-					frappe.log_error(f"Image file not found: {image_url}", "Menu Extraction - Batch File Error")
-					continue
-				
-				file_handle = open(file_path, 'rb')
-				file_handles.append(file_handle)
-				filename = os.path.basename(file_path)
-				file_ext = os.path.splitext(filename)[1].lower()
-				content_type_map = {
-					'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-					'.webp': 'image/webp', '.gif': 'image/gif'
-				}
-				content_type = content_type_map.get(file_ext, 'image/jpeg')
-				image_files.append(('images', (filename, file_handle, content_type)))
-			except Exception as e:
-				frappe.log_error(f"Error processing image {image_url}: {str(e)}", "Menu Extraction - Batch Image Error")
-				continue
-		
-		if not image_files:
+			file_path = get_file_path(image_url)
+			if not file_path or not os.path.exists(file_path):
+				if image_url.startswith('/'): image_url = image_url[1:]
+				file_path = frappe.get_site_path('public', 'files', image_url)
+				if not os.path.exists(file_path): file_path = frappe.get_site_path('private', 'files', image_url)
+				if not os.path.exists(file_path): file_path = frappe.get_site_path('public', image_url)
+			
+			if file_path and os.path.exists(file_path):
+				image_paths.append(file_path)
+
+		if not image_paths:
 			frappe.log_error(f"Batch {batch_number}: No valid image files found", "Menu Extraction - Batch Empty")
-			# Update batch completion
 			_update_batch_completion(docname, batch_number, total_batches, None, None)
 			return
-		
-		# Call the extraction API
-		api_url = "https://api.dinematters.com/menu-extraction/api/v1/extraction/extract"
-		headers = {'Expect': ''}
-		
-		# Log API call details for debugging
-		frappe.log_error(
-			f"Batch {batch_number}: Calling API\n"
-			f"URL: {api_url}\n"
-			f"Images count: {len(image_files)}\n"
-			f"Form data: {form_data}\n"
-			f"Image URLs: {batch_images[:3]}...",  # First 3 URLs
-			"Menu Extraction - API Call Start"
+
+		# Call local AI service
+		result = extract_and_generate(
+			image_paths=image_paths,
+			restaurant_name=restaurant_name_for_api,
+			generate_descriptions=bool(doc.generate_descriptions)
 		)
 		
-		try:
-			response = requests.post(
-				api_url,
-				files=image_files,
-				data=form_data,
-				headers=headers,
-				timeout=7200  # 2 hours per batch
-			)
-			
-			# Close file handles
-			for file_handle in file_handles:
-				try:
-					file_handle.close()
-				except:
-					pass
-			
-			# Log response status
-			frappe.log_error(
-				f"Batch {batch_number}: API Response\n"
-				f"Status Code: {response.status_code}\n"
-				f"Response Headers: {dict(response.headers)}\n"
-				f"Response Preview: {response.text[:500]}",
-				"Menu Extraction - API Response"
-			)
-			
-			response.raise_for_status()
-			result = response.json()
-			
-			# Log successful result
-			frappe.log_error(
-				f"Batch {batch_number}: API Success\n"
-				f"Success: {result.get('success')}\n"
-				f"Categories: {len(result.get('data', {}).get('categories', []))}\n"
-				f"Dishes: {len(result.get('data', {}).get('dishes', []))}",
-				"Menu Extraction - API Success"
-			)
-			
-			processing_time = time.time() - start_time
-			
-			# Process batch result
-			if result.get('success'):
-				data = result.get('data', {})
-				# Store batch results temporarily
-				_store_batch_results(docname, batch_number, data, processing_time)
-			else:
-				frappe.log_error(
-					f"Batch {batch_number} API returned success=False: {result.get('message', 'Unknown error')}",
-					"Menu Extraction - Batch API Error"
-				)
-				_update_batch_completion(docname, batch_number, total_batches, None, None)
+		# Log successful result
+		frappe.log_error(
+			f"Batch {batch_number}: Extraction Success\n"
+			f"Success: {result.get('success')}\n"
+			f"Categories: {len(result.get('data', {}).get('categories', []))}\n"
+			f"Dishes: {len(result.get('data', {}).get('dishes', []))}",
+			"Menu Extraction - Internal Success"
+		)
 		
-		except Exception as e:
-			# Close file handles on error
-			for file_handle in file_handles:
-				try:
-					file_handle.close()
-				except:
-					pass
-			
+		processing_time = time.time() - start_time
+		
+		# Process batch result
+		if result.get('success'):
+			data = result.get('data', {})
+			# Store batch results temporarily
+			_store_batch_results(docname, batch_number, data, processing_time)
+		else:
 			frappe.log_error(
-				f"Batch {batch_number} error: {str(e)}\n{frappe.get_traceback()}",
-				"Menu Extraction - Batch Error"
+				f"Batch {batch_number} extraction returned success=False: {result.get('error', 'Unknown error')}",
+				"Menu Extraction - Batch Service Error"
 			)
 			_update_batch_completion(docname, batch_number, total_batches, None, None)
+			
+	except Exception as e:
+		frappe.log_error(
+			f"Batch {batch_number} error: {str(e)}\n{frappe.get_traceback()}",
+			"Menu Extraction - Batch Error"
+		)
+		_update_batch_completion(docname, batch_number, total_batches, None, None)
 	
 	except Exception as e:
 		frappe.log_error(
@@ -560,157 +485,36 @@ def _extract_menu_data_internal(docname):
 		if not image_files:
 			frappe.throw(_("No valid image files found"))
 		
-		# Call the extraction API
-		api_url = "https://api.dinematters.com/menu-extraction/api/v1/extraction/extract"
+		# Start time for processing
+		start_time = time.time()
 		
-		# Headers to prevent 417 Expectation Failed error
-		# Disable Expect: 100-continue header for file uploads
-		headers = {
-			'Expect': ''  # Empty string disables the Expect header
-		}
+		# Get images for extraction
+		image_paths = []
+		for img_row in doc.menu_images:
+			if img_row.menu_image:
+				try:
+					image_path = get_file_path(img_row.menu_image)
+					image_paths.append(image_path)
+				except Exception as e:
+					frappe.log_error(f"File path error: {str(e)}", "Menu Extraction Error")
 		
+		if not image_paths:
+			frappe.throw(_("No valid image files found"))
+		
+		# Call local AI service
 		try:
-			# Log request details for debugging
-			frappe.log_error(
-				f"API Request Details:\n"
-				f"URL: {api_url}\n"
-				f"Files count: {len(image_files)}\n"
-				f"Form data: {form_data}\n"
-				f"Headers: {headers}",
-				"Menu Extraction - Request Debug"
-			)
+			extractor = MenuExtractor()
+			restaurant_name = doc.restaurant_name or doc.restaurant
+			data = extractor.extract_from_images(image_paths, restaurant_name)
 			
-			response = requests.post(
-				api_url,
-				files=image_files,
-				data=form_data,
-				headers=headers,
-				timeout=3600  # 1 hour timeout (matches API server configuration)
-			)
-			
-			# Close all file handles
-			for file_handle in file_handles:
-				try:
-					file_handle.close()
-				except:
-					pass
-			
-			# Log response for debugging before raising
-			if not response.ok:
-				frappe.log_error(
-					f"API Error Response:\n"
-					f"Status Code: {response.status_code}\n"
-					f"Response Headers: {dict(response.headers)}\n"
-					f"Response Text: {response.text[:1000]}",  # First 1000 chars
-					"Menu Extraction - API Error Response"
-				)
-			
-			response.raise_for_status()
-			result = response.json()
-			
-		except requests.exceptions.HTTPError as e:
-			# Close file handles on error
-			for file_handle in file_handles:
-				try:
-					file_handle.close()
-				except:
-					pass
-			
-			# Get response details for better error messages
-			status_code = None
-			response_text = ""
-			
-			if hasattr(e, 'response') and e.response:
-				status_code = e.response.status_code
-				try:
-					response_text = e.response.text[:500]  # First 500 chars
-				except:
-					response_text = "Unable to read response"
-			
-			# Log detailed error
-			frappe.log_error(
-				f"API HTTP Error:\n"
-				f"Status Code: {status_code}\n"
-				f"Error: {str(e)}\n"
-				f"Response: {response_text}",
-				"Menu Extraction - HTTP Error"
-			)
-			
-			# Provide more specific error messages
-			if status_code == 400:
-				error_msg = _(
-					"Bad Request (400): The API rejected the request format. "
-					"Please check that the images are valid and properly formatted. "
-					"Response: {0}"
-				).format(response_text[:200])
-			elif status_code == 502:
-				error_msg = _(
-					"API Service Unavailable (502 Bad Gateway). "
-					"The external menu extraction service is currently down or unreachable. "
-					"Please try again later or contact the service administrator."
-				)
-			elif status_code == 417:
-				error_msg = _(
-					"Expectation Failed (417). "
-					"The server could not meet the requirements of the request. "
-					"Please check the file format and try again."
-				)
-			elif status_code == 503:
-				error_msg = _(
-					"Service Unavailable (503). "
-					"The external service is temporarily unavailable. "
-					"Please try again later."
-				)
-			elif status_code == 504:
-				error_msg = _(
-					"Gateway Timeout (504). "
-					"The request took too long to process. "
-					"Please try with fewer images or try again later."
-				)
-			else:
-				error_msg = _("API Request Failed: {0}").format(str(e))
-				if response_text:
-					error_msg += f"\n\nAPI Response: {response_text[:200]}"
-			
-			frappe.throw(error_msg, title=_("Extraction API Error"))
-			
-		except requests.exceptions.Timeout as e:
-			# Close file handles on timeout
-			for file_handle in file_handles:
-				try:
-					file_handle.close()
-				except:
-					pass
-			frappe.throw(
-				_("Request Timeout: The API request took longer than 1 hour to complete. "
-				  "Please try with fewer images or check your network connection."),
-				title=_("Request Timeout")
-			)
-			
-		except requests.exceptions.ConnectionError as e:
-			# Close file handles on connection error
-			for file_handle in file_handles:
-				try:
-					file_handle.close()
-				except:
-					pass
-			frappe.throw(
-				_("Connection Error: Unable to connect to the extraction API. "
-				  "Please check your internet connection and ensure the service is available."),
-				title=_("Connection Error")
-			)
-			
-		except requests.exceptions.RequestException as e:
-			# Close file handles on any other request error
-			for file_handle in file_handles:
-				try:
-					file_handle.close()
-				except:
-					pass
-			frappe.throw(
-				_("API Request Failed: {0}").format(str(e)),
-				title=_("Request Error")
-			)
+			# Wrap in 'success' and 'data' for parity with legacy API expectations
+			result = {
+				'success': True,
+				'data': data
+			}
+		except Exception as e:
+			frappe.log_error(frappe.get_traceback(), "Menu Extraction Internal Error")
+			frappe.throw(_("Extraction API Failed: {0}").format(str(e)), title=_("Extraction API Error"))
 		
 		# Calculate processing time
 		processing_time = time.time() - start_time
@@ -1768,33 +1572,24 @@ def generate_recommendations(docname):
 				"name": cat.category_name
 			})
 		
-		# Call recommendations API
-		api_url = "https://api.dinematters.com/menu-extraction/api/v1/recommendations/generate"
-		
-		payload = {
-			"dishes": dishes,
-			"categories": categories_data,
-			"restaurant_name": restaurant_name,
-			"min_recommendations": 9,
-			"save_to_disk": False
-		}
-		
-		# Update status
-		doc.db_set('extraction_log', _("Generating recommendations..."), update_modified=False)
-		frappe.db.commit()
-		
-		response = requests.post(
-			api_url,
-			json=payload,
-			headers={"Content-Type": "application/json"},
-			timeout=600  # 10 minutes timeout
-		)
-		
-		response.raise_for_status()
-		result = response.json()
+		# Call local recommendations engine
+		try:
+			engine = RecommendationEngine()
+			recs_list, insufficient = engine.generate_recommendations(dishes)
+			
+			# Wrap in 'success' and 'data' for parity with legacy API expectations
+			result = {
+				'success': True,
+				'data': {
+					'recommendations': recs_list
+				}
+			}
+		except Exception as e:
+			frappe.log_error(frappe.get_traceback(), "Recommendations Engine Error")
+			frappe.throw(_("Recommendations Engine Failed: {0}").format(str(e)))
 		
 		if not result.get('success'):
-			frappe.throw(_("Recommendations API failed: {0}").format(result.get('message', 'Unknown error')))
+			frappe.throw(_("Recommendations Engine failed: {0}").format(result.get('message', 'Unknown error')))
 		
 		# Store recommendations in products
 		recommendations_data = result.get('data', {}).get('recommendations', [])

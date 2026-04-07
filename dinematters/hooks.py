@@ -213,18 +213,10 @@ doc_events = {
 # ---------------
 
 scheduler_events = {
-	"daily": [
-		"dinematters.dinematters.tasks.monthly_reconciliation.reconcile_transfers"
-	],
-	"monthly": [
-		"dinematters.dinematters.api.coin_billing.process_monthly_subscription_coin_refill"
-	],
-	"hourly": [
-		"dinematters.dinematters.api.payments.process_retry_charges",
-		# Marketing Studio: check for campaign conversions every hour
-		"dinematters.dinematters.tasks.marketing_tasks.check_campaign_conversions",
-	],
 	"cron": {
+		"30 3 * * *": [
+			"dinematters.dinematters.tasks.marketing_tasks.generate_daily_seo_blog"
+		],
 		"59 23 * * *": [  # Run daily at 23:59 for floor recovery and lite renewals
 			"dinematters.dinematters.tasks.subscription_tasks.process_daily_subscription_floors",
 			"dinematters.dinematters.tasks.subscription_tasks.process_silver_feature_renewals",
