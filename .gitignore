@@ -18,3 +18,5 @@ fastapi_proxy/**/__pycache__/
 *.env
 venv/
 .venv/
+
+package-lock.json
