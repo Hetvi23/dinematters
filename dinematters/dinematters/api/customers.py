@@ -22,6 +22,7 @@ def get_customer_by_phone(phone, restaurant_id):
 	- Customers with valid X-Customer-Token matching the phone number
 	"""
 	try:
+		restaurant = restaurant_id
 		normalized = normalize_phone(phone)
 		if not normalized or len(normalized) != 10:
 			return {"success": False, "error": "Invalid phone number"}

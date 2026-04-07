@@ -205,7 +205,7 @@ def process_image_asset(asset, raw_file_path, temp_dir):
 	
 	# Get original dimensions
 	from PIL import Image
-	with Image.open(source_path) as img:
+	with Image.open(raw_file_path) as img:
 		asset.width, asset.height = img.size
 	
 	# Generate blur placeholder
