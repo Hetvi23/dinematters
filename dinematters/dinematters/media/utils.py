@@ -112,8 +112,6 @@ def get_media_asset_data(owner_doctype, owner_name, media_role, fallback_url=Non
 	
 	# Fallback to legacy URL
 	url = fallback_url or ""
-	if url and url.startswith("/files/"):
-		url = get_url(url)
 	
 	return {
 		"url": url,
