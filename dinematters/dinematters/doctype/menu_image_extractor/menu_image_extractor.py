@@ -10,6 +10,8 @@ import time
 from datetime import datetime
 import os
 import re
+import requests
+import hashlib
 from dinematters.dinematters.services.ai.menu_extraction import MenuExtractor, extract_and_generate
 from dinematters.dinematters.services.ai.recommendations import RecommendationEngine
 
@@ -23,6 +25,31 @@ class MenuImageExtractor(Document):
 			if restaurant_name:
 				self.restaurant_name = restaurant_name
 
+	def on_trash(self):
+		"""Delete all associated Media Assets from R2 when the extraction doc is deleted"""
+		if self.menu_images:
+			for row in self.menu_images:
+				if row.media_asset:
+					# Delete the Media Asset document
+					# This will trigger the cloud storage cleanup if the Media Asset is configured to do so
+					if frappe.db.exists("Media Asset", row.media_asset):
+						frappe.delete_doc("Media Asset", row.media_asset)
+
+	def cleanup_source_images(self):
+		"""Delete all associated Menu Image source files from storage to save space"""
+		if not self.menu_images:
+			return
+			
+		for row in self.menu_images:
+			if row.media_asset:
+				try:
+					if frappe.db.exists("Media Asset", row.media_asset):
+						frappe.delete_doc("Media Asset", row.media_asset, ignore_permissions=True)
+				except Exception as e:
+					frappe.log_error(f"Failed to cleanup image {row.media_asset}: {str(e)}", "Menu Extraction Cleanup Error")
+		
+		# Optional: Clear the table links too if we want to be thorough, 
+		# but keeping the rows (now with empty media_asset) provides a record of what was uploaded.
 
 def generate_product_id_from_name(product_name):
 	"""Generate a slug-like product_id from product_name"""
@@ -85,52 +112,46 @@ def extract_menu_data(docname):
 	Returns instantly after queuing all batches
 	"""
 	try:
-		# Get document for validation
 		doc = frappe.get_doc("Menu Image Extractor", docname)
 		
-		# Validate images
+		# Hardening: Prevent duplicate extractions if already processing
+		if doc.extraction_status == "Processing":
+			return {
+				'success': True,
+				'message': _("Extraction is already in progress for this session."),
+				'status': 'processing'
+			}
+
+		# Validation: Check image list
 		if not doc.menu_images:
 			frappe.throw(_("Please upload at least one menu image"))
 		
 		if len(doc.menu_images) > 20:
 			frappe.throw(_("Maximum 20 images allowed. Currently {0} images uploaded.").format(len(doc.menu_images)))
 		
-		# Check if extraction is already in progress
-		if doc.extraction_status == "Processing":
-			frappe.throw(_("Extraction is already in progress. Please wait for it to complete."))
-		
-		# Reset extraction data if re-extracting (status is Completed or Failed)
-		if doc.extraction_status in ["Completed", "Failed"]:
-			# Clear previous extraction data
-			# For child tables, we need to reload the doc and clear the child table
-			doc.reload()
-			doc.extracted_dishes = []
-			doc.extraction_log = ''
-			doc.categories_created = 0
-			doc.items_created = 0
-			doc.items_updated = 0
-			doc.items_skipped = 0
-			doc.extraction_date = None
-			doc.processing_time = None
-			doc.approval_status = 'Pending'
-			doc.save(ignore_permissions=True)
-			frappe.db.commit()
-		
-		# Update status to Processing (minimal save)
-		doc.db_set('extraction_status', 'Processing', update_modified=False)
-		doc.db_set('extraction_log', _("Extraction started. Processing images in batches..."), update_modified=False)
-		frappe.db.commit()
-		
-		# Split images into batches (5 images per batch for optimal processing)
+		# Prepare batch info
 		batch_size = 5
 		image_batches = []
 		for i in range(0, len(doc.menu_images), batch_size):
 			batch = doc.menu_images[i:i + batch_size]
 			image_batches.append([img.menu_image for img in batch])
+
+		# Reset extraction metrics and set processing state
+		doc.extracted_dishes = []
+		doc.extraction_log = _("Extraction started. Processing images in batches...")
+		doc.categories_created = 0
+		doc.items_created = 0
+		doc.items_updated = 0
+		doc.items_skipped = 0
+		doc.extraction_date = None
+		doc.processing_time = None
+		doc.approval_status = 'Pending'
+		doc.extraction_status = 'Processing'
+		doc.total_batches = len(image_batches)
+		doc.completed_batches = 0
 		
-		# Store batch information
-		doc.db_set('total_batches', len(image_batches), update_modified=False)
-		doc.db_set('completed_batches', 0, update_modified=False)
+		# Save and commit before enqueuing to ensure frontend sees the state
+		doc.save(ignore_permissions=True)
 		frappe.db.commit()
 		
 		# Enqueue each batch as a separate job - no timeout, process in parallel
@@ -166,6 +187,55 @@ def extract_menu_data(docname):
 		frappe.throw(_("Error starting extraction: {0}").format(str(e)))
 
 
+def scrub_price(price_val):
+	"""Sanitize price value to float by removing currency symbols and whitespace"""
+	if not price_val:
+		return 0.0
+	if isinstance(price_val, (int, float)):
+		return float(price_val)
+	try:
+		# Remove everything except digits and decimal point
+		cleaned = re.sub(r'[^\d.]', '', str(price_val))
+		return float(cleaned) if cleaned else 0.0
+	except:
+		return 0.0
+
+
+@frappe.whitelist()
+def get_extraction_status(docname):
+	"""
+	Dedicated status polling API - reads DIRECTLY from DB, bypasses all SDK caching.
+	Returns current state of extraction: status, batch progress, and metadata.
+	Mirrors the pattern used by AI Enhancement's get_enhancement_status.
+	"""
+	# Read directly from DB - no doc cache
+	result = frappe.db.get_value(
+		"Menu Image Extractor",
+		docname,
+		[
+			"extraction_status",
+			"total_batches",
+			"completed_batches",
+			"extraction_log",
+			"items_created",
+			"categories_created",
+		],
+		as_dict=True
+	)
+	if not result:
+		frappe.throw("Extraction document not found: {}".format(docname))
+
+	return {
+		"status": result.extraction_status,
+		"total_batches": result.total_batches or 0,
+		"completed_batches": result.completed_batches or 0,
+		"extraction_log": result.extraction_log,
+		"items_created": result.items_created or 0,
+		"categories_created": result.categories_created or 0,
+	}
+
+
+
 def _extract_batch_internal(docname, batch_images, batch_number, total_batches):
 	"""
 	Process a single batch of images
@@ -194,16 +264,19 @@ def _extract_batch_internal(docname, batch_images, batch_number, total_batches):
 		
 		# Internal extraction logic
 		image_paths = []
+		temp_files = []  # Track files to delete later
+
 		for image_url in batch_images:
-			file_path = get_file_path(image_url)
-			if not file_path or not os.path.exists(file_path):
-				if image_url.startswith('/'): image_url = image_url[1:]
-				file_path = frappe.get_site_path('public', 'files', image_url)
-				if not os.path.exists(file_path): file_path = frappe.get_site_path('private', 'files', image_url)
-				if not os.path.exists(file_path): file_path = frappe.get_site_path('public', image_url)
-			
-			if file_path and os.path.exists(file_path):
-				image_paths.append(file_path)
+			try:
+				local_path, is_temp = _get_local_image_path(image_url)
+				if local_path and os.path.exists(local_path):
+					image_paths.append(local_path)
+					if is_temp:
+						temp_files.append(local_path)
+				else:
+					frappe.log_error(f"Batch {batch_number}: Could not resolve image path for {image_url}", "Menu Extraction - Path Error")
+			except Exception as e:
+				frappe.log_error(f"Batch {batch_number}: Error resolving image {image_url}\n{str(e)}", "Menu Extraction - Resolution Error")
 
 		if not image_paths:
 			frappe.log_error(f"Batch {batch_number}: No valid image files found", "Menu Extraction - Batch Empty")
@@ -211,6 +284,10 @@ def _extract_batch_internal(docname, batch_images, batch_number, total_batches):
 			return
 
 		# Call local AI service
+		restaurant_name_for_api = doc.restaurant_name
+		if not restaurant_name_for_api and doc.restaurant:
+			restaurant_name_for_api = frappe.db.get_value("Restaurant", doc.restaurant, "restaurant_name")
+
 		result = extract_and_generate(
 			image_paths=image_paths,
 			restaurant_name=restaurant_name_for_api,
@@ -239,20 +316,91 @@ def _extract_batch_internal(docname, batch_images, batch_number, total_batches):
 				"Menu Extraction - Batch Service Error"
 			)
 			_update_batch_completion(docname, batch_number, total_batches, None, None)
-			
-	except Exception as e:
-		frappe.log_error(
-			f"Batch {batch_number} error: {str(e)}\n{frappe.get_traceback()}",
-			"Menu Extraction - Batch Error"
-		)
-		_update_batch_completion(docname, batch_number, total_batches, None, None)
 	
 	except Exception as e:
-		frappe.log_error(
-			f"Batch {batch_number} fatal error: {str(e)}\n{frappe.get_traceback()}",
-			"Menu Extraction - Batch Fatal Error"
-		)
+		frappe.log_error(f"Batch {batch_number} failed: {str(e)}\n{frappe.get_traceback()}", "Menu Extraction - Batch Error")
 		_update_batch_completion(docname, batch_number, total_batches, None, None)
+	
+	finally:
+		# CLEANUP: Delete temporary downloaded files
+		if 'temp_files' in locals() and temp_files:
+			for temp_file in temp_files:
+				try:
+					if os.path.exists(temp_file):
+						os.remove(temp_file)
+				except Exception as cleanup_err:
+					frappe.log_error(f"Failed to cleanup temp file {temp_file}: {str(cleanup_err)}", "Menu Extraction - Cleanup Error")
+
+
+def _get_local_image_path(image_url):
+	"""
+	Resolve a URL/path to a local file path.
+	If it's an external URL, download it to a temporary location.
+	Returns (file_path, is_temporary)
+	"""
+	if not image_url:
+		return None, False
+
+	# CASE 1: External URL (matches http:// or https://)
+	if image_url.startswith(('http://', 'https://')):
+		try:
+			# Check if it corresponds to the local cdn (just in case)
+			cdn_prefix = frappe.conf.get("cdn_url") or "cdn.dinematters.com"
+			if cdn_prefix in image_url:
+				# It is highly likely to be on R2
+				pass
+			
+			# Download to tmp
+			tmp_dir = frappe.get_site_path('tmp', 'mie_extractions')
+			if not os.path.exists(tmp_dir):
+				os.makedirs(tmp_dir, exist_ok=True)
+			
+			# Generate a unique filename to avoid collisions
+			url_hash = hashlib.md5(image_url.encode()).hexdigest()
+			ext = os.path.splitext(image_url.split('?')[0])[1] or '.png'
+			temp_path = os.path.join(tmp_dir, f"mie_{url_hash}{ext}")
+			
+			# Skip download if it already exists (unlikely in same job but good practice)
+			if os.path.exists(temp_path):
+				return temp_path, True
+				
+			response = requests.get(image_url, timeout=30)
+			response.raise_for_status()
+			
+			with open(temp_path, 'wb') as f:
+				f.write(response.content)
+			
+			return temp_path, True
+			
+		except Exception as e:
+			frappe.log_error(f"Failed to download external image {image_url}: {str(e)}", "Menu Extraction - Download Error")
+			return None, False
+
+	# CASE 2: Local Frappe URL or Path
+	try:
+		file_path = get_file_path(image_url)
+		if file_path and os.path.exists(file_path):
+			return file_path, False
+			
+		# Fallback manual path resolving if get_file_path fails
+		clean_path = image_url if not image_url.startswith('/') else image_url[1:]
+		
+		# Try public files
+		full_path = frappe.get_site_path('public', clean_path)
+		if os.path.exists(full_path): return full_path, False
+		
+		# Try private files
+		full_path = frappe.get_site_path('private', clean_path)
+		if os.path.exists(full_path): return full_path, False
+		
+		# Try public files directory specifically
+		full_path = frappe.get_site_path('public', 'files', clean_path)
+		if os.path.exists(full_path): return full_path, False
+		
+	except Exception:
+		pass
+		
+	return None, False
 
 
 def _store_batch_results(docname, batch_number, data, processing_time):
@@ -272,20 +420,19 @@ def _store_batch_results(docname, batch_number, data, processing_time):
 		doc.db_set('batch_results', json.dumps(batch_results), update_modified=False)
 		
 		# Update completed batches count
-		completed = doc.get('completed_batches') or 0
-		doc.db_set('completed_batches', completed + 1, update_modified=False)
+		completed = (doc.get('completed_batches') or 0) + 1
+		doc.db_set('completed_batches', completed, update_modified=False)
 		
 		total_batches = doc.get('total_batches') or 1
 		
+		# Update progress log
+		extraction_log = _("Processing batches... {0}/{1} completed").format(completed, total_batches)
+		doc.db_set('extraction_log', extraction_log, update_modified=False)
+
 		# Check if all batches are complete
-		if completed + 1 >= total_batches:
+		if completed >= total_batches:
 			# All batches complete - aggregate and process
 			_aggregate_and_process_batches(docname)
-		else:
-			# Update progress log
-			doc.db_set('extraction_log', 
-				_("Processing batches... {0}/{1} completed").format(completed + 1, total_batches),
-				update_modified=False)
 		
 		frappe.db.commit()
 	
@@ -363,6 +510,10 @@ def _aggregate_and_process_batches(docname):
 		# Store aggregated data
 		store_extracted_data(aggregated_data, doc)
 		
+		# Update metrics for display (frontend counts)
+		doc.categories_created = len(all_categories)
+		doc.items_created = len(all_dishes)
+		
 		# Update status
 		doc.extraction_status = "Pending Approval"
 		doc.approval_status = "Pending"
@@ -387,191 +538,16 @@ def _aggregate_and_process_batches(docname):
 			f"Error aggregating batches: {str(e)}\n{frappe.get_traceback()}",
 			"Menu Extraction - Aggregate Error"
 		)
-		doc = frappe.get_doc("Menu Image Extractor", docname)
-		doc.extraction_status = "Failed"
-		doc.extraction_log = f"Error aggregating batch results: {str(e)}"
-		doc.save(ignore_permissions=True)
-		frappe.db.commit()
-
-
-def _extract_menu_data_internal(docname):
-	"""
-	Internal function that performs the actual menu extraction
-	This runs as a background job to avoid web server timeouts
-	"""
-	try:
-		doc = frappe.get_doc("Menu Image Extractor", docname)
-		
-		start_time = time.time()
-		
-		# Prepare files for API request
-		files = []
-		form_data = {}
-		
-		# Add restaurant name for API (use restaurant field if restaurant_name not provided)
-		restaurant_name_for_api = doc.restaurant_name
-		if not restaurant_name_for_api and doc.restaurant:
-			# Get restaurant name from the selected restaurant
-			restaurant_name_for_api = frappe.db.get_value("Restaurant", doc.restaurant, "restaurant_name")
-		
-		if restaurant_name_for_api:
-			form_data['restaurant_name'] = restaurant_name_for_api
-		
-		form_data['save_to_disk'] = 'false'
-		form_data['generate_descriptions'] = 'true' if doc.generate_descriptions else 'false'
-		
-		# Get image files from Frappe
-		image_files = []
-		file_handles = []  # Track file handles for cleanup
-		
-		for idx, img_row in enumerate(doc.menu_images):
-			if img_row.menu_image:
-				# Get file path using Frappe's utility
-				file_url = img_row.menu_image
-				
-				try:
-					# Use Frappe's get_file_path utility which handles both public and private files
-					file_path = get_file_path(file_url)
-					
-					if not file_path or not os.path.exists(file_path):
-						# Fallback: try manual path construction
-						if file_url.startswith('/'):
-							file_url = file_url[1:]
-						
-						# Try public files
-						file_path = frappe.get_site_path('public', 'files', file_url)
-						if not os.path.exists(file_path):
-							# Try private files
-							file_path = frappe.get_site_path('private', 'files', file_url)
-						
-						if not os.path.exists(file_path):
-							# Try direct public path
-							file_path = frappe.get_site_path('public', file_url)
-					
-					if not file_path or not os.path.exists(file_path):
-						frappe.throw(_("Image file not found: {0}").format(img_row.menu_image))
-					
-					# Open file and track handle
-					file_handle = open(file_path, 'rb')
-					file_handles.append(file_handle)
-					
-					# Get filename from path
-					filename = os.path.basename(file_path)
-					
-					# Determine content type from file extension
-					file_ext = os.path.splitext(filename)[1].lower()
-					content_type_map = {
-						'.jpg': 'image/jpeg',
-						'.jpeg': 'image/jpeg',
-						'.png': 'image/png',
-						'.webp': 'image/webp',
-						'.gif': 'image/gif'
-					}
-					content_type = content_type_map.get(file_ext, 'image/jpeg')
-					
-					# Try different formats - the API might expect 'images[]' for multiple files
-					# Format: (field_name, (filename, file_handle, content_type))
-					image_files.append(('images', (filename, file_handle, content_type)))
-					
-				except Exception as e:
-					frappe.log_error(
-						f"Error getting file path for {img_row.menu_image}: {str(e)}\n{frappe.get_traceback()}",
-						"Menu Extraction - File Path Error"
-					)
-					frappe.throw(_("Error accessing image file {0}: {1}").format(
-						img_row.menu_image, str(e)
-					))
-		
-		if not image_files:
-			frappe.throw(_("No valid image files found"))
-		
-		# Start time for processing
-		start_time = time.time()
-		
-		# Get images for extraction
-		image_paths = []
-		for img_row in doc.menu_images:
-			if img_row.menu_image:
-				try:
-					image_path = get_file_path(img_row.menu_image)
-					image_paths.append(image_path)
-				except Exception as e:
-					frappe.log_error(f"File path error: {str(e)}", "Menu Extraction Error")
-		
-		if not image_paths:
-			frappe.throw(_("No valid image files found"))
-		
-		# Call local AI service
+		# Fallback to reload and set failed
 		try:
-			extractor = MenuExtractor()
-			restaurant_name = doc.restaurant_name or doc.restaurant
-			data = extractor.extract_from_images(image_paths, restaurant_name)
-			
-			# Wrap in 'success' and 'data' for parity with legacy API expectations
-			result = {
-				'success': True,
-				'data': data
-			}
-		except Exception as e:
-			frappe.log_error(frappe.get_traceback(), "Menu Extraction Internal Error")
-			frappe.throw(_("Extraction API Failed: {0}").format(str(e)), title=_("Extraction API Error"))
-		
-		# Calculate processing time
-		processing_time = time.time() - start_time
-		
-		# Process the response
-		if result.get('success'):
-			# Log extracted data to console
-			data = result.get('data', {})
-			
-			# Safely get categories and dishes, ensuring they are lists
-			categories = data.get('categories', [])
-			dishes = data.get('dishes', [])
-			
-			# Ensure categories and dishes are lists (not dicts or other types)
-			if not isinstance(categories, list):
-				categories = list(categories.values()) if isinstance(categories, dict) else []
-			if not isinstance(dishes, list):
-				dishes = list(dishes.values()) if isinstance(dishes, dict) else []
-			
-			# Safely slice the lists
-			categories_preview = categories[:3] if len(categories) > 0 else []
-			dishes_preview = dishes[:5] if len(dishes) > 0 else []
-			
-			frappe.log_error(
-				f"Extracted Data Summary:\n" +
-				f"Categories: {len(categories)}\n" +
-				f"Dishes: {len(dishes)}\n" +
-				f"First 3 categories: {json.dumps(categories_preview, indent=2)}\n" +
-				f"First 5 dishes: {json.dumps(dishes_preview, indent=2)}",
-				"Menu Extraction - Data Preview"
-			)
-			
-			# Store extracted data in child tables instead of creating immediately
-			store_extracted_data(result.get('data', {}), doc)
-			
-			# Update document status to Pending Approval
-			doc.extraction_status = "Pending Approval"
-			doc.approval_status = "Pending"
-			doc.extraction_log = f"Extraction completed successfully!\n\n" + \
-				f"Categories extracted: {len(categories)}\n" + \
-				f"Dishes extracted: {len(dishes)}\n\n" + \
-				"Please review the extracted data below and click 'Approve and Create Menu Items' to add them to the database."
-			doc.extraction_date = datetime.now()
-			doc.processing_time = f"{processing_time:.2f} seconds"
-			doc.raw_response = json.dumps(result, indent=2)
+			doc = frappe.get_doc("Menu Image Extractor", docname)
+			doc.extraction_status = "Failed"
+			doc.extraction_log = f"Error aggregating batch results: {str(e)}"
 			doc.save(ignore_permissions=True)
 			frappe.db.commit()
-			
-			# Print to console for debugging
-			print("\n" + "="*70)
-			print("EXTRACTION RESULTS")
-			print("="*70)
-			print(f"Categories extracted: {len(categories)}")
-			print(f"Dishes extracted: {len(dishes)}")
-			print("Data stored in child tables for review.")
-			print("="*70)
-			
+		except:
+			pass
+
 			# Safely get sample data
 			sample_categories = []
 			sample_dishes = []
@@ -1033,14 +1009,17 @@ def process_extracted_data(data, extractor_doc):
 			if not isinstance(cat_data, dict):
 				continue
 			category_id = cat_data.get('id')
-			category_name = cat_data.get('name')
+			category_name = cat_data.get('name') or cat_data.get('displayName') or category_id
 			
 			if not category_id or not category_name:
 				frappe.log_error(
-					f"Skipping category: missing id or name. id={category_id}, name={category_name}",
+					f"Skipping category: still missing critical identity after fallback. id={category_id}, name={category_name}",
 					"Menu Category Creation Skip"
 				)
 				continue
+			
+			# Normalize name for mapping
+			norm_cat_name = str(category_name).strip().lower()
 			
 			# Check if category exists for THIS restaurant (by category_id AND restaurant)
 			existing_category = None
@@ -1087,11 +1066,14 @@ def process_extracted_data(data, extractor_doc):
 				except frappe.exceptions.UniqueValidationError:
 					# Race condition: category was created by another process
 					# Just use the existing one
-					category_map[category_name] = category_id
 					frappe.log_error(
 						f"Category {category_id} was created by another process. Using existing category.",
 						"Menu Category - Race Condition"
 					)
+				
+				# Populate map with both original and normalized name for maximum fallback compatibility
+				category_map[category_name] = category_id
+				category_map[norm_cat_name] = category_id
 			
 		except Exception as e:
 			error_msg = f"Error creating/updating category {category_id or 'unknown'}: {str(e)[:140]}"
@@ -1148,7 +1130,8 @@ def process_extracted_data(data, extractor_doc):
 		
 		# Set basic fields
 		product_doc.product_name = product_name
-		product_doc.price = dish_data.get('price', 0)
+		product_doc.price = scrub_price(dish_data.get('price', 0))
+		product_doc.original_price = scrub_price(dish_data.get('originalPrice', 0))
 		
 		# Handle description: Only set if product doesn't already have one
 		# The API will generate descriptions only for items missing them when generate_descriptions=true
@@ -1161,11 +1144,22 @@ def process_extracted_data(data, extractor_doc):
 		product_doc.is_vegetarian = 1 if dish_data.get('isVegetarian') else 0
 		product_doc.has_no_media = 1 if dish_data.get('hasNoMedia') else 0
 		
-		# Set category
+		# Set category with robust matching
 		category_name = dish_data.get('category')
-		if category_name and category_name in category_map:
-			product_doc.category = category_map[category_name]
+		cat_to_link = None
+		
+		if category_name:
+			norm_dish_cat = str(category_name).strip().lower()
+			# Try original name first, then normalized
+			cat_to_link = category_map.get(category_name) or category_map.get(norm_dish_cat)
+		
+		if cat_to_link:
+			product_doc.category = cat_to_link
+			product_doc.category_name = category_name or frappe.db.get_value("Menu Category", cat_to_link, "category_name")
+		elif category_name:
+			# If category name exists but wasn't in list, create it on the fly or at least set the name
 			product_doc.category_name = category_name
+			frappe.log_error(f"Dish '{product_name}' refers to unknown category '{category_name}'. Link failed.", "Menu Extraction - Link Warning")
 		
 		# Set main category
 		main_category = dish_data.get('mainCategory')
@@ -1255,20 +1249,24 @@ def process_extracted_data(data, extractor_doc):
 				custom_row.is_required = 1 if custom_data.get('required') else 0
 				custom_row.display_order = custom_data.get('displayOrder', 0)
 				
-				# Append options - this is required, so we must have at least one
+				# Append options to the question (NESTED CHILD TABLE)
 				options_appended = 0
-				for option_data in valid_options:
-					# Double-check that label exists before appending
-					if not option_data.get('label'):
-						continue
+				for opt_idx, option_data in enumerate(valid_options):
+					opt_row = custom_row.append('options', {})
+					opt_row.option_id = option_data.get('id') or f"opt_{opt_idx}_{int(time.time())}"
+					opt_row.label = option_data.get('label')
 					
-					option_row = custom_row.append('options', {})
-					option_row.option_id = option_data.get('id', '')
-					option_row.label = option_data.get('label', '')
-					option_row.price = option_data.get('price', 0)
-					option_row.is_default = 1 if option_data.get('isDefault') else 0
-					option_row.is_vegetarian = 1 if option_data.get('isVegetarian') else 0
-					option_row.display_order = option_data.get('displayOrder', 0)
+					# Sanitize price for options too
+					raw_opt_price = option_data.get('price', 0)
+					if isinstance(raw_opt_price, str):
+						raw_opt_price = re.sub(r'[^\d.]', '', raw_opt_price)
+						opt_row.price = float(raw_opt_price) if raw_opt_price else 0
+					else:
+						opt_row.price = raw_opt_price
+						
+					opt_row.is_default = 1 if option_data.get('isDefault') else 0
+					opt_row.is_vegetarian = 1 if option_data.get('isVegetarian') else 0
+					opt_row.display_order = option_data.get('displayOrder', opt_idx)
 					options_appended += 1
 				
 				# Safety check: if no options were actually appended, remove the question
@@ -1317,8 +1315,19 @@ def approve_extracted_data(docname):
 	"""
 	try:
 		doc = frappe.get_doc("Menu Image Extractor", docname)
-		
-		# Check if document is in pending approval status
+
+		# Hardening: Prevent double-approval
+		if doc.approval_status == "Approved" or doc.extraction_status == "Completed":
+			return {
+				'success': True,
+				'message': _("This extraction has already been approved and items have been created."),
+				'stats': {
+					'items_created': doc.items_created,
+					'categories_created': doc.categories_created
+				}
+			}
+
+		frappe.log_error(f"Approving extracted data for {docname}", "Menu Approval - Start")
 		if doc.extraction_status != "Pending Approval":
 			frappe.throw(_("Only documents with 'Pending Approval' status can be approved."))
 		
@@ -1497,6 +1506,16 @@ def approve_extracted_data(docname):
 		doc.items_created = stats['items_created']
 		doc.categories_created = stats['categories_created']
 		doc.save(ignore_permissions=True)
+		
+		# AUTOMATIC CLEANUP: Delete source menu images now that data is successfully approved
+		# This saves significant storage space for the merchant
+		try:
+			doc.cleanup_source_images()
+			doc.extraction_log += "\n\nStorage optimized: Source images cleaned up successfully."
+			doc.save(ignore_permissions=True)
+		except:
+			pass # Don't fail the whole approval if cleanup fails
+			
 		frappe.db.commit()
 		
 		return {

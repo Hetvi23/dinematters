@@ -865,7 +865,130 @@ def get_order(restaurant_id, order_id):
 
 
 @frappe.whitelist()
-def update_order_status(order_id, status):
+def update_order_items(order_id, items, restaurant_id):
+	"""
+	PATCH /api/v1/orders/:orderId/items
+	Update items in an existing order.
+	Used by merchant dashboard to edit orders.
+	"""
+	try:
+		# Validate restaurant
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
+		if not frappe.db.exists("Order", order_id):
+			return {
+				"success": False,
+				"error": {
+					"code": "ORDER_NOT_FOUND",
+					"message": f"Order {order_id} not found"
+				}
+			}
+		
+		order_doc = frappe.get_doc("Order", order_id)
+		
+		# Validate order belongs to restaurant
+		if order_doc.restaurant != restaurant:
+			return {
+				"success": False,
+				"error": {
+					"code": "ORDER_NOT_FOUND",
+					"message": f"Order {order_id} not found for restaurant {restaurant_id}"
+				}
+			}
+		
+		# Don't allow editing cancelled or billed orders
+		if order_doc.status in ["cancelled", "billed", "delivered"]:
+			return {
+				"success": False,
+				"error": {
+					"code": "ORDER_FINALIZED",
+					"message": f"Order is already {order_doc.status} and cannot be edited."
+				}
+			}
+		
+		# Parse items if string
+		if isinstance(items, str):
+			items = json.loads(items)
+		
+		if not items or len(items) == 0:
+			return {
+				"success": False,
+				"error": {
+					"code": "VALIDATION_ERROR",
+					"message": "Order must contain at least one item"
+				}
+			}
+		
+		# Clear existing items
+		order_doc.set("order_items", [])
+		
+		# Add new items
+		for item in items:
+			dish_id = item.get("dishId")
+			quantity = cint(item.get("quantity", 1))
+			customizations = item.get("customizations", {})
+			
+			if not frappe.db.exists("Menu Product", dish_id):
+				return {"success": False, "error": {"code": "PRODUCT_NOT_FOUND", "message": f"Product {dish_id} not found"}}
+			
+			product = frappe.get_doc("Menu Product", dish_id)
+			load_customization_options(product)
+			
+			if product.restaurant != restaurant:
+				return {"success": False, "error": {"code": "PRODUCT_NOT_FOUND", "message": f"Product {dish_id} invalid for restaurant"}}
+			
+			# Calculate unit price (base + customizations)
+			unit_price = flt(product.price)
+			if customizations and product.customization_questions:
+				for question in product.customization_questions:
+					qid = question.question_id
+					if qid in customizations:
+						selected = customizations[qid]
+						if isinstance(selected, str): selected = [selected]
+						for opt_id in selected:
+							for opt in question.options:
+								if opt.option_id == opt_id:
+									unit_price += flt(opt.price) or 0
+									break
+			
+			order_doc.append("order_items", {
+				"product": dish_id,
+				"quantity": quantity,
+				"customizations": json.dumps(customizations) if customizations else None,
+				"unit_price": unit_price,
+				"total_price": unit_price * quantity
+			})
+		
+		# Save order - this triggers before_save recalculation in Order DocType
+		order_doc.save(ignore_permissions=True)
+		frappe.db.commit()
+		
+		# Notify via SocketIO
+		try:
+			frappe.publish_realtime('order_update', {
+				'order_id': order_id,
+				'restaurant_id': restaurant
+			}, room=f"restaurant_{restaurant}")
+		except:
+			pass
+			
+		return {
+			"success": True,
+			"data": {
+				"order": format_order(order_doc)
+			}
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in update_order_items: {str(e)}")
+		return {
+			"success": False,
+			"error": {
+				"code": "ORDER_UPDATE_ERROR",
+				"message": str(e)
+			}
+		}
+
+
 	"""
 	PATCH /api/v1/orders/:orderId/status
 	Update order status (admin/backend only)

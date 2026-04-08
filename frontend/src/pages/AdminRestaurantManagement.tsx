@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useFrappeAuth, useFrappePostCall } from '@/lib/frappe'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -27,6 +28,7 @@ interface Restaurant {
 }
 
 export default function AdminRestaurantManagement() {
+  const navigate = useNavigate()
   const { currentUser } = useFrappeAuth()
   const [restaurants, setRestaurants] = useState<Restaurant[]>([])
   const [loading, setLoading] = useState(true)
@@ -386,15 +388,8 @@ export default function AdminRestaurantManagement() {
                           
                           <Button
                             variant="ghost" size="icon" className="h-8 w-8 text-indigo-500 hover:bg-indigo-50"
-                            onClick={() => {
-                              setSelectedRestaurant(restaurant)
-                              setEditPlatformFee(String(restaurant.platform_fee_percent))
-                              setEditMonthlyMinimum(String(restaurant.monthly_minimum))
-                              setEditName(restaurant.restaurant_name)
-                              setEditEmail(restaurant.owner_email || '')
-                              setIsSettingsModalOpen(true)
-                            }}
-                            title="Settings"
+                            onClick={() => navigate(`/admin/restaurants/${restaurant.restaurant_id}`)}
+                            title="Manage Restaurant"
                           >
                             <Settings className="h-4 w-4" />
                           </Button>

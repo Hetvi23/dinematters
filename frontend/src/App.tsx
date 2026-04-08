@@ -39,6 +39,7 @@ const Customers = lazy(() => import('./pages/Customers'))
 const Bookings = lazy(() => import('./pages/Bookings'))
 const Coupons = lazy(() => import('./pages/Coupons'))
 const AdminRestaurantManagement = lazy(() => import('./pages/AdminRestaurantManagement'))
+const AdminRestaurantDetailsPage = lazy(() => import('./pages/AdminRestaurantDetails'))
 const AIEnhancementPage = lazy(() => import('./pages/AIEnhancementPage'))
 const AIGalleryPage = lazy(() => import('./pages/AIGalleryPage'))
 const AIMenuThemeBackgroundPage = lazy(() => import('./pages/AIMenuThemeBackgroundPage'))
@@ -73,11 +74,12 @@ function AppContent() {
 							<Route path="/feature-locked" element={<FeatureLocked />} />
 							<Route path="/setup" element={<Layout><TieredSetupWizard /></Layout>} />
 							<Route path="/setup/:stepId" element={<Layout><TieredSetupWizard /></Layout>} />
-							
+
 							<Route path="/Home Feature" element={<Navigate to="/home-features" replace />} />
 							<Route path="/Home%20Feature" element={<Navigate to="/home-features" replace />} />
 
 							<Route path="/admin/restaurants" element={<Layout><AdminRestaurantManagement /></Layout>} />
+							<Route path="/admin/restaurants/:id" element={<Layout><AdminRestaurantDetailsPage /></Layout>} />
 
 							<Route element={<FeatureProtectedRoute feature="ordering" />}>
 								<Route path="/orders" element={<Layout><Orders /></Layout>} />
@@ -146,7 +148,7 @@ function AppContent() {
 							<Route path="/ai-gallery" element={<Layout><AIGalleryPage /></Layout>} />
 							<Route path="/ai-menu-theme-background" element={<Layout><AIMenuThemeBackgroundPage /></Layout>} />
 							<Route path="/ai-menu-theme-history" element={<Layout><AIMenuThemeHistoryPage /></Layout>} />
-							
+
 							<Route path="/Legacy Content" element={<Layout><LegacyContent /></Layout>} />
 							<Route path="/Legacy Signature Dish" element={<Layout><LegacySignatureDish /></Layout>} />
 							<Route path="/restaurant/:restaurantId/payment" element={<Layout><Payment /></Layout>} />

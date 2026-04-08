@@ -299,6 +299,8 @@ def get_restaurant_from_owner(owner_doctype, owner_name):
 		return owner_name
 	elif owner_doctype == "Restaurant Config":
 		return frappe.db.get_value("Restaurant Config", owner_name, "restaurant")
+	elif owner_doctype == "Menu Image Extractor":
+		return frappe.db.get_value("Menu Image Extractor", owner_name, "restaurant")
 	elif owner_doctype == "Event":
 		return frappe.db.get_value("Event", owner_name, "restaurant")
 	elif owner_doctype == "Offer":
@@ -360,6 +362,7 @@ def validate_media_role_for_doctype(owner_doctype, media_role):
 		"Home Feature": ["home_feature_image"],
 		"Restaurant": ["restaurant_logo", "restaurant_hero_video", "restaurant_banner", "restaurant_gallery_image"],
 		"Restaurant Config": ["restaurant_config_logo", "restaurant_config_hero_video", "apple_touch_icon"],
+		"Menu Image Extractor": ["category_image"],
 		"Event": ["event_image"],
 		"Offer": ["offer_image"],
 		"Legacy Content": ["legacy_hero_media", "legacy_hero_fallback", "legacy_footer_media"],

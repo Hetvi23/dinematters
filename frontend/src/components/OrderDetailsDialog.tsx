@@ -20,11 +20,18 @@ import {
   Calendar,
   Hash,
   ArrowRight,
-  Loader2
+  Loader2,
+  Plus,
+  Minus,
+  Trash2,
+  Edit3,
+  Search,
+  X,
+  Save
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { toast } from 'sonner'
-import { getFrappeError } from '@/lib/utils'
+import { getFrappeError, cn } from '@/lib/utils'
 import DeliveryMap from './DeliveryMap'
 import {
   Select,
@@ -34,6 +41,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+import { useFrappeGetDocList } from '@/lib/frappe'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 
 interface OrderDetailsDialogProps {
   orderId: string | null
@@ -46,6 +56,16 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
   const [copied, setCopied] = useState(false)
   const { print } = usePrint()
   const { restaurantConfig } = useRestaurant()
+  const selectedRestaurant = restaurantConfig?.restaurant?.name
+
+  // Editing State
+  const [isEditing, setIsEditing] = useState(false)
+  const [editItems, setEditItems] = useState<any[]>([])
+  const [isSaving, setIsSaving] = useState(false)
+  const [showProductSearch, setShowProductSearch] = useState(false)
+  const [productSearchTerm, setProductSearchTerm] = useState('')
+  const [selectedProductForCustomization, setSelectedProductForCustomization] = useState<any>(null)
+  const [tempCustomizations, setTempCustomizations] = useState<Record<string, any>>({})
   
   const { data: order, isLoading, mutate } = useFrappeGetDoc('Order', orderId || '', {
     fields: ['*'],
@@ -67,6 +87,145 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
   // Delivery API calls
   const { call: assignDeliveryAPI } = useFrappePostCall('dinematters.dinematters.api.delivery.assign_delivery')
   const { call: cancelDeliveryAPI } = useFrappePostCall('dinematters.dinematters.api.delivery.cancel_delivery')
+  const { call: updateOrderItemsAPI } = useFrappePostCall('dinematters.dinematters.api.orders.update_order_items')
+
+  // Product List for Search
+  const { data: allProductsData } = useFrappeGetDocList(
+    'Menu Product',
+    {
+      fields: ['product_id', 'product_name', 'category_name', 'price', 'main_category', 'customization_questions'],
+      filters: selectedRestaurant ? ({ restaurant: selectedRestaurant, is_active: 1 } as any) : undefined,
+      limit: 500,
+      orderBy: { field: 'product_name', order: 'asc' } as any
+    },
+    (open && isEditing) ? `edit-order-products-${selectedRestaurant}` : null
+  )
+
+  const allProducts = (allProductsData as any[]) || []
+
+  const filteredSearchProducts = useMemo(() => {
+    if (!productSearchTerm.trim()) return allProducts.slice(0, 10)
+    const term = productSearchTerm.toLowerCase()
+    return allProducts.filter(p => 
+      p.product_name.toLowerCase().includes(term) || 
+      p.product_id.toLowerCase().includes(term) ||
+      (p.category_name || '').toLowerCase().includes(term)
+    ).slice(0, 50)
+  }, [allProducts, productSearchTerm])
+
+  const handleStartEdit = () => {
+    if (!order) return
+    const items = order.order_items.map((item: any) => ({
+      dishId: item.product,
+      product_name: item.product_name,
+      quantity: item.quantity,
+      unitPrice: item.unit_price,
+      customizations: parseCustomizations(item.customizations)
+    }))
+    setEditItems(items)
+    setIsEditing(true)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+    setEditItems([])
+    setShowProductSearch(false)
+    setSelectedProductForCustomization(null)
+  }
+
+  const handleQuantityChange = (index: number, delta: number) => {
+    setEditItems(prev => {
+      const updated = [...prev]
+      const newQty = Math.max(1, (updated[index].quantity || 1) + delta)
+      updated[index] = { ...updated[index], quantity: newQty }
+      return updated
+    })
+  }
+
+  const handleRemoveItem = (index: number) => {
+    setEditItems(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleAddProduct = (product: any) => {
+    // If product has customizations, show customization selection
+    if (product.customization_questions && JSON.parse(product.customization_questions || '[]').length > 0) {
+      setSelectedProductForCustomization(product)
+      // Initialize default customizations
+      const defaultCusts: Record<string, any> = {}
+      const questions = JSON.parse(product.customization_questions || '[]')
+      questions.forEach((q: any) => {
+        const defaultOps = q.options?.filter((o: any) => o.is_default).map((o: any) => o.option_id) || []
+        if (defaultOps.length > 0) {
+          defaultCusts[q.question_id] = q.question_type === 'single' ? defaultOps[0] : defaultOps
+        }
+      })
+      setTempCustomizations(defaultCusts)
+    } else {
+      // Add directly
+      setEditItems(prev => [
+        ...prev,
+        {
+          dishId: product.product_id,
+          product_name: product.product_name,
+          quantity: 1,
+          unitPrice: product.price,
+          customizations: {}
+        }
+      ])
+      setShowProductSearch(false)
+      setProductSearchTerm('')
+      toast.success(`${product.product_name} added to order`)
+    }
+  }
+
+  const handleConfirmCustomization = () => {
+    if (!selectedProductForCustomization) return
+    
+    setEditItems(prev => [
+      ...prev,
+      {
+        dishId: selectedProductForCustomization.product_id,
+        product_name: selectedProductForCustomization.product_name,
+        quantity: 1,
+        unitPrice: selectedProductForCustomization.price,
+        customizations: tempCustomizations
+      }
+    ])
+    
+    setSelectedProductForCustomization(null)
+    setTempCustomizations({})
+    setShowProductSearch(false)
+    setProductSearchTerm('')
+    toast.success(`${selectedProductForCustomization.product_name} added with customizations`)
+  }
+
+  const handleSaveOrder = async () => {
+    if (!orderId || !selectedRestaurant) return
+    if (editItems.length === 0) {
+      toast.error('Order must have at least one item')
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const res = await updateOrderItemsAPI({
+        order_id: orderId,
+        items: JSON.stringify(editItems),
+        restaurant_id: selectedRestaurant
+      })
+
+      const result = (res as any)?.message || res
+      if (!result?.success) throw new Error(result?.error || 'Failed to update order items')
+      
+      toast.success('Order updated successfully')
+      mutate()
+      setIsEditing(false)
+    } catch (e: any) {
+      toast.error('Failed to update order', { description: getFrappeError(e) })
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   const handleAssignDelivery = async () => {
     if (!order?.name) return
@@ -81,7 +240,8 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
       }
       
       const res = await assignDeliveryAPI(payload)
-      if (!res.success) throw new Error(res.error || 'Failed to assign delivery')
+      const result = (res as any)?.message || res
+      if (!result?.success) throw new Error(result?.error || 'Failed to assign delivery')
       
       toast.success('Delivery assigned successfully')
       window.location.reload()
@@ -101,7 +261,8 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
         order_id: order.name,
         delivery_id: order.delivery_id 
       })
-      if (!res.success) throw new Error(res.error || 'Failed to cancel delivery')
+      const result = (res as any)?.message || res
+      if (!result?.success) throw new Error(result?.error || 'Failed to cancel delivery')
       
       toast.success('Delivery cancelled successfully')
       window.location.reload()
@@ -217,9 +378,22 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                   </div>
                 </div>
                 
-                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 font-bold text-xs uppercase tracking-wider shadow-sm ${statusConfig.color}`}>
-                  <StatusIcon className="w-4 h-4" />
-                  {statusConfig.label}
+                <div className="flex items-center gap-3">
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 font-bold text-xs uppercase tracking-wider shadow-sm ${statusConfig.color}`}>
+                    <StatusIcon className="w-4 h-4" />
+                    {statusConfig.label}
+                  </div>
+                  
+                  {!isEditing && order?.status !== 'cancelled' && order?.status !== 'billed' && order?.status !== 'delivered' && (
+                    <Button 
+                      variant="outline" 
+                      onClick={handleStartEdit}
+                      className="rounded-xl border-2 font-black text-[10px] uppercase h-8 px-3"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 mr-1" />
+                      Edit Order
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -437,53 +611,235 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                     </div>
                     <h3 className="text-xs font-black uppercase tracking-widest">Order Items</h3>
                   </div>
-                  <span className="text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full text-muted-foreground">
-                    {order.order_items?.length || 0} Products
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {isEditing && (
+                      <Button 
+                        size="sm" 
+                        variant="default"
+                        onClick={() => setShowProductSearch(true)}
+                        className="h-8 text-[10px] font-black uppercase tracking-wider rounded-lg"
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1" />
+                        Add Product
+                      </Button>
+                    )}
+                    <span className="text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full text-muted-foreground">
+                      {(isEditing ? editItems : order.order_items)?.length || 0} Products
+                    </span>
+                  </div>
                 </div>
                 
                 <div className="divide-y divide-gray-100 dark:divide-zinc-800">
-                  {order.order_items?.map((item: any, index: number) => {
-                    const customizations = parseCustomizations(item.customizations)
-                    const hasCustomizations = customizations && Object.keys(customizations).length > 0
+                  {isEditing ? (
+                    editItems.map((item: any, index: number) => {
+                      const hasCustomizations = item.customizations && Object.keys(item.customizations).length > 0
 
-                    return (
-                      <div key={index} className="p-4 hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center justify-center font-mono font-black text-xs min-w-[24px] h-[24px] bg-zinc-900 text-white rounded-md shadow-inner">
-                                {item.quantity || 1}
+                      return (
+                        <div key={index} className="p-4 hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1">
+                                  <button 
+                                    onClick={() => handleQuantityChange(index, -1)}
+                                    className="w-6 h-6 flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
+                                  >
+                                    <Minus className="w-3.5 h-3.5" />
+                                  </button>
+                                  <span className="w-8 text-center font-black text-sm">{item.quantity || 1}</span>
+                                  <button 
+                                    onClick={() => handleQuantityChange(index, 1)}
+                                    className="w-6 h-6 flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                                <span className="text-base font-bold text-foreground truncate">{item.product_name || item.dishId}</span>
                               </div>
-                              <span className="text-base font-bold text-foreground truncate">{item.product_name || item.product || 'Unnamed Item'}</span>
+                              
+                              {hasCustomizations && (
+                                <div className="mt-2 ml-16 space-y-1">
+                                  {Object.entries(item.customizations).map(([question, options]: [string, any]) => {
+                                    const opts = Array.isArray(options) ? options : [options]
+                                    return (
+                                      <div key={question} className="flex items-start gap-1.5">
+                                        <span className="text-[10px] uppercase font-bold text-muted-foreground/60 mt-0.5">{question}:</span>
+                                        <span className="text-xs font-medium text-muted-foreground leading-tight">{opts.join(', ')}</span>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
                             </div>
-                            
-                            {hasCustomizations && (
-                              <div className="mt-2 ml-8 space-y-1">
-                                {Object.entries(customizations).map(([question, options]: [string, any]) => {
-                                  const opts = Array.isArray(options) ? options : [options]
-                                  return (
-                                    <div key={question} className="flex items-start gap-1.5">
-                                      <span className="text-[10px] uppercase font-bold text-muted-foreground/60 mt-0.5">{question}:</span>
-                                      <span className="text-xs font-medium text-muted-foreground leading-tight">{opts.join(', ')}</span>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-black text-foreground">{formatAmount(item.total_price || item.unit_price)}</p>
-                            <p className="text-[10px] text-muted-foreground font-mono mt-0.5 opacity-60">
-                              @{formatAmount(item.unit_price)}
-                            </p>
+                            <div className="text-right flex flex-col items-end gap-2">
+                              {/* Remove Button */}
+                              <button 
+                                onClick={() => handleRemoveItem(index)}
+                                className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                title="Remove Item"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                              <p className="text-sm font-black text-foreground">{formatAmount((item.totalPrice || item.unitPrice) * item.quantity)}</p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })
+                  ) : (
+                    order.order_items?.map((item: any, index: number) => {
+                      const customizations = parseCustomizations(item.customizations)
+                      const hasCustomizations = customizations && Object.keys(customizations).length > 0
+
+                      return (
+                        <div key={index} className="p-4 hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center justify-center font-mono font-black text-xs min-w-[24px] h-[24px] bg-zinc-900 text-white rounded-md shadow-inner">
+                                  {item.quantity || 1}
+                                </div>
+                                <span className="text-base font-bold text-foreground truncate">{item.product_name || item.product || 'Unnamed Item'}</span>
+                              </div>
+                              
+                              {hasCustomizations && (
+                                <div className="mt-2 ml-8 space-y-1">
+                                  {Object.entries(customizations).map(([question, options]: [string, any]) => {
+                                    const opts = Array.isArray(options) ? options : [options]
+                                    return (
+                                      <div key={question} className="flex items-start gap-1.5">
+                                        <span className="text-[10px] uppercase font-bold text-muted-foreground/60 mt-0.5">{question}:</span>
+                                        <span className="text-xs font-medium text-muted-foreground leading-tight">{opts.join(', ')}</span>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-black text-foreground">{formatAmount(item.total_price || item.unit_price)}</p>
+                              <p className="text-[10px] text-muted-foreground font-mono mt-0.5 opacity-60">
+                                @{formatAmount(item.unit_price)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
                 </div>
+
+                {/* Product Search Overlay (Internal) */}
+                {isEditing && showProductSearch && (
+                  <div className="p-4 border-t bg-slate-100/50 dark:bg-zinc-800/50 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input 
+                          placeholder="Search menu products..."
+                          value={productSearchTerm}
+                          onChange={e => setProductSearchTerm(e.target.value)}
+                          className="pl-9 h-9 text-sm"
+                          autoFocus
+                        />
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => setShowProductSearch(false)} className="h-9 w-9">
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+
+                    <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1">
+                      {filteredSearchProducts.map(p => (
+                        <div 
+                          key={p.product_id}
+                          onClick={() => handleAddProduct(p)}
+                          className="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800 cursor-pointer hover:border-primary transition-all group shadow-sm"
+                        >
+                          <div>
+                            <p className="font-bold text-sm group-hover:text-primary transition-colors">{p.product_name}</p>
+                            <p className="text-[10px] text-muted-foreground">{p.category_name} · {p.main_category}</p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs font-black">{formatAmount(p.price)}</span>
+                            <div className="p-1 rounded-md bg-zinc-100 dark:bg-zinc-800 group-hover:bg-primary group-hover:text-white transition-colors">
+                              <Plus className="w-3.5 h-3.5" />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {filteredSearchProducts.length === 0 && (
+                        <p className="text-center py-8 text-xs text-muted-foreground italic">No products found matching "{productSearchTerm}"</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* Customization Sub-modal (Inline for dashboard) */}
+              {selectedProductForCustomization && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                  <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                    <div className="p-6 border-b flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-black">{selectedProductForCustomization.product_name}</h3>
+                        <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold">Customize Item</p>
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => setSelectedProductForCustomization(null)} className="rounded-full">
+                        <X className="w-5 h-5" />
+                      </Button>
+                    </div>
+                    
+                    <div className="p-6 max-h-[60vh] overflow-y-auto space-y-6">
+                      {JSON.parse(selectedProductForCustomization.customization_questions || '[]').map((q: any) => (
+                        <div key={q.question_id} className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-black">{q.title}</p>
+                            {q.is_required && <Badge variant="destructive" className="text-[8px] h-4">Required</Badge>}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {q.options?.map((opt: any) => {
+                              const isSelected = q.question_type === 'single' 
+                                ? tempCustomizations[q.question_id] === opt.option_id
+                                : (tempCustomizations[q.question_id] || []).includes(opt.option_id)
+                                
+                              return (
+                                <button
+                                  key={opt.option_id}
+                                  onClick={() => {
+                                    if (q.question_type === 'single') {
+                                      setTempCustomizations(prev => ({ ...prev, [q.question_id]: opt.option_id }))
+                                    } else {
+                                      const current = tempCustomizations[q.question_id] || []
+                                      const updated = current.includes(opt.option_id)
+                                        ? current.filter((id: string) => id !== opt.option_id)
+                                        : [...current, opt.option_id]
+                                      setTempCustomizations(prev => ({ ...prev, [q.question_id]: updated }))
+                                    }
+                                  }}
+                                  className={cn(
+                                    "flex flex-col items-start p-3 rounded-xl border-2 text-left transition-all",
+                                    isSelected 
+                                      ? "border-primary bg-primary/5 dark:bg-primary/10" 
+                                      : "border-zinc-100 dark:border-zinc-800 hover:border-zinc-200"
+                                  )}
+                                >
+                                  <span className={cn("text-xs font-bold", isSelected ? "text-primary" : "text-foreground")}>{opt.label}</span>
+                                  {opt.price > 0 && <span className="text-[10px] text-muted-foreground mt-0.5">+{formatAmount(opt.price)}</span>}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="p-6 bg-zinc-50 dark:bg-zinc-800/50 flex gap-3">
+                      <Button variant="outline" onClick={() => setSelectedProductForCustomization(null)} className="flex-1 rounded-xl font-bold">Cancel</Button>
+                      <Button onClick={handleConfirmCustomization} className="flex-1 rounded-xl font-black uppercase tracking-wider">Confirm</Button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Payment & Summary */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start pb-4">
@@ -601,24 +957,46 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
             
             {/* Action Bar */}
             <div className="p-4 border-t bg-white dark:bg-zinc-900 flex justify-end gap-3 sticky bottom-0">
-                <button 
-                  onClick={() => onOpenChange(false)}
-                  className="px-6 py-2.5 rounded-xl font-bold text-sm bg-gray-100 dark:bg-zinc-800 text-foreground hover:bg-gray-200 dark:hover:bg-zinc-700 transition-all border-b-4 border-gray-200 dark:border-zinc-700 active:border-b-0 active:translate-y-1"
-                >
-                  Close Window
-                </button>
-                <button 
-                  onClick={() => print(order, { type: 'KOT' })}
-                  className="px-6 py-2.5 rounded-xl font-black text-[10px] uppercase bg-purple-100 text-purple-700 hover:bg-purple-200 border-b-4 border-purple-200 active:border-b-0 active:translate-y-1"
-                >
-                  Print KOT
-                </button>
-                <button 
-                  onClick={() => print(order, { type: 'RECEIPT', restaurant: restaurantConfig?.restaurant })}
-                  className="px-6 py-2.5 rounded-xl font-black text-[10px] uppercase bg-zinc-900 text-white hover:bg-black border-b-4 border-zinc-950 active:border-b-0 active:translate-y-1"
-                >
-                  Print Receipt
-                </button>
+                {isEditing ? (
+                  <>
+                    <button 
+                      onClick={handleCancelEdit}
+                      disabled={isSaving}
+                      className="px-6 py-2.5 rounded-xl font-bold text-sm bg-gray-100 dark:bg-zinc-800 text-foreground hover:bg-gray-200 dark:hover:bg-zinc-700 transition-all border-b-4 border-gray-200 dark:border-zinc-700 active:border-b-0 active:translate-y-1"
+                    >
+                      Discard Changes
+                    </button>
+                    <button 
+                      onClick={handleSaveOrder}
+                      disabled={isSaving}
+                      className="px-6 py-2.5 rounded-xl font-black text-[10px] uppercase bg-primary text-white hover:bg-primary/90 border-b-4 border-primary/20 active:border-b-0 active:translate-y-1 flex items-center gap-2"
+                    >
+                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      {isSaving ? 'Updating...' : 'Save Order Changes'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button 
+                      onClick={() => onOpenChange(false)}
+                      className="px-6 py-2.5 rounded-xl font-bold text-sm bg-gray-100 dark:bg-zinc-800 text-foreground hover:bg-gray-200 dark:hover:bg-zinc-700 transition-all border-b-4 border-gray-200 dark:border-zinc-700 active:border-b-0 active:translate-y-1"
+                    >
+                      Close Window
+                    </button>
+                    <button 
+                      onClick={() => print(order, { type: 'KOT' })}
+                      className="px-6 py-2.5 rounded-xl font-black text-[10px] uppercase bg-purple-100 text-purple-700 hover:bg-purple-200 border-b-4 border-purple-200 active:border-b-0 active:translate-y-1"
+                    >
+                      Print KOT
+                    </button>
+                    <button 
+                      onClick={() => print(order, { type: 'RECEIPT', restaurant: restaurantConfig?.restaurant })}
+                      className="px-6 py-2.5 rounded-xl font-black text-[10px] uppercase bg-zinc-900 text-white hover:bg-black border-b-4 border-zinc-950 active:border-b-0 active:translate-y-1"
+                    >
+                      Print Receipt
+                    </button>
+                  </>
+                )}
             </div>
           </div>
         ) : (

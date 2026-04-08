@@ -184,7 +184,14 @@ export default function EditableExtractedDishesTable({
                           step="0.01"
                         />
                       ) : (
-                        <span>${Number(price).toFixed(2)}</span>
+                        <div className="flex flex-col gap-1">
+                          <span className="font-bold">{Number(price).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          {dish.customizations_json && (
+                            <Badge variant="outline" className="text-[9px] py-0 px-1.5 border-primary/30 text-primary bg-primary/5">
+                              + Customizations
+                            </Badge>
+                          )}
+                        </div>
                       )}
                     </TableCell>
                     <TableCell className="max-w-xs">
@@ -196,7 +203,7 @@ export default function EditableExtractedDishesTable({
                           rows={2}
                         />
                       ) : (
-                        <div className="truncate text-sm text-muted-foreground">
+                        <div className="line-clamp-2 text-[11px] text-muted-foreground leading-tight">
                           {String(description)}
                         </div>
                       )}

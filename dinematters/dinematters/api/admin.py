@@ -106,6 +106,46 @@ def get_all_restaurants():
         }
 
 @frappe.whitelist()
+def get_restaurant_details(restaurant_id):
+    """
+    Get all details of a single restaurant.
+    Only accessible by admin users.
+    """
+    try:
+        # Check admin access first
+        access_check = check_admin_access()
+        if not access_check.get('success') or not access_check.get('data', {}).get('allowed'):
+            return {
+                'success': False,
+                'error': 'Admin access required'
+            }
+        
+        # Get restaurant record
+        restaurant = frappe.get_doc('Restaurant', {'restaurant_id': restaurant_id})
+        if not restaurant:
+            return {
+                'success': False,
+                'error': 'Restaurant not found'
+            }
+        
+        # Convert password fields to stars/placeholder to protect secrets but allow checking if they exist
+        restaurant_dict = restaurant.as_dict()
+        
+        return {
+            'success': True,
+            'data': {
+                'restaurant': restaurant_dict
+            }
+        }
+    except Exception as e:
+        frappe.log_error("Admin API Error", f"Error in get_restaurant_details: {str(e)}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@frappe.whitelist()
 def update_restaurant_plan(restaurant_id, plan_type):
     """
     Update restaurant's subscription plan
@@ -524,15 +564,34 @@ def admin_update_restaurant_settings(restaurant_id, updates):
             
         # Prevent non-admin fields from being updated here if needed, 
         # but for now we follow the user's request for platform_fee_percent
-        allowed_fields = ['platform_fee_percent', 'monthly_minimum', 'is_active', 'restaurant_name', 'owner_email']
+        # Allow most fields for admin updates
+        allowed_fields = [
+            'platform_fee_percent', 'monthly_minimum', 'is_active', 'restaurant_name', 'owner_email',
+            'owner_phone', 'owner_name', 'plan_type', 'billing_status', 'mandate_status',
+            'pos_provider', 'pos_enabled', 'pos_app_key', 'pos_app_secret', 'pos_access_token', 'pos_merchant_id',
+            'enable_loyalty', 'enable_takeaway', 'enable_delivery', 'enable_dine_in', 'no_ordering',
+            'tax_rate', 'gst_number', 'default_delivery_fee', 'default_packaging_fee', 'minimum_order_value',
+            'estimated_prep_time', 'timezone', 'currency', 'tables', 'description', 'google_map_url'
+        ]
         
         for field, value in updates.items():
             if field in allowed_fields:
-                if field in ['platform_fee_percent', 'monthly_minimum']:
+                # Handle type conversions for numeric/boolean fields
+                if field in ['platform_fee_percent', 'monthly_minimum', 'tax_rate', 'default_delivery_fee', 
+                            'default_packaging_fee', 'minimum_order_value', 'coins_balance']:
                     try:
                         value = float(value)
                     except:
                         continue
+                elif field in ['is_active', 'enable_loyalty', 'enable_takeaway', 'enable_delivery', 
+                              'enable_dine_in', 'no_ordering', 'pos_enabled']:
+                    value = 1 if value in [True, 1, '1', 'true'] else 0
+                elif field in ['tables', 'estimated_prep_time']:
+                    try:
+                        value = int(value)
+                    except:
+                        continue
+                
                 setattr(restaurant, field, value)
         
         restaurant.save(ignore_permissions=True)

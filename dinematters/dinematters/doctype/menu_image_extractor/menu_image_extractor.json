@@ -94,7 +94,7 @@
    "fieldtype": "Table",
    "label": "Menu Images",
    "options": "Menu Image Item",
-   "reqd": 1,
+   "reqd": 0,
    "description": "Upload multiple menu images (PNG, JPEG, WebP). Maximum 20 images."
   },
   {

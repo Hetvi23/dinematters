@@ -53,7 +53,8 @@ export default function OrderDetail() {
       }
       
       const res = await assignDeliveryAPI(payload)
-      if (!res.success) throw new Error(res.error || 'Failed to assign delivery')
+      const result = (res as any)?.message || res
+      if (!result?.success) throw new Error(result?.error || 'Failed to assign delivery')
       
       toast.success('Delivery assigned successfully')
       window.location.reload()
@@ -73,7 +74,8 @@ export default function OrderDetail() {
         order_id: order.name,
         delivery_id: order.delivery_id 
       })
-      if (!res.success) throw new Error(res.error || 'Failed to cancel delivery')
+      const result = (res as any)?.message || res
+      if (!result?.success) throw new Error(result?.error || 'Failed to cancel delivery')
       
       toast.success('Delivery cancelled successfully')
       window.location.reload()
