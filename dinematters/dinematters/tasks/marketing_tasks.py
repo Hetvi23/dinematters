@@ -699,26 +699,26 @@ def generate_daily_seo_blog():
         focus_res = random.choice(restaurants)
         res_id = focus_res.name
         res_name = focus_res.restaurant_name or res_id
-        res_city = focus_res.city or "Mumbai"
+        res_city = focus_res.city or "India"
         
         # 2. Context Fetching: Real-time dishes and location
         dishes = frappe.get_all("Menu Product", 
             filters={"restaurant": res_id, "is_active": 1}, 
             limit=20, fields=["name", "product_name", "description", "category_name"])
         
-        # Neighborhood/City injection
-        neighborhoods = ["Bandra", "Juhu", "Colaba", "Powai", "Andheri", "Kolla", "Worli", "Lower Parel"]
-        neighborhood = random.choice(neighborhoods)
         today_date = frappe.utils.today()
         current_year = today_date.split("-")[0]
         
-        context = f"Restaurant: {res_name} in {neighborhood}, {res_city}. Date: {today_date}.\n"
+        context = f"Restaurant: {res_name} in {res_city}. Date: {today_date}.\n"
         if focus_res.description:
             context += f"About: {focus_res.description}\n"
         
         if dishes:
-            dish_list = ", ".join([d.product_name for d in dishes if d.product_name])
+            dish_names_list = [d.product_name for d in dishes if d.product_name]
+            dish_list = ", ".join(dish_names_list)
             context += f"Signature Menu Items (Inject these naturally): {dish_list}."
+        else:
+            dish_names_list = []
 
         # 3. Image Strategy: Fetch real random food images from ALL Diamond/Gold restaurants for variety
         image_url = None
@@ -754,13 +754,36 @@ def generate_daily_seo_blog():
         
         # 4. Content Generation
         gen = ContentGenerator()
-        keywords = [
-            f"best dining experience in {res_city} {current_year}", "future of restaurant technology",
-            "how to skyrocket restaurant revenue", "digital transformation in f&b mumbai",
-            "ultimate guide to qr code ordering", f"food trends {current_year}",
-            "improving customer loyalty in cafes", f"luxury dining in {neighborhood}"
-        ]
-        keyword = random.choice(keywords)
+        
+        # ✅ DYNAMIC KEYWORD GENERATION (High-End SEO Strategy)
+        # Fetch cuisine type from Restaurant if available
+        cuisine = frappe.db.get_value("Restaurant", res_id, "cuisine") or "Multi-cuisine"
+        location_slug = res_city
+        
+        # Prepare dish objects for keyword generator
+        keywords_dishes = [{"item_name": name} for name in dish_names_list]
+        
+        dynamic_keywords = gen.generate_dynamic_keywords(
+            restaurant_name=res_name,
+            location=location_slug,
+            dishes=keywords_dishes,
+            cuisine=cuisine
+        )
+        
+        # Fallback to static list if AI fails
+        if not dynamic_keywords:
+            dynamic_keywords = [
+                f"best dining experience in {res_city} {current_year}", 
+                "future of restaurant technology",
+                "how to skyrocket restaurant revenue", 
+                "digital transformation in f&b mumbai",
+                "ultimate guide to qr code ordering", 
+                f"food trends {current_year}",
+                "improving customer loyalty in cafes", 
+                f"luxury dining in {res_city}"
+            ]
+        
+        keyword = random.choice(dynamic_keywords)
         
         article = gen.generate_article(
             keyword=keyword,

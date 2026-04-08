@@ -34,6 +34,7 @@ interface RestaurantContextType {
     tableBooking: boolean
   }
   billingInfo: any | null
+  googleMapsApiKey: string | null
 }
 
 const RestaurantContext = createContext<RestaurantContextType | undefined>(undefined)
@@ -54,6 +55,7 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [restaurantConfig, setRestaurantConfig] = useState<any | null>(null)
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null)
 
   // Set a timeout to prevent infinite loading state
   useEffect(() => {
@@ -123,9 +125,15 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
       if (payload?.success) {
         const configData = payload.data || null
         setRestaurantConfig(configData)
+        if (configData?.settings?.googleMapsApiKey) {
+          setGoogleMapsApiKey(configData.settings.googleMapsApiKey)
+        }
         setIsLoading(false)
       } else if (payload?.data) {
         setRestaurantConfig(payload.data)
+        if (payload.data?.settings?.googleMapsApiKey) {
+          setGoogleMapsApiKey(payload.data.settings.googleMapsApiKey)
+        }
         setIsLoading(false)
       } else {
         setRestaurantConfig(null)
@@ -232,6 +240,7 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
         isActive,
         features,
         billingInfo,
+        googleMapsApiKey,
       }}
     >
       {children}

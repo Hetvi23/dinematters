@@ -210,6 +210,7 @@ def get_restaurant_config(restaurant_id):
 				"verifyMyUser": bool(config.get("verify_my_user")),
 				"enableLoyalty": bool(restaurant_doc.get("enable_loyalty")),
 				"defaultDeliveryFee": flt(restaurant_doc.get("default_delivery_fee", 0)),
+				"googleMapsApiKey": frappe.conf.get("google_maps_api_key") or frappe.db.get_single_value("Dinematters Settings", "google_maps_api_key"),
 				"order_settings": {
 					"enable_takeaway": bool(restaurant_doc.get("enable_takeaway", 1)),
 					"enable_delivery": bool(restaurant_doc.get("enable_delivery", 0)),

@@ -81,21 +81,26 @@ class ContentGenerator:
         try: self.anthropic_client = get_anthropic_client()
         except: self.anthropic_client = None
     
-    def generate_article(self, keyword: str, title: Optional[str] = None, length: int = 2000, style: str = "professional", language: str = "en", provider: str = "openai", media_urls: List[str] = None, **kwargs) -> Dict:
+    def generate_article(self, keyword: str, title: Optional[str] = None, length: int = 2000, style: str = "professional", language: str = "en", provider: str = "openai", media_urls: List[str] = None, menu_context: List[Dict] = None, **kwargs) -> Dict:
         """Sequential implementation for Frappe environment"""
         if provider == "openai":
-            return self._generate_with_openai(keyword, title, length, style, language, media_urls=media_urls, **kwargs)
+            article = self._generate_with_openai(keyword, title, length, style, language, media_urls=media_urls, menu_context=menu_context, **kwargs)
         elif provider == "anthropic" and self.anthropic_client:
-            return self._generate_with_anthropic(keyword, title, length, style, language, media_urls=media_urls, **kwargs)
+            article = self._generate_with_anthropic(keyword, title, length, style, language, media_urls=media_urls, menu_context=menu_context, **kwargs)
         else:
             frappe.throw(f"Provider {provider} not available or configured")
+        
+        # 10/10 Upgrade: Polishing Pass for SEO & Conversions
+        article["content"] = self._polish_content(article["content"], keyword, menu_context)
+        article["word_count"] = len(article["content"].split())
+        return article
 
-    def _generate_with_openai(self, keyword, title, length, style, language, client_context=None, client_links=None, media_urls=None, **kwargs):
-        prompt = self._build_seo_prompt(keyword, title, length, style, client_context, client_links, media_urls)
+    def _generate_with_openai(self, keyword, title, length, style, language, client_context=None, client_links=None, media_urls=None, menu_context=None, **kwargs):
+        prompt = self._build_seo_prompt(keyword, title, length, style, client_context, client_links, media_urls, menu_context)
         response = self.openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are an elite SEO content strategist."},
+                {"role": "system", "content": "You are an elite SEO content strategist who writes human-like, high-conversion copy."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=min(length * 2, 4000),
@@ -123,51 +128,83 @@ class ContentGenerator:
             "word_count": len(content.split()), "keyword": keyword, "language": language, "style": style
         }
 
-    def generate_premium_metadata(self, content, keyword):
-        prompt = f"""Analyze the blog content and generate high-performance SEO metadata for keyword '{keyword}'.
-        Requirements:
-        1. SEO Title: 50-60 characters, extremely catchy, includes '{keyword}'.
-        2. Meta Description: 120-155 characters, high CTR, enticing summary.
-        3. Tags: At least 8-10 highly relevant, comma-separated keywords including the neighborhood, city, current year (2026), and dish names.
+    def generate_premium_metadata(self, content, keyword, restaurant_info=None):
+        prompt = f"""Analyze the blog content and generate a 10/10 SEO & Social bundle for keyword '{keyword}'.
         
-        Output MUST be pure JSON with keys: meta_title, meta_description, tags.
-        Content Context: {content[:3000]}"""
+        Requirements:
+        1. SEO Title: 50-60 characters, high CTR, includes '{keyword}'.
+        2. Meta Description: 120-155 characters, enticing summary.
+        3. Tags: 10 relevant keywords (location, year 2026, dish names).
+        4. Schema Markup: Generate valid JSON-LD (LD+JSON) for 'Recipe' or 'FoodEstablishment' depending on content. Include 'name', 'description', 'publisher', and 'about'.
+        5. Social Snippets: Short, engaging captions for Instagram, Twitter (with hashtags), and Facebook.
+        
+        Output MUST be pure JSON with keys: meta_title, meta_description, tags, schema_markup, social_snippets (dict).
+        Content Context: {content[:3000]}
+        Restaurant Context: {json.dumps(restaurant_info) if restaurant_info else "N/A"}"""
         
         response = self.openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a senior SEO specialist. Output valid JSON only."},
+                {"role": "system", "content": "You are a senior SEO & Social Media specialist. Output valid JSON only."},
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"}
         )
         return json.loads(response.choices[0].message.content)
 
-    def _build_seo_prompt(self, keyword, title, length, style, client_context=None, client_links=None, media_urls=None):
+    def _polish_content(self, content, keyword, menu_context=None):
+        """Second pass to remove AI patterns and enhance conversion hooks."""
+        prompt = f"""Review and optimize this blog post for 10/10 SEO and Human Readability.
+        
+        Tasks:
+        1. Remove repetitive 'AI-sounding' phrases (e.g., 'In conclusion', 'In the ever-evolving landscape').
+        2. Ensure the keyword '{keyword}' is naturally integrated in the first 100 words.
+        3. Enhance CTAs: If any dishes from the list below are mentioned, ensure they have a 'conversion hook' (e.g., 'Try our [Dish] for only [Price] today!').
+        4. Fix any heading hierarchy issues.
+        
+        Menu Context: {json.dumps(menu_context) if menu_context else "N/A"}
+        
+        Original Content:
+        {content}"""
+        
+        response = self.openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a world-class editor and conversion copywriter."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.4,
+        )
+        return response.choices[0].message.content.strip()
+
+    def _build_seo_prompt(self, keyword, title, length, style, client_context=None, client_links=None, media_urls=None, menu_context=None):
         base_prompt = f"""You are a master SEO strategist. Write an industry-leading, premium article for "{keyword}".
         Requirements: Length {max(1500, length)} words, Tone: Authoritative, Professional, and Engaging.
         Structure:
         - H1 Title: Extremely compelling and SEO-optimized.
-        - H2 & H3: Use semantic hierarchy. NO literal "H2:" or "H3:" prefixes.
+        - H2 & H3: Use semantic hierarchy.
         - Bulleted lists and numbered steps for readability.
         - 2 real-world case studies or "Deep Dives".
-        - Final Call to Action (CTA) for Dinematters.
+        - SMART CTAs: Use the menu items provided below to inject real price-based hooks strategically.
         - Professional Byline: "Dinematters Editorial Team".
         - Author Profile: Brief expert bio at the very end.
         
-        IMPORTANT: Use the year 2026 as the current context. Inject a deep understanding of local Mumbai dining trends.
+        IMPORTANT: Use the year 2026 as the current context.
+        
+        CONVERSION HOOKS (Inject these naturally):
+        {json.dumps(menu_context) if menu_context else "Use generic CTAs for Dinematters."}
         
         IMAGE INJECTION:
-        I am providing a list of real restaurant images. You MUST inject AT LEAST 3 and AT MOST 5 of these images strategically into the sections using standard Markdown: ![Descriptive, SEO-rich Alt Text](URL). Ensure the alt text describes the specific context and includes keywords.
+        I am providing a list of real restaurant images. You MUST inject AT LEAST 3 and AT MOST 5 of these images strategically into the sections using standard Markdown: ![Descriptive, SEO-rich Alt Text](URL).
         Available Imagery:
         {"\n".join(media_urls) if media_urls else "No images provided - use text only."}
         
         Content Goals:
-        - Hook the reader in the first 50 words with a compelling statistic.
-        - Provide actionable steps for restaurant owners.
-        - Maintain high keyword density naturally."""
+        - Hook the reader in the first 50 words with a compelling local Mumbai/India statistic.
+        - Provide actionable steps for restaurant owners or foodies.
+        - Maintain high keyword density (1.5-2%) naturally."""
         
-        if client_context: base_prompt += f"\n\nContext & Dishes: {client_context[:5000]}"
+        if client_context: base_prompt += f"\n\nContext & Full Menu: {client_context[:5000]}"
         if client_links: base_prompt += f"\n\nLinks: {json.dumps(client_links)}"
         return base_prompt
 
@@ -182,22 +219,53 @@ class ContentGenerator:
         text = re.sub(r'#', '', text)
         return text.strip()[:max_length] + "..."
 
-    def generate_premium_metadata(self, content, keyword):
-        prompt = f"Analyze content and generate SEO Title (50-60 chars), Meta Description (120-155 chars), and a comma-separated list of 5 relevant Tags for keyword '{keyword}'. Content: {content[:2000]}"
+
+    def generate_dynamic_keywords(self, restaurant_name, location, dishes, cuisine=None):
+        """Generate high-end, dynamic SEO keywords based on restaurant context"""
+        dish_names = [d.get("item_name") for d in dishes[:10]]
+        context = f"Restaurant: {restaurant_name}\nLocation: {location}\nCuisine: {cuisine}\nTop Dishes: {', '.join(dish_names)}"
+        
+        prompt = f"""You are an elite SEO strategist for the 2026 Indian and Global dining scene.
+        Generate 5 high-authority "Power Keywords" for a blog post targeting foodies and restaurant enthusiasts.
+        
+        Context:
+        {context}
+        
+        Requirements:
+        - Must be highly specific to the restaurant's menu items.
+        - Must include the location and the year 2026.
+        - Style: "High-end", "Trending", "Authoritative".
+        - Examples: "The Ultimate Guide to India's Best {dish_names[0] if dish_names else 'Sushi'}", "Why {restaurant_name} is Dominating the local Food Scene in 2026", "5 Secrets Behind the Perfect {dish_names[1] if len(dish_names) > 1 else 'Cocktail'}".
+        
+        Output MUST be pure JSON array of strings."""
+        
         response = self.openai_client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role": "system", "content": "You are an SEO specialist. Output JSON only with keys: meta_title, meta_description, tags."}, {"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": "You are a senior SEO specialist. Output a JSON array of strings only."},
+                {"role": "user", "content": prompt}
+            ],
             response_format={"type": "json_object"}
         )
-        return json.loads(response.choices[0].message.content)
+        try:
+            res = json.loads(response.choices[0].message.content)
+            # Handle if the AI wraps it in a key
+            if isinstance(res, dict):
+                for val in res.values():
+                    if isinstance(val, list): return val
+            return res if isinstance(res, list) else []
+        except:
+            return []
 
 @frappe.whitelist()
-def generate_seo_content(keyword, title=None, length=1500, style="professional", provider="openai", context=None):
+def generate_seo_content(keyword, title=None, length=1500, style="professional", provider="openai", context=None, menu=None):
     """API endpoint for SEO content generation."""
     try:
         gen = ContentGenerator()
-        article = gen.generate_article(keyword, title, length, style, provider=provider, client_context=context)
-        meta = gen.generate_premium_metadata(article["content"], keyword)
+        article = gen.generate_article(keyword, title, length, style, provider=provider, client_context=context, menu_context=menu)
+        
+        restaurant_info = {"name": context[:100]} if context else None
+        meta = gen.generate_premium_metadata(article["content"], keyword, restaurant_info=restaurant_info)
         article.update(meta)
         return {"success": True, "data": article}
     except Exception as e:

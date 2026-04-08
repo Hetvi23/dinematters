@@ -60,7 +60,7 @@ def get_articles(limit=10, offset=0):
     """
     posts = frappe.get_all("Blog Post", 
         filters={"published": 1},
-        fields=["name", "title", "blog_intro", "published_on", "blogger", "blog_category", "meta_description", "meta_title", "route", "_user_tags"],
+        fields=["name", "title", "blog_intro", "published_on", "blogger", "blog_category", "meta_description", "meta_title", "route", "_user_tags", "meta_image"],
         limit=limit,
         start=offset,
         order_by="published_on desc"

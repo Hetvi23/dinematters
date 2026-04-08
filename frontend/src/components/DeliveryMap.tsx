@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { useFrappeGetDoc } from '@/lib/frappe'
 import { Loader2 } from 'lucide-react'
+import { useRestaurant } from '@/contexts/RestaurantContext'
 
 interface DeliveryMapProps {
   pickupLocation?: { lat: number; lng: number }
@@ -29,13 +29,11 @@ export default function DeliveryMap({
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch Google Maps API Key from Settings
-  const { data: settings } = useFrappeGetDoc('Dinematters Settings', 'Dinematters Settings', {
-    fields: ['google_maps_api_key']
-  })
+  const { googleMapsApiKey } = useRestaurant()
+  const activeMapsKey = googleMapsApiKey || (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined)
 
   useEffect(() => {
-    if (!settings?.google_maps_api_key) return
+    if (!activeMapsKey) return
 
     const loadGoogleMaps = () => {
       if (window.google && window.google.maps) {
@@ -44,7 +42,7 @@ export default function DeliveryMap({
       }
 
       const script = document.createElement('script')
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${settings.google_maps_api_key}&libraries=places&v=beta`
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${activeMapsKey}&libraries=places&v=beta`
       script.async = true
       script.defer = true
       script.onload = initMap
@@ -70,7 +68,7 @@ export default function DeliveryMap({
     }
 
     loadGoogleMaps()
-  }, [settings?.google_maps_api_key])
+  }, [activeMapsKey])
 
   useEffect(() => {
     if (!map || !window.google) return

@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { MapPin, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useRestaurant } from '@/contexts/RestaurantContext'
 
 interface AddressAutocompleteProps {
   value: string
@@ -25,8 +26,8 @@ declare global {
   }
 }
 
-// Use the Vite env var directly — Frappe Password fields are never returned via API
-const MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
+// Default fallback key from build-time env
+const ENV_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
 
 export default function AddressAutocomplete({
   value,
@@ -44,6 +45,8 @@ export default function AddressAutocomplete({
   const [placesService, setPlacesService] = useState<any>(null)
   const [sessionToken, setSessionToken] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const { googleMapsApiKey } = useRestaurant()
+  const activeMapsKey = googleMapsApiKey || ENV_MAPS_API_KEY
   const [isSelected, setIsSelected] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   // Only show suggestions after user explicitly types — prevents firing on load with saved data
@@ -62,7 +65,7 @@ export default function AddressAutocomplete({
 
   // Load Google Maps Script & initialize Autocomplete
   useEffect(() => {
-    if (!MAPS_API_KEY || typeof window === 'undefined') return
+    if (!activeMapsKey || typeof window === 'undefined') return
 
     const initAutocomplete = async () => {
       const maps = window.google?.maps
@@ -112,13 +115,13 @@ export default function AddressAutocomplete({
 
     // Add the script tag
     const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${MAPS_API_KEY}&libraries=places&v=beta&loading=async`
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${activeMapsKey}&libraries=places&v=beta&loading=async`
     script.async = true
     script.defer = true
     script.onload = () => initAutocomplete()
     script.onerror = () => console.error('[AddressAutocomplete] Failed to load Google Maps script')
     document.head.appendChild(script)
-  }, [])
+  }, [activeMapsKey])
 
   // Fetch suggestions when value changes — only if user has actively typed
   useEffect(() => {
