@@ -47,7 +47,8 @@ def get_restaurant_config(restaurant_id):
 			 "menu_theme_background_enabled", "menu_theme_paid_until",
 			 "enable_events", "enable_offers", "enable_coupons", "enable_experience_lounge", "verify_my_user",
 			 "enable_loyalty",
-			 "google_review_link", "instagram_profile_link", "facebook_profile_link", "whatsapp_phone_number"],
+			 "google_review_link", "instagram_profile_link", "facebook_profile_link", "whatsapp_phone_number",
+			 "swiggy_link", "zomato_link"],
 			as_dict=True
 		)
 		
@@ -81,7 +82,9 @@ def get_restaurant_config(restaurant_id):
 				"google_review_link": "",
 				"instagram_profile_link": "",
 				"facebook_profile_link": "",
-				"whatsapp_phone_number": ""
+				"whatsapp_phone_number": "",
+				"swiggy_link": "",
+				"zomato_link": ""
 			}
 		
 		# Build color palette
@@ -225,7 +228,9 @@ def get_restaurant_config(restaurant_id):
 				"googleReviewLink": config.get("google_review_link", ""),
 				"instagramProfileLink": config.get("instagram_profile_link", ""),
 				"facebookProfileLink": config.get("facebook_profile_link", ""),
-				"whatsappPhoneNumber": config.get("whatsapp_phone_number", "")
+				"whatsappPhoneNumber": config.get("whatsapp_phone_number", ""),
+				"swiggyLink": config.get("swiggy_link", ""),
+				"zomatoLink": config.get("zomato_link", "")
 			},
 			"subscription": {
 				"planType": restaurant_doc.plan_type or "SILVER",

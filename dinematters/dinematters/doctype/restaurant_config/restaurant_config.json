@@ -59,7 +59,9 @@
   "instagram_profile_link",
   "column_break_social_media",
   "facebook_profile_link",
-  "whatsapp_phone_number"
+  "whatsapp_phone_number",
+  "swiggy_link",
+  "zomato_link"
  ],
  "fields": [
   {
@@ -365,6 +367,22 @@
    "label": "WhatsApp Phone Number",
    "options": "Phone",
    "description": "Phone number for WhatsApp contact"
+  },
+  {
+   "fieldname": "swiggy_link",
+   "fieldtype": "Data",
+   "label": "Swiggy Link",
+   "options": "URL",
+   "description": "Link to Swiggy restaurant page",
+   "length": 1000
+  },
+  {
+   "fieldname": "zomato_link",
+   "fieldtype": "Data",
+   "label": "Zomato Link",
+   "options": "URL",
+   "description": "Link to Zomato restaurant page",
+   "length": 1000
   }
  ],
  "index_web_pages_for_search": 1,

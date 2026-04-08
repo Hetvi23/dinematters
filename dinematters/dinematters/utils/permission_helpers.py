@@ -32,8 +32,13 @@ def get_restaurant_permission_query_conditions(user, doctype):
 	if doctype == "Restaurant":
 		return f"`tab{doctype}`.name IN ({restaurant_list})"
 	
-	# For other doctypes, filter by restaurant field
-	return f"`tab{doctype}`.restaurant IN ({restaurant_list})"
+	# For other doctypes, filter by restaurant field if it exists
+	meta = frappe.get_meta(doctype)
+	if meta.has_field("restaurant"):
+		return f"`tab{doctype}`.restaurant IN ({restaurant_list})"
+	
+	# Skip filtering for doctypes without restaurant field (e.g. child tables)
+	return ""
 
 
 def has_restaurant_permission(doc, user=None):

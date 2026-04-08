@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Plus, Edit2, Trash2, Users, Camera, Image, Star as StarIcon, Loader2 } from 'lucide-react'
+import { Plus, Edit2, Trash2, Users, Camera, Image, Star as StarIcon, Loader2, Instagram } from 'lucide-react'
 import { toast } from 'sonner'
 import { uploadToR2 } from '@/lib/r2Upload'
 
@@ -30,6 +30,7 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
   const [editingItem, setEditingItem] = useState<any>(null)
   const [currentSection, setCurrentSection] = useState<string>('')
   const [uploading, setUploading] = useState(false)
+  const [reelsToAdd, setReelsToAdd] = useState<string[]>([''])
 
   // Get the main legacy content document
   const { data: legacyContent, isLoading: contentLoading, mutate: mutateContent } = useFrappeGetDoc(
@@ -38,54 +39,25 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
     { enabled: !!selectedRestaurant }
   )
 
-  // Get child table data with dedicated mutate functions
-  const { data: signatureDishes, mutate: mutateSignatureDishes } = useFrappeGetDocList('Legacy Signature Dish', {
-    filters: selectedRestaurant ? ({ parent: selectedRestaurant } as any) : undefined,
-    fields: ['name', 'dish', 'display_order', 'dish_name'],
-    orderBy: { field: 'display_order', order: 'asc' } as any
-  })
-
-  // We only need the mutate functions for these, which are called in refreshAll()
-  const { mutate: mutateTestimonials } = useFrappeGetDocList('Legacy Testimonial', {
-    filters: selectedRestaurant ? ({ parent: selectedRestaurant } as any) : undefined,
-    fields: ['name']
-  })
-
-  const { data: members, mutate: mutateMembers } = useFrappeGetDocList('Legacy Member', {
-    filters: selectedRestaurant ? ({ parent: selectedRestaurant } as any) : undefined,
-    fields: ['name', 'member_name', 'role', 'image', 'display_order'],
-    orderBy: { field: 'display_order', order: 'asc' } as any
-  })
-
-  const { data: galleryImages, mutate: mutateGallery } = useFrappeGetDocList('Legacy Gallery Image', {
-    filters: selectedRestaurant ? ({ parent: selectedRestaurant } as any) : undefined,
-    fields: ['name', 'image', 'title', 'display_order'],
-    orderBy: { field: 'display_order', order: 'asc' } as any
-  })
-
-  const { mutate: mutateReels } = useFrappeGetDocList('Legacy Instagram Reel', {
-    filters: selectedRestaurant ? ({ parent: selectedRestaurant } as any) : undefined,
-    fields: ['name']
-  })
+  // Child table data is derived from the main legacyContent document
+  const signatureDishes = legacyContent?.signature_dishes || []
+  const members = legacyContent?.members || []
+  const galleryImages = legacyContent?.gallery_featured_images || []
+  const instagramReels = legacyContent?.instagram_reels || []
 
   // Get all menu products for signature dishes selection
   const { data: allMenuProducts } = useFrappeGetDocList('Menu Product', {
     filters: selectedRestaurant ? ({ restaurant: selectedRestaurant, is_active: 1 } as any) : undefined,
-    fields: ['name', 'product_name', 'image', 'category_name', 'main_category'],
+    fields: ['name', 'product_name', 'category_name', 'main_category'],
     orderBy: { field: 'product_name', order: 'asc' } as any
   })
 
   const { call: createDoc, loading: isCreating } = useFrappePostCall('frappe.client.insert')
   const { updateDoc, loading: isUpdating } = useFrappeUpdateDoc()
-  const { deleteDoc, loading: isDeleting } = useFrappeDeleteDoc()
+  const { deleteDoc } = useFrappeDeleteDoc()
   const { call: updateLegacyContent } = useFrappePostCall('dinematters.dinematters.api.legacy.update_legacy_content')
 
   const refreshAll = () => {
-    mutateSignatureDishes()
-    mutateTestimonials()
-    mutateMembers()
-    mutateGallery()
-    mutateReels()
     mutateContent()
   }
 
@@ -338,6 +310,62 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
     </Card>
   )
 
+  const renderInstagramReelsSection = () => (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Instagram className="h-5 w-5" />
+            Moments We Treasure
+            <Badge variant="secondary">{instagramReels?.length || 0}/3</Badge>
+          </CardTitle>
+          <Button 
+            size="sm" 
+            onClick={() => {
+              setEditingItem({ type: 'Instagram Reel', doctype: 'Legacy Instagram Reel' })
+              setCurrentSection('Instagram Reel')
+              setIsDialogOpen(true)
+            }}
+            disabled={(instagramReels?.length || 0) >= 3}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Add Reel
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {instagramReels && instagramReels.length > 0 ? (
+          <div className="space-y-4">
+            {instagramReels.map((item: any) => (
+              <div key={item.name} className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex-1 min-w-0 mr-4">
+                  <h4 className="font-semibold truncate">{item.title || 'Instagram Reel'}</h4>
+                  <p className="text-sm text-muted-foreground truncate">{item.reel_link}</p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <Button size="sm" variant="outline" onClick={() => {
+                    setEditingItem({ ...item, type: 'Instagram Reel', doctype: 'Legacy Instagram Reel' })
+                    setCurrentSection('Instagram Reel')
+                    setIsDialogOpen(true)
+                  }}>
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => handleDelete('Legacy Instagram Reel', item.name, 'Instagram Reel')}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            No reels yet. Add up to 3 Instagram Reels to showcase "Moments We Treasure".
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+
   const renderFormDialogContent = () => {
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault()
@@ -375,6 +403,39 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
             } else if (!editingItem?.image) {
               toast.error('Gallery image is required')
               return
+            }
+            break
+          case 'Instagram Reel':
+            if (editingItem?.name) {
+              // Edit mode
+              data.reel_link = formData.get('reel_link')
+              data.title = formData.get('title')
+              data.display_order = parseInt(formData.get('display_order') as string) || 0
+            } else {
+              // Add mode - multiple reels
+              const links = reelsToAdd.filter(link => link.trim() !== '')
+              if (links.length === 0) {
+                toast.error('At least one reel link is required')
+                return
+              }
+              
+              for (const link of links) {
+                await createDoc({
+                  reel_link: link,
+                  title: 'Instagram Reel',
+                  doctype: 'Legacy Instagram Reel',
+                  parent: selectedRestaurant,
+                  parenttype: 'Legacy Content',
+                  parentfield: 'instagram_reels'
+                })
+              }
+              
+              toast.success(`${links.length} reel(s) added successfully`)
+              setIsDialogOpen(false)
+              setEditingItem(null)
+              setReelsToAdd([''])
+              refreshAll()
+              return // Already handled
             }
             break
         }
@@ -520,6 +581,84 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
       )
     }
 
+    if (currentSection === 'Instagram Reel') {
+      const remainingSlots = 3 - (instagramReels?.length || 0)
+      
+      return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {editingItem?.name ? (
+            <>
+              <div>
+                <Label htmlFor="reel_link">Reel Link</Label>
+                <Input name="reel_link" defaultValue={editingItem?.reel_link} required placeholder="https://www.instagram.com/reels/..." />
+              </div>
+              <div>
+                <Label htmlFor="title">Title (Optional)</Label>
+                <Input name="title" defaultValue={editingItem?.title} placeholder="e.g. Grandma's Recipe" />
+              </div>
+              <div>
+                <Label htmlFor="display_order">Display Order</Label>
+                <Input type="number" name="display_order" defaultValue={editingItem?.display_order || 0} />
+              </div>
+            </>
+          ) : (
+            <div className="space-y-4">
+              {reelsToAdd.map((link, index) => (
+                <div key={index} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Reel Link {index + 1}</Label>
+                    {index > 0 && (
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 text-destructive"
+                        onClick={() => setReelsToAdd(reelsToAdd.filter((_, i) => i !== index))}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  <Input 
+                    value={link} 
+                    onChange={(e) => {
+                      const newReels = [...reelsToAdd]
+                      newReels[index] = e.target.value
+                      setReelsToAdd(newReels)
+                    }} 
+                    placeholder="https://www.instagram.com/reels/..."
+                    required={index === 0}
+                  />
+                </div>
+              ))}
+              
+              {reelsToAdd.length < remainingSlots && (
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full"
+                  onClick={() => setReelsToAdd([...reelsToAdd, ''])}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add another Reel
+                </Button>
+              )}
+            </div>
+          )}
+          
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isCreating || isUpdating}>
+              {editingItem?.name ? 'Update' : 'Add Reels'}
+            </Button>
+          </div>
+        </form>
+      )
+    }
+
     return null
   }
 
@@ -607,6 +746,7 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
         {renderSignatureDishesSection()}
         {renderMembersSection()}
         {renderGallerySection()}
+        {renderInstagramReelsSection()}
       </div>
 
       <div className="flex justify-end gap-4 pt-6">

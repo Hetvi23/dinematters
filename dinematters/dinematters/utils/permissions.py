@@ -6,7 +6,6 @@ Utility functions for Restaurant User Permissions
 """
 
 import frappe
-from frappe.permissions import add_user_permission, remove_user_permission
 from frappe import _
 
 
@@ -22,7 +21,7 @@ def create_restaurant_user_permission(user, restaurant, is_default=0):
 			return
 		
 		# Create User Permission
-		add_user_permission(
+		frappe.permissions.add_user_permission(
 			doctype="Restaurant",
 			name=restaurant,
 			user=user,
@@ -36,7 +35,7 @@ def create_restaurant_user_permission(user, restaurant, is_default=0):
 def remove_restaurant_user_permission(user, restaurant):
 	"""Remove User Permission for restaurant"""
 	try:
-		remove_user_permission(
+		frappe.permissions.remove_user_permission(
 			doctype="Restaurant",
 			name=restaurant,
 			user=user,
@@ -105,15 +104,16 @@ def get_user_restaurant_ids(user):
 	"""Get list of restaurant IDs user has access to based on Restaurant User records"""
 	if user == "Administrator":
 		# Administrator has access to all restaurants
-		restaurants = frappe.get_all("Restaurant", filters={"is_active": 1}, pluck="name")
+		# Use frappe.db.get_all to bypass any potential hooks and ignore permissions
+		restaurants = [d.name for d in frappe.db.get_all("Restaurant", filters={"is_active": 1})]
 		return restaurants
 	
-	# Get restaurants from Restaurant User records (role-based approach)
-	restaurant_users = frappe.get_all(
+	# Get restaurants from Restaurant User records
+	# Using frappe.db.get_all to be safest against recursion
+	restaurant_users = [d.restaurant for d in frappe.db.get_all(
 		"Restaurant User",
-		filters={"user": user, "is_active": 1},
-		pluck="restaurant"
-	)
+		filters={"user": user, "is_active": 1}
+	)]
 	return restaurant_users
 
 
