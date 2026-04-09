@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import * as React from 'react'
 import { useFrappeGetDoc, useFrappeGetDocList, useFrappePostCall, useFrappeUpdateDoc, useFrappeDeleteDoc } from '@/lib/frappe'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -18,38 +19,38 @@ export default function LegacyContentPage() {
   const [editingItem, setEditingItem] = useState<any>(null)
 
   // Get the main legacy content document
-  const { data: legacyContent, isLoading: contentLoading } = useFrappeGetDoc(
+  const { isLoading: contentLoading } = useFrappeGetDoc(
     'Legacy Content',
     selectedRestaurant || '',
     { enabled: !!selectedRestaurant }
   )
 
   // Get child table data
-  const { data: signatureDishes } = useFrappeGetDocList('Legacy Signature Dish', {
+  const { data: signatureDishes, mutate: mutateSignatureDishes } = useFrappeGetDocList('Legacy Signature Dish', {
     filters: [['parent', '=', selectedRestaurant]],
     fields: ['name', 'dish', 'display_order', 'dish_name'],
     orderBy: { field: 'display_order', order: 'asc' }
   })
 
-  const { data: testimonials } = useFrappeGetDocList('Legacy Testimonial', {
+  const { data: testimonials, mutate: mutateTestimonials } = useFrappeGetDocList('Legacy Testimonial', {
     filters: [['parent', '=', selectedRestaurant]],
     fields: ['name', 'customer_name', 'rating', 'text', 'location', 'avatar', 'display_order'],
     orderBy: { field: 'display_order', order: 'asc' }
   })
 
-  const { data: members } = useFrappeGetDocList('Legacy Member', {
+  const { data: members, mutate: mutateMembers } = useFrappeGetDocList('Legacy Member', {
     filters: [['parent', '=', selectedRestaurant]],
     fields: ['name', 'member_name', 'role', 'image', 'display_order'],
     orderBy: { field: 'display_order', order: 'asc' }
   })
 
-  const { data: galleryImages } = useFrappeGetDocList('Legacy Gallery Image', {
+  const { data: galleryImages, mutate: mutateGallery } = useFrappeGetDocList('Legacy Gallery Image', {
     filters: [['parent', '=', selectedRestaurant]],
     fields: ['name', 'image', 'title', 'display_order'],
     orderBy: { field: 'display_order', order: 'asc' }
   })
 
-  const { data: instagramReels } = useFrappeGetDocList('Legacy Instagram Reel', {
+  const { data: instagramReels, mutate: mutateReels } = useFrappeGetDocList('Legacy Instagram Reel', {
     filters: [['parent', '=', selectedRestaurant]],
     fields: ['name', 'reel_link', 'title', 'display_order'],
     orderBy: { field: 'display_order', order: 'asc' }
@@ -63,7 +64,7 @@ export default function LegacyContentPage() {
 
   const { call: createDoc, loading: isCreating } = useFrappePostCall('frappe.client.insert')
   const { updateDoc, loading: isUpdating } = useFrappeUpdateDoc()
-  const { deleteDoc, loading: isDeleting } = useFrappeDeleteDoc()
+  const { deleteDoc } = useFrappeDeleteDoc()
 
   const handleSave = async (data: any, type: string, doctype: string) => {
     try {
@@ -84,8 +85,12 @@ export default function LegacyContentPage() {
       setIsDialogOpen(false)
       setEditingItem(null)
       
-      // Force a page refresh to show updated data
-      window.location.reload()
+      // Refresh relevant data
+      mutateSignatureDishes()
+      mutateTestimonials()
+      mutateMembers()
+      mutateGallery()
+      mutateReels()
     } catch (error) {
       toast.error(`Failed to save ${type}`)
     }
@@ -95,8 +100,13 @@ export default function LegacyContentPage() {
     try {
       await deleteDoc(doctype, name)
       toast.success(`${type} deleted successfully`)
-      // Force a page refresh to show updated data
-      window.location.reload()
+      
+      // Refresh relevant data
+      mutateSignatureDishes()
+      mutateTestimonials()
+      mutateMembers()
+      mutateGallery()
+      mutateReels()
     } catch (error) {
       toast.error(`Failed to delete ${type}`)
     }
@@ -113,7 +123,7 @@ export default function LegacyContentPage() {
     return mapping[doctype] || ''
   }
 
-  const renderSection = (title: string, icon: any, data: any[], type: string, doctype: string, renderItem: (item: any) => JSX.Element) => (
+  const renderSection = (title: string, icon: any, data: any[], type: string, doctype: string, renderItem: (item: any) => React.ReactNode) => (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">

@@ -15,7 +15,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { City, State } from 'country-state-city'
 
 interface CityStateSelectorProps {
   cityValue?: string;
@@ -32,30 +31,42 @@ export function CityStateSelector({
 }: CityStateSelectorProps) {
   const [open, setOpen] = React.useState(false)
   const [loading, setLoading] = React.useState(true)
+  const [indianCities, setIndianCities] = React.useState<any[]>([])
   
-  // Memoize the full list of Indian cities to avoid re-calculating on every render
-  const indianCities = React.useMemo(() => {
-    try {
-      const cities = City.getCitiesOfCountry('IN') || []
-      const states = State.getStatesOfCountry('IN') || []
-      
-      // Create a map for quick state lookup
-      const stateMap = new Map(states.map(s => [s.isoCode, s.name]))
-      
-      return cities.map(city => ({
-        city: city.name,
-        state: stateMap.get(city.stateCode) || city.stateCode,
-        lat: city.latitude,
-        lng: city.longitude,
-        label: `${city.name}, ${stateMap.get(city.stateCode) || city.stateCode}`,
-        value: `${city.name.toLowerCase()}-${city.stateCode.toLowerCase()}-${Math.random().toString(36).substr(2, 5)}`
-      }))
-    } catch (error) {
-      console.error('Failed to load cities:', error)
-      return []
-    } finally {
-      setLoading(false)
+  // Load heavy geo data asynchronously
+  React.useEffect(() => {
+    async function loadData() {
+      try {
+        const { City, State } = await import('country-state-city')
+        const cities = City.getCitiesOfCountry('IN') || []
+        const states = State.getStatesOfCountry('IN') || []
+        
+        // Create a map for quick state lookup
+        const stateMap = new Map(states.map(s => [s.isoCode, s.name]))
+        
+        const processed = cities.map(city => ({
+          city: city.name,
+          state: stateMap.get(city.stateCode) || city.stateCode,
+          lat: city.latitude,
+          lng: city.longitude,
+          label: `${city.name}, ${stateMap.get(city.stateCode) || city.stateCode}`,
+          value: `${city.name.toLowerCase()}-${city.stateCode.toLowerCase()}-${Math.random().toString(36).substr(2, 5)}`
+        }))
+        
+        setIndianCities(processed)
+      } catch (error) {
+        console.error('Failed to load cities:', error)
+      } finally {
+        setLoading(false)
+      }
     }
+    
+    // Tiny delay to ensure critical path loads first
+    const timer = setTimeout(() => {
+      loadData()
+    }, 100)
+    
+    return () => clearTimeout(timer)
   }, [])
 
   const currentValue = React.useMemo(() => {

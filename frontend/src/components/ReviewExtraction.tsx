@@ -1,4 +1,4 @@
-import { useFrappeGetDocList, useFrappeGetDoc, useFrappeGetCall, useFrappePostCall } from '@/lib/frappe'
+import { useFrappeGetDocList, useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,7 +19,7 @@ export default function ReviewExtraction({ restaurantId }: ReviewExtractionProps
     'Menu Image Extractor',
     {
       fields: ['name', 'restaurant', 'extraction_status', 'extraction_log', 'total_batches', 'completed_batches', 'creation', 'modified'],
-      filters: { restaurant: restaurantId },
+      filters: restaurantId ? [['restaurant', '=', restaurantId]] : undefined,
       orderBy: { field: 'creation', order: 'desc' },
       limit: 1
     },
@@ -69,8 +69,8 @@ export default function ReviewExtraction({ restaurantId }: ReviewExtractionProps
         }
       }
       toast.success(message)
-      // Refresh data
-      window.location.reload()
+      // Refresh data reactively
+      refreshExtraction()
     } catch (error: any) {
       const errorMessage = error?.message || error?.data?.message || 'Failed to approve extraction'
       toast.error(typeof errorMessage === 'string' ? errorMessage : 'Failed to approve extraction')

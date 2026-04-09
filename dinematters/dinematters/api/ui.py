@@ -125,21 +125,23 @@ def get_user_restaurants():
 				'restaurants': []
 			}
 		
-		# Get restaurant details
+		# Get restaurant details - using ignore_permissions for the IDs we already verified
 		restaurants = frappe.get_all(
 			"Restaurant",
 			filters={"name": ["in", restaurant_ids]},
-			fields=["name", "restaurant_id", "restaurant_name", "owner_email", "is_active", "creation", "modified"],
-			order_by="creation desc"
+			fields=["name", "restaurant_id", "restaurant_name", "owner_email", "is_active", "plan_type", "creation", "modified"],
+			order_by="creation desc",
+			ignore_permissions=True
 		)
 		
 		return {
 			'restaurants': restaurants
 		}
 	except Exception as e:
-		frappe.log_error(f"Error getting user restaurants: {str(e)}")
+		frappe.log_error(f"Error getting user restaurants for {frappe.session.user}: {str(e)}")
 		return {
-			'restaurants': []
+			'restaurants': [],
+			'error': str(e)
 		}
 
 

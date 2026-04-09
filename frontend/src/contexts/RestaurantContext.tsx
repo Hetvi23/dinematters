@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo } from 'react'
+import { useFrappeGetCall } from '@/lib/frappe'
 
 interface Restaurant {
   name: string
@@ -42,52 +43,71 @@ const RestaurantContext = createContext<RestaurantContextType | undefined>(undef
 const STORAGE_KEY = 'dinematters-selected-restaurant'
 
 export function RestaurantProvider({ children }: { children: ReactNode }) {
-  const [selectedRestaurant, setSelectedRestaurantState] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        return localStorage.getItem(STORAGE_KEY)
-      } catch {
-        return null
-      }
-    }
-    return null
-  })
+  const [selectedRestaurant, setSelectedRestaurantState] = useState<string | null>(null)
   const [restaurants, setRestaurants] = useState<Restaurant[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [restaurantConfig, setRestaurantConfig] = useState<any | null>(null)
   const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null)
 
-  // Set a timeout to prevent infinite loading state
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false)
-    }, 3000) // 3 second timeout
+  // Root level fetch to break the render deadlock
+  const { data: restaurantsData } = useFrappeGetCall<{ message: { restaurants: Restaurant[] } }>(
+    'dinematters.dinematters.api.ui.get_user_restaurants',
+    {},
+    'user-restaurants'
+  )
 
-    return () => clearTimeout(timer)
-  }, [])
+  const fetchedRestaurants = useMemo(() => restaurantsData?.message?.restaurants || [], [restaurantsData])
+
+  // Simplified loading logic for instant response
+
+  useEffect(() => {
+    // Only clear loading once we have BOTH the restaurant list AND the subscription config
+    // or if we have at least verified there is no config coming.
+    if (restaurants.length > 0 && restaurantConfig !== null) {
+      setIsLoading(false)
+    } else if (restaurantsData && restaurants.length === 0) {
+      // Handle the case where the user has no restaurants at all
+      setIsLoading(false)
+    }
+  }, [restaurants, restaurantConfig, restaurantsData])
+
+  // Automatically sync fetched data into state
+  useEffect(() => {
+    if (restaurantsData && fetchedRestaurants.length >= 0) {
+      setRestaurantsData(fetchedRestaurants)
+    }
+  }, [fetchedRestaurants, restaurantsData])
 
   // Load restaurants (this will be set by Layout component)
   const setRestaurantsData = (data: Restaurant[]) => {
     setRestaurants(data)
-    setIsLoading(false)
     
-    // Check current state and localStorage to determine if we need to set a default
-    const currentSelected = selectedRestaurant
-    if (!currentSelected && data.length > 0) {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      let newSelectedRestaurant: string | null = null
-      
-      if (saved && data.find(r => r.name === saved || r.restaurant_id === saved)) {
-        newSelectedRestaurant = saved
-      } else {
-        const firstRestaurant = data[0]
-        newSelectedRestaurant = firstRestaurant.name
-        localStorage.setItem(STORAGE_KEY, firstRestaurant.name)
-      }
-      
-      if (newSelectedRestaurant) {
-        setSelectedRestaurantState(newSelectedRestaurant)
-      }
+    // Validate current state and localStorage to determine the correct active restaurant
+    const saved = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null
+    let newSelectedRestaurant: string | null = null
+    
+    // Priority 1: Use currently selected if it is valid in the new data
+    const currentIsValid = selectedRestaurant && data.find(r => r.name === selectedRestaurant || r.restaurant_id === selectedRestaurant)
+    
+    if (currentIsValid) {
+      newSelectedRestaurant = selectedRestaurant
+    } 
+    // Priority 2: Use saved ID if it's valid for this user
+    else if (saved && data.find(r => r.name === saved || r.restaurant_id === saved)) {
+      newSelectedRestaurant = saved
+    } 
+    // Priority 3: Default to first restaurant
+    else if (data.length > 0) {
+      newSelectedRestaurant = data[0].name
+      localStorage.setItem(STORAGE_KEY, newSelectedRestaurant)
+    }
+
+    if (newSelectedRestaurant !== selectedRestaurant) {
+      setSelectedRestaurantState(newSelectedRestaurant)
+      // Keep loading TRUE until the next render cycle when selectedRestaurant state is applied
+      setTimeout(() => setIsLoading(false), 0)
+    } else {
+      setIsLoading(false)
     }
   }
 
@@ -174,7 +194,9 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
   }, [selectedRestaurant])
 
   // Extract subscription data from config
-  const planType = restaurantConfig?.subscription?.planType || 'SILVER'
+  const rawPlanType = String(restaurantConfig?.subscription?.planType || 'SILVER').toUpperCase()
+  const planType = rawPlanType as 'SILVER' | 'GOLD' | 'DIAMOND'
+  
   const billingStatus = restaurantConfig?.subscription?.billingStatus || 'active'
   const coinsBalance = restaurantConfig?.subscription?.coinsBalance || 0
   const isActive = restaurantConfig?.subscription?.isActive ?? true

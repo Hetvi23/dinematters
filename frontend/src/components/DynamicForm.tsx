@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react'
 import { useDocTypeMeta, DocTypeField } from '@/lib/doctype'
 import { usePermissions } from '@/lib/permissions'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ColorPaletteSelector } from '@/components/ui/color-palette-selector'
-import { CityStateSelector } from '@/components/ui/CityStateSelector'
+const CityStateSelector = lazy(() => import('@/components/ui/CityStateSelector').then(m => ({ default: m.CityStateSelector })))
 import AddressAutocomplete from '@/components/ui/AddressAutocomplete'
 import { DatePicker } from '@/components/ui/date-picker'
 import { useFrappeGetDoc, useFrappePostCall, useFrappeGetDocList } from '@/lib/frappe'
@@ -75,7 +75,10 @@ export default function DynamicForm({
     if (hookEnabled && refreshDoc) {
       void (refreshDoc as any)()
     }
-  }, [hookEnabled, refreshDoc])
+  }, [hookEnabled, refreshDoc, doctype, docname])
+
+  const isLoading = metaLoading || permLoading || (docLoading && mode !== 'create')
+
 
   // Debug: Log hook state immediately
   console.log(`[DynamicForm] ${doctype} - Hook state (immediate):`, {
@@ -137,6 +140,11 @@ export default function DynamicForm({
 
   // Track if formData has been initialized to prevent overwriting user changes
   const [formDataInitialized, setFormDataInitialized] = useState(false)
+
+  // Identity state guard - prevent rendering stale data or blank frames while DocIdentity is changing
+  const isDataStale = docData && (docData as any).name !== docname && mode !== 'create'
+  const isInitialLoad = mode !== 'create' && !docData && !formDataInitialized
+  const shouldShowSkeleton = !skipLoadingState && (isLoading || metaLoading || isDataStale || isInitialLoad)
   const initialDataRef = useRef(initialData || {})
   const hasUserDataRef = useRef(false)
   const originalDataRef = useRef<Record<string, any>>({}) // Track original data for change detection
@@ -154,19 +162,29 @@ export default function DynamicForm({
   const lastHydratedKeyRef = useRef<string | null>(null)
   const currentDocKey = `${doctype}-${docname}`
 
-  useEffect(() => {
-    // Never overwrite user edits
-    if (hasUserDataRef.current) {
-      return
+  // Unified Lifecycle Engine: Handles Reset, Hydration, and Create Mode Initialization
+  useLayoutEffect(() => {
+    // 1. IDENTITY CHECK - Did the document we are looking at change?
+    const isNewIdentity = lastHydratedKeyRef.current !== currentDocKey
+    
+    if (isNewIdentity) {
+      // Never overwrite user edits if they've started typing in a new form
+      if (hasUserDataRef.current) {
+        return
+      }
+      
+      // RESET: Wipe state for the new identity
+      setFormDataInitialized(false)
+      lastHydratedKeyRef.current = null
+      setFormData({})
+      originalDataRef.current = {}
+      // We don't return here; we continue to check if data is available for the new identity immediately
     }
 
-    // When docData becomes available and we haven't hydrated it yet for this specific doc/doctype pair
+    // 2. HYDRATION: If we have data and need to hydrate
     if (docData && mode !== 'create' && (lastHydratedKeyRef.current !== currentDocKey || !formDataInitialized)) {
-      console.log(`[DynamicForm] ${doctype} - Hydrating docData:`, docname)
-
-      // Load existing document data from backend - this is the source of truth for most fields
+      // Load existing document data from backend
       const cleanDocData = { ...docData }
-      // Remove metadata fields that shouldn't be compared
       delete cleanDocData.name
       delete cleanDocData.creation
       delete cleanDocData.modified
@@ -175,7 +193,7 @@ export default function DynamicForm({
 
       const mergedData = { ...cleanDocData }
 
-      // If meta is available, ensure all fields are initialized (even if NULL in backend)
+      // Initialize missing fields from meta
       if (meta && meta.fields) {
         meta.fields.forEach(field => {
           if (!field.hidden && !(field.fieldname in mergedData)) {
@@ -186,28 +204,22 @@ export default function DynamicForm({
         })
       }
 
-      // Override read-only fields with initialData values
+      // Read-only field overrides
       readOnlyFields.forEach(fieldname => {
-        if (initialData[fieldname] !== undefined && initialData[fieldname] !== null && initialData[fieldname] !== '') {
-          mergedData[fieldname] = initialData[fieldname]
-        } else if (initialDataRef.current[fieldname] !== undefined && initialDataRef.current[fieldname] !== null && initialDataRef.current[fieldname] !== '') {
-          mergedData[fieldname] = initialDataRef.current[fieldname]
+        const value = initialData[fieldname] || initialDataRef.current[fieldname]
+        if (value !== undefined && value !== null && value !== '') {
+          mergedData[fieldname] = value
         }
       })
-
-      // Special handling for restaurant field
-      const restaurantFromInitial = initialData.restaurant || initialDataRef.current.restaurant
-      if (restaurantFromInitial && typeof restaurantFromInitial === 'string' && !/^[A-Z]{3}$/.test(restaurantFromInitial)) {
-        mergedData.restaurant = restaurantFromInitial
-      }
 
       setFormData(mergedData)
       originalDataRef.current = { ...mergedData } 
       setFormDataInitialized(true)
       lastHydratedKeyRef.current = currentDocKey
       hasUserDataRef.current = false 
-    } else if (meta && !formDataInitialized && mode === 'create') {
-      // Initialize for create mode
+    } 
+    // 3. CREATE MODE: Initial setup
+    else if (meta && !formDataInitialized && mode === 'create') {
       const defaults: Record<string, any> = { ...initialDataRef.current }
       meta.fields.forEach(field => {
         if (field.default !== undefined && field.default !== null && !(field.fieldname in defaults)) {
@@ -219,16 +231,8 @@ export default function DynamicForm({
       setFormDataInitialized(true)
       hasUserDataRef.current = false 
     }
-  }, [docData, meta, mode, formDataInitialized, docname, initialData])
+  }, [docData, meta, mode, formDataInitialized, docname, initialData, doctype, currentDocKey])
 
-  // Reset when docname or mode changes
-  useEffect(() => {
-    setFormDataInitialized(false)
-    lastHydratedKeyRef.current = null
-    hasUserDataRef.current = false
-    setFormData({})
-    originalDataRef.current = {}
-  }, [docname, mode])
 
   // Update initialDataRef when initialData changes (separate effect to avoid resetting form)
   useEffect(() => {
@@ -364,7 +368,6 @@ export default function DynamicForm({
     onChange(hasChanges)
   }, [formData, formDataInitialized, onChange])
 
-  const isLoading = metaLoading || permLoading || (docLoading && mode !== 'create')
 
   // Determine actual mode based on permissions
   const actualMode = mode === 'create'
@@ -714,17 +717,19 @@ export default function DynamicForm({
                 City
                 {field.required && <span className="text-destructive">*</span>}
               </Label>
-              <CityStateSelector
-                cityValue={formData.city}
-                stateValue={formData.state}
-                onChange={(city, state, lat, lng) => {
-                  handleFieldChange('city', city)
-                  handleFieldChange('state', state)
-                  if (lat) handleFieldChange('city_latitude', parseFloat(lat))
-                  if (lng) handleFieldChange('city_longitude', parseFloat(lng))
-                }}
-                disabled={isReadOnly}
-              />
+              <Suspense fallback={<div className="h-10 animate-pulse bg-muted rounded-md" />}>
+                <CityStateSelector
+                  cityValue={formData.city}
+                  stateValue={formData.state}
+                  onChange={(city, state, lat, lng) => {
+                    handleFieldChange('city', city)
+                    handleFieldChange('state', state)
+                    if (lat) handleFieldChange('city_latitude', parseFloat(lat))
+                    if (lng) handleFieldChange('city_longitude', parseFloat(lng))
+                  }}
+                  disabled={isReadOnly}
+                />
+              </Suspense>
               {field.description && (
                 <p className="text-xs text-muted-foreground">{getEnhancedDescription(field, doctype)}</p>
               )}
@@ -917,9 +922,13 @@ export default function DynamicForm({
                 <SelectValue placeholder={`Select ${field.label}`} />
               </SelectTrigger>
               <SelectContent>
-                {options.map(opt => (
-                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                ))}
+                {options.length > 0 ? (
+                  options.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="no-options-available" disabled>No options available</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -1227,7 +1236,6 @@ export default function DynamicForm({
                 onChange={(items) => handleFieldChange(field.fieldname, items)}
                 required={field.required}
                 disabled={isReadOnly}
-                categoryName={docname}
               />
               {field.description && (
                 <p className="text-xs text-muted-foreground">{field.description}</p>
@@ -1313,7 +1321,7 @@ export default function DynamicForm({
   }
 
   // Skip loading state if skipLoadingState is true (parent handles loading via page reload)
-  if (!skipLoadingState && (isLoading || metaLoading)) {
+  if (shouldShowSkeleton) {
     return (
       <Card>
         <CardContent className="space-y-6 py-8">
@@ -1561,9 +1569,8 @@ function LinkFieldReadOnly({
   const { data: linkedRecord } = useFrappeGetDoc(linkedDoctype, value || '', {
     enabled: !!value && !!linkedDoctype
   })
-  // Use selected restaurant from context as a more reliable fallback
   const { selectedRestaurant } = useRestaurant()
-  const selectedRestaurantKey = selectedRestaurant || (typeof window !== 'undefined' && localStorage.getItem('dinematters-selected-restaurant')) || ''
+  const selectedRestaurantKey = selectedRestaurant || ''
   const { data: selectedRestaurantDoc } = useFrappeGetDoc('Restaurant', selectedRestaurantKey || '', {
     enabled: !!selectedRestaurantKey && linkedDoctype === 'Restaurant'
   })
@@ -1731,7 +1738,7 @@ function LinkField({
               )
             })
           ) : (
-            <SelectItem value="" disabled>No options available</SelectItem>
+            <SelectItem value="no-options-available" disabled>No options available</SelectItem>
           )}
         </SelectContent>
       </Select>

@@ -191,7 +191,7 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
-  const { selectedRestaurant, setSelectedRestaurant, setRestaurantsData, isGold, isDiamond, planType, coinsBalance, billingStatus, isActive, refreshConfig, billingInfo } = useRestaurant()
+  const { selectedRestaurant, setSelectedRestaurant, restaurants, isGold, isDiamond, planType, coinsBalance, billingStatus, isActive, refreshConfig, billingInfo } = useRestaurant()
   const { formatAmountNoDecimals } = useCurrency()
   const [sidebarOpen, setSidebarOpen] = useState(false) // Mobile sidebar
   const [sidebarExpanded, setSidebarExpanded] = useState(true) // Desktop sidebar expanded/collapsed
@@ -303,35 +303,16 @@ export default function Layout({ children }: LayoutProps) {
   const { call: createRestaurant } = useFrappePostCall('frappe.client.insert')
   const { call: generateQrCodes } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.generate_qr_codes_pdf')
 
-  // Fetch user's restaurants
-  const { data: restaurantsData } = useFrappeGetCall<{ message: { restaurants: Restaurant[] } }>(
-    'dinematters.dinematters.api.ui.get_user_restaurants',
-    {},
-    'user-restaurants'
-  )
 
-  const restaurants = useMemo(() => restaurantsData?.message?.restaurants || [], [restaurantsData])
-
-  // Update context with restaurants data
   useEffect(() => {
-    // Always update context to stop loading, even if restaurants array is empty
-    if (restaurantsData) {
-      setRestaurantsData(restaurants)
-    }
-  }, [restaurants, setRestaurantsData, restaurantsData])
-
-  // Simple admin check - using same pattern as working TestApiCalls.tsx
-  useEffect(() => {
-    console.log('Current user from useFrappeAuth:', currentUser)
+    // Wait for currentUser to be loaded
+    if (!currentUser) return;
 
     // Simple check: if user is Administrator, set admin to true
-    // This follows the same pattern as TestApiCalls.tsx which works
     if (currentUser === 'Administrator') {
       setIsAdmin(true)
-      console.log('Admin access granted for Administrator')
     } else {
       setIsAdmin(false)
-      console.log('Admin access denied for user:', currentUser)
     }
   }, [currentUser])
 
@@ -352,8 +333,6 @@ export default function Layout({ children }: LayoutProps) {
     setSelectedRestaurant(restaurantId)
     // Dispatch custom event to notify other components
     window.dispatchEvent(new CustomEvent('restaurant-selected'))
-    // Reload page to refresh data with new restaurant context
-    window.location.reload()
   }
 
   // Handle create restaurant submission
@@ -420,7 +399,6 @@ export default function Layout({ children }: LayoutProps) {
         // Navigate to the new restaurant's setup wizard
         setTimeout(() => {
           navigate(`/setup/${encodeURIComponent(urlFriendlyName)}`, { replace: true })
-          window.location.reload()
         }, 100)
       } else {
         throw new Error('Failed to create restaurant')
@@ -446,13 +424,24 @@ export default function Layout({ children }: LayoutProps) {
   // Preview URL path: slug preferred, fallback to restaurant_id for all pages
   const previewPath = restaurantDoc?.slug || restaurantDoc?.restaurant_id || currentRestaurant?.restaurant_id || selectedRestaurant || ''
 
-  // Fetch orders for analytics - filter by selected restaurant
+  // Fetch orders for analytics - filter by selected restaurant and TODAY ONLY for performance
+  const todayStart = useMemo(() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    // Format for Frappe: YYYY-MM-DD HH:mm:ss
+    return d.toISOString().split('T')[0] + ' 00:00:00'
+  }, [])
+
   const { data: orders } = useFrappeGetDocList('Order', {
     fields: ['name', 'status', 'total', 'creation', 'restaurant', 'is_tokenization', 'is_whatsapp_order', 'payment_method'],
-    filters: selectedRestaurant ? ({ restaurant: selectedRestaurant, "is_tokenization": ["!=", 1] } as any) : undefined,
-    limit: 200,
+    filters: selectedRestaurant ? { 
+      restaurant: selectedRestaurant, 
+      "is_tokenization": ["!=", 1],
+      "creation": [">=", todayStart]
+    } as any : undefined,
+    limit: 500, // Increased limit for today's orders but restricted by time
     orderBy: { field: 'creation', order: 'desc' }
-  }, selectedRestaurant ? `orders-analytics-${selectedRestaurant}` : null)
+  }, selectedRestaurant ? `orders-badges-${selectedRestaurant}` : null)
 
   // Calculate analytics metrics
   const analytics = useMemo(() => {
@@ -613,7 +602,7 @@ export default function Layout({ children }: LayoutProps) {
         onMouseLeave={(e) => {
           // Don't collapse if select dropdown is open or if mouse is moving to dropdown
           const relatedTarget = e.relatedTarget as HTMLElement
-          if (!selectOpen && relatedTarget && !relatedTarget.closest('[role="listbox"]')) {
+          if (!selectOpen && relatedTarget && typeof relatedTarget.closest === 'function' && !relatedTarget.closest('[role="listbox"]')) {
             setSidebarHovered(false)
           }
         }}

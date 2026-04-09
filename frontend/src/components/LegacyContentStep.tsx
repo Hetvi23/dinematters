@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useFrappeGetDoc, useFrappeGetDocList, useFrappePostCall, useFrappeUpdateDoc, useFrappeDeleteDoc } from '@/lib/frappe'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -31,6 +31,13 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
   const [currentSection, setCurrentSection] = useState<string>('')
   const [uploading, setUploading] = useState(false)
   const [reelsToAdd, setReelsToAdd] = useState<string[]>([''])
+  const [heroData, setHeroData] = useState({
+    hero_media_type: 'image',
+    hero_title: '',
+    opening_text: '',
+    paragraph_1: '',
+    paragraph_2: ''
+  })
 
   // Get the main legacy content document
   const { data: legacyContent, isLoading: contentLoading, mutate: mutateContent } = useFrappeGetDoc(
@@ -60,6 +67,33 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
   const refreshAll = () => {
     mutateContent()
   }
+
+  // Unified Sync Engine: Handles both re-fetch and state migration
+  useEffect(() => {
+    // 1. Force a refresh if the restaurant context changes
+    if (selectedRestaurant && mutateContent) {
+      void (mutateContent() as any)
+    }
+
+    // 2. Only sync to local state if the data from server matches our selected restaurant
+    // This prevents "flickering" or syncing stale data from the previous step/restaurant
+    if (legacyContent && legacyContent.name === selectedRestaurant) {
+      console.log(`[LegacySync] SYNCING DATA for ${selectedRestaurant}`, {
+        hero_title: legacyContent.hero_title,
+        has_content: !!legacyContent.hero_title
+      })
+      
+      setHeroData({
+        hero_media_type: legacyContent.hero_media_type || 'image',
+        hero_title: legacyContent.hero_title || '',
+        opening_text: legacyContent.opening_text || '',
+        paragraph_1: legacyContent.paragraph_1 || '',
+        paragraph_2: legacyContent.paragraph_2 || ''
+      })
+    } else if (legacyContent) {
+      console.log(`[LegacySync] IGNORING STALE DATA: expected ${selectedRestaurant}, got ${legacyContent.name}`)
+    }
+  }, [selectedRestaurant, legacyContent, mutateContent])
 
   const handleSaveChild = async (data: any, type: string, doctype: string) => {
     try {
@@ -694,21 +728,19 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={(e) => {
+          <form 
+            key={legacyContent?.name || 'loading'}
+            onSubmit={(e) => {
             e.preventDefault()
-            const formData = new FormData(e.target as HTMLFormElement)
-            const data: any = {
-              hero_media_type: formData.get('hero_media_type'),
-              hero_title: formData.get('hero_title'),
-              opening_text: formData.get('opening_text'),
-              paragraph_1: formData.get('paragraph_1'),
-              paragraph_2: formData.get('paragraph_2')
-            }
-            handleLegacyContentSave(data)
+            handleLegacyContentSave(heroData)
           }} className="space-y-4">
             <div>
               <Label htmlFor="hero_media_type">Hero Media Type</Label>
-              <Select name="hero_media_type" defaultValue={legacyContent?.hero_media_type || 'image'}>
+              <Select 
+                name="hero_media_type" 
+                value={heroData.hero_media_type}
+                onValueChange={(val) => setHeroData(prev => ({ ...prev, hero_media_type: val }))}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select media type" />
                 </SelectTrigger>
@@ -720,19 +752,39 @@ export default function LegacyContentStep({ selectedRestaurant, onComplete }: Le
             </div>
             <div>
               <Label htmlFor="hero_title">Hero Title</Label>
-              <Input name="hero_title" defaultValue={legacyContent?.hero_title || ''} placeholder="Enter your restaurant's story title" />
+              <Input 
+                name="hero_title" 
+                value={heroData.hero_title} 
+                onChange={(e) => setHeroData(prev => ({ ...prev, hero_title: e.target.value }))}
+                placeholder="Enter your restaurant's story title" 
+              />
             </div>
             <div>
               <Label htmlFor="opening_text">Opening Text</Label>
-              <Textarea name="opening_text" defaultValue={legacyContent?.opening_text || ''} placeholder="Welcome text for your restaurant" />
+              <Textarea 
+                name="opening_text" 
+                value={heroData.opening_text} 
+                onChange={(e) => setHeroData(prev => ({ ...prev, opening_text: e.target.value }))}
+                placeholder="Welcome text for your restaurant" 
+              />
             </div>
             <div>
               <Label htmlFor="paragraph_1">First Paragraph</Label>
-              <Textarea name="paragraph_1" defaultValue={legacyContent?.paragraph_1 || ''} placeholder="Tell your restaurant's story" />
+              <Textarea 
+                name="paragraph_1" 
+                value={heroData.paragraph_1} 
+                onChange={(e) => setHeroData(prev => ({ ...prev, paragraph_1: e.target.value }))}
+                placeholder="Tell your restaurant's story" 
+              />
             </div>
             <div>
               <Label htmlFor="paragraph_2">Second Paragraph (Optional)</Label>
-              <Textarea name="paragraph_2" defaultValue={legacyContent?.paragraph_2 || ''} placeholder="Continue your story" />
+              <Textarea 
+                name="paragraph_2" 
+                value={heroData.paragraph_2} 
+                onChange={(e) => setHeroData(prev => ({ ...prev, paragraph_2: e.target.value }))}
+                placeholder="Continue your story" 
+              />
             </div>
             <Button type="submit" disabled={isUpdating}>
               {isUpdating ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}

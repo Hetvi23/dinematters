@@ -62,7 +62,7 @@ interface SetupProgressResponse {
 export default function TieredSetupWizard() {
   const { stepId: urlSlug } = useParams<{ stepId?: string }>()
   const navigate = useNavigate()
-  const { selectedRestaurant, setSelectedRestaurant, planType, isSilver, isGold, isDiamond, isLoading: contextLoading } = useRestaurant()
+  const { selectedRestaurant, setSelectedRestaurant, planType, isSilver, isGold, isDiamond, isLoading: contextLoading, restaurants } = useRestaurant()
 
   // Define All Possible Steps
   const allPotentialSteps: WizardStep[] = [
@@ -111,7 +111,14 @@ export default function TieredSetupWizard() {
 
   const currentStep = steps[currentStepIndex] || steps[0]
 
+  console.log(`[Wizard] Rendering Step ${currentStepIndex} (${currentStep.id})`, {
+    selectedRestaurant,
+    doctype: currentStep.doctype,
+    mode: ((currentStep.id === 'restaurant' || currentStep.id === 'config') && selectedRestaurant) ? 'edit' : 'create'
+  })
+
   const handleNext = () => {
+    console.log(`[Wizard] NEXT clicked. Current step: ${currentStep.id}`)
     if (currentStepIndex < steps.length - 1) {
       const nextIndex = currentStepIndex + 1
       navigate(`/setup/${stepIdToSlug(steps[nextIndex].id)}`)
@@ -124,6 +131,7 @@ export default function TieredSetupWizard() {
   }
 
   const handlePrevious = () => {
+    console.log(`[Wizard] PREVIOUS clicked. Moving from ${currentStep.id}`)
     if (currentStepIndex > 0) {
       const prevIndex = currentStepIndex - 1
       navigate(`/setup/${stepIdToSlug(steps[prevIndex].id)}`)
@@ -148,11 +156,11 @@ export default function TieredSetupWizard() {
     return <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-none shadow-lg gap-1 px-3 py-1"><Star className="w-3.5 h-3.5" /> SILVER Foundation</Badge>
   }
 
-  if (contextLoading || !steps.length) {
+  if (contextLoading || !steps.length || (restaurants.length > 0 && !selectedRestaurant)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
         <Loader2 className="w-10 h-10 animate-spin text-primary" />
-        <p className="text-muted-foreground animate-pulse">Initializing your personalized setup...</p>
+        <p className="text-muted-foreground animate-pulse">Synchronizing your dashboard...</p>
       </div>
     )
   }
@@ -268,13 +276,13 @@ export default function TieredSetupWizard() {
               {/* Conditional Step Rendering */}
               {currentStep.customComponent === 'StaffMembersList' ? (
                 <StaffMembersList 
-                  key={`wizard-staff-${selectedRestaurant}`}
+                  key={`wizard-staff-${currentStep.id}-${selectedRestaurant}`}
                   restaurantId={selectedRestaurant || ''} 
                   onAdd={() => refreshProgress?.()} 
                 />
               ) : currentStep.customComponent === 'LegacyContentStep' ? (
                 <LegacyContentStep 
-                  key={`wizard-legacy-${selectedRestaurant}`}
+                  key={`wizard-legacy-${currentStep.id}-${selectedRestaurant}`}
                   selectedRestaurant={selectedRestaurant ?? ''} 
                   onComplete={() => {
                     refreshProgress?.()

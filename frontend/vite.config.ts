@@ -56,7 +56,6 @@ export default defineConfig(({ command, mode }) => {
 							'cmdk',
 							'sonner'
 						],
-						'vendor-geo': ['country-state-city'],
 						'vendor-utils': ['date-fns', 'clsx', 'tailwind-merge', 'zod', 'react-hook-form'],
 						'vendor-dnd': ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities']
 					}

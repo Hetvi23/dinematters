@@ -36,6 +36,7 @@ export default function FeatureProtectedRoute({ feature, requireGold = false }: 
     hasTimedOut
   )
 
+
   if (!hasAccess) {
     return <Navigate to="/feature-locked" state={{ from: location.pathname }} replace />
   }

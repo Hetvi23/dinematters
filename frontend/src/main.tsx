@@ -1,18 +1,19 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import App from './App.tsx'
+import App from './App'
 
 function initApp() {
+  const win = window as any;
   // Ensure frappe object exists
-  if (!window.frappe) {
-    window.frappe = {} as any;
+  if (!win.frappe) {
+    win.frappe = {} as any;
   }
 
   // Only sync if frappe.model exists (frappe-react-sdk handles model syncing)
-  if (window.frappe.boot && window.frappe.boot.docs && window.frappe.model && typeof window.frappe.model.sync === 'function') {
+  if (win.frappe.boot && win.frappe.boot.docs && win.frappe.model && typeof win.frappe.model.sync === 'function') {
     try {
-      window.frappe.model.sync(window.frappe.boot.docs);
+      win.frappe.model.sync(win.frappe.boot.docs);
     } catch (e) {
       // Silently fail - frappe-react-sdk will handle model syncing
       console.debug('frappe.model.sync not available, using frappe-react-sdk');
@@ -33,11 +34,10 @@ if (import.meta.env.DEV) {
     .then(response => response.json())
     .then((values) => {
       const v = JSON.parse(values.message)
-      if (!window.frappe) window.frappe = {} as any;
-      //@ts-expect-error - frappe will be available
-      window.frappe.boot = v
-      //@ts-expect-error - frappe will be available
-      window.frappe._messages = window.frappe.boot["__messages"];
+      const win = window as any;
+      if (!win.frappe) win.frappe = {} as any;
+      win.frappe.boot = v;
+      win.frappe._messages = v["__messages"] || {};
       initApp();
     })
     .catch((error) => {
@@ -45,14 +45,15 @@ if (import.meta.env.DEV) {
       initApp();
     })
 } else {
-  // In production, boot data is injected via HTML
-  // Wait for DOM and ensure frappe.boot is set from the inline script
+  // Production trace
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-      setTimeout(initApp, 50);
+      initApp();
     });
   } else {
-    setTimeout(initApp, 50);
+    initApp();
   }
 }
+
+// Global start marker
 

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -7,11 +8,27 @@ import { useRestaurant } from '@/contexts/RestaurantContext'
 export default function FeatureLocked() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isGold, isDiamond, planType } = useRestaurant()
+  const { isGold, isDiamond, planType, isLoading } = useRestaurant()
 
   // Get the attempted path from location state or current path
   const attemptedPath = (location.state?.from || location.pathname).replace('/dinematters', '')
   const { featureName, requiredPlan } = getFeatureDetails(attemptedPath)
+
+  // Auto-unlock logic: If the user actually has access now, send them back
+  useEffect(() => {
+    if (isLoading) return
+
+    const hasAccess = 
+      isDiamond || 
+      (requiredPlan === 'GOLD' && (isGold || isDiamond))
+    
+    if (hasAccess) {
+      // Ensure we don't double-prefix the path. 
+      // navigate() automatically prepends the basename from App.tsx
+      const target = (location.state?.from || '/dashboard').replace('/dinematters', '')
+      navigate(target, { replace: true })
+    }
+  }, [isGold, isDiamond, isLoading, requiredPlan, navigate, location, attemptedPath])
 
   const handleGoBack = () => {
     navigate(-1)

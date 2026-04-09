@@ -10,7 +10,7 @@ import frappe
 from frappe import _
 from frappe.utils import get_url, flt, cint
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api, get_restaurant_context
-from dinematters.dinematters.media.utils import get_media_asset_data
+from dinematters.dinematters.media.utils import get_media_asset_data, get_media_assets_batch
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 import json
 
@@ -26,7 +26,10 @@ def get_restaurant_config(restaurant_id):
 	try:
 		# Fail-safe: Sync subscription if overdue (only for authenticated users to save guest performance)
 		if frappe.session.user != "Guest":
-			sync_restaurant_subscription(restaurant_id)
+			# Fast-path check: avoid loading full Doc if no plan switch is pending
+			is_pending = frappe.db.get_value("Restaurant", restaurant_id, "deferred_plan_type")
+			if is_pending:
+				sync_restaurant_subscription(restaurant_id)
 
 		# Validate restaurant
 		restaurant = validate_restaurant_for_api(restaurant_id)
@@ -111,37 +114,39 @@ def get_restaurant_config(restaurant_id):
 		if not primary_color:
 			primary_color = next(iter(color_palette.values()), "#DB782F")
 		
-		# Get Media Assets using centralized utility
+		# Batch fetch branding Media Assets in one go
+		media_roles = ["restaurant_config_logo", "restaurant_config_hero_video", "apple_touch_icon"]
 		config_name = frappe.db.get_value("Restaurant Config", {"restaurant": restaurant}, "name")
+		media_batch = get_media_assets_batch("Restaurant Config", [config_name], media_roles) if config_name else {}
 		
 		# Get logo with variants and blur placeholder
-		logo_data = get_media_asset_data(
-			"Restaurant Config",
-			config_name,
-			"restaurant_config_logo",
-			config.get("logo")
-		)
+		logo_data = media_batch.get((config_name, "restaurant_config_logo")) or {
+			"url": config.get("logo") or "",
+			"blur_placeholder": None,
+			"variants": {},
+			"srcset": None
+		}
 		logo = logo_data["url"]
 		logo_blur = logo_data.get("blur_placeholder")
 		logo_variants = logo_data.get("variants", {})
 		logo_srcset = logo_data.get("srcset")
 		
 		# Get hero video
-		hero_data = get_media_asset_data(
-			"Restaurant Config",
-			config_name,
-			"restaurant_config_hero_video",
-			config.get("hero_video")
-		)
+		hero_data = media_batch.get((config_name, "restaurant_config_hero_video")) or {
+			"url": config.get("hero_video") or "",
+			"blur_placeholder": None,
+			"variants": {},
+			"srcset": None
+		}
 		hero_video = hero_data["url"]
 		
 		# Get apple touch icon with variants
-		icon_data = get_media_asset_data(
-			"Restaurant Config",
-			config_name,
-			"apple_touch_icon",
-			config.get("apple_touch_icon")
-		)
+		icon_data = media_batch.get((config_name, "apple_touch_icon")) or {
+			"url": config.get("apple_touch_icon") or "",
+			"blur_placeholder": None,
+			"variants": {},
+			"srcset": None
+		}
 		apple_touch_icon = icon_data["url"]
 		icon_variants = icon_data.get("variants", {})
 		

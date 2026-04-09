@@ -107,20 +107,44 @@ def get_default_restaurant(user):
 
 
 def get_user_restaurant_ids(user):
-	"""Get list of restaurant IDs user has access to based on Restaurant User records"""
+	"""Get list of restaurant IDs user has access to based on Restaurant User records
+	Optimized with Request-Level Caching and Redis Caching for Production Scale.
+	"""
 	if user == "Administrator":
 		# Administrator has access to all restaurants
-		# Use frappe.db.get_all to bypass any potential hooks and ignore permissions
-		restaurants = [d.name for d in frappe.db.get_all("Restaurant", filters={"is_active": 1})]
-		return restaurants
+		# Cache results in frappe.local to ensure it only runs once per request
+		if not hasattr(frappe.local, "all_restaurant_ids"):
+			# Use direct SQL to avoid any hooks when fetching the list of all restaurants
+			all_res = frappe.db.sql("SELECT name FROM `tabRestaurant` WHERE is_active = 1", as_dict=True)
+			frappe.local.all_restaurant_ids = [d.name for d in all_res]
+		return frappe.local.all_restaurant_ids
 	
-	# Get restaurants from Restaurant User records
-	# Using frappe.db.get_all to be safest against recursion
-	restaurant_users = [d.restaurant for d in frappe.db.get_all(
-		"Restaurant User",
-		filters={"user": user, "is_active": 1}
-	)]
-	return restaurant_users
+	# Tier 1: Request-Level Cache (Memory)
+	cache_key = f"user_restaurant_ids_{user}"
+	if hasattr(frappe.local, cache_key):
+		return getattr(frappe.local, cache_key)
+	
+	# Tier 2: Redis-Level Cache (Shared Memory) - 10 minute TTL
+	redis_key = f"dinematters:user_restaurants:{user}"
+	cached_ids = frappe.cache().get_value(redis_key)
+	if cached_ids is not None:
+		setattr(frappe.local, cache_key, cached_ids)
+		return cached_ids
+
+	# Tier 3: Database Query (Direct SQL for speed and to bypass hooks)
+	restaurant_users = frappe.db.sql("""
+		SELECT restaurant 
+		FROM `tabRestaurant User` 
+		WHERE user = %s AND is_active = 1
+	""", user, as_dict=True)
+	
+	ids = [d.restaurant for d in restaurant_users if d.restaurant]
+	
+	# Save to all cache tiers
+	setattr(frappe.local, cache_key, ids)
+	frappe.cache().set_value(redis_key, ids, expires_in_sec=600)
+	
+	return ids
 
 
 def validate_restaurant_access(user, restaurant):

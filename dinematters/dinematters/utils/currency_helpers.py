@@ -22,9 +22,12 @@ def get_currency_symbol(currency_code):
 		currency_code = "INR"
 	
 	try:
-		currency_doc = frappe.get_doc("Currency", currency_code)
-		symbol = currency_doc.symbol or currency_code
-		symbol_on_right = bool(currency_doc.symbol_on_right) if hasattr(currency_doc, 'symbol_on_right') else False
+		res = frappe.db.get_value("Currency", currency_code, ["symbol", "symbol_on_right"], as_dict=True)
+		if res:
+			symbol = res.get("symbol") or currency_code
+			symbol_on_right = bool(res.get("symbol_on_right", False))
+		else:
+			raise frappe.DoesNotExistError
 	except (frappe.DoesNotExistError, Exception):
 		# Fallback to common currency symbols
 		fallback_symbols = {
