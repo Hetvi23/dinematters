@@ -131,14 +131,22 @@ def handle_payment_captured(payload):
 		if request_type == "tokenization" or (order_id and notes.get("attempt_id")):
 			try:
 				customer_id = payment_data.get("customer_id") or payment_data.get("customer")
-				token_id = payment_data.get("token") or (payment_data.get("card") or {}).get("token") or (payment_data.get("card") or {}).get("token_id")
+				# Look for token in all possible locations
+				token_id = (
+					payment_data.get("token_id") or 
+					payment_data.get("token") or 
+					(payment_data.get("card") or {}).get("token") or 
+					(payment_data.get("card") or {}).get("token_id")
+				)
 
 				if restaurant_from_notes and frappe.db.exists("Restaurant", restaurant_from_notes):
 					if customer_id:
 						frappe.db.set_value("Restaurant", restaurant_from_notes, "razorpay_customer_id", customer_id)
 					if token_id:
-						frappe.db.set_value("Restaurant", restaurant_from_notes, "razorpay_token_id", token_id)
-						frappe.db.set_value("Restaurant", restaurant_from_notes, "mandate_status", "active")
+						frappe.db.set_value("Restaurant", restaurant_from_notes, {
+							"razorpay_token_id": token_id, 
+							"mandate_status": "active"
+						})
 					frappe.db.commit()
 				
 				# Log capture in Tokenization Attempt

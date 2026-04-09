@@ -683,6 +683,7 @@ def create_tokenization_order(restaurant_id, amount=1, customer_name=None, custo
 				"amount": attempt_doc.amount,
 				"currency": "INR",
 				"key_id": key_id,
+				"customer_id": customer_id,
 				"attempt_doc": attempt_doc.name
 			}
 		}
