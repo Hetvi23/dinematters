@@ -59,6 +59,7 @@ export default function AutopaySetupPage() {
   const [loading, setLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
   const [isChangingPlan, setIsChangingPlan] = useState(false)
+  const [isSettingUpMandate, setIsSettingUpMandate] = useState(false)
   const [showRecharge, setShowRecharge] = useState(false)
   
   // Local form state
@@ -202,6 +203,7 @@ export default function AutopaySetupPage() {
   }
 
   const handleSetupMandate = async () => {
+    setIsSettingUpMandate(true)
     try {
       const loaded = await new Promise<boolean>((resolve) => {
         if ((window as any).Razorpay) return resolve(true)
@@ -216,7 +218,6 @@ export default function AutopaySetupPage() {
 
       const res = await createTokenOrder({
         restaurant_id: selectedRestaurant,
-        amount: 1,
         customer_name: activeRes?.restaurant_name || activeRes?.name,
         customer_email: (activeRes as any)?.owner_email || ''
       })
@@ -229,7 +230,7 @@ export default function AutopaySetupPage() {
         key: key_id,
         subscription_id: razorpay_subscription_id,
         name: 'DineMatters Autopay',
-        description: 'Authorize Autopay Mandate (₹1 Refundable)',
+        description: 'Authorize Mandate (Safety Cap: ₹15,000) — ₹1 verification fee',
         theme: { color: '#f97316' },
         handler: async (response: any) => {
           // Verify signature and save token immediately
@@ -263,6 +264,8 @@ export default function AutopaySetupPage() {
       rzp.open()
     } catch (error: any) {
       toast.error('Mandate setup failed', { description: error.message })
+    } finally {
+      setIsSettingUpMandate(false)
     }
   }
 
@@ -422,8 +425,19 @@ export default function AutopaySetupPage() {
                 </p>
               </div>
             </div>
-            <Button variant={billingInfo?.mandate_active ? "outline" : "default"} onClick={handleSetupMandate}>
-              {billingInfo?.mandate_active ? 'Update Card' : 'Setup Autopay'}
+            <Button 
+              variant={billingInfo?.mandate_active ? "outline" : "default"} 
+              onClick={handleSetupMandate}
+              disabled={isSettingUpMandate}
+            >
+              {isSettingUpMandate ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Securing Connection...
+                </>
+              ) : (
+                billingInfo?.mandate_active ? 'Update Card' : 'Setup Autopay'
+              )}
             </Button>
           </CardContent>
         </Card>

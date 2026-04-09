@@ -13,23 +13,25 @@ from dinematters.dinematters.utils.customer_helpers import require_verified_phon
 from dinematters.dinematters.utils.razorpay_utils import get_razorpay_config, get_razorpay_client, get_or_create_razorpay_customer
 
 def get_or_create_mandate_plan(client):
-	"""Get or create a dummy ₹1 plan for mandate registration."""
+	"""Get or create a high-limit registration plan for Autopay mandates."""
 	try:
-		# This plan is never actually billed recurringly; we cancel the sub after tokenization.
-		plan_name = "Autopay Mandate Setup v2"
+		# For production, we want the mandate to have a high enough limit
+		# so that multiple coin recharges of ₹1,000, ₹5,000, etc. are allowed without re-verification.
+		# A ₹15,000 limit is a safe production standard for DineMatters merchants.
+		plan_name = "DineMatters Autopay Mandate (Limit ₹15,000)"
 		plans = client.plan.all()
 		for p in plans.get("items", []):
 			if p.get("item", {}).get("name") == plan_name:
 				return p.get("id")
 		
 		new_plan = client.plan.create({
-			"period": "monthly",
-			"interval": 1,
+			"period": "yearly",
+			"interval": 10,
 			"item": {
 				"name": plan_name,
-				"amount": 100, # ₹1
+				"amount": 1500000, # ₹15,000 Safety Cap (Mandate Limit)
 				"currency": "INR",
-				"description": "One-time mandate registration"
+				"description": "Permanent mandate authorization for automatic coin recharges"
 			}
 		})
 		return new_plan.get("id")
@@ -638,10 +640,10 @@ def can_set_merchant_keys():
 		return {"success": False, "error": str(e)}
 
 @frappe.whitelist(allow_guest=True)
-def create_tokenization_order(restaurant_id, amount=1, customer_name=None, customer_email=None):
+def create_tokenization_order(restaurant_id, customer_name=None, customer_email=None):
 	"""
-	Create a Razorpay Subscription to register a mandate (UPI, Card, eNACH).
-	We use the Subscriptions API because it's the only way to support UPI Autopay in Checkout.
+	Create a Razorpay Subscription to register a production mandate (UPI, Card, eNACH).
+	We use the Subscriptions API to ensure full multi-method support for live customers.
 	"""
 	try:
 		_restaurant_name = validate_restaurant_for_api(restaurant_id)
@@ -665,18 +667,21 @@ def create_tokenization_order(restaurant_id, amount=1, customer_name=None, custo
 		frappe.db.commit()
 
 		# Create Subscription
-		subscription = client.subscription.create({
+		subscription_payload = {
 			"plan_id": plan_id,
 			"customer_id": customer_id,
-			"total_count": 12, # 1 year max, will be cancelled immediately
+			"total_count": 120, # 10 years, will be cancelled after token capture
 			"quantity": 1,
 			"customer_notify": 0,
 			"notes": {
 				"attempt_id": attempt_doc.name,
 				"restaurant_id": restaurant_id,
+				"description": "Production Autopay Mandate Registration (Limit: ₹15,000)",
 				"type": "tokenization"
 			}
-		})
+		}
+		
+		subscription = client.subscription.create(subscription_payload)
 
 		sub_id = subscription.get("id")
 		attempt_doc.razorpay_order_id = sub_id # store sub_id in order_id field for webhook mapping
