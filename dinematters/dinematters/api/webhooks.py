@@ -55,12 +55,14 @@ def razorpay_webhook():
 		if not merchant_secret:
 			try:
 				restaurant_note = payload_preview.get("payload", {}).get("payment", {}).get("entity", {}).get("notes", {}).get("restaurant_id")
+				if not restaurant_note:
+					restaurant_note = payload_preview.get("payload", {}).get("order", {}).get("entity", {}).get("notes", {}).get("restaurant_id")
+					
 				if restaurant_note and frappe.db.exists("Restaurant", restaurant_note):
 					try:
 						_rest2 = frappe.get_doc("Restaurant", restaurant_note)
 						merchant_secret = _rest2.get_password("razorpay_webhook_secret") or merchant_secret
 					except Exception:
-						# leave merchant_secret unchanged if retrieval fails
 						pass
 			except Exception:
 				pass
@@ -86,7 +88,7 @@ def razorpay_webhook():
 			frappe.log_error(f"Duplicate webhook event: {event_id}", "razorpay.webhook.duplicate")
 			return {"success": True, "message": "Duplicate event ignored"}
 		
-		# Create webhook log entry (allow Guest to insert raw payload for audit)
+		# Create webhook log entry
 		webhook_log = frappe.get_doc({
 			"doctype": "Razorpay Webhook Log",
 			"event_id": event_id,
@@ -99,7 +101,7 @@ def razorpay_webhook():
 		except Exception:
 			frappe.log_error(f"Failed to insert webhook log: {event_id}", "razorpay.webhook.log_insert")
 
-		# Enqueue processing of this webhook log as an internal user (Administrator)
+		# Enqueue processing
 		try:
 			frappe.enqueue('dinematters.dinematters.api.webhook_worker.process_webhook_log',
 				webhook_log_name=webhook_log.name,
@@ -108,10 +110,8 @@ def razorpay_webhook():
 				user='Administrator'
 			)
 		except Exception as e:
-			# If enqueue fails, log the error and return - worker retry may handle this later
 			frappe.log_error(f"Failed to enqueue webhook processing: {str(e)}", "razorpay.webhook.enqueue_error")
 
-		# Respond quickly — actual processing happens in worker
 		return {"success": True, "message": "Webhook received"}
 		
 	except Exception as e:
@@ -120,56 +120,44 @@ def razorpay_webhook():
 
 
 def handle_payment_captured(payload):
-	"""Handle payment.captured event"""
+	"""Handle payment.captured, order.paid, and payment.authorized events"""
 	try:
+		event = payload.get("event")
 		payment_data = payload.get("payload", {}).get("payment", {}).get("entity", {})
-		order_id = payment_data.get("order_id")
-		payment_id = payment_data.get("id")
-		amount = payment_data.get("amount")
+		order_data = payload.get("payload", {}).get("order", {}).get("entity", {})
 		
-		notes = payment_data.get("notes") or {}
-		# If notes contains restaurant mapping (tokenization/order), use it
+		order_id = payment_data.get("order_id") or order_data.get("id")
+		payment_id = payment_data.get("id")
+		
+		notes = payment_data.get("notes") or order_data.get("notes") or {}
 		restaurant_from_notes = notes.get("restaurant_id")
 		request_type = notes.get("type")
-		# If notes indicate tokenization (even if order_id present), handle tokenization first
+		
+		# Handle Mandate Tokenization
 		if request_type == "tokenization" or (order_id and notes.get("attempt_id")):
 			try:
-				# Attempt to map to a TokenizationAttempt (new DocType). Notes may contain attempt_id (preferred)
-				attempt_id = notes.get("attempt_id") or notes.get("order_id")
-				attempt_doc = None
-				if attempt_id and frappe.db.exists("Tokenization Attempt", attempt_id):
-					attempt_doc = frappe.get_doc("Tokenization Attempt", attempt_id)
-				else:
-					# fallback: try find by razorpay_order_id matching this payment's order (if present)
-					rows = frappe.get_all("Tokenization Attempt", filters={"razorpay_order_id": payment_data.get("order_id")}, fields=["name"])
-					if rows:
-						attempt_doc = frappe.get_doc("Tokenization Attempt", rows[0].name)
-
 				customer_id = payment_data.get("customer_id") or payment_data.get("customer")
 				token_id = payment_data.get("token") or (payment_data.get("card") or {}).get("token") or (payment_data.get("card") or {}).get("token_id")
 
-				# Persist token/customer on Restaurant if available
-				if restaurant_from_notes:
+				if restaurant_from_notes and frappe.db.exists("Restaurant", restaurant_from_notes):
 					if customer_id:
 						frappe.db.set_value("Restaurant", restaurant_from_notes, "razorpay_customer_id", customer_id)
 					if token_id:
 						frappe.db.set_value("Restaurant", restaurant_from_notes, "razorpay_token_id", token_id)
 						frappe.db.set_value("Restaurant", restaurant_from_notes, "mandate_status", "active")
 					frappe.db.commit()
-
-				# If we found an attempt doc, update it
-				if attempt_doc:
-					try:
-						attempt_doc.razorpay_payment_id = payment_id
-						if customer_id:
-							attempt_doc.customer_id = customer_id
-						if token_id:
-							attempt_doc.token_id = token_id
-						attempt_doc.status = "captured"
-						attempt_doc.processed = 1
-						attempt_doc.save(ignore_permissions=True)
-					except Exception as e:
-						frappe.log_error(f"Failed to update TokenizationAttempt {attempt_doc.name}: {str(e)}", "razorpay.webhook.token_save")
+				
+				# Log capture in Tokenization Attempt
+				attempt_id = notes.get("attempt_id") or order_id
+				if attempt_id and frappe.db.exists("Tokenization Attempt", attempt_id):
+					frappe.db.set_value("Tokenization Attempt", attempt_id, {
+						"razorpay_payment_id": payment_id,
+						"customer_id": customer_id,
+						"token_id": token_id,
+						"status": "captured",
+						"processed": 1
+					})
+					frappe.db.commit()
 
 				return {"success": True, "message": "Tokenization recorded", "payment_id": payment_id}
 			except Exception as e:
@@ -181,296 +169,179 @@ def handle_payment_captured(payload):
 			try:
 				restaurant = restaurant_from_notes or notes.get("restaurant")
 				coins = float(notes.get("coins") or 0)
-				gst_amount = float(notes.get("gst_amount") or 0)
-				total_paid = float(notes.get("total_payable") or 0)
-				
 				if restaurant and coins > 0:
 					from dinematters.dinematters.api.coin_billing import record_transaction
 					record_transaction(
 						restaurant=restaurant,
 						txn_type="Purchase",
 						amount=coins,
-						gst_amount=gst_amount,
-						total_paid=total_paid,
-						description=f"Coin Purchase: {coins} Coins (GST ₹{gst_amount:.2f} included)",
+						description=f"Coin Purchase: {coins} Coins",
 						payment_id=payment_id
 					)
 					return {"success": True, "message": "Coins added successfully"}
 			except Exception as e:
-				frappe.log_error(f"Coin purchase verification failed: {str(e)}", "razorpay.webhook.coin_purchase")
+				frappe.log_error(f"Coin purchase failed: {str(e)}", "razorpay.webhook.coin_purchase")
 				return {"error": str(e)}
-		# Fallback to ledger mapping if present
-		ledgers = frappe.get_all("Monthly Billing Ledger", filters={"razorpay_payment_id": payment_id}, fields=["name", "restaurant"])
-		if ledgers:
-			try:
-				mb = frappe.get_doc("Monthly Billing Ledger", ledgers[0].name)
-				mb.payment_status = "paid"
-				mb.payment_date = datetime.now().date()
-				try:
-					mb.save(ignore_permissions=True)
-				except Exception:
-					frappe.db.set_value("Monthly Billing Ledger", mb.name, "payment_status", "paid")
-					frappe.db.set_value("Monthly Billing Ledger", mb.name, "payment_date", datetime.now().date())
-					frappe.db.commit()
-				return {"success": True, "ledger_paid": mb.name, "payment_id": payment_id}
-			except Exception as e:
-				frappe.log_error(f"Failed to mark ledger paid: {str(e)}", "razorpay.webhook.ledger_error")
-				return {"error": str(e)}
-		else:
-			return {"error": "No order_id in payment data"}
-		
-		# Find order by Razorpay order ID
-		orders = frappe.get_all("Order", 
-			filters={"razorpay_order_id": order_id},
-			fields=["name", "restaurant", "total", "platform_fee_amount"]
-		)
-		
-		if not orders:
-			frappe.log_error(f"Order not found for Razorpay order ID: {order_id}", "razorpay.webhook.order_not_found")
-			return {"error": "Order not found"}
-		
-		order_name = orders[0].name
-		# Update order status using DB to avoid form validation issues in background worker
-		# Online paid: Auto Accepted → pushed to KOT, kitchen starts preparation
-		try:
-			frappe.db.set_value("Order", order_name, "razorpay_payment_id", payment_id)
-			frappe.db.set_value("Order", order_name, "transaction_id", payment_id)
-			frappe.db.set_value("Order", order_name, "payment_status", "completed")
-			frappe.db.set_value("Order", order_name, "status", "Auto Accepted")
-			frappe.db.commit()
-		except Exception:
-			# fallback to safe doc update if DB updates fail
-			try:
-				order = frappe.get_doc("Order", order_name)
-				order.razorpay_payment_id = payment_id
-				order.transaction_id = payment_id
-				order.payment_status = "completed"
-				order.status = "Auto Accepted"
-				order.save(ignore_permissions=True)
-			except Exception as ex:
-				frappe.log_error(f"Failed to update Order {order_name}: {str(ex)}", "razorpay.webhook.order_update")
-		
-		# Update monthly revenue ledger
-		# Refresh order doc or fetch fields for ledger update
-		try:
-			order = frappe.get_doc("Order", order_name)
-			update_monthly_ledger(order.restaurant, order.total, order.platform_fee_amount)
-		except Exception:
-			# If order doc cannot be loaded, skip ledger update and log
-			frappe.log_error(f"Failed to load order for ledger update: {order_name}", "razorpay.webhook.ledger_skip")
-		
-		# Also, if this payment corresponds to a Monthly Billing Ledger, mark it paid
-		try:
-			mb_ledgers = frappe.get_all("Monthly Billing Ledger", filters={"razorpay_payment_id": payment_id}, fields=["name"])
-			if mb_ledgers:
-				mb = frappe.get_doc("Monthly Billing Ledger", mb_ledgers[0].name)
-				mb.payment_status = "paid"
-				mb.payment_date = datetime.now().date()
-				try:
-					mb.save(ignore_permissions=True)
-				except Exception:
-					frappe.db.set_value("Monthly Billing Ledger", mb.name, "payment_status", "paid")
-					frappe.db.set_value("Monthly Billing Ledger", mb.name, "payment_date", datetime.now().date())
-					frappe.db.commit()
-				# Post accounting journal entry for the received payment
-				try:
-					# Create simple JE: debit Bank, credit Platform Income
-					site_conf = frappe.get_conf()
-					bank_account = site_conf.get("razorpay_gl_bank_account")
-					income_account = site_conf.get("razorpay_gl_income_account")
-					if bank_account and income_account:
-						amount = int(mb.final_amount or 0) / 100.0
-						je = frappe.get_doc({
-							"doctype": "Journal Entry",
-							"posting_date": datetime.now().date(),
-							"voucher_type": "Bank Entry",
-							"user_remark": f"Monthly billing payment for {mb.restaurant} {mb.billing_month}",
-							"accounts": [
-								{"account": bank_account, "debit_in_account_currency": amount},
-								{"account": income_account, "credit_in_account_currency": amount}
-							]
-						})
-						je.insert(ignore_permissions=True)
-						frappe.db.set_value("Monthly Billing Ledger", mb.name, "journal_entry", je.name)
-						frappe.db.commit()
-					else:
-						frappe.log_error("GL accounts not configured for journal posting", "razorpay.webhook.journal_skip")
-				except Exception as e:
-					frappe.log_error(f"Failed to create Journal Entry for ledger {mb.name}: {str(e)}", "razorpay.webhook.journal_error")
-		except Exception:
-			# non-fatal
-			pass
 
-		# If token/customer present in payment (tokenization flow), persist to Restaurant
-		try:
-			# payment_data may contain customer id and card/token details
-			customer_id = payment_data.get("customer_id") or payment_data.get("customer")
-			token_id = None
-			if payment_data.get("token"):
-				token_id = payment_data.get("token")
-			elif isinstance(payment_data.get("card"), dict):
-				token_id = payment_data.get("card").get("token") or payment_data.get("card").get("token_id")
+		# Handle Standard Order Payment
+		if order_id:
+			orders = frappe.get_all("Order", filters={"razorpay_order_id": order_id}, fields=["name", "restaurant", "total", "platform_fee_amount"])
+			if orders:
+				order_name = orders[0].name
+				frappe.db.set_value("Order", order_name, {
+					"razorpay_payment_id": payment_id,
+					"transaction_id": payment_id,
+					"payment_status": "completed",
+					"status": "Auto Accepted"
+				})
+				frappe.db.commit()
+				
+				# Update monthly ledger
+				update_monthly_ledger(orders[0].restaurant, orders[0].total, orders[0].platform_fee_amount)
+				return {"success": True, "order_updated": order_name}
 
-			# If our Order doc links to a restaurant via notes, load it
-			restaurant_name = None
-			try:
-				r_order = frappe.get_doc("Order", order_name)
-				restaurant_name = r_order.restaurant
-			except Exception:
-				restaurant_name = None
-
-			if restaurant_name and (customer_id or token_id):
-				try:
-					if customer_id:
-						frappe.db.set_value("Restaurant", restaurant_name, "razorpay_customer_id", customer_id)
-					if token_id:
-						frappe.db.set_value("Restaurant", restaurant_name, "razorpay_token_id", token_id)
-						frappe.db.set_value("Restaurant", restaurant_name, "mandate_status", "active")
-					frappe.db.commit()
-				except Exception:
-					# non-fatal
-					pass
-		except Exception:
-			pass
-
-		return {
-			"success": True,
-			"order_updated": order.name,
-			"payment_id": payment_id
-		}
+		return {"success": True, "message": "Event processed but no specific action taken"}
 		
 	except Exception as e:
-		frappe.log_error(f"Payment captured handler failed: {str(e)}", "razorpay.webhook.payment_captured")
+		frappe.log_error(f"Payment capture handler failed: {str(e)}", "razorpay.webhook.payment_captured")
 		return {"error": str(e)}
 
 
-def handle_transfer_processed(payload):
-	"""Deprecated: transfer.processed handling removed in SaaS billing mode"""
-	return {"success": False, "error": "transfer.processed handling is deprecated"}
-
-
 def handle_refund_processed(payload):
-	"""Handle refund.processed event"""
+	"""Handle refund.processed and refund.created events"""
 	try:
 		refund_data = payload.get("payload", {}).get("refund", {}).get("entity", {})
 		payment_id = refund_data.get("payment_id")
 		refund_amount = refund_data.get("amount")
 		
-		# Find order by payment ID
-		orders = frappe.get_all("Order",
-			filters={"razorpay_payment_id": payment_id},
-			fields=["name", "restaurant", "total", "platform_fee_amount"]
-		)
+		orders = frappe.get_all("Order", filters={"razorpay_payment_id": payment_id}, fields=["name", "restaurant", "total", "platform_fee_amount"])
 		
 		if orders:
 			order = frappe.get_doc("Order", orders[0].name)
-			
-			# Calculate refund proportions
 			total_amount_paise = int(order.total * 100)
 			refund_ratio = refund_amount / total_amount_paise
-			platform_fee_refund = int(order.platform_fee_amount * refund_ratio)
+			platform_fee_refund = int((order.platform_fee_amount or 0) * refund_ratio)
 			
-			# Update order status
 			if refund_amount == total_amount_paise:
-				order.payment_status = "refunded"
-				order.status = "cancelled"
+				frappe.db.set_value("Order", order.name, {"payment_status": "refunded", "status": "cancelled"})
 			else:
-				order.payment_status = "partially_refunded"
+				frappe.db.set_value("Order", order.name, "payment_status", "partially_refunded")
 			
-			order.save()
-			
-			# Reverse platform fee in monthly ledger
+			frappe.db.commit()
 			reverse_monthly_ledger(order.restaurant, refund_amount, platform_fee_refund)
 		
-		return {
-			"success": True,
-			"refund_amount": refund_amount,
-			"payment_id": payment_id
-		}
-		
+		return {"success": True, "refund_processed": True}
 	except Exception as e:
-		frappe.log_error(f"Refund processed handler failed: {str(e)}", "razorpay.webhook.refund_processed")
+		frappe.log_error(f"Refund handler failed: {str(e)}", "razorpay.webhook.refund")
 		return {"error": str(e)}
 
 
 def handle_payment_link_paid(payload):
-	"""Handle payment_link.paid event (for monthly minimums)"""
+	"""Handle payment_link.paid event"""
 	try:
 		payment_link_data = payload.get("payload", {}).get("payment_link", {}).get("entity", {})
 		payment_link_id = payment_link_data.get("id")
 		
-		# Find monthly ledger entry by payment link ID
-		ledgers = frappe.get_all("Monthly Revenue Ledger",
-			filters={"payment_link_id": payment_link_id},
-			fields=["name"]
-		)
-		
+		ledgers = frappe.get_all("Monthly Revenue Ledger", filters={"payment_link_id": payment_link_id}, fields=["name"])
 		if ledgers:
-			ledger = frappe.get_doc("Monthly Revenue Ledger", ledgers[0].name)
-			ledger.status = "paid"
-			ledger.paid_date = datetime.now().date()
-			# Save with ignore_permissions so webhook processing as Guest can update ledger
-			try:
-				ledger.save(ignore_permissions=True)
-			except Exception:
-				# fallback to db update if save fails
-				try:
-					frappe.db.set_value("Monthly Revenue Ledger", ledger.name, "status", "paid")
-					frappe.db.set_value("Monthly Revenue Ledger", ledger.name, "paid_date", datetime.now().date())
-					frappe.db.commit()
-				except Exception:
-					frappe.log_error(f"Failed to mark ledger paid: {ledger.name}", "razorpay.webhook.ledger_update")
-		
-		return {
-			"success": True,
-			"payment_link_id": payment_link_id
-		}
-		
+			frappe.db.set_value("Monthly Revenue Ledger", ledgers[0].name, {
+				"status": "paid",
+				"paid_date": datetime.now().date()
+			})
+			frappe.db.commit()
+		return {"success": True, "pl_paid": True}
 	except Exception as e:
-		frappe.log_error(f"Payment link paid handler failed: {str(e)}", "razorpay.webhook.payment_link_paid")
+		frappe.log_error(f"Payment link handler failed: {str(e)}", "razorpay.webhook.pl_paid")
 		return {"error": str(e)}
 
 
 def handle_payment_failed(payload):
-	"""Handle payment.failed event for recurring billing failures"""
+	"""Handle payment.failed and other failure events"""
 	try:
 		payment_data = payload.get("payload", {}).get("payment", {}).get("entity", {})
 		payment_id = payment_data.get("id")
-		# Find ledger by payment id
+		
+		# Mark ledger failed if applicable
 		ledgers = frappe.get_all("Monthly Billing Ledger", filters={"razorpay_payment_id": payment_id}, fields=["name", "restaurant"])
 		if ledgers:
-			ledger = frappe.get_doc("Monthly Billing Ledger", ledgers[0].name)
-			ledger.payment_status = "failed"
-			try:
-				ledger.save(ignore_permissions=True)
-			except Exception:
-				frappe.db.set_value("Monthly Billing Ledger", ledger.name, "payment_status", "failed")
-				frappe.db.commit()
-			# Mark restaurant billing status as overdue and notify
-			try:
-				restaurant_name = ledgers[0].restaurant
-				frappe.db.set_value("Restaurant", restaurant_name, "billing_status", "overdue")
-				frappe.db.commit()
-			except Exception:
-				pass
-		return {"success": True, "payment_id": payment_id}
+			frappe.db.set_value("Monthly Billing Ledger", ledgers[0].name, "payment_status", "failed")
+			frappe.db.set_value("Restaurant", ledgers[0].restaurant, "billing_status", "overdue")
+			frappe.db.commit()
+		return {"success": True, "failure_recorded": True}
 	except Exception as e:
-		frappe.log_error(f"Payment failed handler failed: {str(e)}", "razorpay.webhook.payment_failed")
+		frappe.log_error(f"Payment failure handler failed: {str(e)}", "razorpay.webhook.failed")
 		return {"error": str(e)}
+
+
+def handle_subscription_event(payload):
+	"""Handle subscription.* and token.confirmed events"""
+	try:
+		event = payload.get("event")
+		sub_data = payload.get("payload", {}).get("subscription", {}).get("entity", {})
+		payment_data = payload.get("payload", {}).get("payment", {}).get("entity", {})
+		
+		if event == "subscription.charged":
+			return handle_payment_captured(payload)
+			
+		customer_id = sub_data.get("customer_id") or payment_data.get("customer_id")
+		token_id = payment_data.get("token_id") or payment_data.get("token")
+		
+		notes = sub_data.get("notes") or payment_data.get("notes") or {}
+		restaurant = notes.get("restaurant_id")
+		
+		if restaurant and frappe.db.exists("Restaurant", restaurant):
+			if event in ["subscription.activated", "subscription.authenticated", "token.confirmed"]:
+				frappe.db.set_value("Restaurant", restaurant, "mandate_status", "active")
+				if token_id:
+					frappe.db.set_value("Restaurant", restaurant, "razorpay_token_id", token_id)
+				if customer_id:
+					frappe.db.set_value("Restaurant", restaurant, "razorpay_customer_id", customer_id)
+			elif event in ["subscription.paused", "subscription.pending"]:
+				frappe.db.set_value("Restaurant", restaurant, "mandate_status", "paused")
+			elif event in ["subscription.cancelled", "subscription.halted"]:
+				frappe.db.set_value("Restaurant", restaurant, "mandate_status", "inactive")
+			
+			frappe.db.commit()
+			return {"success": True, "event": event, "restaurant": restaurant}
+			
+		return {"success": True, "message": "No restaurant mapping found"}
+	except Exception as e:
+		frappe.log_error(f"Subscription handler failed: {str(e)}", "razorpay.webhook.subscription")
+		return {"error": str(e)}
+
+
+def handle_dispute_event(payload):
+	"""Handle payment.dispute.* events"""
+	try:
+		event = payload.get("event")
+		dispute_data = payload.get("payload", {}).get("dispute", {}).get("entity", {})
+		payment_id = dispute_data.get("payment_id")
+		amount = dispute_data.get("amount", 0) / 100.0
+		reason = dispute_data.get("reason_code")
+		
+		msg = f"CRITICAL: Razorpay Dispute {event} for Payment {payment_id}. Amount: INR {amount}. Reason: {reason}"
+		frappe.log_error(msg, "razorpay.dispute_alert")
+		return {"success": True, "alert_logged": True}
+	except Exception:
+		return {"success": False}
+
+
+def handle_operational_event(payload):
+	"""Handle informational/ops events (settlements, downtimes)"""
+	try:
+		return {"success": True, "event_logged": payload.get("event")}
+	except Exception:
+		return {"success": False}
 
 
 def update_monthly_ledger(restaurant_id, order_total, platform_fee_amount):
 	"""Update monthly revenue ledger with new order"""
 	try:
 		current_month = datetime.now().strftime("%Y-%m")
-		
-		# Get or create monthly ledger entry
 		ledger_name = f"MRL-{restaurant_id}-{current_month}"
 		
-		if frappe.db.exists("Monthly Revenue Ledger", ledger_name):
-			ledger = frappe.get_doc("Monthly Revenue Ledger", ledger_name)
-		else:
-			ledger = frappe.get_doc({
+		if not frappe.db.exists("Monthly Revenue Ledger", ledger_name):
+			doc = frappe.get_doc({
 				"doctype": "Monthly Revenue Ledger",
 				"restaurant": restaurant_id,
 				"month": current_month,
@@ -479,13 +350,15 @@ def update_monthly_ledger(restaurant_id, order_total, platform_fee_amount):
 				"minimum_due": 0,
 				"status": "pending"
 			})
+			doc.insert(ignore_permissions=True)
 		
-		# Update totals
 		order_total_paise = int(order_total * 100)
-		ledger.total_gmv = (ledger.total_gmv or 0) + order_total_paise
-		ledger.total_platform_fee = (ledger.total_platform_fee or 0) + (platform_fee_amount or 0)
-		
-		ledger.save()
+		frappe.db.sql(f"""
+			UPDATE `tabMonthly Revenue Ledger` 
+			SET total_gmv = total_gmv + %s, total_platform_fee = total_platform_fee + %s
+			WHERE name = %s
+		""", (order_total_paise, float(platform_fee_amount or 0), ledger_name))
+		frappe.db.commit()
 		
 	except Exception as e:
 		frappe.log_error(f"Monthly ledger update failed: {str(e)}", "razorpay.monthly_ledger")
@@ -498,10 +371,13 @@ def reverse_monthly_ledger(restaurant_id, refund_amount, platform_fee_refund):
 		ledger_name = f"MRL-{restaurant_id}-{current_month}"
 		
 		if frappe.db.exists("Monthly Revenue Ledger", ledger_name):
-			ledger = frappe.get_doc("Monthly Revenue Ledger", ledger_name)
-			ledger.total_gmv = max(0, (ledger.total_gmv or 0) - refund_amount)
-			ledger.total_platform_fee = max(0, (ledger.total_platform_fee or 0) - platform_fee_refund)
-			ledger.save()
+			frappe.db.sql(f"""
+				UPDATE `tabMonthly Revenue Ledger` 
+				SET total_gmv = GREATEST(0, total_gmv - %s), 
+				    total_platform_fee = GREATEST(0, total_platform_fee - %s)
+				WHERE name = %s
+			""", (refund_amount, platform_fee_refund, ledger_name))
+			frappe.db.commit()
 		
 	except Exception as e:
 		frappe.log_error(f"Monthly ledger reversal failed: {str(e)}", "razorpay.monthly_ledger_reverse")
