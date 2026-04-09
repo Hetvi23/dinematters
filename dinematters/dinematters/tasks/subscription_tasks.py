@@ -153,6 +153,7 @@ def process_silver_feature_renewals():
             `tabRestaurant` r ON r.name = rc.restaurant
         WHERE 
             r.plan_type = 'SILVER' 
+            AND r.is_active = 1
             AND rc.menu_theme_background_enabled = 1
             AND (rc.menu_theme_paid_until IS NULL OR rc.menu_theme_paid_until <= %s)
     """, (today(),), as_dict=1)

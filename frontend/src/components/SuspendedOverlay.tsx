@@ -10,7 +10,7 @@ interface SuspendedOverlayProps {
 
 export const SuspendedOverlay: React.FC<SuspendedOverlayProps> = ({ 
   restaurantName, 
-  reason = "Your account has been suspended due to an outstanding balance exceeding the ₹300 grace period." 
+  reason = "Your account has been suspended due to a security reason. Please contact support for reactivation." 
 }) => {
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/80 backdrop-blur-md animate-in fade-in duration-500">

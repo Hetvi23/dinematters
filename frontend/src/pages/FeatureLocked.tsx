@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,10 +18,10 @@ export default function FeatureLocked() {
   useEffect(() => {
     if (isLoading) return
 
-    const hasAccess = 
-      isDiamond || 
+    const hasAccess =
+      isDiamond ||
       (requiredPlan === 'GOLD' && (isGold || isDiamond))
-    
+
     if (hasAccess) {
       // Ensure we don't double-prefix the path. 
       // navigate() automatically prepends the basename from App.tsx
@@ -64,32 +64,32 @@ export default function FeatureLocked() {
           <CardContent className="space-y-6">
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
               <p className="text-sm text-blue-800 dark:text-blue-200">
-                You're currently on the <span className="font-semibold">{planType || 'SILVER'}</span> plan. 
+                You're currently on the <span className="font-semibold">{planType || 'SILVER'}</span> plan.
                 Upgrade to {requiredPlan} to unlock this feature and more.
               </p>
             </div>
 
             {/* Action Buttons */}
             <div className="space-y-3">
-              <Button 
+              <Button
                 onClick={handleUpgrade}
                 className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3"
               >
                 <Crown className="h-4 w-4 mr-2" />
                 Upgrade to {requiredPlan}
               </Button>
-              
+
               <div className="grid grid-cols-2 gap-3">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={handleGoBack}
                   className="py-2"
                 >
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Go Back
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={handleGoToDashboard}
                   className="py-2"
                 >
@@ -195,7 +195,7 @@ function getFeatureDetails(path: string): { featureName: string; requiredPlan: '
     'pos-integration': { name: 'POS Integration', plan: 'DIAMOND' },
     'recommendations-engine': { name: 'AI Recommendations', plan: 'GOLD' },
     'payment-stats': { name: 'Payment Analytics', plan: 'GOLD' },
-    
+
     // DocType mappings (ModuleList)
     'Order': { name: 'Ordering Dashboard', plan: 'DIAMOND' },
     'Coupon': { name: 'Coupon Management', plan: 'DIAMOND' },
@@ -216,14 +216,14 @@ function getFeatureDetails(path: string): { featureName: string; requiredPlan: '
   if (featureMap[cleanPath]) {
     return { featureName: featureMap[cleanPath].name, requiredPlan: featureMap[cleanPath].plan }
   }
-  
+
   // Check partial matches or path starts with
   for (const [key, value] of Object.entries(featureMap)) {
     if (cleanPath.startsWith(key)) {
       return { featureName: value.name, requiredPlan: value.plan }
     }
   }
-  
+
   // Default fallback
   return { featureName: 'This Premium Feature', requiredPlan: 'GOLD' }
 }

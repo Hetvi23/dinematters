@@ -12,6 +12,7 @@ import { PageSkeleton } from './components/PageSkeleton'
 // Lazy load all page components for code-splitting
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Login = lazy(() => import('./pages/Login'))
+const MyAccount = lazy(() => import('./pages/MyAccount'))
 const FeatureLocked = lazy(() => import('./pages/FeatureLocked'))
 const TieredSetupWizard = lazy(() => import('./pages/TieredSetupWizard'))
 const ModuleDetail = lazy(() => import('./pages/ModuleDetail'))
@@ -71,6 +72,7 @@ function AppContent() {
 						<Route element={<ProtectedRoute />}>
 							<Route path="/" element={<Navigate to="/dashboard" replace />} />
 							<Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+							<Route path="/account" element={<Layout><MyAccount /></Layout>} />
 							<Route path="/feature-locked" element={<FeatureLocked />} />
 							<Route path="/setup" element={<Layout><TieredSetupWizard /></Layout>} />
 							<Route path="/setup/:stepId" element={<Layout><TieredSetupWizard /></Layout>} />

@@ -32,7 +32,7 @@ def get_restaurant_config(restaurant_id):
 				sync_restaurant_subscription(restaurant_id)
 
 		# Validate restaurant
-		restaurant = validate_restaurant_for_api(restaurant_id)
+		restaurant = validate_restaurant_for_api(restaurant_id, allow_inactive=True)
 		
 		# Get restaurant context
 		restaurant_context = get_restaurant_context(restaurant_id)

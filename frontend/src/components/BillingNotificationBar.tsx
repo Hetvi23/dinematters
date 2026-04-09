@@ -20,14 +20,41 @@ interface BillingNotificationBarProps {
     last_auto_recharge_date?: string | null
   } | null
   planType: 'SILVER' | 'GOLD' | 'DIAMOND'
+  isActive?: boolean
 }
 
-export const BillingNotificationBar: React.FC<BillingNotificationBarProps> = ({ billingInfo, planType }) => {
+export const BillingNotificationBar: React.FC<BillingNotificationBarProps> = ({ billingInfo, planType, isActive = true }) => {
   const isGold = planType === 'GOLD'
   const isDiamond = planType === 'DIAMOND'
   const isPremium = isGold || isDiamond
   const navigate = useNavigate()
   if (!billingInfo) return null
+
+  // When restaurant is inactive, show deactivation notice as highest priority
+  if (!isActive) {
+    return (
+      <div className={cn(
+        "w-full py-2 px-4 flex items-center justify-center gap-4 text-xs font-semibold animate-in slide-in-from-top-4 duration-500 shadow-inner",
+        "bg-gradient-to-r from-red-600 via-red-500 to-orange-500 text-white border-red-400"
+      )}>
+        <div className="flex items-center gap-2 max-w-7xl w-full">
+          <div className="flex items-center gap-2 flex-grow overflow-hidden">
+            <div className="p-1 rounded-md bg-white/20 shrink-0">
+              <ShieldAlert className="h-4 w-4" />
+            </div>
+            <span className="truncate">Account suspended due to security reason. Please contact support to reactivate.</span>
+          </div>
+          <button
+            onClick={() => navigate('/account')}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-black hover:bg-white/90 transition-all shrink-0 active:scale-95"
+          >
+            My Account
+            <ArrowRight className="h-3 w-3" />
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   const notifications = []
 
@@ -37,8 +64,8 @@ export const BillingNotificationBar: React.FC<BillingNotificationBarProps> = ({ 
       id: 'suspended',
       type: 'critical',
       icon: <ShieldAlert className="h-4 w-4" />,
-      message: "Account suspended due to non-payment. Please recharge coins to resume services.",
-      action: { label: 'Recharge Now', onClick: () => navigate('/autopay-setup?buy=true') }
+      message: "Account suspended due to security reason. Please contact support to reactivate.",
+      action: { label: 'Contact Support', onClick: () => window.location.href = 'mailto:support@dinematters.ono.menu' }
     })
   } else if (billingInfo.billing_status === 'overdue') {
     notifications.push({

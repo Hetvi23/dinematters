@@ -46,7 +46,7 @@ def get_restaurant_from_id(restaurant_id):
 	return restaurant
 
 
-def validate_restaurant_for_api(restaurant_id, user=None):
+def validate_restaurant_for_api(restaurant_id, user=None, allow_inactive=False):
 	"""
 	Validate restaurant for API calls
 	Returns restaurant name if valid, raises exception if not
@@ -68,7 +68,7 @@ def validate_restaurant_for_api(restaurant_id, user=None):
 		frappe.throw(_("Restaurant not found"), exc=frappe.DoesNotExistError)
 	
 	# Check if restaurant is active
-	if not frappe.db.get_value("Restaurant", restaurant, "is_active"):
+	if not allow_inactive and not frappe.db.get_value("Restaurant", restaurant, "is_active"):
 		frappe.throw(
 			_("Restaurant {0} is not active").format(restaurant_id),
 			exc=frappe.ValidationError

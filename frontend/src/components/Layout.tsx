@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, Coins, Crown, CreditCard, Settings, MessageSquare, Megaphone, Send, Zap, BarChart3 } from 'lucide-react'
+import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, ShieldAlert, Coins, Crown, CreditCard, Settings, MessageSquare, Megaphone, Send, Zap, BarChart3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useFrappeGetDocList, useFrappeGetCall, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
+import { useFrappeGetDocList, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
 import { AiRechargeModal } from '@/components/AiRechargeModal'
 import { useState, useEffect, useMemo } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -28,7 +28,7 @@ interface LayoutProps {
 }
 
 function UserProfileDropdown() {
-  const { logout } = useFrappeAuth()
+  const { logout, currentUser } = useFrappeAuth()
   const bootUserRaw = (window as any)?.frappe?.boot?.user
   // Frappe boot.user can be string (username) or object { name, email, ... }
   const bootUser = typeof bootUserRaw === 'string'
@@ -51,7 +51,9 @@ function UserProfileDropdown() {
   // Redirect to ERPNext/Frappe site (e.g. http://localhost:8000/)
   const siteOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
   const deskUrl = `${siteOrigin}/app`
-  const userProfileUrl = `${siteOrigin}/app/user/${encodeURIComponent(String(bootUser))}`
+  
+  // Check if main admin (or you could check boot.user.roles if desired)
+  const isMainAdmin = currentUser === 'Administrator'
 
   return (
     <DropdownMenu>
@@ -65,17 +67,21 @@ function UserProfileDropdown() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuItem asChild>
-          <a href={userProfileUrl} className="flex items-center gap-2 cursor-pointer">
+          <Link to="/account" className="flex items-center gap-2 cursor-pointer">
             <User className="h-4 w-4" />
             My Account
-          </a>
+          </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <a href={deskUrl} className="flex items-center gap-2 cursor-pointer">
-            <LayoutDashboard className="h-4 w-4" />
-            Switch To Desk
-          </a>
-        </DropdownMenuItem>
+        
+        {isMainAdmin && (
+          <DropdownMenuItem asChild>
+            <a href={deskUrl} className="flex items-center gap-2 cursor-pointer">
+              <LayoutDashboard className="h-4 w-4" />
+              Switch To Desk
+            </a>
+          </DropdownMenuItem>
+        )}
+
         <DropdownMenuItem
           onClick={handleLogout}
           className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
@@ -168,23 +174,16 @@ const navigation: NavItem[] = [
     icon: Megaphone,
     feature: 'marketing_studio',
     children: [
-      { name: 'Overview',    href: '/marketing',                icon: BarChart3,  feature: 'marketing_studio' },
-      { name: 'Campaigns',   href: '/marketing/campaigns',      icon: Send,       feature: 'marketing_studio' },
-      { name: 'Automation',  href: '/marketing/automation',     icon: Zap,        feature: 'marketing_studio' },
-      { name: 'Segments',    href: '/marketing/segments',       icon: Users,      feature: 'marketing_studio' },
-      { name: 'Analytics',   href: '/marketing/analytics',      icon: TrendingUp, feature: 'marketing_studio' },
+      { name: 'Overview', href: '/marketing', icon: BarChart3, feature: 'marketing_studio' },
+      { name: 'Campaigns', href: '/marketing/campaigns', icon: Send, feature: 'marketing_studio' },
+      { name: 'Automation', href: '/marketing/automation', icon: Zap, feature: 'marketing_studio' },
+      { name: 'Segments', href: '/marketing/segments', icon: Users, feature: 'marketing_studio' },
+      { name: 'Analytics', href: '/marketing/analytics', icon: TrendingUp, feature: 'marketing_studio' },
     ],
   },
   // Admin-only link - will be filtered by admin check in render
   { type: 'link', name: 'Restaurant Management', href: '/admin/restaurants', icon: Shield, adminOnly: true },
 ]
-
-interface Restaurant {
-  name: string
-  restaurant_id: string
-  restaurant_name: string
-  is_active: boolean
-}
 
 export default function Layout({ children }: LayoutProps) {
   const { currentUser } = useFrappeAuth()
@@ -211,7 +210,7 @@ export default function Layout({ children }: LayoutProps) {
     const handleBalanceUpdate = (e: any) => {
       if (e.detail?.refresh) {
         // Immediate refresh when explicitly requested via event
-         refreshConfig()
+        refreshConfig()
       }
     }
     window.addEventListener('coins-updated', handleBalanceUpdate)
@@ -266,15 +265,15 @@ export default function Layout({ children }: LayoutProps) {
   const getFeatureStatus = (feature?: string) => {
     if (!feature) return { isLocked: false, requiredTier: null }
     if (isDiamond) return { isLocked: false, requiredTier: null }
-    
+
     if (DIAMOND_ONLY_FEATURES.includes(feature)) {
-       return { isLocked: true, requiredTier: 'DIAMOND' }
+      return { isLocked: true, requiredTier: 'DIAMOND' }
     }
-    
+
     if (GOLD_FEATURES.includes(feature)) {
-       return { isLocked: !isGold, requiredTier: 'GOLD' }
+      return { isLocked: !isGold, requiredTier: 'GOLD' }
     }
-    
+
     return { isLocked: false, requiredTier: null }
   }
 
@@ -434,8 +433,8 @@ export default function Layout({ children }: LayoutProps) {
 
   const { data: orders } = useFrappeGetDocList('Order', {
     fields: ['name', 'status', 'total', 'creation', 'restaurant', 'is_tokenization', 'is_whatsapp_order', 'payment_method'],
-    filters: selectedRestaurant ? { 
-      restaurant: selectedRestaurant, 
+    filters: selectedRestaurant ? {
+      restaurant: selectedRestaurant,
       "is_tokenization": ["!=", 1],
       "creation": [">=", todayStart]
     } as any : undefined,
@@ -678,13 +677,17 @@ export default function Layout({ children }: LayoutProps) {
                             </div>
                           </SelectItem>
                         ))}
-                        <div className="border-t border-border my-1" />
-                        <SelectItem value="__create_new__" className="text-primary">
-                          <div className="flex items-center gap-2 w-full">
-                            <Plus className="h-4 w-4 text-primary flex-shrink-0" />
-                            <span className="text-sm font-medium">Create New Restaurant</span>
-                          </div>
-                        </SelectItem>
+                        {isAdmin && (
+                          <>
+                            <div className="border-t border-border my-1" />
+                            <SelectItem value="__create_new__" className="text-primary">
+                              <div className="flex items-center gap-2 w-full">
+                                <Plus className="h-4 w-4 text-primary flex-shrink-0" />
+                                <span className="text-sm font-medium">Create New Restaurant</span>
+                              </div>
+                            </SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   ) : (
@@ -763,7 +766,7 @@ export default function Layout({ children }: LayoutProps) {
 
           {/* Navigation */}
           <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto">
-            {navigation
+            {isActive && navigation
               .filter((item) => {
                 if (item.adminOnly && !isAdmin) {
                   return false
@@ -795,7 +798,7 @@ export default function Layout({ children }: LayoutProps) {
                   const featureStatus = getFeatureStatus(item.feature)
                   const isLocked = featureStatus.isLocked
 
-                  const LockIcon = (item.feature && DIAMOND_ONLY_FEATURES.includes(item.feature)) 
+                  const LockIcon = (item.feature && DIAMOND_ONLY_FEATURES.includes(item.feature))
                     ? (
                       <div className="flex items-center gap-0.5 flex-shrink-0">
                         <Lock className="h-3 w-3 text-muted-foreground/60" />
@@ -869,16 +872,16 @@ export default function Layout({ children }: LayoutProps) {
                   return sum
                 }, 0)
                 const showBadge = groupBadgeCount > 0
-                
+
                 // Group locking logic
                 const groupStatus = getFeatureStatus(group.feature)
                 const isGroupLocked = groupStatus.isLocked
-                
+
                 // Check if all children are also locked (to mark parent as fully locked)
                 const allChildrenLocked = filteredChildren.length > 0 && filteredChildren.every(child => getFeatureStatus(child.feature).isLocked)
                 const isGroupFullyLocked = isGroupLocked || allChildrenLocked
 
-                const GroupLockIcon = (group.feature && DIAMOND_ONLY_FEATURES.includes(group.feature)) 
+                const GroupLockIcon = (group.feature && DIAMOND_ONLY_FEATURES.includes(group.feature))
                   ? (
                     <div className="flex items-center gap-0.5 flex-shrink-0">
                       <Lock className="h-3 w-3 text-muted-foreground/60" />
@@ -919,12 +922,12 @@ export default function Layout({ children }: LayoutProps) {
                           .map((child) => {
                             const ChildIcon = child.icon || group.icon
                             const isChildActive = location.pathname === child.href || (child.href !== '/' && location.pathname.startsWith(child.href + '/'))
-                            
+
                             // Unified child locking logic
                             const childStatus = getFeatureStatus(child.feature)
                             const isChildLocked = childStatus.isLocked
 
-                            const ChildLockIcon = (child.feature && DIAMOND_ONLY_FEATURES.includes(child.feature)) 
+                            const ChildLockIcon = (child.feature && DIAMOND_ONLY_FEATURES.includes(child.feature))
                               ? <Star className="h-3 w-3 text-amber-500 flex-shrink-0 ml-auto" />
                               : <Lock className="h-3 w-3 text-muted-foreground/60 flex-shrink-0 ml-auto" />
                             return (
@@ -1021,20 +1024,20 @@ export default function Layout({ children }: LayoutProps) {
                             const ChildIcon = child.icon || group.icon
                             const isChildActive = location.pathname === child.href ||
                               (child.href !== '/' && child.href !== '/dashboard' && child.href !== '/marketing' && location.pathname.startsWith(child.href + '/'))
-                              const childBadgeCount = child.badgeHref === '/orders'
-                                ? pendingOrders
-                                : child.badgeHref === '/accept-orders'
-                                  ? acceptPendingOrders
-                                  : child.badgeHref === '/whatsapp-orders'
-                                    ? whatsappPendingOrders
-                                    : 0
-                              const showChildBadge = childBadgeCount > 0
-                            
+                            const childBadgeCount = child.badgeHref === '/orders'
+                              ? pendingOrders
+                              : child.badgeHref === '/accept-orders'
+                                ? acceptPendingOrders
+                                : child.badgeHref === '/whatsapp-orders'
+                                  ? whatsappPendingOrders
+                                  : 0
+                            const showChildBadge = childBadgeCount > 0
+
                             // Unified child locking logic (Expanded View)
                             const childStatus = getFeatureStatus(child.feature)
                             const isChildLocked = childStatus.isLocked
 
-                            const ChildLockIcon = (child.feature && DIAMOND_ONLY_FEATURES.includes(child.feature)) 
+                            const ChildLockIcon = (child.feature && DIAMOND_ONLY_FEATURES.includes(child.feature))
                               ? (
                                 <div className="flex items-center gap-0.5 flex-shrink-0">
                                   <Lock className="h-3 w-3 text-muted-foreground/60" />
@@ -1367,14 +1370,92 @@ export default function Layout({ children }: LayoutProps) {
             </div>
           </div>
           {/* Global Billing Notifications */}
-          <BillingNotificationBar billingInfo={billingInfo} planType={planType} />
+          <BillingNotificationBar billingInfo={billingInfo} planType={planType} isActive={isActive} />
         </header>
 
         {/* Page Content */}
-        <main className="p-3 sm:p-4 md:p-6 bg-background min-h-[calc(100vh-4.5rem)] overflow-x-hidden">
-          <div className="max-w-7xl mx-auto">
-            <Breadcrumb />
-            {children}
+        <main className="p-3 sm:p-4 md:p-6 bg-background min-h-[calc(100vh-4.5rem)] overflow-x-hidden relative">
+          <div className="max-w-7xl mx-auto h-full">
+            {(!isActive && location.pathname !== '/account') ? (
+               <div className="flex flex-col items-center justify-center min-h-[60vh] h-full text-center space-y-6">
+                 {/* Billing Notification Banner inside deactivation overlay */}
+                 {billingInfo && (planType === 'GOLD' || planType === 'DIAMOND') && !billingInfo.mandate_active && (
+                   <div className="w-full max-w-lg animate-in slide-in-from-top-4 duration-500">
+                     <div className="w-full py-3 px-4 flex items-center justify-center gap-4 text-xs font-semibold rounded-xl shadow-inner bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white">
+                       <div className="flex items-center gap-2 w-full">
+                         <div className="flex items-center gap-2 flex-grow overflow-hidden">
+                           <div className="p-1 rounded-md bg-white/20 shrink-0">
+                             <AlertCircle className="h-4 w-4" />
+                           </div>
+                           <span className="truncate">{planType} requires active mandate. Set up Autopay now for seamless operation.</span>
+                         </div>
+                         <button
+                           onClick={() => navigate('/autopay-setup')}
+                           className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-black hover:bg-white/90 transition-all shrink-0 active:scale-95"
+                         >
+                           Set Up
+                         </button>
+                       </div>
+                     </div>
+                   </div>
+                 )}
+                 {billingInfo && billingInfo.billing_status === 'suspended' && (
+                   <div className="w-full max-w-lg animate-in slide-in-from-top-4 duration-500">
+                     <div className="w-full py-3 px-4 flex items-center justify-center gap-4 text-xs font-semibold rounded-xl shadow-inner bg-gradient-to-r from-red-600 via-red-500 to-orange-500 text-white">
+                       <div className="flex items-center gap-2 w-full">
+                         <div className="flex items-center gap-2 flex-grow overflow-hidden">
+                           <div className="p-1 rounded-md bg-white/20 shrink-0">
+                             <ShieldAlert className="h-4 w-4" />
+                           </div>
+                           <span className="truncate">Account suspended due to security reason. Please contact support to reactivate.</span>
+                         </div>
+                         <button
+                           onClick={() => navigate('/autopay-setup?buy=true')}
+                           className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-black hover:bg-white/90 transition-all shrink-0 active:scale-95"
+                         >
+                           Recharge Now
+                         </button>
+                       </div>
+                     </div>
+                   </div>
+                 )}
+                 {billingInfo && billingInfo.coins_balance < 0 && (
+                   <div className="w-full max-w-lg animate-in slide-in-from-top-4 duration-500">
+                     <div className="w-full py-3 px-4 flex items-center justify-center gap-4 text-xs font-semibold rounded-xl shadow-inner bg-gradient-to-r from-red-600 via-red-500 to-orange-500 text-white">
+                       <div className="flex items-center gap-2 w-full">
+                         <div className="flex items-center gap-2 flex-grow overflow-hidden">
+                           <div className="p-1 rounded-md bg-white/20 shrink-0">
+                             <ShieldAlert className="h-4 w-4" />
+                           </div>
+                           <span className="truncate">Account at risk due to negative balance (₹{billingInfo.coins_balance.toLocaleString()}). Recharge immediately.</span>
+                         </div>
+                         <button
+                           onClick={() => navigate('/autopay-setup?buy=true')}
+                           className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-black hover:bg-white/90 transition-all shrink-0 active:scale-95"
+                         >
+                           Pay Now
+                         </button>
+                       </div>
+                     </div>
+                   </div>
+                 )}
+                 <div className="bg-background max-w-lg p-10 rounded-2xl shadow-sm border border-border flex flex-col items-center">
+                    <ShieldAlert className="h-16 w-16 text-rose-500 mb-6" />
+                    <h1 className="text-2xl font-bold mb-3">Restaurant Deactivated</h1>
+                    <p className="text-muted-foreground text-sm leading-relaxed mb-6">
+                      Your Dinematters is deactivated due to security reason (something like production application) for that restaurant where nothing is accessible.
+                    </p>
+                    <p className="text-xs text-muted-foreground/60">
+                      Please select another active restaurant from the top header or visit your <Link to="/account" className="text-primary underline">Account</Link> tab.
+                    </p>
+                 </div>
+               </div>
+            ) : (
+               <>
+                 {location.pathname !== '/account' && <Breadcrumb />}
+                 {children}
+               </>
+            )}
           </div>
         </main>
       </div>
@@ -1487,8 +1568,8 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Hard Suspension Overlay */}
       {!isActive && billingStatus === 'suspended' && (
-        <SuspendedOverlay 
-          restaurantName={restaurantDoc?.restaurant_name || currentRestaurant?.restaurant_name || "Your Restaurant"} 
+        <SuspendedOverlay
+          restaurantName={restaurantDoc?.restaurant_name || currentRestaurant?.restaurant_name || "Your Restaurant"}
         />
       )}
     </div>
