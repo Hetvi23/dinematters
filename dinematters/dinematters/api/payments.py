@@ -654,8 +654,6 @@ def create_tokenization_order(restaurant_id, amount=1, customer_name=None, custo
 		# If we have a customer ID, link it and request a recurring token (Mandate)
 		if customer_id:
 			order_payload["customer_id"] = customer_id
-			# 'method': 'socket' is the universal flag for recurring mandates
-			order_payload["method"] = "socket"
 		
 		razorpay_order = client.order.create(order_payload)
 

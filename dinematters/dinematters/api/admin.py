@@ -610,3 +610,117 @@ def admin_update_restaurant_settings(restaurant_id, updates):
         frappe.db.rollback()
         return {'success': False, 'error': str(e)}
 
+@frappe.whitelist()
+def admin_onboard_restaurant_owner(restaurant_id, owner_name, owner_email):
+    """
+    Onboard a restaurant owner.
+    Creates a Frappe User, assigns roles, links to Restaurant, and triggers welcome email.
+    """
+    try:
+        # Check admin access first
+        access_check = check_admin_access()
+        if not access_check.get('success') or not access_check.get('data', {}).get('allowed'):
+            return {'success': False, 'error': 'Admin access required'}
+
+        if not owner_email:
+            return {'success': False, 'error': 'Owner email is required'}
+
+        # Get restaurant
+        restaurant = frappe.get_doc('Restaurant', {'restaurant_id': restaurant_id})
+        if not restaurant:
+            return {'success': False, 'error': 'Restaurant not found'}
+
+        # 1. Update Restaurant record if details changed
+        if restaurant.owner_email != owner_email or restaurant.owner_name != owner_name:
+            restaurant.owner_email = owner_email
+            restaurant.owner_name = owner_name
+            restaurant.save(ignore_permissions=True)
+            frappe.db.commit()
+
+        # 2. Look up or create Frappe User
+        user_id = frappe.db.get_value("User", {"email": owner_email}, "name")
+        first_name = owner_name.split()[0] if owner_name else "Owner"
+        
+        from dinematters.dinematters.utils.permissions import assign_user_to_restaurant, create_restaurant_user_permission
+
+        is_new = False
+        onboard_link = None
+        email_sent = False
+
+        if not user_id:
+            # Create a new user
+            user_doc = frappe.get_doc({
+                "doctype": "User",
+                "email": owner_email,
+                "first_name": first_name,
+                "user_type": "System User"
+            })
+            user_doc.insert(ignore_permissions=True)
+            user_id = user_doc.name
+            is_new = True
+            
+            # Generate link manually and try to send email
+            try:
+                onboard_link = user_doc.reset_password(send_email=True)
+                email_sent = True
+            except Exception:
+                # Still get the link without sending email if it fails
+                onboard_link = user_doc.reset_password(send_email=False)
+                frappe.log_error("Onboarding Email Failed", "SMTP setup missing or invalid. Generated link manually.")
+        else:
+            # Existing user - try to send reset email
+            user_doc = frappe.get_doc("User", user_id)
+            try:
+                onboard_link = user_doc.reset_password(send_email=True)
+                email_sent = True
+            except Exception:
+                onboard_link = user_doc.reset_password(send_email=False)
+                frappe.log_error("Password Reset Email Failed", "SMTP setup missing or invalid. Generated link manually.")
+        
+        # 3. Add necessary roles
+        roles_to_add = ["System User", "Restaurant Staff"]
+        
+        has_changes = False
+        for role in roles_to_add:
+            if frappe.db.exists("Role", role):
+                if not frappe.db.exists("Has Role", {"parent": user_id, "role": role}):
+                    user_doc.append("roles", {"role": role})
+                    has_changes = True
+
+        if has_changes:
+            user_doc.save(ignore_permissions=True)
+
+        # 4. Link user to the restaurant
+        has_existing_default = frappe.db.exists("Restaurant User", {"user": user_id, "is_default": 1})
+        is_default_flag = 0 if has_existing_default else 1
+
+        # create_restaurant_user_permission maps Frappe User Permissions
+        create_restaurant_user_permission(user_id, restaurant.name, is_default=is_default_flag)
+        
+        # Check if already in 'Restaurant User' doctype
+        if not frappe.db.exists("Restaurant User", {"user": user_id, "restaurant": restaurant.name}):
+            assign_user_to_restaurant(user_id, restaurant.name, role="Restaurant Staff", is_default=is_default_flag)
+
+        frappe.db.commit()
+
+        status_msg = "successfully onboarded" if is_new else "already exists and has been granted access"
+        email_msg = "An email has been sent." if email_sent else "Email could not be sent (SMTP not setup), but access is granted."
+        
+        full_msg = f"Owner {owner_email} {status_msg}. {email_msg}"
+        
+        return {
+            'success': True,
+            'message': full_msg,
+            'data': {
+                'user': user_id,
+                'email': owner_email,
+                'is_new': is_new,
+                'email_sent': email_sent,
+                'onboard_link': onboard_link
+            }
+        }
+    except Exception as e:
+        frappe.log_error("Admin Onboarding Error", f"Error in admin_onboard_restaurant_owner: {str(e)}")
+        frappe.db.rollback()
+        return {'success': False, 'error': str(e)}
+

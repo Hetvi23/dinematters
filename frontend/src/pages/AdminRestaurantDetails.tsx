@@ -96,12 +96,21 @@ function AdminRestaurantDetailsPage() {
   const [isMenuModalOpen, setIsMenuModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
 
+  const [isOnboardModalOpen, setIsOnboardModalOpen] = useState(false)
+  const [onboardName, setOnboardName] = useState('')
+  const [onboardEmail, setOnboardEmail] = useState('')
+  const [isOnboarding, setIsOnboarding] = useState(false)
+  const [onboardResult, setOnboardResult] = useState<{message: string, link?: string, emailSent: boolean} | null>(null)
+
   // APIs
   const { call: getDetails } = useFrappePostCall<{ success: boolean, data: { restaurant: Restaurant } }>(
     'dinematters.dinematters.api.admin.get_restaurant_details'
   )
   const { call: updateSettings } = useFrappePostCall<{ success: boolean, message?: string, error?: string }>(
     'dinematters.dinematters.api.admin.admin_update_restaurant_settings'
+  )
+  const { call: onboardOwner } = useFrappePostCall<{ success: boolean, message?: string, error?: string }>(
+    'dinematters.dinematters.api.admin.admin_onboard_restaurant_owner'
   )
 
   const loadDetails = async () => {
@@ -171,6 +180,57 @@ function AdminRestaurantDetailsPage() {
   const handleDiscardChanges = () => {
     setRestaurant(originalRestaurant)
     toast.info('Changes discarded')
+  }
+
+  const handleOnboardOwner = async () => {
+    if (!id || !onboardEmail) {
+      toast.error('Email is required')
+      return
+    }
+    try {
+      setIsOnboarding(true)
+      const result = await onboardOwner({
+        restaurant_id: id,
+        owner_name: onboardName,
+        owner_email: onboardEmail
+      }) as any
+      
+      if (result?.message?.success) {
+        const data = result.message.data
+        const emailSent = data.email_sent
+        const message = result.message.message
+        const link = data.onboard_link
+        
+        setOnboardResult({message, link, emailSent})
+        
+        if (emailSent) {
+          toast.success(message)
+          setIsOnboardModalOpen(false)
+        } else {
+          toast.warning("Access granted, but email delivery failed. Link generated for manual sharing.")
+        }
+        
+        loadDetails()
+      } else {
+        throw new Error(result?.message?.error || 'Failed to onboard owner')
+      }
+    } catch (error) {
+      toast.error('Failed to onboard owner', { description: getFrappeError(error) })
+    } finally {
+      setIsOnboarding(false)
+    }
+  }
+
+  const openOnboardModal = () => {
+    setOnboardName(restaurant?.owner_name || '')
+    setOnboardEmail(restaurant?.owner_email || '')
+    setOnboardResult(null)
+    setIsOnboardModalOpen(true)
+  }
+
+  const handleCopyLink = (link: string) => {
+    navigator.clipboard.writeText(link)
+    toast.success('Link copied to clipboard')
   }
 
   const formatDate = (dateString: string) => {
@@ -259,6 +319,88 @@ function AdminRestaurantDetailsPage() {
                     }}
                   />
                 </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={isOnboardModalOpen} onOpenChange={(open) => {
+              setIsOnboardModalOpen(open)
+              if (!open) setOnboardResult(null)
+            }}>
+              <DialogContent className={onboardResult ? "max-w-md" : ""}>
+                <DialogHeader>
+                  <DialogTitle>{onboardResult ? "Onboarding Result" : "Onboard Restaurant Owner"}</DialogTitle>
+                  <DialogDescription>
+                    {onboardResult 
+                      ? "The owner has been successfully configured in the system."
+                      : "Create a system user, assign the required roles, and send them a secure password-setup email."}
+                  </DialogDescription>
+                </DialogHeader>
+
+                {onboardResult ? (
+                  <div className="space-y-6 py-4">
+                    <div className={cn(
+                      "p-4 rounded-xl border flex items-start gap-3",
+                      onboardResult.emailSent ? "bg-green-500/5 border-green-200 text-green-700" : "bg-orange-500/5 border-orange-200 text-orange-700"
+                    )}>
+                      {onboardResult.emailSent ? <ShieldCheck className="h-5 w-5 shrink-0" /> : <ShieldAlert className="h-5 w-5 shrink-0" />}
+                      <p className="text-sm font-medium">{onboardResult.message}</p>
+                    </div>
+
+                    {onboardResult.link && !onboardResult.emailSent && (
+                      <div className="space-y-3">
+                        <Label className="text-xs uppercase font-bold text-muted-foreground tracking-widest">Manual Setup Link</Label>
+                        <div className="flex gap-2">
+                          <Input value={onboardResult.link} readOnly className="font-mono text-[10px] bg-muted/30" />
+                          <Button 
+                            variant="secondary" 
+                            size="icon" 
+                            onClick={() => handleCopyLink(onboardResult.link!)}
+                            title="Copy link"
+                          >
+                            <Save className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground leading-relaxed italic">
+                          Send this link to the owner via WhatsApp or Email. It will allow them to securely set their password and log in.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex justify-end">
+                      <Button onClick={() => setIsOnboardModalOpen(false)}>Done</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label>Owner Name</Label>
+                        <Input 
+                          value={onboardName} 
+                          onChange={(e) => setOnboardName(e.target.value)} 
+                          placeholder="e.g. John Doe"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Owner Email (Required)</Label>
+                        <Input 
+                          type="email"
+                          value={onboardEmail} 
+                          onChange={(e) => setOnboardEmail(e.target.value)} 
+                          placeholder="e.g. john@restaurant.com"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">A secure welcome email will be dispatched to this address.</p>
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-3">
+                      <Button variant="outline" onClick={() => setIsOnboardModalOpen(false)}>Cancel</Button>
+                      <Button onClick={handleOnboardOwner} disabled={isOnboarding || !onboardEmail}>
+                        {isOnboarding ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
+                        Confirm Onboarding
+                      </Button>
+                    </div>
+                  </>
+                )}
               </DialogContent>
             </Dialog>
 
@@ -372,9 +514,14 @@ function AdminRestaurantDetailsPage() {
                   <Separator />
 
                   <div className="space-y-4">
-                    <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                      <User className="h-3.5 w-3.5" /> Ownership
-                    </h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                        <User className="h-3.5 w-3.5" /> Ownership
+                      </h3>
+                      <Button size="sm" variant="outline" onClick={openOnboardModal} className="gap-2 border-primary/20 text-primary hover:bg-primary/5">
+                        <ShieldCheck className="h-4 w-4" /> Onboard System Owner
+                      </Button>
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="space-y-2">
                         <Label>Owner Name</Label>

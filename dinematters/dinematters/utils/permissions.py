@@ -29,7 +29,10 @@ def create_restaurant_user_permission(user, restaurant, is_default=0):
 			ignore_permissions=True
 		)
 	except Exception as e:
-		frappe.log_error(f"Error creating restaurant user permission: {str(e)}", "Restaurant Permission")
+		frappe.log_error(
+			title="Restaurant Permission", 
+			message=f"Error creating restaurant user permission: {str(e)}"
+		)
 
 
 def remove_restaurant_user_permission(user, restaurant):
@@ -42,7 +45,10 @@ def remove_restaurant_user_permission(user, restaurant):
 			ignore_permissions=True
 		)
 	except Exception as e:
-		frappe.log_error(f"Error removing restaurant user permission: {str(e)}", "Restaurant Permission")
+		frappe.log_error(
+			title="Restaurant Permission", 
+			message=f"Error removing restaurant user permission: {str(e)}"
+		)
 
 
 def assign_user_to_restaurant(user, restaurant, role="Restaurant Staff", is_default=0):
