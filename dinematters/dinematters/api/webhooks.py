@@ -8,7 +8,7 @@ import hmac
 import hashlib
 from frappe import _
 from datetime import datetime
-from dinematters.dinematters.utils.razorpay_utils import get_razorpay_config
+from dinematters.dinematters.utils.razorpay_utils import get_razorpay_config, get_razorpay_client
 
 
 def verify_razorpay_signature(body, signature, webhook_secret):
@@ -131,12 +131,14 @@ def handle_payment_captured(payload):
 		if request_type == "tokenization" or (order_id and notes.get("attempt_id")):
 			try:
 				customer_id = payment_data.get("customer_id") or payment_data.get("customer")
-				# Look for token in all possible locations
+				# Multi-method token extraction (Card, UPI, Netbanking)
 				token_id = (
 					payment_data.get("token_id") or 
 					payment_data.get("token") or 
 					(payment_data.get("card") or {}).get("token") or 
-					(payment_data.get("card") or {}).get("token_id")
+					(payment_data.get("card") or {}).get("token_id") or
+					payload.get("payload", {}).get("token", {}).get("entity", {}).get("id") or
+					payload.get("payload", {}).get("token", {}).get("entity", {}).get("token")
 				)
 
 				if restaurant_from_notes and frappe.db.exists("Restaurant", restaurant_from_notes):
@@ -183,6 +185,36 @@ def handle_payment_captured(payload):
 					return {"success": True, "message": "Coins added successfully"}
 			except Exception as e:
 				frappe.log_error(f"Coin purchase failed: {str(e)}", "razorpay.webhook.coin_purchase")
+				return {"error": str(e)}
+
+		# Handle Auto-Recharge (async bank confirmation e.g. HDFC, Axis)
+		if request_type == "auto_recharge":
+			try:
+				restaurant = restaurant_from_notes or notes.get("restaurant")
+				if restaurant and frappe.db.exists("Restaurant", restaurant):
+					from dinematters.dinematters.api.coin_billing import _credit_autopay_coins
+					threshold = frappe.db.get_value("Restaurant", restaurant, "auto_recharge_threshold") or 300
+					recharge_amt = float(payment_data.get("amount") or 0) / 100.0
+					if recharge_amt > 0:
+						_credit_autopay_coins(restaurant, recharge_amt, payment_id, threshold)
+						return {"success": True, "message": f"Auto-recharge coins credited for {restaurant}"}
+			except Exception as e:
+				frappe.log_error(f"Auto-recharge webhook credit failed: {str(e)}", "razorpay.webhook.auto_recharge")
+				return {"error": str(e)}
+
+		# Handle Monthly Bill payment confirmation
+		if request_type == "monthly_bill":
+			try:
+				ledger_name = notes.get("ledger")
+				if ledger_name and frappe.db.exists("Monthly Billing Ledger", ledger_name):
+					frappe.db.set_value("Monthly Billing Ledger", ledger_name, {
+						"payment_status": "paid",
+						"razorpay_payment_id": payment_id
+					})
+					frappe.db.commit()
+					return {"success": True, "message": f"Monthly bill {ledger_name} marked paid"}
+			except Exception as e:
+				frappe.log_error(f"Monthly bill webhook failed: {str(e)}", "razorpay.webhook.monthly_bill")
 				return {"error": str(e)}
 
 		# Handle Standard Order Payment
@@ -285,11 +317,20 @@ def handle_subscription_event(payload):
 		if event == "subscription.charged":
 			return handle_payment_captured(payload)
 			
-		customer_id = sub_data.get("customer_id") or payment_data.get("customer_id")
-		token_id = payment_data.get("token_id") or payment_data.get("token")
+		customer_id = sub_data.get("customer_id") or payment_data.get("customer_id") or payload.get("payload", {}).get("token", {}).get("entity", {}).get("customer_id")
+		
+		# Look for token in all possible sub-payloads (Subscription, Payment, or direct Token entity)
+		token_id = (
+			payment_data.get("token_id") or 
+			payment_data.get("token") or 
+			sub_data.get("token_id") or
+			payload.get("payload", {}).get("token", {}).get("entity", {}).get("id") or
+			payload.get("payload", {}).get("token", {}).get("entity", {}).get("token")
+		)
 		
 		notes = sub_data.get("notes") or payment_data.get("notes") or {}
 		restaurant = notes.get("restaurant_id")
+		request_type = notes.get("type")
 		
 		if restaurant and frappe.db.exists("Restaurant", restaurant):
 			if event in ["subscription.activated", "subscription.authenticated", "token.confirmed"]:
@@ -298,6 +339,27 @@ def handle_subscription_event(payload):
 					frappe.db.set_value("Restaurant", restaurant, "razorpay_token_id", token_id)
 				if customer_id:
 					frappe.db.set_value("Restaurant", restaurant, "razorpay_customer_id", customer_id)
+				
+				# --- Multi-Method Logic: Cancellation & Persistence ---
+				if request_type == "tokenization":
+					# 1. Update Tokenization Attempt
+					attempt_id = notes.get("attempt_id") or sub_data.get("id")
+					if attempt_id and frappe.db.exists("Tokenization Attempt", attempt_id):
+						frappe.db.set_value("Tokenization Attempt", attempt_id, {
+							"customer_id": customer_id,
+							"token_id": token_id,
+							"status": "captured",
+							"processed": 1
+						})
+					
+					# 2. Cancel the Registration-Only Subscription immediately
+					if sub_data.get("id") and sub_data.get("status") != "cancelled":
+						try:
+							client = get_razorpay_client()
+							client.subscription.cancel(sub_data.get("id"), {"cancel_at_cycle_end": 0})
+						except Exception as e:
+							frappe.log_error(f"Failed to cancel registration sub {sub_data.get('id')}: {str(e)}", "razorpay.sub_cancel")
+
 			elif event in ["subscription.paused", "subscription.pending"]:
 				frappe.db.set_value("Restaurant", restaurant, "mandate_status", "paused")
 			elif event in ["subscription.cancelled", "subscription.halted"]:

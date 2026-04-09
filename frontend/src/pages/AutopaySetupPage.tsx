@@ -43,10 +43,10 @@ interface BillingInfo {
   monthly_minimum: number
   platform_fee_percent: number
   plan_defaults: {
-    pro_monthly: number
-    lux_monthly: number
+    pro_monthly: number   // GOLD monthly minimum
+    lux_monthly: number   // DIAMOND monthly minimum
     lux_commission: number
-    lux_barrier: number
+    lux_barrier: number   // DIAMOND upgrade entry requirement
   }
 }
 
@@ -81,6 +81,9 @@ export default function AutopaySetupPage() {
   )
   const { call: createTokenOrder } = useFrappePostCall<any>(
     'dinematters.dinematters.api.payments.create_tokenization_order'
+  )
+  const { call: confirmMandate } = useFrappePostCall<any>(
+    'dinematters.dinematters.api.payments.confirm_mandate_setup'
   )
 
   const activeRes = restaurants.find(r => r.name === selectedRestaurant)
@@ -220,17 +223,42 @@ export default function AutopaySetupPage() {
 
       if (!res.message?.success) throw new Error(res.message?.error || 'Failed to start mandate setup')
 
-      const { key_id, razorpay_order_id } = res.message.data
+      const { key_id, razorpay_subscription_id } = res.message.data
+
       const rzp = new (window as any).Razorpay({
         key: key_id,
-        order_id: razorpay_order_id,
+        subscription_id: razorpay_subscription_id,
         name: 'DineMatters Autopay',
-        description: 'Secure Mandate Setup (₹1 Refundable)',
+        description: 'Authorize Autopay Mandate (₹1 Refundable)',
         theme: { color: '#f97316' },
-        handler: () => {
-          toast.success('Mandate authorized! It will be active shortly.')
-          setTimeout(loadInfo, 3000)
-        }
+        handler: async (response: any) => {
+          // Verify signature and save token immediately
+          try {
+            const confirmRes = await confirmMandate({
+              restaurant_id: selectedRestaurant,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: razorpay_subscription_id, // Pass sub_id as order_id ref
+              razorpay_signature: response.razorpay_signature,
+            })
+            if (confirmRes.message?.mandate_active) {
+              toast.success('✅ Autopay mandate activated!', {
+                description: 'Your payment method is saved for automatic top-ups.'
+              })
+            } else {
+              toast.success('Payment verified! Mandate will activate shortly.', {
+                description: 'We will confirm via webhook within a few minutes.'
+              })
+            }
+          } catch {
+            toast.success('Payment done! Mandate activating...', {
+              description: 'This may take a few minutes to reflect.'
+            })
+          }
+          setTimeout(loadInfo, 2000)
+        },
+        modal: {
+          ondismiss: () => toast.error('Mandate setup cancelled.'),
+        },
       })
       rzp.open()
     } catch (error: any) {

@@ -120,64 +120,135 @@ def trigger_auto_recharge(restaurant):
     """Charge the restaurant for coins using their saved mandate."""
     try:
         res_doc = frappe.get_doc("Restaurant", restaurant)
-        # DYNAMIC RECHARGE LOGIC (Grace + 300 Min)
-        # Current logic: abs(negative_balance) + max(configured_amount, 300)
+        # DYNAMIC RECHARGE LOGIC (Grace + configured min, at least 300)
         current_bal = float(res_doc.coins_balance or 0)
         debt_to_clear = abs(min(0, current_bal))
-        
+
         configured_recharge = float(res_doc.auto_recharge_amount or 1000)
         actual_top_up = max(configured_recharge, 300.0)
-        
+
         recharge_amt = debt_to_clear + actual_top_up
         recharge_amt_paise = int(recharge_amt * 100)
 
-        # Safety: Hard Cap for RBI AFA
+        # Safety: Hard Cap for RBI AFA (₹15,000)
         if recharge_amt > AUTO_RECHARGE_HARD_CAP:
-             recharge_amt = AUTO_RECHARGE_HARD_CAP
-             recharge_amt_paise = int(AUTO_RECHARGE_HARD_CAP * 100)
+            recharge_amt = AUTO_RECHARGE_HARD_CAP
+            recharge_amt_paise = int(AUTO_RECHARGE_HARD_CAP * 100)
+
+        # Guard: must have active mandate and saved token
+        if res_doc.mandate_status != "active" or not res_doc.razorpay_token_id or not res_doc.razorpay_customer_id:
+            frappe.log_error(
+                f"Auto-recharge skipped for {restaurant}: mandate not active or token missing. "
+                f"mandate_status={res_doc.mandate_status}, token={bool(res_doc.razorpay_token_id)}",
+                "Autopay Skip"
+            )
+            return
 
         client = get_razorpay_client()
-        
-        # Charge via Token (Mandate)
-        payment_payload = {
+
+        # STEP 1: Create Razorpay Order with token notification (RBI pre-debit rule)
+        import time
+        payment_after_ts = int(time.time()) + (36 * 3600) + (5 * 60)  # 36h 5m minimum TAT
+
+        order = client.order.create({
             "amount": recharge_amt_paise,
             "currency": "INR",
-            "customer_id": res_doc.razorpay_customer_id,
-            "token": res_doc.razorpay_token_id,
-            "description": f"DineMatters Hyper-Recharge: ₹{recharge_amt} (Clearing debt + ₹{actual_top_up} Top-up)",
+            "payment_capture": True,
+            "receipt": f"autopay_{restaurant[:20]}_{int(time.time())}",
+            "notification": {
+                "token_id": res_doc.razorpay_token_id,
+                "payment_after": payment_after_ts
+            },
             "notes": {
                 "restaurant": restaurant,
                 "type": "auto_recharge",
-                "debt_cleared": debt_to_clear,
-                "topup_added": actual_top_up
-                # GOLD WhatsApp guest: filter by phone number captured at checkout
+                "debt_cleared": str(debt_to_clear),
+                "topup_added": str(actual_top_up)
             }
-        }
-        
-        payment = client.payment.create_recursive(payment_payload)
-        
-        if payment.get("status") in ["captured", "authorized"]:
-            # Success! Add coins to wallet
-            record_transaction(
-                restaurant=restaurant,
-                txn_type="Autopay Recharge",
-                amount=recharge_amt,
-                description=f"Auto-Recharge triggered (Balance was below ₹{res_doc.auto_recharge_threshold})",
-                payment_id=payment.get("id")
+        })
+
+        order_id = order.get("id")
+        if not order_id:
+            frappe.log_error(f"Auto-recharge order creation returned no id for {restaurant}", "Autopay Error")
+            return
+
+        # STEP 2: Create recurring payment via saved mandate token
+        # SDK: client.payment.createRecurring() maps to POST /v1/payments/create/recurring
+        contact = res_doc.get("owner_phone") or "9999999999"
+        email = res_doc.get("owner_email") or f"billing@{restaurant.replace(' ', '').lower()}.com"
+
+        payment = client.payment.createRecurring({
+            "email": email,
+            "contact": contact,
+            "amount": recharge_amt_paise,
+            "currency": "INR",
+            "order_id": order_id,
+            "customer_id": res_doc.razorpay_customer_id,
+            "token": res_doc.razorpay_token_id,
+            "recurring": True,
+            "description": f"DineMatters Autopay: Rs.{recharge_amt:.0f} for {restaurant}",
+            "notes": {
+                "restaurant": restaurant,
+                "type": "auto_recharge",
+                "debt_cleared": str(debt_to_clear),
+                "topup_added": str(actual_top_up)
+            }
+        })
+
+        pay_status = payment.get("status") if isinstance(payment, dict) else None
+        razorpay_payment_id = payment.get("razorpay_payment_id") or payment.get("id")
+
+        frappe.log_error(
+            f"Auto-recharge initiated for {restaurant}: order={order_id}, "
+            f"payment_id={razorpay_payment_id}, status={pay_status}, amount=Rs.{recharge_amt}",
+            "Autopay Info"
+        )
+
+        if pay_status in ["captured", "authorized"]:
+            _credit_autopay_coins(restaurant, recharge_amt, razorpay_payment_id, res_doc.auto_recharge_threshold)
+
+        elif pay_status == "created":
+            # Async banks (HDFC, Axis, etc.) - coins credited when webhook payment.captured fires
+            frappe.log_error(
+                f"Auto-recharge async (status=created) for {restaurant}. "
+                f"Coins will be credited when webhook fires for {razorpay_payment_id}",
+                "Autopay Async"
             )
-            
-            # Update safety metrics
-            frappe.db.sql("""
-                UPDATE `tabRestaurant`
-                SET daily_auto_recharge_count = daily_auto_recharge_count + %s,
-                    last_auto_recharge_date = %s
-                WHERE name = %s
-            """, (recharge_amt, datetime.now().date(), restaurant))
-            
-            frappe.db.commit()
-            
+
+        elif pay_status == "failed":
+            frappe.log_error(f"Auto-recharge payment failed for {restaurant}: {payment}", "Autopay Failed")
+
     except Exception as e:
         frappe.log_error(f"Auto-recharge failed for {restaurant}: {str(e)}", "Autopay Error")
+
+
+def _credit_autopay_coins(restaurant, recharge_amt, payment_id, threshold):
+    """Credit auto-recharge coins after confirmed payment. Idempotent."""
+    already_credited = frappe.db.exists("Coin Transaction", {
+        "restaurant": restaurant,
+        "payment_id": payment_id,
+        "transaction_type": "Autopay Recharge"
+    })
+    if already_credited:
+        return
+
+    record_transaction(
+        restaurant=restaurant,
+        txn_type="Autopay Recharge",
+        amount=recharge_amt,
+        description=f"Auto-Recharge triggered (Balance was below Rs.{threshold})",
+        payment_id=payment_id
+    )
+
+    frappe.db.sql("""
+        UPDATE `tabRestaurant`
+        SET daily_auto_recharge_count = daily_auto_recharge_count + %s,
+            last_auto_recharge_date = %s
+        WHERE name = %s
+    """, (recharge_amt, datetime.now().date(), restaurant))
+
+    frappe.db.commit()
+
 
 
 # ─── Public APIs ──────────────────────────────────────────────────────────────
@@ -246,12 +317,15 @@ def get_coin_billing_info(restaurant):
         "onboarding_date": res.onboarding_date,
         "last_auto_recharge_date": res.last_auto_recharge_date,
         # Plan Defaults for Upgrade UI
+        # Keys match frontend BillingInfo interface exactly
+        "monthly_minimum": float(res.monthly_minimum or 0),
+        "platform_fee_percent": float(res.platform_fee_percent or 0),
         "plan_defaults": {
             "silver_monthly": 0.0,
-            "gold_monthly": settings.gold_monthly_fee or 999.0,
-            "diamond_monthly": settings.diamond_monthly_floor or 1299.0,
-            "diamond_commission": settings.diamond_commission_percent or 1.5,
-            "diamond_barrier": settings.diamond_upgrade_barrier or 1299.0
+            "pro_monthly": float(settings.gold_monthly_fee or 999.0),       # GOLD monthly min
+            "lux_monthly": float(settings.diamond_monthly_floor or 1299.0), # DIAMOND monthly min
+            "lux_commission": float(settings.diamond_commission_percent or 1.5),
+            "lux_barrier": float(settings.diamond_upgrade_barrier or 1299.0) # DIAMOND upgrade balance requirement
         }
     }
 

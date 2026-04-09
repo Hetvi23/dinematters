@@ -12,6 +12,32 @@ from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_ap
 from dinematters.dinematters.utils.customer_helpers import require_verified_phone, get_or_create_customer, validate_customer_session, is_phone_verified, normalize_phone
 from dinematters.dinematters.utils.razorpay_utils import get_razorpay_config, get_razorpay_client, get_or_create_razorpay_customer
 
+def get_or_create_mandate_plan(client):
+	"""Get or create a dummy ₹1 plan for mandate registration."""
+	try:
+		# This plan is never actually billed recurringly; we cancel the sub after tokenization.
+		plan_name = "Autopay Mandate Setup v2"
+		plans = client.plan.all()
+		for p in plans.get("items", []):
+			if p.get("item", {}).get("name") == plan_name:
+				return p.get("id")
+		
+		new_plan = client.plan.create({
+			"period": "monthly",
+			"interval": 1,
+			"item": {
+				"name": plan_name,
+				"amount": 100, # ₹1
+				"currency": "INR",
+				"description": "One-time mandate registration"
+			}
+		})
+		return new_plan.get("id")
+	except Exception as e:
+		frappe.log_error(f"Failed to get/create mandate plan: {str(e)}", "razorpay.mandate_plan")
+		return None
+
+
 
 
 
@@ -613,77 +639,163 @@ def can_set_merchant_keys():
 
 @frappe.whitelist(allow_guest=True)
 def create_tokenization_order(restaurant_id, amount=1, customer_name=None, customer_email=None):
-	"""Create a small Razorpay order to tokenize a merchant card (dev/prod tokenization via Checkout).
-	   This creates an Order doc and a Razorpay order; webhook will capture token/customer info."""
+	"""
+	Create a Razorpay Subscription to register a mandate (UPI, Card, eNACH).
+	We use the Subscriptions API because it's the only way to support UPI Autopay in Checkout.
+	"""
 	try:
 		_restaurant_name = validate_restaurant_for_api(restaurant_id)
-		restaurant = frappe.get_doc("Restaurant", _restaurant_name)
+		client = get_razorpay_client()
+		customer_id = get_or_create_razorpay_customer(restaurant_id)
+		
+		plan_id = get_or_create_mandate_plan(client)
+		if not plan_id:
+			raise Exception("Could not create registration plan")
 
-		# Create a TokenizationAttempt doc (separate from regular Orders)
-		amount_paise = int(float(amount) * 100)
+		# Create a TokenizationAttempt doc
 		attempt_doc = frappe.get_doc({
 			"doctype": "Tokenization Attempt",
 			"restaurant": restaurant_id,
-			"order_ref": None,
-			"amount": amount_paise,
+			"amount": 100, # ₹1
 			"currency": "INR",
 			"status": "pending",
-			"notes": json.dumps({"requested_by": frappe.session.user}) if frappe.session and getattr(frappe, "session", None) else None
+			"notes": json.dumps({"via": "subscription"})
 		})
 		attempt_doc.insert(ignore_permissions=True)
-		# Persist immediately so downstream webhook processing can find this attempt even if later steps fail
 		frappe.db.commit()
 
-		# Create Razorpay order and store mapping to TokenizationAttempt
-		client = get_razorpay_client()
-		
-		# Ensure we have a customer ID for mandatess
-		customer_id = get_or_create_razorpay_customer(restaurant_id)
-		
-		order_payload = {
-			"amount": attempt_doc.amount,
-			"currency": "INR",
-			"payment_capture": 1,
+		# Create Subscription
+		subscription = client.subscription.create({
+			"plan_id": plan_id,
+			"customer_id": customer_id,
+			"total_count": 12, # 1 year max, will be cancelled immediately
+			"quantity": 1,
+			"customer_notify": 0,
 			"notes": {
 				"attempt_id": attempt_doc.name,
 				"restaurant_id": restaurant_id,
 				"type": "tokenization"
 			}
-		}
-		
-		# If we have a customer ID, link it and request a recurring token (Mandate)
-		if customer_id:
-			order_payload["customer_id"] = customer_id
-		
-		razorpay_order = client.order.create(order_payload)
+		})
 
-		# Update attempt doc with razorpay_order_id for webhook mapping
-		try:
-			attempt_doc.razorpay_order_id = razorpay_order.get("id")
-			attempt_doc.status = "created"
-			attempt_doc.save(ignore_permissions=True)
-			frappe.db.commit()
-		except Exception:
-			# best-effort: leave attempt as-is and log
-			frappe.log_error(f"Failed to save razorpay_order_id for attempt {attempt_doc.name}", "razorpay.create_token_order")
+		sub_id = subscription.get("id")
+		attempt_doc.razorpay_order_id = sub_id # store sub_id in order_id field for webhook mapping
+		attempt_doc.status = "created"
+		attempt_doc.save(ignore_permissions=True)
+		frappe.db.commit()
 
-		# Mode-aware key_id for the frontend via central utility
 		cfg = get_razorpay_config()
-		key_id = cfg.get("key_id")
-
 		return {
 			"success": True,
 			"data": {
-				"razorpay_order_id": razorpay_order.get("id"),
-				"amount": attempt_doc.amount,
+				"razorpay_subscription_id": sub_id,
+				"amount": 100,
 				"currency": "INR",
-				"key_id": key_id,
+				"key_id": cfg.get("key_id"),
 				"customer_id": customer_id,
 				"attempt_doc": attempt_doc.name
 			}
 		}
 	except Exception as e:
 		frappe.log_error(f"Failed to create tokenization order: {str(e)}", "razorpay.create_token_order")
+		return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist(allow_guest=True)
+def confirm_mandate_setup(restaurant_id, razorpay_payment_id, razorpay_order_id, razorpay_signature):
+	"""
+	Confirm mandate registration after Razorpay Checkout handler fires.
+	Verifies signature, fetches token from Razorpay, and saves to Restaurant doc.
+	This is called by the frontend after the Checkout handler returns.
+	"""
+	try:
+		_restaurant_name = validate_restaurant_for_api(restaurant_id)
+		
+		# 1. Verify payment signature
+		cfg = get_razorpay_config()
+		client = get_razorpay_client()
+		
+		# Signature verification varies by type (Order vs Subscription)
+		try:
+			if razorpay_order_id.startswith('sub_'):
+				client.utility.verify_subscription_payment_signature({
+					'razorpay_subscription_id': razorpay_order_id,
+					'razorpay_payment_id': razorpay_payment_id,
+					'razorpay_signature': razorpay_signature
+				})
+			else:
+				client.utility.verify_payment_signature({
+					'razorpay_order_id': razorpay_order_id,
+					'razorpay_payment_id': razorpay_payment_id,
+					'razorpay_signature': razorpay_signature
+				})
+		except Exception as e:
+			frappe.log_error(f"Mandate signature verification failed for {_restaurant_name}: {str(e)}", "razorpay.confirm_mandate")
+			return {"success": False, "error": "Payment signature verification failed"}
+		
+		# 2. Fetch payment details from Razorpay to get the token
+		try:
+			payment = client.payment.fetch(razorpay_payment_id)
+		except Exception as e:
+			# Signature verified so trust is established; fall back to webhook for token
+			frappe.log_error(f"Could not fetch payment {razorpay_payment_id} from Razorpay: {str(e)}", "razorpay.confirm_mandate")
+			payment = {}
+		
+		customer_id = payment.get("customer_id") or payment.get("customer")
+		token_id = (
+			payment.get("token_id") or
+			payment.get("token") or
+			(payment.get("card") or {}).get("token_id") or
+			(payment.get("card") or {}).get("token") or
+			payment.get("notes", {}).get("token_id")
+		)
+		
+		# 3. Save to restaurant doc
+		restarurant_doc = frappe.get_doc("Restaurant", _restaurant_name)
+		updated = False
+		
+		if customer_id and not restarurant_doc.razorpay_customer_id:
+			restarurant_doc.razorpay_customer_id = customer_id
+			updated = True
+			
+		if token_id:
+			restarurant_doc.razorpay_token_id = token_id
+			restarurant_doc.mandate_status = "active"
+			updated = True
+		elif customer_id:
+			# Token not yet in payment response (webhook will deliver it via token.confirmed)
+			# Set mandate as "pending" so UI shows correct state
+			if restarurant_doc.mandate_status != "active":
+				restarurant_doc.mandate_status = "pending"
+			updated = True
+		
+		if updated:
+			restarurant_doc.save(ignore_permissions=True)
+			frappe.db.commit()
+		
+		# 4. Update Tokenization Attempt doc
+		try:
+			attempt = frappe.db.get_value("Tokenization Attempt", {"razorpay_order_id": razorpay_order_id}, "name")
+			if attempt:
+				frappe.db.set_value("Tokenization Attempt", attempt, {
+					"razorpay_payment_id": razorpay_payment_id,
+					"customer_id": customer_id,
+					"token_id": token_id,
+					"status": "captured",
+					"processed": 1
+				})
+				frappe.db.commit()
+		except Exception:
+			pass  # Non-fatal
+		
+		return {
+			"success": True,
+			"mandate_active": restarurant_doc.mandate_status == "active",
+			"token_saved": bool(token_id),
+			"message": "Mandate registered successfully" if token_id else "Payment verified. Mandate will activate shortly via webhook."
+		}
+	except Exception as e:
+		frappe.log_error(f"confirm_mandate_setup failed for {restaurant_id}: {str(e)}", "razorpay.confirm_mandate")
 		return {"success": False, "error": str(e)}
 
 
@@ -813,27 +925,52 @@ def charge_monthly_bill(ledger_name):
 				frappe.log_error(f"Failed to create RBI fallback link for {ledger.name}: {str(e)}", "razorpay.charge_monthly_bill")
 				# Fall through to attempt autopay as last resort
 
-		# Attempt a charge using stored token. Different razorpay client versions expose different resources
-		payment_payload = {
+		# STEP 1: Create Razorpay Order (required before recurring charge for RBI pre-debit compliance)
+		import time
+		payment_after_ts = int(time.time()) + (36 * 3600) + (5 * 60)  # 36h 5m minimum TAT
+
+		billing_order = client.order.create({
 			"amount": int(ledger.final_amount),
 			"currency": "INR",
-			"customer": restaurant.razorpay_customer_id,
-			"token": restaurant.razorpay_token_id,
-			"capture": 1,
-			"notes": {"ledger": ledger.name}
-		}
+			"payment_capture": True,
+			"receipt": f"bill_{ledger.name[:20]}",
+			"notification": {
+				"token_id": restaurant.razorpay_token_id,
+				"payment_after": payment_after_ts
+			},
+			"notes": {
+				"ledger": ledger.name,
+				"restaurant": ledger.restaurant,
+				"type": "monthly_bill"
+			}
+		})
+		billing_order_id = billing_order.get("id")
+		if not billing_order_id:
+			raise Exception("Billing order creation returned no id")
+
+		# STEP 2: Create recurring charge via mandate token
+		# Uses SDK: client.payment.createRecurring -> POST /v1/payments/create/recurring
+		contact = restaurant.get("owner_phone") or "9999999999"
+		email = restaurant.get("owner_email") or f"billing@{ledger.restaurant.replace(' ', '').lower()}.com"
 
 		payment = None
 		try:
-			# Preferred: client.payments.create
-			if hasattr(client, 'payments') and hasattr(client.payments, 'create'):
-				payment = client.payments.create(payment_payload)
-			# Fallback: client.payment.create
-			elif hasattr(client, 'payment') and hasattr(client.payment, 'create'):
-				payment = client.payment.create(payment_payload)
-			else:
-				# Last resort: try generic request
-				payment = client.request('POST', '/payments', payment_payload)
+			payment = client.payment.createRecurring({
+				"email": email,
+				"contact": contact,
+				"amount": int(ledger.final_amount),
+				"currency": "INR",
+				"order_id": billing_order_id,
+				"customer_id": restaurant.razorpay_customer_id,
+				"token": restaurant.razorpay_token_id,
+				"recurring": True,
+				"description": f"DineMatters Monthly Bill: {ledger.billing_month}",
+				"notes": {
+					"ledger": ledger.name,
+					"restaurant": ledger.restaurant,
+					"type": "monthly_bill"
+				}
+			})
 		except Exception as e:
 			# mark ledger for retry with exponential backoff
 			try:
