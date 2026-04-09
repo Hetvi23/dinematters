@@ -46,6 +46,46 @@ def get_razorpay_client(restaurant_id=None):
 	return razorpay.Client(auth=(key_id, key_secret))
 
 
+def get_or_create_razorpay_customer(restaurant_id):
+	"""Get or create a Razorpay Customer ID for a restaurant to enable recurring mandates."""
+	try:
+		rest = frappe.get_doc("Restaurant", restaurant_id)
+		client = get_razorpay_client()
+		
+		# If we have an ID, verify it still exists in the current Razorpay account
+		if rest.razorpay_customer_id:
+			try:
+				client.customer.fetch(rest.razorpay_customer_id)
+				return rest.razorpay_customer_id
+			except Exception:
+				# Customer doesn't exist in THIS Razorpay account (e.g. key switch)
+				# We will clear it and create a new one below
+				pass
+
+		# Build customer data
+		customer_data = {
+			"name": rest.name,
+			"email": rest.email or f"admin@{restaurant_id}.com",
+			"notes": {
+				"restaurant_id": restaurant_id,
+				"source": "saas_billing_setup"
+			}
+		}
+		
+		# Create in Razorpay
+		customer = client.customer.create(data=customer_data)
+		customer_id = customer.get("id")
+		
+		# Save back to Restaurant
+		frappe.db.set_value("Restaurant", restaurant_id, "razorpay_customer_id", customer_id)
+		frappe.db.commit()
+		
+		return customer_id
+	except Exception as e:
+		frappe.log_error(f"Failed to get/create Razorpay Customer for {restaurant_id}: {str(e)}", "razorpay.get_or_create_customer")
+		return None
+
+
 @frappe.whitelist(allow_guest=True)
 def create_linked_account(*args, **kwargs):
 	"""Legacy Route linked-account functionality removed.
@@ -676,7 +716,11 @@ def create_tokenization_order(restaurant_id, amount=1, customer_name=None, custo
 
 		# Create Razorpay order and store mapping to TokenizationAttempt
 		client = get_razorpay_client()
-		razorpay_order = client.order.create({
+		
+		# Ensure we have a customer ID for mandatess
+		customer_id = get_or_create_razorpay_customer(restaurant_id)
+		
+		order_payload = {
 			"amount": attempt_doc.amount,
 			"currency": "INR",
 			"payment_capture": 1,
@@ -685,7 +729,18 @@ def create_tokenization_order(restaurant_id, amount=1, customer_name=None, custo
 				"restaurant_id": restaurant_id,
 				"type": "tokenization"
 			}
-		})
+		}
+		
+		# If we have a customer ID, link it and request a recurring token (Mandate)
+		if customer_id:
+			order_payload["customer_id"] = customer_id
+			# This 'token' parameter tells Razorpay to present the Mandate UI 
+			# and return a token_id in the webhook.
+			order_payload["token"] = {
+				"auth_type": "pin" # Default for UPI Mandates; Cards will use appropriate flow
+			}
+		
+		razorpay_order = client.order.create(order_payload)
 
 		# Update attempt doc with razorpay_order_id for webhook mapping
 		try:
