@@ -143,6 +143,7 @@ const navigation: NavItem[] = [
   },
   { type: 'link', name: 'WhatsApp Orders', href: '/whatsapp-orders', icon: MessageSquare, badgeHref: '/whatsapp-orders', feature: 'whatsapp_orders' },
   { type: 'link', name: 'Table Bookings', href: '/bookings', icon: Calendar, feature: 'table_booking' },
+  { type: 'link', name: 'Events', href: '/events', icon: Calendar, feature: 'events' },
   { type: 'link', name: 'Customers', href: '/customers', icon: Users, feature: 'customer' },
   {
     type: 'group',

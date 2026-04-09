@@ -16,6 +16,8 @@
   "date",
   "time",
   "location",
+  "google_maps_link",
+  "registration_link",
   "category",
   "featured",
   "status",
@@ -86,6 +88,16 @@
    "fieldname": "location",
    "fieldtype": "Data",
    "label": "Location"
+  },
+  {
+   "fieldname": "google_maps_link",
+   "fieldtype": "Data",
+   "label": "Google Maps Link"
+  },
+  {
+   "fieldname": "registration_link",
+   "fieldtype": "Data",
+   "label": "Registration Link"
   },
   {
    "fieldname": "category",
@@ -228,8 +240,10 @@
    "write": 1
   },
   {
+   "create": 1,
    "read": 1,
-   "role": "Restaurant Staff"
+   "role": "Restaurant Staff",
+   "write": 1
   },
   {
    "read": 1,

@@ -57,6 +57,7 @@ const MarketingCampaigns = lazy(() => import('./pages/MarketingCampaigns'))
 const MarketingAutomation = lazy(() => import('./pages/MarketingAutomation'))
 const MarketingSegments = lazy(() => import('./pages/MarketingSegments'))
 const MarketingAnalytics = lazy(() => import('./pages/MarketingAnalytics'))
+const Events = lazy(() => import('./pages/Events'))
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -107,6 +108,10 @@ function AppContent() {
 
 							<Route element={<FeatureProtectedRoute feature="tableBooking" />}>
 								<Route path="/bookings" element={<Layout><Bookings /></Layout>} />
+							</Route>
+
+							<Route element={<FeatureProtectedRoute feature="events" />}>
+								<Route path="/events" element={<Layout><Events /></Layout>} />
 							</Route>
 
 							<Route element={<FeatureProtectedRoute feature="ordering" />}>
