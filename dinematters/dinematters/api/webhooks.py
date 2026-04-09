@@ -8,6 +8,7 @@ import hmac
 import hashlib
 from frappe import _
 from datetime import datetime
+from dinematters.dinematters.utils.razorpay_utils import get_razorpay_config
 
 
 def verify_razorpay_signature(body, signature, webhook_secret):
@@ -43,39 +44,25 @@ def razorpay_webhook():
 
 		# Account id may be present at top level
 		account_id = payload_preview.get("account_id")
-		merchant_secret = None
+		merchant_restaurant = None
 		if account_id:
-			# Use get_doc().get_password to retrieve decrypted password fields.
-			try:
-				_rest = frappe.get_doc("Restaurant", frappe.db.get_value("Restaurant", {"razorpay_account_id": account_id}))
-				merchant_secret = _rest.get_password("razorpay_webhook_secret") or None
-			except Exception:
-				merchant_secret = None
+			merchant_restaurant = frappe.db.get_value("Restaurant", {"razorpay_account_id": account_id})
+
 		# Fallback: check notes.restaurant_id in payload
-		if not merchant_secret:
+		if not merchant_restaurant:
 			try:
 				restaurant_note = payload_preview.get("payload", {}).get("payment", {}).get("entity", {}).get("notes", {}).get("restaurant_id")
 				if not restaurant_note:
 					restaurant_note = payload_preview.get("payload", {}).get("order", {}).get("entity", {}).get("notes", {}).get("restaurant_id")
 					
 				if restaurant_note and frappe.db.exists("Restaurant", restaurant_note):
-					try:
-						_rest2 = frappe.get_doc("Restaurant", restaurant_note)
-						merchant_secret = _rest2.get_password("razorpay_webhook_secret") or merchant_secret
-					except Exception:
-						pass
+					merchant_restaurant = restaurant_note
 			except Exception:
 				pass
 
-		# Determine which secret to use: merchant-level if present, otherwise site-level
-		is_live = frappe.conf.get("razorpay_live_mode") or frappe.get_conf().get("razorpay_live_mode")
-		
-		if merchant_secret:
-			webhook_secret = merchant_secret
-		elif is_live:
-			webhook_secret = frappe.conf.get("razorpay_live_webhook_secret") or frappe.conf.get("razorpay_webhook_secret") or frappe.get_conf().get("razorpay_webhook_secret")
-		else:
-			webhook_secret = frappe.conf.get("razorpay_test_webhook_secret") or frappe.conf.get("razorpay_webhook_secret") or frappe.get_conf().get("razorpay_webhook_secret")
+		# Determine which secret to use via central utility (Respects merchant override)
+		cfg = get_razorpay_config(merchant_restaurant)
+		webhook_secret = cfg.get("webhook_secret")
 
 		# Verify signature
 		if not verify_razorpay_signature(body, signature, webhook_secret):

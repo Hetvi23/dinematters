@@ -10,86 +10,12 @@ from datetime import datetime
 from frappe import _
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
 from dinematters.dinematters.utils.customer_helpers import require_verified_phone, get_or_create_customer, validate_customer_session, is_phone_verified, normalize_phone
+from dinematters.dinematters.utils.razorpay_utils import get_razorpay_config, get_razorpay_client, get_or_create_razorpay_customer
 
 
 
 
-def get_razorpay_client(restaurant_id=None):
-	"""Get Razorpay client.
-	If restaurant_id provided and that Restaurant has merchant credentials set, use them.
-	Otherwise pick site-level keys based on razorpay_live_mode (True/False)."""
-	key_id = None
-	key_secret = None
-
-	if restaurant_id:
-		try:
-			rest = frappe.get_doc("Restaurant", restaurant_id)
-			key_id = rest.get("razorpay_merchant_key_id")
-			try:
-				key_secret = rest.get_password("razorpay_merchant_key_secret")
-			except Exception:
-				key_secret = rest.get("razorpay_merchant_key_secret")
-		except Exception:
-			key_id = None
-			key_secret = None
-
-	# Fallback to site keys if no merchant specific override
-	if not key_id or not key_secret:
-		# Mode selector: razorpay_live_mode = True/False in site_config.json
-		is_live = frappe.conf.get("razorpay_live_mode") or frappe.get_conf().get("razorpay_live_mode")
-		
-		if is_live:
-			key_id = frappe.conf.get("razorpay_live_key_id") or frappe.get_conf().get("razorpay_live_key_id")
-			key_secret = frappe.conf.get("razorpay_live_key_secret") or frappe.get_conf().get("razorpay_live_key_secret")
-		else:
-			# Fallback to test keys OR the generic razorpay_key_id for backward compatibility
-			key_id = frappe.conf.get("razorpay_test_key_id") or frappe.conf.get("razorpay_key_id") or frappe.get_conf().get("razorpay_key_id")
-			key_secret = frappe.conf.get("razorpay_test_key_secret") or frappe.conf.get("razorpay_key_secret") or frappe.get_conf().get("razorpay_key_secret")
-
-	if not key_id or not key_secret:
-		frappe.throw(_("Razorpay API keys not configured. Please set razorpay_live_key_id/secret or razorpay_test_key_id/secret in site_config."))
-
-	return razorpay.Client(auth=(key_id, key_secret))
-
-
-def get_or_create_razorpay_customer(restaurant_id):
-	"""Get or create a Razorpay Customer ID for a restaurant to enable recurring mandates."""
-	try:
-		rest = frappe.get_doc("Restaurant", restaurant_id)
-		client = get_razorpay_client()
-		
-		# If we have an ID, verify it still exists in the current Razorpay account
-		if rest.razorpay_customer_id:
-			try:
-				client.customer.fetch(rest.razorpay_customer_id)
-				return rest.razorpay_customer_id
-			except Exception:
-				# Customer doesn't exist in THIS Razorpay account (e.g. key switch)
-				# We will clear it and create a new one below
-				pass
-
-		# Build customer data
-		customer_data = {
-			"name": rest.name,
-			"email": rest.email or f"admin@{restaurant_id}.com",
-			"notes": {
-				"restaurant_id": restaurant_id,
-				"source": "saas_billing_setup"
-			}
-		}
-		
-		# Create in Razorpay
-		customer = client.customer.create(data=customer_data)
-		customer_id = customer.get("id")
-		
-		# Save back to Restaurant
-		frappe.db.set_value("Restaurant", restaurant_id, "razorpay_customer_id", customer_id)
-		frappe.db.commit()
-		
-		return customer_id
-	except Exception as e:
-		frappe.log_error(f"Failed to get/create Razorpay Customer for {restaurant_id}: {str(e)}", "razorpay.get_or_create_customer")
-		return None
+# (Local Razorpay helpers moved to utils.razorpay_utils)
 
 
 @frappe.whitelist(allow_guest=True)
@@ -342,21 +268,9 @@ def create_payment_order(restaurant_id, order_items, total_amount, subtotal=None
 
 		# Get public key for frontend.
 		# If restaurant provided merchant keys, return merchant key_id so frontend Checkout uses merchant credentials.
-		try:
-			merchant_key_id = None
-			merchant_secret = None
-			if restaurant:
-				merchant_key_id = restaurant.get("razorpay_merchant_key_id")
-				try:
-					merchant_secret = restaurant.get_password("razorpay_merchant_key_secret")
-				except Exception:
-					merchant_secret = restaurant.get("razorpay_merchant_key_secret")
-			if merchant_key_id and merchant_secret:
-				key_id = merchant_key_id
-			else:
-				key_id = frappe.conf.get("razorpay_key_id") or frappe.get_conf().get("razorpay_key_id")
-		except Exception:
-			key_id = frappe.conf.get("razorpay_key_id") or frappe.get_conf().get("razorpay_key_id")
+		# Fetch Key ID via universal helper (mode-aware)
+		cfg = get_razorpay_config(restaurant.name if restaurant else None)
+		key_id = cfg.get("key_id")
 
 		return {
 			"success": True,
@@ -758,7 +672,10 @@ def create_tokenization_order(restaurant_id, amount=1, customer_name=None, custo
 			# best-effort: leave attempt as-is and log
 			frappe.log_error(f"Failed to save razorpay_order_id for attempt {attempt_doc.name}", "razorpay.create_token_order")
 
-		key_id = frappe.conf.get("razorpay_key_id") or frappe.get_conf().get("razorpay_key_id")
+		# Mode-aware key_id for the frontend via central utility
+		cfg = get_razorpay_config()
+		key_id = cfg.get("key_id")
+
 		return {
 			"success": True,
 			"data": {

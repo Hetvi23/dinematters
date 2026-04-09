@@ -8,6 +8,7 @@ import razorpay
 import math
 from datetime import datetime
 from frappe import _
+from dinematters.dinematters.utils.razorpay_utils import get_razorpay_client, get_razorpay_config
 
 # ─── Constants ───────────────────────────────────────────────────────────────
 INR_PER_COIN = 1
@@ -18,13 +19,7 @@ AUTO_RECHARGE_HARD_CAP = 15000.0   # RBI AFA Limit for single transaction
 
 # ─── Internal helpers ─────────────────────────────────────────────────────────
 
-def _get_razorpay_client():
-    """Return site-level Razorpay client."""
-    key_id = frappe.conf.get("razorpay_key_id") or frappe.get_conf().get("razorpay_key_id")
-    key_secret = frappe.conf.get("razorpay_key_secret") or frappe.get_conf().get("razorpay_key_secret")
-    if not key_id or not key_secret:
-        frappe.throw(_("Razorpay API keys not configured for the platform"))
-    return razorpay.Client(auth=(key_id, key_secret))
+# (Internal Razorpay helper moved to utils.razorpay_utils)
 
 
 def record_transaction(restaurant, txn_type, amount, description="", payment_id=None, ref_doctype=None, ref_name=None, gst_amount=0, total_paid=0, fail_below=None):
@@ -141,7 +136,7 @@ def trigger_auto_recharge(restaurant):
              recharge_amt = AUTO_RECHARGE_HARD_CAP
              recharge_amt_paise = int(AUTO_RECHARGE_HARD_CAP * 100)
 
-        client = _get_razorpay_client()
+        client = get_razorpay_client()
         
         # Charge via Token (Mandate)
         payment_payload = {
@@ -334,7 +329,7 @@ def create_coin_purchase_order(restaurant, amount):
     
     amount_paise = int(total_payable * 100)
     
-    client = _get_razorpay_client()
+    client = get_razorpay_client()
     razorpay_order = client.order.create({
         "amount": amount_paise,
         "currency": "INR",
@@ -348,7 +343,8 @@ def create_coin_purchase_order(restaurant, amount):
         }
     })
     
-    key_id = frappe.conf.get("razorpay_key_id") or frappe.get_conf().get("razorpay_key_id")
+    cfg = get_razorpay_config()
+    key_id = cfg.get("key_id")
     return {
         "success": True,
         "razorpay_order_id": razorpay_order["id"],
@@ -364,13 +360,9 @@ def verify_coin_purchase(restaurant, razorpay_order_id, razorpay_payment_id, raz
     Verify a successful manual coin purchase and credit the restaurant.
     """
     # 1. Verify Signature
-    key_id = frappe.conf.get("razorpay_key_id") or frappe.get_conf().get("razorpay_key_id")
-    key_secret = frappe.conf.get("razorpay_key_secret") or frappe.get_conf().get("razorpay_key_secret")
-    
-    if not key_id or not key_secret:
-        frappe.throw(_("Razorpay API keys not configured"))
-
-    client = razorpay.Client(auth=(key_id, key_secret))
+    client = get_razorpay_client()
+    cfg = get_razorpay_config()
+    key_id = cfg.get("key_id")
     
     params_dict = {
         'razorpay_order_id': razorpay_order_id,

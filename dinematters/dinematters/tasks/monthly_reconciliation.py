@@ -6,17 +6,10 @@ import frappe
 import razorpay
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
+from dinematters.dinematters.utils.razorpay_utils import get_razorpay_client
 
 
-def get_razorpay_client():
-	"""Get Razorpay client with API keys"""
-	key_id = frappe.conf.get("razorpay_key_id") or frappe.get_conf().get("razorpay_key_id")
-	key_secret = frappe.conf.get("razorpay_key_secret") or frappe.get_conf().get("razorpay_key_secret")
-
-	if not key_id or not key_secret:
-		frappe.throw("Razorpay API keys not configured")
-	
-	return razorpay.Client(auth=(key_id, key_secret))
+# (Local Razorpay helper moved to utils.razorpay_utils)
 
 
 @frappe.whitelist()
