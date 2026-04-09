@@ -158,8 +158,8 @@ export default function Breadcrumb() {
   }
 
   return (
-    <nav className="flex items-center gap-1.5 text-sm mb-4" aria-label="Breadcrumb">
-      <ol className="flex items-center gap-1.5 flex-wrap">
+    <nav className="flex items-center gap-1.5 text-sm mb-4 overflow-hidden" aria-label="Breadcrumb">
+      <ol className="flex items-center gap-1.5 flex-nowrap overflow-x-auto no-scrollbar py-1">
         {breadcrumbs.map((crumb, index) => {
           const isLast = index === breadcrumbs.length - 1
           

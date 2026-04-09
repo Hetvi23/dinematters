@@ -185,11 +185,11 @@ export default function TieredSetupWizard() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-3">
-             <h1 className="text-4xl font-black tracking-tight text-foreground">Setup Wizard</h1>
+          <div className="flex flex-wrap items-center gap-3">
+             <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-foreground">Setup Wizard</h1>
              <PlanBadge />
           </div>
-          <p className="text-muted-foreground max-w-lg">
+          <p className="text-sm sm:text-base text-muted-foreground max-w-lg">
             Let's get your {planType.toLowerCase()} experience ready. Follow these steps to unlock full potential.
           </p>
         </div>
@@ -218,41 +218,41 @@ export default function TieredSetupWizard() {
       </div>
 
       {/* Main Content Card */}
-      <Card className="border-none shadow-2xl shadow-primary/5 overflow-hidden rounded-[2rem] bg-card/50 backdrop-blur-sm border border-white/10">
-        <CardHeader className="p-8 pb-4 border-b border-white/5 space-y-4">
+      <Card className="border-none shadow-2xl shadow-primary/5 overflow-hidden rounded-2xl sm:rounded-[2rem] bg-card/50 backdrop-blur-sm border border-white/10">
+        <CardHeader className="p-4 sm:p-8 sm:pb-4 border-b border-white/5 space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Step {currentStepIndex + 1}</span>
-                <CardTitle className="text-2xl font-bold">{currentStep.title}</CardTitle>
+                <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Step {currentStepIndex + 1}</span>
+                <CardTitle className="text-xl sm:text-2xl font-bold">{currentStep.title}</CardTitle>
               </div>
-              <CardDescription className="text-base text-foreground/70">{currentStep.description}</CardDescription>
+              <CardDescription className="text-sm sm:text-base text-foreground/70">{currentStep.description}</CardDescription>
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={handlePrevious} 
                 disabled={currentStepIndex === 0}
-                className="text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground h-9"
               >
-                <ArrowLeft className="w-4 h-4 mr-2" /> Previous
+                <ArrowLeft className="w-4 h-4 mr-1 sm:mr-2" /> <span className="text-xs sm:text-sm">Prev</span>
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => handleNext()} className="text-muted-foreground hover:text-foreground">Skip</Button>
+              <Button variant="ghost" size="sm" onClick={() => handleNext()} className="text-muted-foreground hover:text-foreground h-9 text-xs sm:text-sm">Skip</Button>
               {formHasChanges ? (
                 <Button 
                   onClick={() => setTriggerSave(prev => prev + 1)}
-                  className="bg-primary hover:bg-primary/90 text-white rounded-xl shadow-lg shadow-primary/20 px-6"
+                  className="bg-primary hover:bg-primary/90 text-white rounded-xl shadow-lg shadow-primary/20 px-4 sm:px-6 h-9 sm:h-auto"
                 >
-                  <Check className="w-4 h-4 mr-2" /> Save & Continue
+                  <Check className="w-4 h-4 mr-1 sm:mr-2" /> <span className="text-xs sm:text-sm">Save</span>
                 </Button>
               ) : (
                 <Button 
                   onClick={handleNext}
-                  className="rounded-xl shadow-md px-6"
+                  className="rounded-xl shadow-md px-4 sm:px-6 h-9 sm:h-auto"
                 >
-                  {currentStepIndex === steps.length - 1 ? 'Finish Setup' : 'Next Step'} <ArrowRight className="w-4 h-4 ml-2" />
+                  <span className="text-xs sm:text-sm">{currentStepIndex === steps.length - 1 ? 'Finish' : 'Next'}</span> <ArrowRight className="w-4 h-4 ml-1 sm:mr-2" />
                 </Button>
               )}
             </div>
@@ -261,7 +261,7 @@ export default function TieredSetupWizard() {
         
         <CardContent className="p-0">
            {/* Minimalist Box-like Segmented Progress */}
-           <div className="px-8 pt-3 pb-0 flex gap-1 w-full">
+           <div className="px-4 sm:px-8 pt-3 pb-0 flex gap-1 w-full">
              {steps.map((_, i) => (
                 <div 
                   key={i} 
@@ -272,7 +272,7 @@ export default function TieredSetupWizard() {
                 />
              ))}
            </div>
-           <div className="p-8">
+           <div className="p-4 sm:p-8">
               {/* Conditional Step Rendering */}
               {currentStep.customComponent === 'StaffMembersList' ? (
                 <StaffMembersList 

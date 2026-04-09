@@ -1442,7 +1442,7 @@ export default function DynamicForm({
       {/* Validation Status */}
       {mode !== 'view' && requiredFieldsCount > 0 && (
         <div className={cn(
-          "p-4 rounded-md border",
+          "p-3 sm:p-4 rounded-md border",
           allRequiredFieldsFilled
             ? "bg-green-50 border-green-200"
             : "bg-amber-50 border-amber-200"
@@ -1450,16 +1450,16 @@ export default function DynamicForm({
           <div className="flex items-center gap-2">
             {allRequiredFieldsFilled ? (
               <>
-                <Check className="h-5 w-5 text-green-600" />
-                <span className="text-sm font-medium text-green-900">
-                  All {requiredFieldsCount} required field(s) filled
+                <Check className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
+                <span className="text-xs sm:text-sm font-medium text-green-900">
+                  All {requiredFieldsCount} required filled
                 </span>
               </>
             ) : (
               <>
-                <span className="text-amber-600 font-bold">!</span>
-                <span className="text-sm font-medium text-amber-900">
-                  {requiredFieldsCount - filledRequiredFields} of {requiredFieldsCount} required field(s) missing
+                <span className="text-amber-600 font-bold text-xs sm:text-sm">!</span>
+                <span className="text-xs sm:text-sm font-medium text-amber-900">
+                  {requiredFieldsCount - filledRequiredFields} of {requiredFieldsCount} required missing
                 </span>
               </>
             )}
@@ -1501,11 +1501,11 @@ export default function DynamicForm({
               </div>
             )}
             <div className={cn(
-              "grid gap-6",
+              "grid gap-4 sm:gap-6",
               // For table fields (like customization_questions, product_media), use full width
               section.fields.some(f => f.fieldtype === 'Table')
                 ? "grid-cols-1"
-                : "md:grid-cols-2"
+                : "grid-cols-1 sm:grid-cols-2"
             )}>
               {section.fields.map(field => {
                 const rendered = renderField(field)
@@ -1520,9 +1520,9 @@ export default function DynamicForm({
       )}
 
       {/* Action Buttons */}
-      <div className="flex justify-end gap-3 pt-6 border-t">
+      <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t">
         {onCancel && (
-          <Button variant="outline" onClick={onCancel} disabled={saving}>
+          <Button variant="outline" onClick={onCancel} disabled={saving} className="w-full sm:w-auto">
             Cancel
           </Button>
         )}
@@ -1535,7 +1535,7 @@ export default function DynamicForm({
               sections.flatMap(s => s.fields).length === 0
             }
             size="lg"
-            className="min-w-[120px]"
+            className="min-w-[120px] w-full sm:w-auto shadow-lg"
             title={
               !allRequiredFieldsFilled
                 ? `Please fill in all ${requiredFieldsCount - filledRequiredFields} required field(s)`

@@ -203,7 +203,7 @@ export const BillingNotificationBar: React.FC<BillingNotificationBarProps> = ({ 
 
   return (
     <div className={cn(
-      "w-full py-2 px-4 flex items-center justify-center gap-4 text-xs font-semibold animate-in slide-in-from-top-4 duration-500 shadow-inner",
+      "w-full py-1.5 sm:py-2 px-3 sm:px-4 flex items-center justify-center gap-2 sm:gap-4 text-[10px] sm:text-xs font-semibold animate-in slide-in-from-top-4 duration-500 shadow-inner",
       variantStyles[activeNote.type as keyof typeof variantStyles]
     )}>
       <div className="flex items-center gap-2 max-w-7xl w-full">

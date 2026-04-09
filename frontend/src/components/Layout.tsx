@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, ShieldAlert, Coins, Crown, CreditCard, Settings, MessageSquare, Megaphone, Send, Zap, BarChart3 } from 'lucide-react'
+import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, ShieldAlert, Coins, Crown, CreditCard, Settings, MessageSquare, Megaphone, Send, Zap, BarChart3, Menu } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
 import { AiRechargeModal } from '@/components/AiRechargeModal'
@@ -725,9 +725,10 @@ export default function Layout({ children }: LayoutProps) {
                   {/* Close Button - Mobile Only */}
                   <button
                     onClick={() => setSidebarOpen(false)}
-                    className="lg:hidden p-1.5 rounded-md hover:bg-sidebar-accent transition-colors"
+                    className="lg:hidden p-2.5 -mr-1 rounded-md hover:bg-sidebar-accent transition-colors active:scale-95"
+                    aria-label="Close menu"
                   >
-                    <X className="h-4 w-4 text-muted-foreground" />
+                    <X className="h-5 w-5 text-muted-foreground" />
                   </button>
                 </div>
               </>
@@ -1313,12 +1314,20 @@ export default function Layout({ children }: LayoutProps) {
                 </span>
               </div>
             </div>
-            <div className="lg:hidden flex-1 overflow-x-auto px-2">
-              <div className="flex items-center gap-2">
+            <div className="lg:hidden flex items-center gap-1 flex-1 min-w-0">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="p-2 mr-1 rounded-md hover:bg-muted transition-colors"
+                aria-label="Open menu"
+              >
+                <Menu className="h-5 w-5 text-foreground" />
+              </button>
+              
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
                 {/* Today's Revenue - Mobile */}
                 <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-muted whitespace-nowrap">
                   <DollarSign className="h-3 w-3 text-primary flex-shrink-0" />
-                  <span className="text-xs font-semibold text-foreground">
+                  <span className="text-[10px] font-bold text-foreground">
                     {formatAmountNoDecimals(analytics.todayRevenue)}
                   </span>
                 </div>
@@ -1326,16 +1335,16 @@ export default function Layout({ children }: LayoutProps) {
                 {/* Today's Orders - Mobile */}
                 <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-muted whitespace-nowrap">
                   <ShoppingCart className="h-3 w-3 text-primary flex-shrink-0" />
-                  <span className="text-xs font-semibold text-foreground">
+                  <span className="text-[10px] font-bold text-foreground">
                     {analytics.todayOrders}
                   </span>
                 </div>
 
-                {/* Pending Orders - Mobile */}
+                {/* Pending Orders - Mobile Alert */}
                 {analytics.pendingOrders > 0 && (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#fff4ce] dark:bg-[#ca5010]/20 border border-[#ffe69d] dark:border-[#ca5010]/40 whitespace-nowrap">
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#fff4ce] dark:bg-[#ca5010]/20 border border-[#ffe69d] dark:border-[#ca5010]/40 whitespace-nowrap animate-pulse">
                     <AlertCircle className="h-3 w-3 text-[#ca5010] dark:text-[#ffaa44] flex-shrink-0" />
-                    <span className="text-xs font-semibold text-[#ca5010] dark:text-[#ffaa44]">
+                    <span className="text-[10px] font-bold text-[#ca5010] dark:text-[#ffaa44]">
                       {analytics.pendingOrders}
                     </span>
                   </div>

@@ -283,8 +283,8 @@ export default function Dashboard() {
         {/* Dynamic Upgrade Banner */}
         {!isAtLeastGold && (
            <div 
-             className="flex items-center gap-4 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 p-4 rounded-xl border border-orange-100 dark:border-orange-900/30 group cursor-pointer hover:shadow-md transition-all duration-300" 
-             onClick={() => navigate('/billing')}
+             className="flex flex-1 sm:flex-initial items-center gap-3 sm:gap-4 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 p-3 sm:p-4 rounded-xl border border-orange-100 dark:border-orange-900/30 group cursor-pointer hover:shadow-md transition-all duration-300" 
+             onClick={() => navigate('/autopay-setup')}
            >
              <div className="h-10 w-10 bg-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-orange-500/20 group-hover:scale-110 transition-transform">
                <Zap className="h-5 w-5 text-white animate-pulse" />

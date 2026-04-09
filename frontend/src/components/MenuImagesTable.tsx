@@ -216,7 +216,7 @@ export default function MenuImagesTable({
           </div>
           
           {/* Subtle scroll shadow hints */}
-          <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-white to-transparent pointer-events-none" />
+          <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-background to-transparent pointer-events-none" />
         </div>
       ) : (
         <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-2xl bg-muted/5">
