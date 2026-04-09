@@ -17,31 +17,37 @@ from dinematters.dinematters.utils.customer_helpers import require_verified_phon
 def get_razorpay_client(restaurant_id=None):
 	"""Get Razorpay client.
 	If restaurant_id provided and that Restaurant has merchant credentials set, use them.
-	Otherwise fall back to site-level Razorpay keys from site_config / env."""
+	Otherwise pick site-level keys based on razorpay_live_mode (True/False)."""
 	key_id = None
 	key_secret = None
 
 	if restaurant_id:
 		try:
 			rest = frappe.get_doc("Restaurant", restaurant_id)
-			# For Password fields, retrieve decrypted secret via get_password
 			key_id = rest.get("razorpay_merchant_key_id")
 			try:
 				key_secret = rest.get_password("razorpay_merchant_key_secret")
 			except Exception:
-				# fallback to plain field if get_password isn't available
 				key_secret = rest.get("razorpay_merchant_key_secret")
 		except Exception:
-			# ignore and fallback to site keys
 			key_id = None
 			key_secret = None
 
+	# Fallback to site keys if no merchant specific override
 	if not key_id or not key_secret:
-		key_id = frappe.conf.get("razorpay_key_id") or frappe.get_conf().get("razorpay_key_id")
-		key_secret = frappe.conf.get("razorpay_key_secret") or frappe.get_conf().get("razorpay_key_secret")
+		# Mode selector: razorpay_live_mode = True/False in site_config.json
+		is_live = frappe.conf.get("razorpay_live_mode") or frappe.get_conf().get("razorpay_live_mode")
+		
+		if is_live:
+			key_id = frappe.conf.get("razorpay_live_key_id") or frappe.get_conf().get("razorpay_live_key_id")
+			key_secret = frappe.conf.get("razorpay_live_key_secret") or frappe.get_conf().get("razorpay_live_key_secret")
+		else:
+			# Fallback to test keys OR the generic razorpay_key_id for backward compatibility
+			key_id = frappe.conf.get("razorpay_test_key_id") or frappe.conf.get("razorpay_key_id") or frappe.get_conf().get("razorpay_key_id")
+			key_secret = frappe.conf.get("razorpay_test_key_secret") or frappe.conf.get("razorpay_key_secret") or frappe.get_conf().get("razorpay_key_secret")
 
 	if not key_id or not key_secret:
-		frappe.throw(_("Razorpay API keys not configured"))
+		frappe.throw(_("Razorpay API keys not configured. Please set razorpay_live_key_id/secret or razorpay_test_key_id/secret in site_config."))
 
 	return razorpay.Client(auth=(key_id, key_secret))
 

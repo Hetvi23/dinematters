@@ -68,7 +68,14 @@ def razorpay_webhook():
 				pass
 
 		# Determine which secret to use: merchant-level if present, otherwise site-level
-		webhook_secret = merchant_secret or (frappe.conf.get("razorpay_webhook_secret") or frappe.get_conf().get("razorpay_webhook_secret"))
+		is_live = frappe.conf.get("razorpay_live_mode") or frappe.get_conf().get("razorpay_live_mode")
+		
+		if merchant_secret:
+			webhook_secret = merchant_secret
+		elif is_live:
+			webhook_secret = frappe.conf.get("razorpay_live_webhook_secret") or frappe.conf.get("razorpay_webhook_secret") or frappe.get_conf().get("razorpay_webhook_secret")
+		else:
+			webhook_secret = frappe.conf.get("razorpay_test_webhook_secret") or frappe.conf.get("razorpay_webhook_secret") or frappe.get_conf().get("razorpay_webhook_secret")
 
 		# Verify signature
 		if not verify_razorpay_signature(body, signature, webhook_secret):
