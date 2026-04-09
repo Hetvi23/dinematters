@@ -654,11 +654,8 @@ def create_tokenization_order(restaurant_id, amount=1, customer_name=None, custo
 		# If we have a customer ID, link it and request a recurring token (Mandate)
 		if customer_id:
 			order_payload["customer_id"] = customer_id
-			# This 'token' parameter tells Razorpay to present the Mandate UI 
-			# and return a token_id in the webhook.
-			order_payload["token"] = {
-				"auth_type": "pin" # Default for UPI Mandates; Cards will use appropriate flow
-			}
+			# 'method': 'socket' is the universal flag for recurring mandates
+			order_payload["method"] = "socket"
 		
 		razorpay_order = client.order.create(order_payload)
 
