@@ -83,10 +83,9 @@ def get_or_create_razorpay_customer(restaurant_id):
 				# Customer doesn't exist in THIS Razorpay account (e.g. key switch)
 				pass
 
-		# Build customer data
 		customer_data = {
 			"name": rest.name,
-			"email": rest.email or f"admin@{restaurant_id}.com",
+			"email": rest.get("owner_email") or rest.owner or f"admin@{restaurant_id}.com",
 			"notes": {
 				"restaurant_id": restaurant_id,
 				"source": "saas_billing_setup"
