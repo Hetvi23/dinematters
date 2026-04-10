@@ -46,7 +46,12 @@ jobs:
           echo "$SITE_CONFIG_JSON" | ssh -o StrictHostKeyChecking=no $SSH_USER@$SERVER_HOST \
             "export SITE_CONFIG_JSON=\$(cat); \
              cd /home/frappe/frappe-bench && \
-             bash apps/dinematters/scripts/deploy.sh $BRANCH"
+             if [ -f apps/dinematters/scripts/deploy.sh ]; then \
+               bash apps/dinematters/scripts/deploy.sh $BRANCH; \
+             else \
+               echo 'New script not found at apps/dinematters/scripts/deploy.sh, falling back to ./deploy.sh for migration...'; \
+               bash ./deploy.sh $BRANCH; \
+             fi"
 
       - name: Verify scheduler is active
         env:
