@@ -273,6 +273,9 @@ def log_event(restaurant_id, event_type, event_value=None, session_id=None, plat
 	Logs a guest interaction event. Whitelisted for guests.
 	"""
 	try:
+		# Ensure restaurant_id is lowercase slugs
+		restaurant_id = restaurant_id.lower() if restaurant_id else restaurant_id
+		
 		if not restaurant_id or not event_type:
 			return {"success": False, "message": "Missing required fields"}
 
@@ -303,14 +306,18 @@ def get_dashboard_summary(restaurant_id):
 	Returns a tiered summary of analytics for the merchant dashboard.
 	"""
 	try:
+		# Ensure restaurant_id is lowercase (DocNames in DineMatters are lowercase slugs)
+		restaurant_id = restaurant_id.lower() if restaurant_id else restaurant_id
+		
 		# Validate restaurant & check subscription tier
 		restaurant = frappe.get_doc("Restaurant", restaurant_id)
 		# Assume plan is stored on Restaurant or available via a helper
 		from dinematters.dinematters.utils.feature_gate import get_restaurant_plan
 		plan = get_restaurant_plan(restaurant_id) # Returns 'SILVER', 'GOLD', or 'DIAMOND'
 
-		end_date = today()
-		start_date_7d = add_days(end_date, -7)
+		# Use tomorrow's date for end_date to include all events from today (April 10)
+		end_date = add_days(today(), 1)
+		start_date_7d = add_days(today(), -7) # Exactly 7 days ago
 
 		# 1. Traffic Stats (Always available, but SILVER leads with this)
 		traffic_stats = frappe.db.sql("""
@@ -337,13 +344,20 @@ def get_dashboard_summary(restaurant_id):
 		if prev_traffic.total_views > 0:
 			growth = ((traffic_stats.total_views - prev_traffic.total_views) / prev_traffic.total_views) * 100
 
+		# 2. Lifetime Analytics (Production-Grade Optimization: Index ensures this is fast)
+		lifetime_scans = frappe.db.count("Analytics Event", {
+			"restaurant": restaurant_id,
+			"event_type": "menu_view"
+		})
+
 		summary = {
 			"success": True,
 			"tier": plan,
 			"traffic": {
 				"totalViews": traffic_stats.total_views,
 				"uniqueVisitors": traffic_stats.unique_visitors,
-				"growth": round(growth, 1)
+				"growth": round(growth, 1),
+				"lifetimeScans": lifetime_scans
 			}
 		}
 
@@ -358,7 +372,10 @@ def get_dashboard_summary(restaurant_id):
 		
 		if peak_hour_data:
 			h = peak_hour_data[0].hour
-			summary["traffic"]["peakHour"] = f"{h:02d}:00"
+			am_pm = "AM" if h < 12 else "PM"
+			display_h = h % 12
+			if display_h == 0: display_h = 12
+			summary["traffic"]["peakHour"] = f"{display_h} {am_pm}"
 			summary["traffic"]["peakHourLabel"] = "Most busy time"
 
 		# 1.2 Top Category by Scans (Tease for SILVER, data for GOLD)

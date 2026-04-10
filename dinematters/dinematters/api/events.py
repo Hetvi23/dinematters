@@ -54,6 +54,8 @@ def get_events(restaurant_id, featured=None, category=None, upcoming_only=True):
 				"repeat_this_event",
 				"repeat_on",
 				"repeat_till",
+				"google_maps_link",
+				"registration_link",
 				"monday",
 				"tuesday",
 				"wednesday",
@@ -88,7 +90,9 @@ def get_events(restaurant_id, featured=None, category=None, upcoming_only=True):
 				"category": event.get("category", ""),
 				"featured": bool(event.get("featured", False)),
 				"status": event.get("status", "upcoming"),
-				"image_src": event.get("image_src", "")
+				"image_src": event.get("image_src", ""),
+				"google_maps_link": event.get("google_maps_link", ""),
+				"registration_link": event.get("registration_link", "")
 			}
 			
 			# Add recurring event information if applicable

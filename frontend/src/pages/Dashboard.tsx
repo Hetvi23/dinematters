@@ -214,7 +214,7 @@ export default function Dashboard() {
     restaurant_id: selectedRestaurant
   }, selectedRestaurant ? `analytics-dashboard-${selectedRestaurant}` : null)
 
-  const analyticsData = analytics?.success ? analytics : null
+  const analyticsData = analytics?.message?.success ? analytics.message : (analytics?.success ? analytics : null)
 
   // Calculations
   const totalOrders = orders?.length || 0
@@ -311,7 +311,7 @@ export default function Dashboard() {
             <StatCard 
               title="Menu Scans (7D)"
               value={analyticsData?.traffic?.totalViews || 0}
-              subtext="Total menu opens this week"
+              subtext={`Total: ${analyticsData?.traffic?.lifetimeScans || 0} Lifetime`}
               icon={QrCode}
               trend={analyticsData?.traffic?.growth >= 0 ? 'up' : 'down'}
               trendValue={`${Math.abs(analyticsData?.traffic?.growth || 0)}%`}
