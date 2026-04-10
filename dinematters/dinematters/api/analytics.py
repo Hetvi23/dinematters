@@ -13,6 +13,7 @@ from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_ap
 import json
 
 
+# Production-grade analytics engine with tiered feature gating
 @frappe.whitelist()
 def get_offer_analytics(restaurant_id, start_date=None, end_date=None):
 	"""

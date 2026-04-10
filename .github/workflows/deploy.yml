@@ -11,6 +11,7 @@ on:
       - 'requirements.txt'
       - 'pyproject.toml'
       - '.github/workflows/deploy.yml'
+      - '.github/workflows/DEPLOYMENT_STATUS.txt'
   workflow_dispatch:
     inputs:
       branch:
