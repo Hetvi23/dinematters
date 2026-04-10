@@ -776,7 +776,7 @@ export default function DynamicForm({
                       handleFieldChange(field.fieldname, uploadedUrl)
 
                       // Auto-save the field to database immediately
-                      console.log('[DynamicForm] Auto-saving video upload:', { doctype, docname, field: field.fieldname, uploadedUrl })
+                        // console.log Removed - Production Build
                       if (docname && uploadedUrl) {
                         try {
                           const saveResult = await updateDoc({
@@ -1119,7 +1119,7 @@ export default function DynamicForm({
                         handleFieldChange(field.fieldname, uploadedUrl)
 
                         // Auto-save the field to database immediately
-                        console.log('[DynamicForm] Auto-saving file upload:', { doctype, docname, field: field.fieldname, uploadedUrl })
+                        // console.log Removed - Production Build
                         if (docname && uploadedUrl) {
                           try {
                             const saveResult = await updateDoc({
@@ -1127,7 +1127,7 @@ export default function DynamicForm({
                               name: docname,
                               doc_data: { [field.fieldname]: uploadedUrl }
                             })
-                            console.log('[DynamicForm] Auto-save result:', saveResult)
+                            // console.log Removed - Production Build
                             toast.success('File uploaded and saved successfully')
                             // Refresh the document to show updated data
                             if (refreshDoc) {
