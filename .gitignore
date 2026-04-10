@@ -8,6 +8,20 @@ __pycache__
 
 # Build artifacts - ignore all Vite-generated assets (hash-named chunks)
 dinematters/public/dinematters/assets/
+dinematters/public/dinematters/index.html
+dinematters/www/dinematters.html
+
+# Generated files
+*.log
+*.sqlite
+.env
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.tox/
+.nox/
+.cache/
 
 # FastAPI Proxy - Environment and virtual environment
 fastapi_proxy/.env
