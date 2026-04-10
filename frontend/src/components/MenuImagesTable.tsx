@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Trash2, Upload, Plus, Image as ImageIcon } from 'lucide-react'
+import { Trash2, Upload, Plus, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { uploadToR2 } from '@/lib/r2Upload'
@@ -111,14 +111,14 @@ export default function MenuImagesTable({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Label>
-          Menu Images
-          {required && <span className="text-destructive">*</span>}
+    <div className="space-y-6">
+      <div className="flex items-center justify-between px-1">
+        <Label className="text-[11px] uppercase font-black tracking-[0.2em] text-muted-foreground/80">
+          Source Material
+          {required && <span className="text-destructive ml-1">*</span>}
         </Label>
-        <div className="text-sm text-muted-foreground">
-          {currentValue.length} / 20 images
+        <div className="text-xs font-black text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
+          {currentValue.length} / 20 <span className="opacity-60 font-medium">Capture Nodes</span>
         </div>
       </div>
 
@@ -133,97 +133,104 @@ export default function MenuImagesTable({
           className="hidden"
           id="menu-images-upload"
         />
-        <Label
-          htmlFor="menu-images-upload"
-          className={cn(
-            "flex items-center gap-2 px-4 py-2 border rounded-md transition-colors",
-            (disabled || uploading || currentValue.length >= 20) 
-              ? "opacity-50 cursor-not-allowed" 
-              : "cursor-pointer hover:bg-accent"
-          )}
-          onClick={(e) => {
-            if (disabled || uploading || currentValue.length >= 20) {
-              e.preventDefault()
-              return false
-            }
-          }}
-        >
-          <Upload className="h-4 w-4" />
-          {uploading ? 'Uploading...' : 'Upload Images'}
-        </Label>
-        {currentValue.length >= 20 && (
-          <span className="text-sm text-muted-foreground">Maximum 20 images reached</span>
+        
+        {currentValue.length === 0 && (
+          <Label
+            htmlFor="menu-images-upload"
+            className={cn(
+              "flex flex-col items-center justify-center w-full py-12 border-2 border-dashed rounded-[2rem] transition-all cursor-pointer group relative overflow-hidden",
+              (disabled || uploading || currentValue.length >= 20) 
+                ? "opacity-50 cursor-not-allowed bg-muted/50 border-border" 
+                : "bg-background hover:bg-primary/5 hover:border-primary/40 border-border/50 shadow-sm hover:shadow-xl"
+            )}
+          >
+            <div className="p-4 rounded-2xl bg-primary/10 text-primary mb-4 group-hover:scale-110 transition-transform duration-500">
+              <Upload className="h-8 w-8" />
+            </div>
+            <p className="text-lg font-black tracking-tight">Cloud Upload Interface</p>
+            <p className="text-xs text-muted-foreground mt-2 font-medium">Select up to 20 high-resolution menu images</p>
+          </Label>
         )}
       </div>
 
       {/* Images List - Horizontal Scrollable Thumbnails */}
-      {currentValue.length > 0 ? (
+      {currentValue.length > 0 && (
         <div className="relative group/scroll-container">
-          <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1 no-scrollbar -mx-1 px-1">
+          <div className="flex items-center gap-4 overflow-x-auto pb-4 pt-1 no-scrollbar -mx-2 px-2 scroll-smooth">
+            {/* Direct Upload Trigger inside the list when images exist */}
+            <label 
+              htmlFor="menu-images-upload"
+              className={cn(
+                "flex-shrink-0 w-28 h-28 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-all cursor-pointer",
+                (disabled || uploading || currentValue.length >= 20)
+                  ? "opacity-30 border-muted pointer-events-none"
+                  : "border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 hover:border-primary/40"
+              )}
+            >
+              {uploading ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                <>
+                  <Plus className="h-6 w-6" />
+                  <span className="text-[9px] font-black uppercase tracking-widest">Add Node</span>
+                </>
+              )}
+            </label>
+
             {currentValue.map((item, index) => (
               <div 
                 key={index} 
-                className="relative flex-shrink-0 w-24 h-24 rounded-xl border bg-muted overflow-hidden group/item shadow-sm hover:shadow-md transition-all duration-200 ring-primary/20 hover:ring-2"
+                className="relative flex-shrink-0 w-28 h-28 rounded-2xl border border-border/50 bg-muted overflow-hidden group/item shadow-sm hover:shadow-xl transition-all duration-300 ring-primary/20 hover:ring-2"
               >
                 {item.menu_image ? (
                   <img
                     src={item.menu_image}
                     alt={`Menu image ${index + 1}`}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover/item:scale-110"
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover/item:scale-110"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none'
                     }}
                   />
                 ) : (
                   <div className="flex items-center justify-center w-full h-full">
-                    <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
+                    <ImageIcon className="h-8 w-8 text-muted-foreground/20" />
                   </div>
                 )}
                 
                 {/* Deletion Overlay - Premium Style */}
-                <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 group-hover/item:opacity-100 transition-opacity flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] opacity-0 group-hover/item:opacity-100 transition-opacity flex items-center justify-center">
                   <Button
                     variant="destructive"
                     size="icon"
-                    className="h-8 w-8 rounded-full shadow-lg scale-75 group-hover/item:scale-100 transition-transform"
+                    className="h-10 w-10 rounded-2xl shadow-2xl scale-75 group-hover/item:scale-100 transition-transform bg-red-600 hover:bg-red-500 border-none"
                     onClick={(e) => {
                       e.stopPropagation()
                       handleRemove(index)
                     }}
                     disabled={disabled}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-5 w-5" />
                   </Button>
                 </div>
 
                 {/* Index Badge */}
-                <div className="absolute top-1 left-1 bg-black/60 text-white text-[8px] px-1.5 py-0.5 rounded backdrop-blur-sm font-bold">
-                  #{index + 1}
+                <div className="absolute top-2 left-2 bg-black/80 text-white text-[9px] px-2 py-0.5 rounded-lg backdrop-blur-md font-black border border-white/20">
+                  {index + 1}
                 </div>
               </div>
             ))}
-            
-            {/* Empty Slots Indicator if < 20 */}
-            {currentValue.length < 20 && (
-               <label 
-                htmlFor="menu-images-upload"
-                className="flex-shrink-0 w-24 h-24 rounded-xl border-2 border-dashed border-muted-foreground/20 flex flex-col items-center justify-center gap-1 text-muted-foreground/40 hover:text-primary hover:border-primary/40 hover:bg-primary/5 cursor-pointer transition-all"
-               >
-                 <Plus className="h-5 w-5" />
-                 <span className="text-[8px] font-bold uppercase tracking-tighter">Add More</span>
-               </label>
-            )}
           </div>
           
-          {/* Subtle scroll shadow hints */}
-          <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-background to-transparent pointer-events-none" />
+          {/* Subtle scroll shadow hints using theme colors */}
+          <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-card to-transparent pointer-events-none opacity-50" />
+          <div className="absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-card to-transparent pointer-events-none opacity-50" />
         </div>
-      ) : (
-        <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-2xl bg-muted/5">
-          <ImageIcon className="h-10 w-10 mx-auto mb-3 opacity-20" />
-          <p className="font-semibold text-sm">No images uploaded</p>
-          <p className="text-[10px] mt-1 opacity-60">Upload up to 20 menu photos for best AI results</p>
-        </div>
+      )}
+
+      {!uploading && currentValue.length >= 20 && (
+        <p className="text-[10px] text-center font-bold text-orange-600 uppercase tracking-widest bg-orange-500/5 py-3 rounded-2xl border border-orange-500/10">
+           Neural Queue Full - Maximum Nodes Reached
+        </p>
       )}
     </div>
   )

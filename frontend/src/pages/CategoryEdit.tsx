@@ -5,6 +5,9 @@ import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import DynamicForm from '@/components/DynamicForm'
 
+const CATEGORY_HIDE_FIELDS = ['company', 'subdomain']
+const CATEGORY_READ_ONLY_FIELDS = ['restaurant']
+
 export default function CategoryEdit() {
   const { categoryId } = useParams<{ categoryId: string }>()
   const navigate = useNavigate()
@@ -33,7 +36,7 @@ export default function CategoryEdit() {
     )
   }
 
-  const handleSave = (data: any) => {
+  const handleSave = () => {
     toast.success('Category updated successfully')
     navigate('/categories')
   }
@@ -63,8 +66,8 @@ export default function CategoryEdit() {
         mode="edit"
         onSave={handleSave}
         onCancel={handleCancel}
-        hideFields={['company', 'subdomain']}
-        readOnlyFields={['restaurant']}
+        hideFields={CATEGORY_HIDE_FIELDS}
+        readOnlyFields={CATEGORY_READ_ONLY_FIELDS}
       />
     </div>
   )

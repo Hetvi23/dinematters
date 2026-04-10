@@ -5,6 +5,9 @@ import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import DynamicForm from '@/components/DynamicForm'
 
+const PRODUCT_HIDE_FIELDS = ['restaurant_id', 'company', 'subdomain']
+const PRODUCT_READ_ONLY_FIELDS = ['restaurant']
+
 export default function ProductEdit() {
   const { productId } = useParams<{ productId: string }>()
   const navigate = useNavigate()
@@ -33,7 +36,7 @@ export default function ProductEdit() {
     )
   }
 
-  const handleSave = (data: any) => {
+  const handleSave = () => {
     toast.success('Product updated successfully')
     navigate('/products')
   }
@@ -41,6 +44,7 @@ export default function ProductEdit() {
   const handleCancel = () => {
     navigate('/products')
   }
+
 
   return (
     <div className="space-y-6">
@@ -63,8 +67,8 @@ export default function ProductEdit() {
         mode="edit"
         onSave={handleSave}
         onCancel={handleCancel}
-        hideFields={['restaurant_id', 'company', 'subdomain']}
-        readOnlyFields={['restaurant']}
+        hideFields={PRODUCT_HIDE_FIELDS}
+        readOnlyFields={PRODUCT_READ_ONLY_FIELDS}
       />
     </div>
   )

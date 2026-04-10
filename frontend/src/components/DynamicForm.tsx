@@ -175,7 +175,7 @@ export default function DynamicForm({
       
       // RESET: Wipe state for the new identity
       setFormDataInitialized(false)
-      lastHydratedKeyRef.current = null
+      lastHydratedKeyRef.current = currentDocKey // Set immediately to prevent re-render loop during loading
       setFormData({})
       originalDataRef.current = {}
       // We don't return here; we continue to check if data is available for the new identity immediately
@@ -294,7 +294,7 @@ export default function DynamicForm({
     } else {
       initialDataRef.current = {}
     }
-  }, [JSON.stringify(initialData), formDataInitialized, mode, readOnlyFields])
+  }, [JSON.stringify(initialData), formDataInitialized, mode, JSON.stringify(readOnlyFields)])
 
   // Trigger save when parent requests it
   useEffect(() => {
