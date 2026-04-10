@@ -659,23 +659,28 @@ def admin_onboard_restaurant_owner(restaurant_id, owner_name, owner_email):
             user_id = user_doc.name
             is_new = True
             
-            # Generate link manually and try to send email
+            # Generate link manually and fix protocol
+            onboard_link = user_doc.reset_password(send_email=False)
+            if onboard_link and onboard_link.startswith("http://"):
+                onboard_link = onboard_link.replace("http://", "https://", 1)
+            
             try:
-                onboard_link = user_doc.reset_password(send_email=True)
+                send_onboarding_email(owner_email, first_name, onboard_link)
                 email_sent = True
             except Exception:
-                # Still get the link without sending email if it fails
-                onboard_link = user_doc.reset_password(send_email=False)
-                frappe.log_error("Onboarding Email Failed", "SMTP setup missing or invalid. Generated link manually.")
+                frappe.log_error("Onboarding Email Failed", f"Failed to send welcome email to {owner_email}. Link: {onboard_link}")
         else:
             # Existing user - try to send reset email
             user_doc = frappe.get_doc("User", user_id)
+            onboard_link = user_doc.reset_password(send_email=False)
+            if onboard_link and onboard_link.startswith("http://"):
+                onboard_link = onboard_link.replace("http://", "https://", 1)
+            
             try:
-                onboard_link = user_doc.reset_password(send_email=True)
+                send_onboarding_email(owner_email, first_name, onboard_link)
                 email_sent = True
             except Exception:
-                onboard_link = user_doc.reset_password(send_email=False)
-                frappe.log_error("Password Reset Email Failed", "SMTP setup missing or invalid. Generated link manually.")
+                frappe.log_error("Password Reset Email Failed", f"Failed to send reset email to {owner_email}. Link: {onboard_link}")
         
         # 3. Add necessary roles
         roles_to_add = ["System User", "Restaurant Staff"]
@@ -704,7 +709,7 @@ def admin_onboard_restaurant_owner(restaurant_id, owner_name, owner_email):
         frappe.db.commit()
 
         status_msg = "successfully onboarded" if is_new else "already exists and has been granted access"
-        email_msg = "An email has been sent." if email_sent else "Email could not be sent (SMTP not setup), but access is granted."
+        email_msg = "An email has been sent." if email_sent else f"Email could not be sent. Link: {onboard_link}"
         
         full_msg = f"Owner {owner_email} {status_msg}. {email_msg}"
         
@@ -723,4 +728,63 @@ def admin_onboard_restaurant_owner(restaurant_id, owner_name, owner_email):
         frappe.log_error("Admin Onboarding Error", f"Error in admin_onboard_restaurant_owner: {str(e)}")
         frappe.db.rollback()
         return {'success': False, 'error': str(e)}
+
+def send_onboarding_email(recipient, name, link):
+    """
+    Send a custom branded onboarding email to the restaurant owner.
+    Fixes protocol and provides a premium experience.
+    """
+    site_url = "https://backend.dinematters.com"
+    subject = "Welcome to DineMatters"
+    
+    html_content = f"""
+    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; color: #1a1a1a; background-color: #f9fafb;">
+        <div style="background-color: #ffffff; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
+            <div style="display: flex; align-items: center; margin-bottom: 32px;">
+                <div style="width: 12px; height: 12px; background-color: #10b981; border-radius: 50%; margin-right: 12px;"></div>
+                <h1 style="font-size: 24px; font-weight: 700; margin: 0; color: #111827;">Welcome to DineMatters</h1>
+            </div>
+            
+            <p style="font-size: 16px; line-height: 24px; margin-bottom: 24px; color: #374151;">
+                Hello {name},
+            </p>
+            
+            <p style="font-size: 16px; line-height: 24px; margin-bottom: 16px; color: #374151;">
+                A new account has been created for you at <a href="{site_url}" style="color: #2563eb; text-decoration: none; font-weight: 500;">{site_url}</a>.
+            </p>
+            
+            <p style="font-size: 16px; line-height: 24px; margin-bottom: 32px; color: #374151;">
+                Your login id is: <strong style="color: #111827;">{recipient}</strong><br>
+                Click on the link below to complete your registration and set a new password.
+            </p>
+            
+            <div style="margin-bottom: 40px;">
+                <a href="{link}" style="display: inline-block; background-color: #111827; color: #ffffff; padding: 14px 28px; border-radius: 8px; font-size: 16px; font-weight: 600; text-decoration: none; text-align: center;">Complete Registration</a>
+            </div>
+            
+            <div style="padding-top: 32px; border-top: 1px solid #e5e7eb;">
+                <p style="font-size: 14px; line-height: 20px; color: #6b7280; margin-bottom: 8px;">
+                    You can also copy-paste following link in your browser:
+                </p>
+                <p style="font-size: 14px; line-height: 20px; color: #2563eb; word-break: break-all;">
+                    <a href="{link}" style="color: #2563eb; text-decoration: none;">{link}</a>
+                </p>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 24px;">
+            <p style="font-size: 12px; color: #9ca3af;">
+                Sent via ERPNext
+            </p>
+        </div>
+    </div>
+    """
+    
+    frappe.sendmail(
+        recipients=[recipient],
+        subject=subject,
+        content=html_content,
+        now=True
+    )
+
 
