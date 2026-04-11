@@ -1,5 +1,16 @@
-import frappe
 from abc import ABC, abstractmethod
+
+class DineMattersOrderStatus:
+    """
+    Unified Status Engine: Maps all fragmented POS codes to a single language.
+    """
+    PLACED = "Placed"
+    ACCEPTED = "Accepted"
+    PREPARING = "Preparing"
+    READY = "Ready"
+    DISPATCHED = "Dispatched"
+    DELIVERED = "Delivered"
+    CANCELLED = "Cancelled"
 
 class POSProvider(ABC):
     def __init__(self, restaurant_doc):
@@ -13,7 +24,12 @@ class POSProvider(ABC):
 
     @abstractmethod
     def sync_menu(self):
-        """Fetch and sync menu from POS to Dinematters"""
+        """Fetch and sync menu from POS to Dinematters (Push strategy)"""
+        pass
+
+    @abstractmethod
+    def pull_menu(self):
+        """Fetch and sync menu from POS to Dinematters (Pull strategy)"""
         pass
 
     @abstractmethod
@@ -26,6 +42,13 @@ class POSProvider(ABC):
         """Handle status update callbacks from POS"""
         pass
 
+    def map_status(self, raw_status):
+        """
+        Translate POS-specific status to Dinematters standard status.
+        Default implementation returns the raw status.
+        """
+        return raw_status
+
 def get_pos_provider(restaurant_doc):
     if not restaurant_doc.pos_enabled or not restaurant_doc.pos_provider:
         return None
@@ -37,5 +60,9 @@ def get_pos_provider(restaurant_doc):
     if restaurant_doc.pos_provider == "UrbanPiper":
         from dinematters.dinematters.pos.urbanpiper import UrbanPiperProvider
         return UrbanPiperProvider(restaurant_doc)
+    
+    if restaurant_doc.pos_provider == "Restroworks":
+        from dinematters.dinematters.pos.restroworks import RestroworksProvider
+        return RestroworksProvider(restaurant_doc)
     
     return None

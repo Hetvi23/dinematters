@@ -10,12 +10,24 @@ class PetpoojaProvider(POSProvider):
 
     def sync_menu(self):
         """
-        Petpooja usually pushes the menu to us via a POST request to our callback URL.
-        Alternatively, we can fetch it if they provide a GET endpoint (less common for Petpooja).
+        Petpooja usually pushes the menu to us.
+        We provide pull_menu as the standardized way to trigger this.
         """
-        frappe.log_error(f"Menu sync triggered for {self.restaurant.name}", "Petpooja Sync")
-        # In production, we would call Petpooja or wait for their push
-        return {"status": "success", "message": "Menu sync initiated. Waiting for Petpooja push."}
+        return self.pull_menu()
+
+    def pull_menu(self):
+        """
+        Fetch menu from Petpooja (Pull strategy)
+        """
+        # In actual Petpooja implementation, this often requires hitting /get_menus
+        # For now, we provide the template for the 'Price Override' sync logic
+        frappe.log_error(f"Pull Menu triggered for {self.restaurant.name}", "Petpooja Sync")
+        
+        # This would be the mapping logic once response is received:
+        # 1. Resolve Category
+        # 2. Sync Product (Boss Logic: Override Price)
+        
+        return {"status": "success", "message": "Pull Menu initiated for Petpooja."}
 
     def push_order(self, order_doc):
         """
@@ -102,20 +114,11 @@ class PetpoojaProvider(POSProvider):
 
             # Update Order
             order.db_set("status", new_status)
-            if pos_order_id and not order.pos_order_id:
-                order.db_set("pos_order_id", pos_order_id)
+            order.db_set("pos_sync_status", f"Petpooja: {petpooja_status}")
             
-            # Real-time update for ONO Menu (Frontend)
-            frappe.publish_realtime(
-                "order_update", 
-                {
-                    "order_id": order.name, 
-                    "status": new_status,
-                    "order_number": order.order_number,
-                    "restaurant_id": order.restaurant
-                },
-                after_commit=True
-            )
+            # Real-time update for Merchant and Customer
+            from dinematters.dinematters.api.realtime import notify_order_update
+            notify_order_update(order)
 
             # Log for production audit
             frappe.logger().info(f"Petpooja Sync: Order {order.name} status updated to {new_status} (Petpooja: {petpooja_status})")
@@ -127,17 +130,18 @@ class PetpoojaProvider(POSProvider):
 
     def map_status(self, provider_status):
         """
-        Map Petpooja status codes to Dinematters statuses (2026 Spec)
-        1: Accepted, 2: Preparing/Cooking, 3: Food Ready, 4: Dispatched, 5/10: Delivered, -1: Cancelled
+        Map Petpooja status codes to Dinematters statuses (Unified Engine)
         """
+        from dinematters.dinematters.pos.base import DineMattersOrderStatus
+        
         mapping = {
-            "1": "Accepted",      # Accepted
-            "2": "preparing",     # Cooking
-            "3": "ready",         # Food Ready
-            "4": "Dispatched",    # Dispatched/On the way
-            "5": "delivered",     # Delivered
-            "10": "delivered",    # Delivered (Alternative)
-            "-1": "cancelled"     # Cancelled
+            "1": DineMattersOrderStatus.ACCEPTED,
+            "2": DineMattersOrderStatus.PREPARING,
+            "3": DineMattersOrderStatus.READY,
+            "4": DineMattersOrderStatus.DISPATCHED,
+            "5": DineMattersOrderStatus.DELIVERED,
+            "10": DineMattersOrderStatus.DELIVERED,
+            "-1": DineMattersOrderStatus.CANCELLED
         }
         return mapping.get(str(provider_status))
 

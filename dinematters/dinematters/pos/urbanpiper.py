@@ -135,12 +135,37 @@ class UrbanPiperProvider(POSProvider):
         new_state = data.get("order", {}).get("details", {}).get("order_state")
         
         if order_id and new_state:
-            # Map UrbanPiper states to Dinematters states if needed
-            # For now, we update the status field or add a comment
-            frappe.db.set_value("Order", order_id, "pos_sync_status", f"UrbanPiper Status: {new_state}")
+            dm_status = self.map_status(new_state)
+            
+            # Use unified status update logic
+            frappe.db.set_value("Order", order_id, {
+                "status": dm_status,
+                "pos_sync_status": f"UrbanPiper: {new_state}"
+            })
+            
+            # Instant UI Update
+            order_doc = frappe.get_doc("Order", order_id)
+            from dinematters.dinematters.api.realtime import notify_order_update
+            notify_order_update(order_doc)
+            
             return {"status": "success"}
         
         return {"status": "ignored"}
+
+    def map_status(self, raw_status):
+        """
+        Map UrbanPiper states to Dinematters statuses (Unified Engine)
+        """
+        from dinematters.dinematters.pos.base import DineMattersOrderStatus
+        
+        mapping = {
+            "Acknowledged": DineMattersOrderStatus.ACCEPTED,
+            "Food Ready": DineMattersOrderStatus.READY,
+            "Dispatched": DineMattersOrderStatus.DISPATCHED,
+            "Completed": DineMattersOrderStatus.DELIVERED,
+            "Cancelled": DineMattersOrderStatus.CANCELLED
+        }
+        return mapping.get(raw_status, raw_status)
 
     def log_sync(self, status, message):
         """Helper to update the sync status on the Restaurant record"""
