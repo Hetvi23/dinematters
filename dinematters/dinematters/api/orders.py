@@ -218,6 +218,16 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 				"dishId": item["product"]
 			})
 
+		if order_type == "delivery" and delivery_info and delivery_info.get("locationPin") and pricing_items:
+			lat_lng_parts = str(delivery_info.get("locationPin")).split(",")
+			if len(lat_lng_parts) == 2:
+				pricing_items[0]["delivery_location"] = {
+					"address": delivery_info.get("address"),
+					"latitude": lat_lng_parts[0].strip(),
+					"longitude": lat_lng_parts[1].strip()
+				}
+
+
 		# Accurate fulfillment mapping for core pricing engine
 		fulfillment_map = {
 			"dine_in": "Dine-in",
@@ -316,6 +326,8 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 			"delivery_state": delivery_info.get("state") if delivery_info else None,
 			"delivery_zip_code": delivery_info.get("zipCode") if delivery_info else None,
 			"delivery_location_pin": delivery_info.get("locationPin") if delivery_info else None,
+			"delivery_latitude": str(delivery_info.get("locationPin")).split(",")[0].strip() if delivery_info and delivery_info.get("locationPin") and "," in str(delivery_info.get("locationPin")) else None,
+			"delivery_longitude": str(delivery_info.get("locationPin")).split(",")[1].strip() if delivery_info and delivery_info.get("locationPin") and "," in str(delivery_info.get("locationPin")) else None,
 			"delivery_instructions": delivery_info.get("instructions") if delivery_info else None,
 			"pickup_time": pickup_datetime,
 			"estimated_delivery": estimated_delivery,

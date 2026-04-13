@@ -58,6 +58,7 @@ const MarketingAutomation = lazy(() => import('./pages/MarketingAutomation'))
 const MarketingSegments = lazy(() => import('./pages/MarketingSegments'))
 const MarketingAnalytics = lazy(() => import('./pages/MarketingAnalytics'))
 const Events = lazy(() => import('./pages/Events'))
+const LogisticsHub = lazy(() => import('./pages/LogisticsHub'))
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -158,6 +159,7 @@ function AppContent() {
 
 							<Route path="/Legacy Content" element={<Layout><LegacyContent /></Layout>} />
 							<Route path="/Legacy Signature Dish" element={<Layout><LegacySignatureDish /></Layout>} />
+							<Route path="/logistics-hub" element={<Layout><LogisticsHub /></Layout>} />
 							<Route path="/restaurant/:restaurantId/payment" element={<Layout><Payment /></Layout>} />
 							<Route path="/restaurant/:restaurantId/billing" element={<Layout><PaymentSettings /></Layout>} />
 							<Route path="/restaurant/:restaurantId/billing/configure" element={<Layout><PaymentConfiguration /></Layout>} />

@@ -17,7 +17,7 @@ import { toast } from 'sonner'
 interface Trigger {
   name: string; trigger_name: string; trigger_event: string; channel: string
   is_active: number; delay_hours: number; days_since_visit: number
-  loyalty_milestone_coins: number; total_fired: number; message_template: string
+  loyalty_milestone_points: number; total_fired: number; message_template: string
   include_coupon: number; coupon_code: string
 }
 
@@ -57,12 +57,12 @@ const PRESET_TEMPLATES = [
     id: 'milestone',
     emoji: '🏆',
     label: 'Points Milestone',
-    description: 'SMS when a customer crosses 500 loyalty coins.',
+    description: 'SMS when a customer crosses 500 loyalty points.',
     trigger_event: 'On Loyalty Milestone',
     channel: 'SMS',
     delay_hours: 0,
-    loyalty_milestone_coins: 500,
-    message_template: "Congrats {{customer_name}}! You've earned 500+ loyalty coins at {{restaurant_name}} 🏆 Redeem them on your next visit for a FREE reward!"
+    loyalty_milestone_points: 500,
+    message_template: "Congrats {{customer_name}}! You've earned 500+ loyalty points at {{restaurant_name}} 🏆 Redeem them on your next visit for a FREE reward!"
   },
   {
     id: 'referral',
@@ -72,7 +72,7 @@ const PRESET_TEMPLATES = [
     trigger_event: 'On Referral Signup',
     channel: 'Email',
     delay_hours: 0,
-    message_template: "Hi {{customer_name}},\n\nThank you for sharing {{restaurant_name}} with your friends! 🎉\n\nYour referral bonus coins are ready to use on your next order. Keep sharing and keep earning!\n\nSee you at {{restaurant_name}} soon."
+    message_template: "Hi {{customer_name}},\n\nThank you for sharing {{restaurant_name}} with your friends! 🎉\n\nYour referral bonus points are ready to use on your next order. Keep sharing and keep earning!\n\nSee you at {{restaurant_name}} soon."
   },
 ]
 
@@ -154,7 +154,7 @@ export default function MarketingAutomation() {
       channel: preset.channel,
       delay_hours: preset.delay_hours,
       days_since_visit: (preset as any).days_since_visit ?? 30,
-      loyalty_milestone_coins: (preset as any).loyalty_milestone_coins ?? 500,
+      loyalty_milestone_points: (preset as any).loyalty_milestone_points ?? 500,
       is_active: 1,
       message_template: preset.message_template,
       include_coupon: 0,
@@ -259,8 +259,8 @@ export default function MarketingAutomation() {
             )}
             {editTrigger.trigger_event === 'On Loyalty Milestone' && (
               <div className="space-y-2">
-                <Label>Milestone (Coins)</Label>
-                <Input type="number" min={1} value={editTrigger.loyalty_milestone_coins ?? 500} onChange={e => setEditTrigger(t => ({ ...t, loyalty_milestone_coins: parseInt(e.target.value) }))} />
+                <Label>Milestone (₹)</Label>
+                <Input type="number" min={1} value={editTrigger.loyalty_milestone_points ?? 500} onChange={e => setEditTrigger(t => ({ ...t, loyalty_milestone_points: parseInt(e.target.value) }))} />
               </div>
             )}
             <div className="space-y-2 md:col-span-2">

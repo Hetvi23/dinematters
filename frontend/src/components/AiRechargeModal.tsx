@@ -1,9 +1,9 @@
 /**
  * CoinRechargeModal
  * 
- * Allows restaurants to purchase DineMatters Coins using Razorpay.
- * Bundles: 500, 2000, 5000.
- * 1 coin = ₹1 (Base) + 18% GST (Collected Upfront)
+ * Allows restaurants to top-up their DineMatters Wallet using Razorpay.
+ * Bundles: 1000, 2000, 5000.
+ * ₹1 Balance = ₹1 (Base) + 18% GST (Collected Upfront)
  */
 import { useState } from 'react'
 import {
@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { useFrappePostCall } from 'frappe-react-sdk'
-import { Loader2, Sparkles, Zap, Star, Rocket, PenLine, Coins } from 'lucide-react'
+import { Loader2, Sparkles, Zap, Star, Rocket, PenLine, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface CoinRechargeModalProps {
@@ -88,7 +88,7 @@ function loadRazorpayScript(): Promise<boolean> {
 
 export function AiRechargeModal({ open, onClose, restaurant, onSuccess }: CoinRechargeModalProps) {
   const [selectedBundle, setSelectedBundle] = useState<string>('2000')
-  const [customCoins, setCustomCoins] = useState<string>('')
+  const [customBalance, setCustomBalance] = useState<string>('')
   const [isProcessing, setIsProcessing] = useState(false)
 
   const { call: createOrder } = useFrappePostCall(
@@ -99,7 +99,7 @@ export function AiRechargeModal({ open, onClose, restaurant, onSuccess }: CoinRe
   )
 
   const isCustom = selectedBundle === 'custom'
-  const customCoinCount = parseInt(customCoins || '0', 10)
+  const customCoinCount = parseInt(customBalance || '0', 10)
   const selectedCoins = isCustom ? customCoinCount : BUNDLES.find(b => b.id === selectedBundle)?.coins || 0
 
   // Upfront GST Calculation: 18% on top of the base coin cost
@@ -145,8 +145,8 @@ export function AiRechargeModal({ open, onClose, restaurant, onSuccess }: CoinRe
           amount,
           currency: 'INR',
           order_id: razorpay_order_id,
-          name: 'DineMatters Coins',
-          description: `Purchase ${selectedCoins} Coins (₹${basePrice} + ₹${gstAmount} GST)`,
+          name: 'DineMatters Wallet',
+          description: `Top-up ₹${selectedCoins} Balance (₹${basePrice} + ₹${gstAmount} GST)`,
           theme: { color: '#f97316' },
           handler: async (response: any) => {
             try {
@@ -159,7 +159,7 @@ export function AiRechargeModal({ open, onClose, restaurant, onSuccess }: CoinRe
               })
 
               if (verifyRes.message?.success) {
-                toast.success(`✅ Success! ${selectedCoins} coins added to your account.`)
+                toast.success(`✅ Success! ₹${selectedCoins} added to your wallet.`)
                 window.dispatchEvent(new CustomEvent('coins-updated', { detail: { refresh: true } }))
                 onSuccess()
                 resolve()
@@ -193,12 +193,11 @@ export function AiRechargeModal({ open, onClose, restaurant, onSuccess }: CoinRe
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
-            <Coins className="h-5 w-5 text-primary" />
-            Buy DineMatters Coins
+            <Wallet className="h-5 w-5 text-primary" />
+            Top up Wallet
           </DialogTitle>
           <DialogDescription>
-            Coins are used for AI services and platform commissions. 1 Coin = ₹1.
-            <br />
+            Your wallet balance is used for AI services and platform commissions.
           </DialogDescription>
         </DialogHeader>
 
@@ -236,7 +235,7 @@ export function AiRechargeModal({ open, onClose, restaurant, onSuccess }: CoinRe
               </div>
               <div className="flex flex-col items-center">
                 <span className="text-2xl font-black tracking-tight">{bundle.coins.toLocaleString()}</span>
-                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest -mt-1">Coins</span>
+                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest -mt-1">Balance</span>
               </div>
             </button>
           ))}
@@ -271,24 +270,24 @@ export function AiRechargeModal({ open, onClose, restaurant, onSuccess }: CoinRe
                   min={300}
                   step={1}
                   placeholder="e.g. 1500"
-                  value={customCoins}
+                  value={customBalance}
                   onChange={e => {
                     const val = e.target.value
                     if (val === '' || (Number(val) >= 0 && /^\d*$/.test(val))) {
-                      setCustomCoins(val)
+                      setCustomBalance(val)
                     }
                   }}
                   onBlur={e => {
                     const val = parseInt(e.target.value || '0', 10)
-                    if (val > 0 && val < 300) setCustomCoins('300')
+                    if (val > 0 && val < 300) setCustomBalance('300')
                   }}
                   onKeyDown={e => {
                     if (e.key === '-' || e.key === '+' || e.key === 'e') e.preventDefault()
                   }}
                   onClick={e => e.stopPropagation()}
-                  className={cn('w-24 text-right', customCoins && customCoinCount < 300 && customCoinCount > 0 ? 'border-red-400 focus-visible:ring-red-400' : '')}
+                  className={cn('w-24 text-right', customBalance && customCoinCount < 300 && customCoinCount > 0 ? 'border-red-400 focus-visible:ring-red-400' : '')}
                 />
-                <Label className="text-xs shrink-0">Coins</Label>
+                <Label className="text-xs shrink-0">Balance</Label>
               </div>
             )}
           </button>
@@ -297,7 +296,7 @@ export function AiRechargeModal({ open, onClose, restaurant, onSuccess }: CoinRe
         {/* Summary Bar with GST Breakdown */}
         <div className="rounded-xl bg-muted/50 p-5 space-y-3 mt-2 border border-border/50">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Base Coin Amount</span>
+            <span className="text-muted-foreground">Base Top-up Amount</span>
             <span className="font-medium">₹{basePrice.toLocaleString()}</span>
           </div>
           <div className="flex items-center justify-between text-sm">

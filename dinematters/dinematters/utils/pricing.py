@@ -61,17 +61,48 @@ def calculate_cart_totals(restaurant, items, coupon_code=None, loyalty_coins=0, 
 	# 5. Delivery and Packaging Fees
 	delivery_fee = 0
 	packaging_fee = 0
+	delivery_details = {}
+
+	# Fetch configuration for labeling
+	restaurant_doc = frappe.get_doc("Restaurant", restaurant)
+
 	if delivery_type == "Delivery":
-		delivery_fee = flt(frappe.db.get_value("Restaurant", restaurant, "default_delivery_fee") or 0)
-		packaging_fee = flt(frappe.db.get_value("Restaurant", restaurant, "default_packaging_fee") or 0)
+		# Dynamic Delivery Fee Calculation
+		location_data = items[0].get("delivery_location") if items and isinstance(items[0], dict) else None
+		
+		# If we have location, try to get a real quote
+		if location_data and location_data.get("latitude") and location_data.get("longitude"):
+			from dinematters.dinematters.logistics.manager import LogisticsManager
+			try:
+				manager = LogisticsManager(restaurant)
+				quote_res = manager.get_quote({
+					"address": location_data.get("address"),
+					"latitude": location_data.get("latitude"),
+					"longitude": location_data.get("longitude"),
+					"items": items,
+					"total": subtotal
+				})
+				if quote_res.get("success"):
+					delivery_fee = flt(quote_res.get("delivery_fee"))
+					delivery_details = quote_res
+				else:
+					# Fallback to default
+					delivery_fee = flt(restaurant_doc.default_delivery_fee or 0)
+			except Exception:
+				delivery_fee = flt(restaurant_doc.default_delivery_fee or 0)
+		else:
+			# No location provided, use static default
+			delivery_fee = flt(restaurant_doc.default_delivery_fee or 0)
+			
+		packaging_fee = flt(restaurant_doc.default_packaging_fee or 0)
 	elif delivery_type == "Takeaway":
-		packaging_fee = flt(frappe.db.get_value("Restaurant", restaurant, "default_packaging_fee") or 0)
+		packaging_fee = flt(restaurant_doc.default_packaging_fee or 0)
 
 	# 6. Final Total
 	# Total = (Subtotal - Discount) + Tax + Fees - Loyalty
 	total = taxable_amount + tax_amount + delivery_fee + packaging_fee - loyalty_discount
 	
-	# 7. Generate Bill Details (for frontend modular rendering)
+	# 7. Generate Bill Details
 	bill_details = [
 		{"label": "Item Total", "value": subtotal, "type": "subtotal"}
 	]
@@ -87,7 +118,8 @@ def calculate_cart_totals(restaurant, items, coupon_code=None, loyalty_coins=0, 
 		bill_details.append({"label": f"SGST ({tax_rate/2}%)", "value": sgst, "type": "tax"})
 	
 	if packaging_fee > 0:
-		bill_details.append({"label": "Packaging Charge", "value": packaging_fee, "type": "fee"})
+		# User Request: Rename to "Packaging and Extra Charges"
+		bill_details.append({"label": "Packaging and Extra Charges", "value": packaging_fee, "type": "fee"})
 	if delivery_fee > 0:
 		bill_details.append({"label": "Delivery Fee", "value": delivery_fee, "type": "fee"})
 	
@@ -107,6 +139,7 @@ def calculate_cart_totals(restaurant, items, coupon_code=None, loyalty_coins=0, 
 		"sgst": sgst,
 		"taxRate": tax_rate,
 		"deliveryFee": delivery_fee,
+		"deliveryDetails": delivery_details, # New: tracking markup and platform fee
 		"packagingFee": packaging_fee,
 		"total": total,
 		"payableAmount": max(0, total),

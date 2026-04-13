@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, ShieldAlert, Coins, Crown, CreditCard, Settings, MessageSquare, Megaphone, Send, Zap, BarChart3, Menu } from 'lucide-react'
+import { Home, ShoppingCart, Package, Truck, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, ShieldAlert, Wallet, Crown, CreditCard, Settings, MessageSquare, Megaphone, Send, Zap, BarChart3, Menu } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
 import { AiRechargeModal } from '@/components/AiRechargeModal'
@@ -59,10 +59,10 @@ function UserProfileDropdown() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-primary hover:bg-primary/30 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 transition-all border shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-200 focus:ring-offset-2"
           aria-label="User menu"
         >
-          <span className="text-sm font-semibold">{userInitial}</span>
+          <span className="text-xs font-bold">{userInitial}</span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
@@ -125,6 +125,7 @@ const navigation: NavItem[] = [
       { name: 'Manage QR Code', href: '/qr-codes', icon: QrCode },
       { name: 'Home Features', href: '/home-features', icon: Grid3x3 },
       { name: 'Order settings', href: '/frontend-ordering', icon: Package, feature: 'ordering' },
+      { name: 'Logistics Hub', href: '/logistics-hub', icon: Truck, feature: 'ordering' },
       { name: 'AI Menu Background', href: '/ai-menu-theme-background', icon: Sparkles },
     ],
   },
@@ -149,7 +150,7 @@ const navigation: NavItem[] = [
     type: 'group',
     id: 'loyalty-growth',
     name: 'Loyalty & Growth',
-    icon: Coins,
+    icon: Wallet,
     feature: 'loyalty',
     children: [
       { name: 'Loyalty Settings', href: '/loyalty-settings', icon: Settings, feature: 'loyalty' },
@@ -200,7 +201,7 @@ export default function Layout({ children }: LayoutProps) {
   const [selectOpen, setSelectOpen] = useState(false) // Track if restaurant select is open
   const [lockAnimating, setLockAnimating] = useState(false) // Track lock animation state
 
-  // DineMatters Coins in top bar
+  // Wallet Balance in top bar
   const [showTopBarRecharge, setShowTopBarRecharge] = useState(false)
 
   // Admin access state - using exact same pattern as TestApiCalls.tsx
@@ -1353,24 +1354,21 @@ export default function Layout({ children }: LayoutProps) {
               </div>
             </div>
 
-            {/* DineMatters Coins Chip — always visible beside user avatar */}
+            {/* Wallet Balance Chip — always visible beside user avatar */}
             {coinsBalance !== null && selectedRestaurant && (
               <button
                 type="button"
                 onClick={() => setShowTopBarRecharge(true)}
-                title={`DineMatters Coins: ${coinsBalance} — click to buy coins`}
-                className={cn(
-                  'hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xs font-semibold transition-all hover:scale-105 active:scale-95 flex-shrink-0',
-                  coinsBalance < 300
-                    ? 'bg-red-50 border-red-300 text-red-600 dark:bg-red-950/20 dark:border-red-700 dark:text-red-400'
-                    : coinsBalance < 1000
-                      ? 'bg-amber-50 border-amber-300 text-amber-600 dark:bg-amber-950/20 dark:border-amber-700 dark:text-amber-400'
-                      : 'bg-primary/10 border-primary/30 text-primary dark:bg-primary/20 dark:border-primary/40'
-                )}
+                title={`Wallet Balance: ₹${coinsBalance.toLocaleString()} — click to top-up`}
+                className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50/50 hover:border-slate-300 hover:shadow-sm transition-all focus:outline-none flex-shrink-0"
               >
-                <Coins className="h-4.5 w-4.5" />
-                <span className="tabular-nums">{coinsBalance.toLocaleString()}</span>
-                <span className="opacity-60 text-[10px] font-normal uppercase tracking-wider">Coins</span>
+                <div className="flex items-center justify-center p-1 rounded bg-slate-100/50">
+                  <Wallet className="h-3.5 w-3.5 text-slate-500" />
+                </div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-slate-900 font-bold text-sm tracking-tight">₹{coinsBalance.toLocaleString()}</span>
+                  <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-widest">Balance</span>
+                </div>
               </button>
             )}
 
@@ -1566,7 +1564,7 @@ export default function Layout({ children }: LayoutProps) {
         </DialogContent>
       </Dialog>
 
-      {/* DineMatters Coins Recharge Modal — triggered from top bar chip */}
+      {/* DineMatters Wallet Top-up Modal — triggered from top bar chip */}
       {selectedRestaurant && (
         <AiRechargeModal
           open={showTopBarRecharge}

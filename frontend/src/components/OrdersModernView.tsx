@@ -5,18 +5,19 @@ import { useRestaurant } from '@/contexts/RestaurantContext'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { 
-  Clock, 
-  User, 
-  CreditCard, 
-  CheckCircle2, 
-  ChefHat, 
-  PackageCheck, 
-  Receipt, 
+  ChevronDown,
+  Navigation,
   ShoppingBag,
   Bell,
-  Printer,
+  CheckCircle2,
+  ChefHat,
+  PackageCheck,
+  Receipt,
   XCircle,
-  ChevronDown
+  Clock,
+  User,
+  CreditCard,
+  Printer
 } from 'lucide-react'
 import { useFrappePostCall } from '@/lib/frappe'
 import { toast } from 'sonner'
@@ -52,7 +53,8 @@ interface Order {
   discount?: number
   tax?: number
   delivery_fee?: number
-  packaging_fee?: number
+  delivery_partner?: string
+  delivery_status?: string
   order_items?: OrderItem[]
 }
 
@@ -286,9 +288,17 @@ function OrderCard({
               </Badge>
             )}
             {isDelivery && (
-               <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-200/50 font-black text-[10px] h-4.5 px-1.5 uppercase">
-                DELIVERY
-              </Badge>
+               <div className="flex flex-col items-end gap-1">
+                 <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-200/50 font-black text-[10px] h-4.5 px-1.5 uppercase">
+                  DELIVERY
+                </Badge>
+                {order.delivery_partner === 'borzo' && (
+                  <span className="flex items-center gap-1 text-[8px] font-black text-amber-600 uppercase animate-pulse">
+                    <Navigation className="w-2 h-2" />
+                    {order.delivery_status || 'Finding...'}
+                  </span>
+                )}
+               </div>
             )}
           </div>
         </div>

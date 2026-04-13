@@ -42,7 +42,13 @@
   "marketing_msg91_campaign_template",
   "marketing_resend_api_key",
   "marketing_from_email",
-  "marketing_wa_template_name"
+  "marketing_wa_template_name",
+  "section_flash",
+  "flash_access_token",
+  "flash_store_id",
+  "flash_mode",
+  "section_platform_logistics",
+  "platform_delivery_convenience_fee"
  ],
  "fields": [
   {
@@ -164,7 +170,7 @@
    "default": "1299",
    "fieldname": "diamond_upgrade_barrier",
    "fieldtype": "Float",
-   "label": "DIAMOND Upgrade Barrier (Coins)"
+   "label": "DIAMOND Upgrade Barrier (₹)"
   },
   {
    "fieldname": "section_evolution_api",
@@ -207,7 +213,7 @@
    "description": "Coins deducted from restaurant per SMS. Set higher than platform cost to earn margin.",
    "fieldname": "marketing_sms_coins_per_msg",
    "fieldtype": "Float",
-   "label": "SMS Coins Charged to Restaurant"
+   "label": "SMS Charge (₹)"
   },
   {
    "default": "0.77",
@@ -221,7 +227,7 @@
    "description": "Coins deducted from restaurant per WhatsApp message. Current margin: \u20b90.23.",
    "fieldname": "marketing_whatsapp_coins_per_msg",
    "fieldtype": "Float",
-   "label": "WhatsApp Coins Charged to Restaurant"
+   "label": "WhatsApp Charge (₹)"
   },
   {
    "default": "0.005",
@@ -235,7 +241,7 @@
    "description": "Coins deducted per Email sent. High margin channel.",
    "fieldname": "marketing_email_coins_per_msg",
    "fieldtype": "Float",
-   "label": "Email Coins Charged to Restaurant"
+   "label": "Email Charge (₹)"
   },
   {
    "fieldname": "column_break_marketing_2",
@@ -271,6 +277,41 @@
    "fieldname": "marketing_wa_template_name",
    "fieldtype": "Data",
    "label": "WhatsApp Campaign Template Name (Meta BSP)"
+  },
+  {
+   "fieldname": "section_flash",
+   "fieldtype": "Section Break",
+   "label": "uEngage Flash Configuration"
+  },
+  {
+   "fieldname": "flash_access_token",
+   "fieldtype": "Password",
+   "label": "Flash Access Token"
+  },
+  {
+   "fieldname": "flash_store_id",
+   "fieldtype": "Data",
+   "label": "Flash Store ID (Global)",
+   "description": "Single Store ID from uEngage Flash dashboard. All restaurant deliveries are routed through this DineMatters account."
+  },
+  {
+   "default": "Sandbox",
+   "fieldname": "flash_mode",
+   "fieldtype": "Select",
+   "label": "Flash Mode",
+   "options": "Sandbox\nProduction"
+  },
+  {
+   "fieldname": "section_platform_logistics",
+   "fieldtype": "Section Break",
+   "label": "DineMatters Platform Revenue (Logistics)"
+  },
+  {
+   "default": "5.0",
+   "fieldname": "platform_delivery_convenience_fee",
+   "fieldtype": "Currency",
+   "label": "Logistics Platform Fee (\u20b9)",
+   "description": "Fee DineMatters earns for every delivery booked through the system."
   }
  ],
  "index_web_pages_for_search": 1,

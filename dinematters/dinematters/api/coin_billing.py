@@ -1,7 +1,7 @@
 """
-DineMatters Coin Billing System
+DineMatters Wallet Billing System
 Unified wallet for AI credits, Commissions, and Platform Fees.
-1 Coin = ₹1
+1 INR = 1 Wallet Unit
 """
 import frappe
 import razorpay
@@ -11,7 +11,7 @@ from frappe import _
 from dinematters.dinematters.utils.razorpay_utils import get_razorpay_client, get_razorpay_config
 
 # ─── Constants ───────────────────────────────────────────────────────────────
-INR_PER_COIN = 1
+INR_PER_WALLET_UNIT = 1
 COINS_PER_ENHANCEMENT = 10  # ₹10
 COINS_PER_GENERATION = 16   # ₹16
 AUTO_RECHARGE_DAILY_LIMIT = 5000.0  # Safety cap per day
@@ -31,7 +31,7 @@ def record_transaction(restaurant, txn_type, amount, description="", payment_id=
     )
     current_balance = (balance_info[0][0] if balance_info and balance_info[0][0] is not None else 0.0)
 
-    is_deduction = txn_type in ["AI Deduction", "Commission Deduction", "Daily SILVER Floor", "Daily GOLD Floor", "Daily DIAMOND Floor", "Daily GOLD Subscription", "Daily DIAMOND Subscription", "Lead Unlock"]
+    is_deduction = txn_type in ["AI Deduction", "Commission Deduction", "Daily SILVER Floor", "Daily GOLD Floor", "Daily DIAMOND Floor", "Daily GOLD Subscription", "Daily DIAMOND Subscription", "Lead Unlock", "Delivery Fee"]
     
     if is_deduction:
         new_balance = current_balance - abs(amount)
@@ -45,7 +45,7 @@ def record_transaction(restaurant, txn_type, amount, description="", payment_id=
     # Atomic Guardrail: Stop if balance would fall below allowed limit
     if fail_below is not None and new_balance < fail_below:
         frappe.throw(
-            _("Transaction failed: Insufficient DineMatters Coins. Required: {0}, Available: {1} (Limit: {2})").format(
+            _("Transaction failed: Insufficient Wallet Balance. Required: {0}, Available: {1} (Limit: {2})").format(
                 abs(amount), current_balance, fail_below
             ), 
             frappe.ValidationError
@@ -69,7 +69,7 @@ def record_transaction(restaurant, txn_type, amount, description="", payment_id=
     txn.insert(ignore_permissions=True)
     
     # Trigger auto-recharge check if balance falls below threshold
-    if txn_type in ["AI Deduction", "Commission Deduction", "Daily SILVER Floor", "Daily GOLD Floor", "Daily DIAMOND Floor", "Daily GOLD Subscription", "Daily DIAMOND Subscription"]:
+    if txn_type in ["AI Deduction", "Commission Deduction", "Daily SILVER Floor", "Daily GOLD Floor", "Daily DIAMOND Floor", "Daily GOLD Subscription", "Daily DIAMOND Subscription", "Delivery Fee"]:
         check_and_trigger_auto_recharge(restaurant, new_balance)
 
         # Check for system suspension (-300 grace limit)
@@ -350,15 +350,14 @@ def update_subscription_plan(restaurant, plan_type):
 
     if plan_type == "GOLD":
         # Check against restaurant's own minimum, fallback to global default
-        min_required = float(res_info.monthly_minimum if res_info.monthly_minimum else (settings.gold_monthly_fee or 999.0))
         if balance < min_required:
-            frappe.throw(_(f"Insufficient balance to upgrade to GOLD. Minimum {min_required} Coins required. Current: {balance}"), frappe.ValidationError)
+            frappe.throw(_(f"Insufficient balance to upgrade to GOLD. Minimum Rs.{min_required} required. Current: {balance}"), frappe.ValidationError)
     
     if plan_type == "DIAMOND":
         # DIAMOND upgrade barrier is a platform-wide constant (manageable in Settings)
         min_required = float(settings.diamond_upgrade_barrier or 1299.0)
         if balance < min_required:
-            frappe.throw(_(f"Insufficient balance to upgrade to DIAMOND. Minimum {min_required} Coins required. Current: {balance}"), frappe.ValidationError)
+            frappe.throw(_(f"Insufficient balance to upgrade to DIAMOND. Minimum Rs.{min_required} required. Current: {balance}"), frappe.ValidationError)
 
     # 2. Defer activation to Tomorrow 00:00
     from frappe.utils import add_days, getdate
@@ -465,7 +464,7 @@ def verify_coin_purchase(restaurant, razorpay_order_id, razorpay_payment_id, raz
         restaurant=restaurant,
         txn_type="Purchase",
         amount=coins,
-        description=f"Manual Coin Purchase - Ref: {razorpay_payment_id}",
+        description=f"Manual Wallet Top-up - Ref: {razorpay_payment_id}",
         payment_id=razorpay_payment_id,
         gst_amount=gst_amount,
         total_paid=total_paid
@@ -509,7 +508,7 @@ def initialize_free_coins(restaurant):
             restaurant=restaurant,
             txn_type="Free Coins",
             amount=coins_to_add,
-            description=f"Welcome! {coins_to_add} free Coins to get started.",
+            description=f"Welcome! Rs.{coins_to_add} free balance to get started.",
         )
         return True
     return False
@@ -532,7 +531,7 @@ def process_monthly_subscription_coin_refill():
             restaurant=r,
             txn_type="Free Coins",
             amount=60,
-            description="Monthly Subscription Reward: 60 Free Coins",
+            description="Monthly Subscription Reward: 60 Free Balance",
         )
     
     frappe.db.commit()

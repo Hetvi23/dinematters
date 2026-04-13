@@ -176,7 +176,7 @@ export default function CustomerInsights() {
                       <TableCell className="text-sm">{customer.phone || 'N/A'}</TableCell>
                       <TableCell>
                         <Badge variant={customer.balance > 0 ? "default" : "secondary"} className="gap-1">
-                          {customer.balance} Coins
+                          {customer.balance} Points
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -261,7 +261,7 @@ export default function CustomerInsights() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="amount">Number of Coins</Label>
+              <Label htmlFor="amount">Number of Points</Label>
               <Input
                 id="amount"
                 type="number"
@@ -313,7 +313,7 @@ export default function CustomerInsights() {
                   <TableRow>
                     <TableHead className="text-[11px] uppercase tracking-wider font-bold">Date</TableHead>
                     <TableHead className="text-[11px] uppercase tracking-wider font-bold">Type</TableHead>
-                    <TableHead className="text-[11px] uppercase tracking-wider font-bold">Coins</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-bold">Points</TableHead>
                     <TableHead className="text-[11px] uppercase tracking-wider font-bold">Reason</TableHead>
                   </TableRow>
                 </TableHeader>

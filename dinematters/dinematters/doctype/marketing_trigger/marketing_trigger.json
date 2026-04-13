@@ -99,7 +99,7 @@
    "depends_on": "eval:doc.trigger_event == 'On Loyalty Milestone'",
    "fieldname": "loyalty_milestone_coins",
    "fieldtype": "Int",
-   "label": "Milestone (Coins)"
+   "label": "Milestone (₹)"
   },
   {
    "fieldname": "column_break_event_params_2",

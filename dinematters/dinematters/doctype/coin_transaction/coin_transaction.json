@@ -33,7 +33,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Transaction Type",
-   "options": "Purchase\nAI Deduction\nCommission Deduction\nMarketing Deduction\nRefund\nAdmin Adjustment\nFree Coins\nAutopay Recharge\nDaily SILVER Floor\nDaily GOLD Floor\nDaily DIAMOND Floor\nDaily GOLD Subscription\nDaily DIAMOND Subscription\nDaily PRO Floor\nDaily LUX Floor\nDaily PRO Subscription\nLead Unlock",
+   "options": "Purchase\nAI Deduction\nCommission Deduction\nMarketing Deduction\nRefund\nAdmin Adjustment\nWallet Credit\nFree Coins\nAutopay Recharge\nDaily SILVER Floor\nDaily GOLD Floor\nDaily DIAMOND Floor\nDaily GOLD Subscription\nDaily DIAMOND Subscription\nDaily PRO Floor\nDaily LUX Floor\nDaily PRO Subscription\nLead Unlock\nDelivery Fee",
    "reqd": 1
   },
   {
@@ -44,9 +44,9 @@
    "fieldname": "amount",
    "fieldtype": "Float",
    "in_list_view": 1,
-   "label": "Amount (Coins)",
+   "label": "Amount (₹)",
    "reqd": 1,
-   "description": "Amount in Coins (1 Coin = ₹1)"
+   "description": "Amount in INR"
   },
   {
    "fieldname": "gst_amount",
@@ -100,6 +100,7 @@
  "module": "Dinematters",
  "name": "Coin Transaction",
  "naming_rule": "Expression",
+ "label": "Wallet Transaction",
  "owner": "Administrator",
  "permissions": [
   {

@@ -168,7 +168,7 @@ def dispatch_campaign_task(campaign_id):
             balance = float(frappe.db.get_value("Restaurant", campaign.restaurant, "coins_balance") or 0)
             batch_cost = len(chunk) * coins_per_msg
             if balance < batch_cost:
-                paused_reason = f"Paused: Insufficient Coins ({balance:.1f} available, need {batch_cost:.1f})"
+                paused_reason = f"Paused: Insufficient Wallet Balance ({balance:.1f} available, need {batch_cost:.1f})"
                 frappe.log_error(
                     f"Campaign {campaign_id} paused mid-send: {paused_reason}", "Marketing Task"
                 )

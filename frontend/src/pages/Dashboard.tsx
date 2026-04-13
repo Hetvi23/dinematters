@@ -1,5 +1,6 @@
 import { ReactNode } from 'react'
 import { useFrappeGetDocList, useFrappeGetCall } from '@/lib/frappe'
+import { LogisticsHubCard } from '@/components/LogisticsHubCard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { 
   ShoppingCart, 
@@ -190,8 +191,8 @@ export default function Dashboard() {
   const navigate = useNavigate()
   
   // Fetch data
-  const { data: orders } = useFrappeGetDocList('Order', {
-    fields: ['name', 'status', 'total', 'creation', 'restaurant', 'table_number'],
+  const { data: orders, isLoading: ordersLoading } = useFrappeGetDocList('Order', {
+    fields: ['name', 'status', 'total', 'creation', 'restaurant', 'table_number', 'order_type', 'delivery_partner', 'delivery_status', 'delivery_fee'],
     filters: selectedRestaurant ? ({ restaurant: selectedRestaurant } as any) : undefined,
     limit: 100,
     orderBy: { field: 'creation', order: 'desc' }
@@ -348,25 +349,34 @@ export default function Dashboard() {
                <div className="h-1 w-8 bg-indigo-500 rounded-full" />
                <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-500/80">Business Performance</h2>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard 
-                title="7D Revenue"
-                value={formatAmountNoDecimals(totalRevenue)}
-                subtext={`vs ${formatAmountNoDecimals(totalRevenue * 0.9)} last 7D`}
-                icon={TrendingUp}
-                trend="up"
-                trendValue="10%"
-                isGold={true}
-                gradient="from-indigo-600 to-blue-500"
-              />
-              <StatCard 
-                title="Weekly Orders"
-                value={totalOrders}
-                subtext={`${Math.round(totalOrders / 7)} orders daily average`}
-                icon={ShoppingCart}
-                isGold={true}
-                gradient="from-emerald-600 to-teal-500"
-              />
+            
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-4">
+              <div className="lg:col-span-2">
+                 <LogisticsHubCard orders={orders || []} isLoading={ordersLoading} />
+              </div>
+              <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <StatCard 
+                  title="7D Revenue"
+                  value={formatAmountNoDecimals(totalRevenue)}
+                  subtext={`vs ${formatAmountNoDecimals(totalRevenue * 0.9)} last 7D`}
+                  icon={TrendingUp}
+                  trend="up"
+                  trendValue="10%"
+                  isGold={true}
+                  gradient="from-indigo-600 to-blue-500"
+                />
+                <StatCard 
+                  title="Weekly Orders"
+                  value={totalOrders}
+                  subtext={`${Math.round(totalOrders / 7)} orders daily average`}
+                  icon={ShoppingCart}
+                  isGold={true}
+                  gradient="from-emerald-600 to-teal-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
               <StatCard 
                 title="Conv. Rate %"
                 value={`${analyticsData?.enhanced?.conversionRate || 0}%`}

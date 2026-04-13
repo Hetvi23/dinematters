@@ -237,9 +237,9 @@ def send_campaign(campaign_id):
         return {
             "success": False,
             "error": (
-                f"Insufficient Coins. Estimated cost: {estimated_cost:.1f} Coins "
+                f"Insufficient Wallet Balance. Estimated cost: {estimated_cost:.1f} ₹"
                 f"({estimated_reach} recipients × {coins_per_msg} coins/{doc.channel}). "
-                f"Current balance: {balance:.1f} Coins."
+                f"Current balance: {balance:.1f} ₹"
             )
         }
 

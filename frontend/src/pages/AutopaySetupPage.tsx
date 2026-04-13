@@ -18,15 +18,15 @@ import {
   Zap,
   Info,
   Plus,
-  Coins,
+  Wallet,
   History,
   ShieldAlert,
   Crown,
-  CheckCircle2,
   Smartphone,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { AiRechargeModal } from '@/components/AiRechargeModal'
+import { SubscriptionComparisonModal } from '@/components/SubscriptionComparisonModal'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { format, addDays } from 'date-fns'
 
@@ -67,8 +67,9 @@ export default function AutopaySetupPage() {
   const [threshold, setThreshold] = useState('200')
   const [amount, setAmount] = useState('1000')
 
-  // Plan change confirmation state
+  // Plan change state
   const [showConfirm, setShowConfirm] = useState(false)
+  const [showComparison, setShowComparison] = useState(false)
   const [newPlanSelection, setNewPlanSelection] = useState<'SILVER' | 'GOLD' | 'DIAMOND' | null>(null)
 
   const { call: getInfo } = useFrappePostCall<any>(
@@ -135,16 +136,16 @@ export default function AutopaySetupPage() {
     const luxBarrier = billingInfo?.plan_defaults?.lux_barrier || 1299;
 
     if (newPlan === 'GOLD' && (billingInfo?.coins_balance || 0) < proMin) {
-      toast.error('Insufficient Coins', {
-        description: `You need at least ${proMin} coins in your wallet to upgrade to GOLD.`
+      toast.error('Insufficient Balance', {
+        description: `You need at least ₹${proMin} in your wallet to upgrade to GOLD.`
       })
       setShowRecharge(true)
       return
     }
     
     if (newPlan === 'DIAMOND' && (billingInfo?.coins_balance || 0) < luxBarrier) {
-      toast.error('Insufficient Coins', {
-        description: `You need at least ${luxBarrier} coins in your wallet to upgrade to DIAMOND.`
+      toast.error('Insufficient Balance', {
+        description: `You need at least ₹${luxBarrier} in your wallet to upgrade to DIAMOND.`
       })
       setShowRecharge(true)
       return
@@ -179,6 +180,7 @@ export default function AutopaySetupPage() {
     } finally {
       setIsChangingPlan(false)
       setShowConfirm(false)
+      setShowComparison(false)
       setNewPlanSelection(null)
     }
   }
@@ -283,7 +285,7 @@ export default function AutopaySetupPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-foreground">Billing & Subscription</h1>
-          <p className="text-sm text-muted-foreground">Manage your DineMatters tier, wallet and automatic recharge.</p>
+          <p className="text-sm text-muted-foreground">Manage your DineMatters tier, wallet balance and automatic top-ups.</p>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate('/ledger')}>
@@ -292,7 +294,7 @@ export default function AutopaySetupPage() {
           </Button>
           <Button size="sm" className="gap-2 bg-primary text-white" onClick={() => setShowRecharge(true)}>
              <Plus className="h-4 w-4" />
-             Buy Coins
+             Top up Wallet
           </Button>
         </div>
       </div>
@@ -318,76 +320,65 @@ export default function AutopaySetupPage() {
         </Card>
       )}
 
-      {/* Subscription Tier Switcher */}
-      <Card className="border-none shadow-lg bg-gradient-to-r from-primary/5 via-background to-primary/5 overflow-hidden">
-        <CardContent className="p-1">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-1">
-             <button
-              onClick={() => handlePlanToggle('SILVER')}
-              disabled={isChangingPlan}
-              className={cn(
-                "flex items-center justify-center gap-3 py-4 px-6 rounded-xl transition-all",
-                planType === 'SILVER' 
-                  ? "bg-background shadow-sm border border-border/50" 
-                  : "hover:bg-primary/5 text-muted-foreground opacity-60"
-              )}
-             >
-                <div className={cn("p-2 rounded-lg", planType === 'SILVER' ? "bg-primary/10 text-primary" : "bg-muted")}>
-                   <Smartphone className="h-5 w-5" />
-                </div>
-                <div className="text-left">
-                   <p className="text-sm font-black uppercase tracking-tight">SILVER PLAN</p>
-                   <p className="text-[10px] font-medium opacity-70">Free • Basic Features</p>
-                </div>
-                {planType === 'SILVER' && <CheckCircle2 className="h-4 w-4 text-primary ml-auto" />}
-             </button>
+      {/* Subscription Tier Switcher - Refactored to Comparison Modal */}
+      <Card className="border-none shadow-xl bg-gradient-to-br from-background via-background to-primary/5 overflow-hidden ring-1 ring-border/50">
+        <CardContent className="p-0">
+           <div className="flex flex-col md:flex-row items-center p-6 gap-8">
+              <div className="flex-1 space-y-4">
+                 <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "p-3 rounded-2xl shadow-inner",
+                      planType === 'DIAMOND' ? "bg-indigo-500/10 text-indigo-500" : 
+                      planType === 'GOLD' ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                    )}>
+                       {planType === 'DIAMOND' ? <Crown className="h-8 w-8" /> : 
+                        planType === 'GOLD' ? <Crown className="h-8 w-8" /> : <Smartphone className="h-8 w-8" />}
+                    </div>
+                    <div>
+                        <div className="flex items-center gap-2">
+                           <h3 className="text-2xl font-black uppercase tracking-tight">{planType} PLAN</h3>
+                           <Badge className={cn(
+                             "text-[10px] font-bold tracking-tighter",
+                             planType === 'DIAMOND' ? "bg-indigo-500" : "bg-primary"
+                           )}>Active</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground font-medium">
+                          {planType === 'DIAMOND' ? 'Elite business automation & logistics mastery.' : 
+                           planType === 'GOLD' ? 'Popular choice for growing digital brands.' : 
+                           'Free baseline digital presence.'}
+                        </p>
+                    </div>
+                 </div>
 
-             <button
-              onClick={() => handlePlanToggle('GOLD')}
-              disabled={isChangingPlan}
-              className={cn(
-                "flex items-center justify-center gap-3 py-4 px-6 rounded-xl transition-all",
-                planType === 'GOLD' 
-                  ? "bg-background shadow-sm border border-border/50" 
-                  : "hover:bg-primary/5 text-muted-foreground opacity-60"
-              )}
-             >
-                <div className={cn("p-2 rounded-lg", planType === 'GOLD' ? "bg-primary/10 text-primary" : "bg-muted")}>
-                   {isChangingPlan ? <Loader2 className="h-5 w-5 animate-spin" /> : <Crown className="h-5 w-5" />}
-                </div>
-                <div className="text-left">
-                   <div className="flex items-center gap-2">
-                       <p className="text-sm font-black uppercase tracking-tight">GOLD PLAN</p>
-                       <Badge className="bg-primary/20 text-primary text-[8px] h-4 hover:bg-primary/20">POPULAR</Badge>
-                   </div>
-                   <p className="text-[10px] font-medium opacity-70">Min {billingInfo?.plan_defaults?.pro_monthly || 999} / month • Gold Features</p>
-                </div>
-                {planType === 'GOLD' && <CheckCircle2 className="h-4 w-4 text-primary ml-auto" />}
-             </button>
-
-             <button
-              onClick={() => handlePlanToggle('DIAMOND')}
-              disabled={isChangingPlan}
-              className={cn(
-                "flex items-center justify-center gap-3 py-4 px-6 rounded-xl transition-all",
-                planType === 'DIAMOND' 
-                  ? "bg-background shadow-sm border border-border/50" 
-                  : "hover:bg-indigo-500/5 text-muted-foreground opacity-60"
-              )}
-             >
-                <div className={cn("p-2 rounded-lg", planType === 'DIAMOND' ? "bg-indigo-500/10 text-indigo-500" : "bg-muted")}>
-                   {isChangingPlan ? <Loader2 className="h-5 w-5 animate-spin" /> : <Crown className="h-5 w-5" />}
-                </div>
-                <div className="text-left">
-                   <div className="flex items-center gap-2">
-                       <p className="text-sm font-black uppercase tracking-tight">DIAMOND PLAN</p>
-                       <Badge className="bg-indigo-500 text-white text-[8px] h-4 hover:bg-indigo-600">ELITE</Badge>
-                   </div>
-                   <p className="text-[10px] font-medium opacity-70">Min {billingInfo?.plan_defaults?.lux_monthly || 1299} / month • Full Ordering</p>
-                </div>
-                {planType === 'DIAMOND' && <CheckCircle2 className="h-4 w-4 text-indigo-500 ml-auto" />}
-             </button>
-          </div>
+                 <div className="flex flex-wrap gap-3">
+                    <div className="flex-1 min-w-[200px] p-2 px-4 bg-muted/40 rounded-xl border border-border/50">
+                       <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-0.5">Monthly Cost</p>
+                       <p className="text-sm font-bold whitespace-nowrap">
+                          {planType === 'SILVER' ? '₹0' : 
+                           planType === 'GOLD' ? `₹${billingInfo?.plan_defaults.pro_monthly}/mo` : 
+                           `${billingInfo?.plan_defaults.lux_commission}% Success Share`}
+                       </p>
+                    </div>
+                    <div className="p-2 px-4 bg-muted/40 rounded-xl border border-border/50">
+                       <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-0.5">Status</p>
+                       <p className="text-sm font-bold text-emerald-500 flex items-center gap-1 whitespace-nowrap"><ShieldCheck className="h-3.5 w-3.5" /> Verified</p>
+                    </div>
+                 </div>
+              </div>
+              
+              <div className="shrink-0 flex flex-col gap-3 w-full md:w-auto">
+                 <Button 
+                  onClick={() => setShowComparison(true)}
+                  className="gap-2 bg-foreground text-background hover:bg-foreground/90 font-bold px-8 h-12 rounded-xl"
+                 >
+                    <Zap className="h-4 w-4" />
+                    Update Subscription Plan
+                 </Button>
+                 <p className="text-[10px] text-center text-muted-foreground font-medium uppercase tracking-widest">
+                    Compare tiers & features
+                 </p>
+              </div>
+           </div>
         </CardContent>
       </Card>
 
@@ -395,14 +386,14 @@ export default function AutopaySetupPage() {
         {/* Balance Card */}
         <Card className="md:col-span-1 shadow-sm border-none bg-primary/10 dark:bg-primary/20">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium uppercase tracking-wider text-primary">Current Balance</CardTitle>
+            <CardTitle className="text-sm font-medium uppercase tracking-wider text-primary">Available Balance</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <Coins className="h-8 w-8 text-primary" />
-              <div className="text-4xl font-bold tracking-tighter">{billingInfo?.coins_balance.toLocaleString()}</div>
+              <Wallet className="h-8 w-8 text-primary" />
+              <div className="text-4xl font-bold tracking-tighter">₹{billingInfo?.coins_balance.toLocaleString()}</div>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">1 Coin = ₹1. Unified wallet for all charges.</p>
+            <p className="mt-2 text-xs text-muted-foreground">Universal wallet balance for all platform charges.</p>
           </CardContent>
         </Card>
 
@@ -450,7 +441,7 @@ export default function AutopaySetupPage() {
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2">
                 <Zap className="h-5 w-5 text-primary" />
-                Automatic Recharge Context
+                Automatic Top-up Settings
               </CardTitle>
               <CardDescription>Invisible billing to ensure your AI and Order flow stays uninterrupted.</CardDescription>
             </div>
@@ -464,7 +455,7 @@ export default function AutopaySetupPage() {
           <div className={cn("grid gap-8 md:grid-cols-2 transition-all duration-300", !enabled && "opacity-60 grayscale-[0.5] pointer-events-none select-none")}>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label className="text-sm font-bold">Auto-Recharge Threshold (₹)</Label>
+                <Label className="text-sm font-bold">Auto Top-up Threshold (₹)</Label>
                 <div className="relative">
                   <IndianRupee className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input 
@@ -489,7 +480,7 @@ export default function AutopaySetupPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm font-bold">Recharge Amount (₹)</Label>
+                <Label className="text-sm font-bold">Top-up Amount (₹)</Label>
                 <div className="relative">
                   <IndianRupee className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input 
@@ -556,6 +547,19 @@ export default function AutopaySetupPage() {
           </div>
         </CardContent>
       </Card>
+
+      <SubscriptionComparisonModal
+        open={showComparison}
+        onClose={() => setShowComparison(false)}
+        currentPlan={planType as 'SILVER' | 'GOLD' | 'DIAMOND'}
+        onSelectPlan={handlePlanToggle}
+        isChangingPlan={isChangingPlan}
+        planDefaults={{
+          pro_monthly: billingInfo?.plan_defaults.pro_monthly || 999,
+          lux_monthly: billingInfo?.plan_defaults.lux_monthly || 1299,
+          lux_commission: billingInfo?.plan_defaults.lux_commission || 1.5,
+        }}
+      />
 
       <AiRechargeModal 
         open={showRecharge} 

@@ -226,7 +226,7 @@ def enqueue_enhancement(restaurant, owner_doctype, owner_name, original_image_ur
     balance = frappe.db.get_value("Restaurant", restaurant, "coins_balance") or 0.0
     if balance < COIN_COST:
         frappe.throw(
-            f"Insufficient DineMatters Coins. You need {COIN_COST} coins but only have {balance}. "
+            f"Insufficient Wallet Balance (₹). You need {COIN_COST} coins but only have {balance}. "
             "Please recharge your coin wallet.",
             frappe.ValidationError
         )

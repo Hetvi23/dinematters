@@ -246,7 +246,7 @@ export default function LoyaltySettings() {
                   <p className="text-[10px] text-muted-foreground">Limit resets on order.</p>
                 </div>
                 <div className="grid gap-2">
-                  <Label className="text-[11px]">Coins per unique open</Label>
+                  <Label className="text-[11px]">Points per unique open</Label>
                   <Input 
                     type="number" 
                     value={settings.coins_per_unique_open}
@@ -275,7 +275,7 @@ export default function LoyaltySettings() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label>New User Reward (Coins)</Label>
+                <Label>New User Reward (Points)</Label>
                 <Input 
                   type="number" 
                   value={settings.new_user_welcome_reward_coins}

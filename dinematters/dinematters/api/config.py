@@ -707,3 +707,59 @@ def update_order_settings(restaurant_id, settings):
 				"details": error_trace if frappe.conf.developer_mode else None
 			}
 		}
+
+@frappe.whitelist()
+def update_logistics_settings(restaurant_id, settings):
+	"""
+	POST /api/method/dinematters.dinematters.api.config.update_logistics_settings
+	Update logistics hub configuration for a restaurant
+	"""
+	try:
+		# Validate restaurant access
+		restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user)
+		
+		# Parse settings if string
+		if isinstance(settings, str):
+			settings = json.loads(settings)
+		
+		# Get restaurant document
+		restaurant_doc = frappe.get_doc("Restaurant", restaurant)
+		
+		# Update allowed fields
+		updated_fields = []
+		allowed_fields = [
+			"preferred_logistics_provider",
+			"delivery_markup_type",
+			"delivery_markup_value",
+			"default_packaging_fee" # Rebranded as Packaging + Operation Overhead
+		]
+		
+		for field in allowed_fields:
+			if field in settings:
+				value = settings[field]
+				# Numeric conversion
+				if field == "delivery_markup_value" or field == "default_packaging_fee":
+					value = flt(value)
+				
+				restaurant_doc.set(field, value)
+				updated_fields.append(field)
+		
+		if updated_fields:
+			restaurant_doc.save(ignore_permissions=True)
+		
+		return {
+			"success": True,
+			"message": _("Logistics settings updated successfully"),
+			"data": {
+				"updated_fields": updated_fields
+			}
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in update_logistics_settings: {str(e)}")
+		return {
+			"success": False,
+			"error": {
+				"code": "LOGISTICS_UPDATE_ERROR",
+				"message": str(e)
+			}
+		}

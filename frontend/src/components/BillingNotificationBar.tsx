@@ -1,5 +1,5 @@
 import React from 'react'
-import { AlertCircle, ArrowRight, Coins, Calendar, ShieldAlert, Loader2 } from 'lucide-react'
+import { AlertCircle, ArrowRight, Wallet, Calendar, ShieldAlert, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
@@ -126,11 +126,11 @@ export const BillingNotificationBar: React.FC<BillingNotificationBarProps> = ({ 
     const isAutopayComing = billingInfo.auto_recharge_enabled && billingInfo.mandate_active && (billingInfo.current_daily_vol < billingInfo.daily_limit)
     
     let message = isPremium 
-      ? `Coins are dangerously low (₹${billingInfo.coins_balance.toLocaleString()}). ${planType} features may be disabled soon.` 
-      : `Coins are dangerously low (₹${billingInfo.coins_balance.toLocaleString()}). AI and Order flow may be interrupted.`
+      ? `Wallet balance is dangerously low (₹${billingInfo.coins_balance.toLocaleString()}). ${planType} features may be disabled soon.` 
+      : `Wallet balance is dangerously low (₹${billingInfo.coins_balance.toLocaleString()}). AI and Order flow may be interrupted.`
     
     if (isAutopayComing) {
-      message = `Low balance (₹${billingInfo.coins_balance.toLocaleString()}). Automatic recharge of ₹${billingInfo.auto_recharge_amount.toLocaleString()} will be triggered shortly.`
+      message = `Low balance (₹${billingInfo.coins_balance.toLocaleString()}). Automatic top-up of ₹${billingInfo.auto_recharge_amount.toLocaleString()} will be triggered shortly.`
     }
 
     notifications.push({
@@ -138,15 +138,15 @@ export const BillingNotificationBar: React.FC<BillingNotificationBarProps> = ({ 
       type: isAutopayComing ? 'info' : 'critical',
       icon: isAutopayComing ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : <ShieldAlert className="h-4 w-4" />,
       message: message,
-      action: { label: isAutopayComing ? 'Settings' : 'Recharge Now', onClick: () => navigate(isAutopayComing ? '/autopay-setup' : '/autopay-setup?buy=true') }
+      action: { label: isAutopayComing ? 'Settings' : 'Top up Now', onClick: () => navigate(isAutopayComing ? '/autopay-setup' : '/autopay-setup?buy=true') }
     })
   } else if (isPremium && billingInfo.coins_balance < 1000) {
     notifications.push({
       id: 'mid-balance',
       type: 'warning',
-      icon: <Coins className="h-4 w-4" />,
-      message: `Maintain at least 1000 Coins to keep ${planType} enabled without interruption.`,
-      action: { label: 'Buy Coins', onClick: () => navigate('/autopay-setup?buy=true') }
+      icon: <Wallet className="h-4 w-4" />,
+      message: `Maintain at least ₹1000 balance to keep ${planType} enabled without interruption.`,
+      action: { label: 'Top up Wallet', onClick: () => navigate('/autopay-setup?buy=true') }
     })
   }
 
@@ -165,7 +165,7 @@ export const BillingNotificationBar: React.FC<BillingNotificationBarProps> = ({ 
         id: 'autopay-off',
         type: 'info',
         icon: <ShieldAlert className="h-4 w-4" />,
-        message: "Mandate active! Enable Autopay to avoid manual recharging.",
+        message: "Mandate active! Enable Autopay to avoid manual top-ups.",
         action: { label: 'Enable', onClick: () => navigate('/autopay-setup') }
       })
     }
@@ -179,7 +179,7 @@ export const BillingNotificationBar: React.FC<BillingNotificationBarProps> = ({ 
        notifications.push({
         id: 'recent-success',
         type: 'info',
-        icon: <Coins className="h-4 w-4" />,
+        icon: <Wallet className="h-4 w-4" />,
         message: `Success! ₹${billingInfo.auto_recharge_amount.toLocaleString()} was automatically added to your wallet.`,
         action: { label: 'History', onClick: () => navigate('/ledger') }
       })

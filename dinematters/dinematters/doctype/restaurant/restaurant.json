@@ -104,7 +104,12 @@
   "section_break_metadata",
   "description",
   "column_break_google_map",
-  "google_map_url"
+  "google_map_url",
+  "section_logistics_hub",
+  "preferred_logistics_provider",
+  "flash_store_id",
+  "delivery_markup_type",
+  "delivery_markup_value"
  ],
  "fields": [
   {
@@ -308,10 +313,11 @@
    "default": "0"
   },
   {
+   "default": "0",
    "fieldname": "default_packaging_fee",
    "fieldtype": "Currency",
-   "label": "Default Packaging Fee",
-   "default": "0"
+   "label": "Packaging Fee + Operation Overhead",
+   "description": "Fixed charge for packaging and operational overhead per order."
   },
   {
    "fieldname": "minimum_order_value",
@@ -580,23 +586,23 @@
   {
    "fieldname": "section_break_coins",
    "fieldtype": "Section Break",
-   "label": "Coins & Autopay"
+   "label": "Wallet & Autopay"
   },
   {
    "fieldname": "coins_balance",
    "fieldtype": "Float",
-   "label": "Coins Balance",
+   "label": "Wallet Balance (₹)",
    "default": "0",
    "read_only": 1,
    "in_list_view": 1,
-   "description": "Current DineMatters Coins balance (1 Coin = ₹1)"
+   "description": "Current platform balance (₹)"
   },
   {
    "fieldname": "auto_recharge_enabled",
    "fieldtype": "Check",
    "label": "Enable Auto-Recharge",
    "default": "0",
-   "description": "Automatically recharge coins when balance falls below threshold"
+   "description": "Automatically recharge balance when it falls below threshold"
   },
   {
    "fieldname": "column_break_coins",
@@ -755,6 +761,38 @@
    "fieldtype": "Long Text",
    "label": "Google Map URL",
    "description": "Enter the Google Maps URL for your restaurant location"
+  },
+  {
+   "fieldname": "section_logistics_hub",
+   "fieldtype": "Section Break",
+   "label": "Logistics Hub (Advanced)"
+  },
+  {
+   "default": "Flash",
+   "fieldname": "preferred_logistics_provider",
+   "fieldtype": "Select",
+   "label": "Preferred Logistics Provider",
+   "options": "Borzo\nFlash\nSelf"
+  },
+  {
+   "fieldname": "flash_store_id",
+   "fieldtype": "Data",
+   "label": "Flash Store ID",
+   "description": "Unique Store ID from uEngage Flash dashboard"
+  },
+  {
+   "default": "Fixed",
+   "fieldname": "delivery_markup_type",
+   "fieldtype": "Select",
+   "label": "Logistics Markup Type",
+   "options": "Fixed\nPercentage"
+  },
+  {
+   "default": "0",
+   "fieldname": "delivery_markup_value",
+   "fieldtype": "Float",
+   "label": "Logistics Markup Value",
+   "description": "Additional profit for the restaurant on top of the courier fee."
   }
  ],
  "index_web_pages_for_search": 1,

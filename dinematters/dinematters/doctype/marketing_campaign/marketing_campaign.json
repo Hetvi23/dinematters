@@ -156,9 +156,9 @@
    "default": "0",
    "fieldname": "total_cost_coins",
    "fieldtype": "Float",
-   "label": "Total Cost (Coins)",
+   "label": "Total Cost (₹)",
    "read_only": 1,
-   "description": "Total DineMatters Coins deducted for this campaign."
+   "description": "Total Amount deducted from wallet for this campaign."
   },
   {
    "default": "0",

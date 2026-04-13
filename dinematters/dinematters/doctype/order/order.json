@@ -31,6 +31,7 @@
   "column_break_totals",
   "delivery_fee",
   "packaging_fee",
+  "logistics_platform_fee",
   "total",
   "coupon",
   "loyalty_coins_redeemed",
@@ -264,6 +265,14 @@
    "default": "0"
   },
   {
+   "default": "0",
+   "fieldname": "logistics_platform_fee",
+   "fieldtype": "Currency",
+   "label": "Logistics Platform Fee",
+   "read_only": 1,
+   "description": "Fee earned by DineMatters platform for delivery management"
+  },
+  {
    "fieldname": "total",
    "fieldtype": "Currency",
    "in_list_view": 1,
@@ -377,7 +386,7 @@
    "fieldname": "delivery_partner",
    "fieldtype": "Select",
    "label": "Delivery Partner",
-   "options": "borzo\nmanual"
+   "options": "borzo\nflash\nmanual"
   },
   {
    "fieldname": "delivery_mode",

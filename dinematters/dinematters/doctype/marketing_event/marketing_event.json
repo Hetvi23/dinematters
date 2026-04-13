@@ -98,7 +98,7 @@
    "default": "0",
    "fieldname": "coins_charged",
    "fieldtype": "Float",
-   "label": "Coins Charged"
+   "label": "Amount Charged (₹)"
   },
   {
    "fieldname": "conversion_order",

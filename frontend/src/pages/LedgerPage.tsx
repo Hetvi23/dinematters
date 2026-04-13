@@ -23,7 +23,7 @@ import {
 import { DatePicker } from "@/components/ui/date-picker"
 import {
   Search,
-  Coins,
+  Wallet,
   Loader2,
   Sparkles,
   ShoppingCart,
@@ -43,7 +43,7 @@ import {
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { format, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
-import { useCurrency } from '@/hooks/useCurrency'
+
 import { AiRechargeModal } from '@/components/AiRechargeModal'
 
 interface Transaction {
@@ -71,7 +71,7 @@ export default function LedgerPage() {
   const [balance, setBalance] = useState<number>(0)
   const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null)
   
-  const { formatAmountNoDecimals } = useCurrency()
+
 
   const { call: getTransactions } = useFrappePostCall<any>(
     'dinematters.dinematters.api.coin_billing.get_coin_transactions'
@@ -226,7 +226,7 @@ export default function LedgerPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-foreground">Transaction Ledger</h1>
-          <p className="text-sm text-muted-foreground">Detailed history of coin usage and fiscal audits.</p>
+          <p className="text-sm text-muted-foreground">Detailed history of wallet activities and fiscal audits.</p>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" className="gap-2" onClick={handleExportCSV}>
@@ -235,7 +235,7 @@ export default function LedgerPage() {
           </Button>
           <Button size="sm" className="gap-2 bg-primary text-white" onClick={() => setShowRecharge(true)}>
             <Plus className="h-4 w-4" />
-            Buy Coins
+            Top up Wallet
           </Button>
         </div>
       </div>
@@ -244,15 +244,15 @@ export default function LedgerPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="relative overflow-hidden border-none bg-gradient-to-br from-primary/15 via-primary/5 to-background shadow-md backdrop-blur-md p-3">
           <div className="absolute -right-2 -top-2 opacity-5">
-            <Coins className="h-20 w-20" />
+            <Wallet className="h-20 w-20" />
           </div>
           <div className="space-y-1">
              <p className="text-[10px] font-bold uppercase tracking-widest text-primary/70">Available Balance</p>
              <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-black tabular-nums">{balance.toLocaleString()}</span>
-                <span className="text-[10px] font-bold text-muted-foreground uppercase">Coins</span>
+                <span className="text-2xl font-black tabular-nums">₹{balance.toLocaleString()}</span>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase">Balance</span>
              </div>
-             <p className="text-[10px] text-muted-foreground font-medium">Fiscal value: {formatAmountNoDecimals(balance)}</p>
+             <p className="text-[10px] text-muted-foreground font-medium">Unified wallet for all charges.</p>
           </div>
         </Card>
 
@@ -280,7 +280,7 @@ export default function LedgerPage() {
                 <span className="text-2xl font-black tabular-nums text-emerald-600 dark:text-emerald-400">{stats.totalRecharges.toLocaleString()}</span>
                 <span className="text-[10px] font-bold text-muted-foreground uppercase">Total</span>
              </div>
-             <p className="text-[10px] text-muted-foreground font-medium">Total coins added to wallet.</p>
+             <p className="text-[10px] text-muted-foreground font-medium">Total balance added to wallet.</p>
           </div>
         </Card>
       </div>
