@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, Truck, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, ShieldAlert, Wallet, Crown, CreditCard, Settings, MessageSquare, Megaphone, Send, Zap, BarChart3, Menu } from 'lucide-react'
+import { Home, ShoppingCart, Package, Truck, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, ShieldAlert, Wallet, Crown, CreditCard, Settings, MessageSquare, Megaphone, Send, Zap, BarChart3, Menu, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
 import { AiRechargeModal } from '@/components/AiRechargeModal'
@@ -291,12 +291,15 @@ export default function Layout({ children }: LayoutProps) {
     return false
   }
 
+  const [showRestaurantSearch, setShowRestaurantSearch] = useState(false)
+  const [restaurantSearchQuery, setRestaurantSearchQuery] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newRestaurantData, setNewRestaurantData] = useState({
     restaurant_name: '',
     owner_email: '',
     owner_phone: '',
-    tables: ''
+    tables: '',
+    referral_code: ''
   })
   const [isCreating, setIsCreating] = useState(false)
 
@@ -326,8 +329,15 @@ export default function Layout({ children }: LayoutProps) {
         restaurant_name: '',
         owner_email: '',
         owner_phone: '',
-        tables: ''
+        tables: '',
+        referral_code: ''
       })
+      return
+    }
+
+    if (restaurantId === '__search__') {
+      setShowRestaurantSearch(true)
+      setRestaurantSearchQuery('')
       return
     }
 
@@ -361,6 +371,7 @@ export default function Layout({ children }: LayoutProps) {
           owner_email: newRestaurantData.owner_email.trim(),
           owner_phone: newRestaurantData.owner_phone.trim() || undefined,
           tables: tablesCount || 0,
+          referred_by_restaurant_code: newRestaurantData.referral_code.trim() || undefined,
           is_active: 1
         }
       })
@@ -390,7 +401,13 @@ export default function Layout({ children }: LayoutProps) {
 
         // Close modal
         setShowCreateModal(false)
-        setNewRestaurantData({ restaurant_name: '', owner_email: '', owner_phone: '', tables: '' })
+        setNewRestaurantData({ 
+          restaurant_name: '', 
+          owner_email: '', 
+          owner_phone: '', 
+          tables: '',
+          referral_code: ''
+        })
 
         // Set the selected restaurant
         setSelectedRestaurant(restaurantDocName)
@@ -679,6 +696,17 @@ export default function Layout({ children }: LayoutProps) {
                             </div>
                           </SelectItem>
                         ))}
+                        {restaurants.length > 3 && (
+                          <>
+                            <div className="border-t border-border my-1" />
+                            <SelectItem value="__search__" className="text-muted-foreground italic">
+                              <div className="flex items-center gap-2 w-full">
+                                <Search className="h-4 w-4 flex-shrink-0" />
+                                <span className="text-sm">Search / View All Restaurants...</span>
+                              </div>
+                            </SelectItem>
+                          </>
+                        )}
                         {isAdmin && (
                           <>
                             <div className="border-t border-border my-1" />
@@ -1468,6 +1496,80 @@ export default function Layout({ children }: LayoutProps) {
         </main>
       </div>
 
+      {/* Restaurant Selection Modal */}
+      <Dialog open={showRestaurantSearch} onOpenChange={setShowRestaurantSearch}>
+        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle>Search Restaurant</DialogTitle>
+            <DialogDescription>
+              Select a restaurant to switch the dashboard view
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-4 pt-0">
+             <div className="relative mb-4">
+               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+               <Input 
+                 placeholder="Type restaurant name..." 
+                 className="pl-9 bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary h-11"
+                 autoFocus
+                 value={restaurantSearchQuery}
+                 onChange={(e) => setRestaurantSearchQuery(e.target.value)}
+               />
+             </div>
+             
+             <div className="max-h-[350px] overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+               {restaurants
+                 .filter(r => r.restaurant_name.toLowerCase().includes(restaurantSearchQuery.toLowerCase()))
+                 .map((restaurant) => {
+                   const isSelected = selectedRestaurant === restaurant.name
+                   return (
+                     <button
+                       key={restaurant.name}
+                       className={cn(
+                         "w-full flex items-center justify-between p-3 rounded-xl transition-all group",
+                         isSelected 
+                           ? "bg-primary/10 border border-primary/20" 
+                           : "hover:bg-muted border border-transparent"
+                       )}
+                       onClick={() => {
+                         handleRestaurantChange(restaurant.name)
+                         setShowRestaurantSearch(false)
+                       }}
+                     >
+                       <div className="flex items-center gap-3">
+                         <div className={cn(
+                            "h-10 w-10 rounded-lg flex items-center justify-center shadow-sm",
+                            isSelected ? "bg-primary text-white" : "bg-background text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary transition-colors"
+                         )}>
+                            <Store className="h-5 w-5" />
+                         </div>
+                         <div className="text-left">
+                           <p className={cn("text-sm font-bold", isSelected ? "text-primary" : "text-foreground")}>
+                             {restaurant.restaurant_name}
+                           </p>
+                           <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">#{restaurant.name.slice(-6)}</p>
+                         </div>
+                       </div>
+                       {isSelected && (
+                         <CheckCircle2 className="h-5 w-5 text-primary" />
+                       )}
+                     </button>
+                   )
+                 })}
+               {restaurants.filter(r => r.restaurant_name.toLowerCase().includes(restaurantSearchQuery.toLowerCase())).length === 0 && (
+                 <div className="py-12 text-center">
+                   <Store className="h-12 w-12 text-muted-foreground/20 mx-auto mb-3" />
+                   <p className="text-sm text-muted-foreground">No restaurants found matching "{restaurantSearchQuery}"</p>
+                 </div>
+               )}
+             </div>
+          </div>
+          <DialogFooter className="bg-muted/30 p-4 border-t border-border">
+             <Button variant="ghost" onClick={() => setShowRestaurantSearch(false)} className="rounded-xl">Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Create New Restaurant Modal */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
         <DialogContent className="sm:max-w-[500px]">
@@ -1533,6 +1635,19 @@ export default function Layout({ children }: LayoutProps) {
               />
               <p className="text-xs text-muted-foreground">
                 Number of tables in your restaurant. QR codes will be automatically generated if specified.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="referral_code">Referral Code</Label>
+              <Input
+                id="referral_code"
+                placeholder="DINE-XXXX-XXXX"
+                value={newRestaurantData.referral_code}
+                onChange={(e) => setNewRestaurantData(prev => ({ ...prev, referral_code: e.target.value }))}
+                disabled={isCreating}
+              />
+              <p className="text-xs text-muted-foreground">
+                If referred by another merchant, enter their code here to give them ₹500.
               </p>
             </div>
           </div>

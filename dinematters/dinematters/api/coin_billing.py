@@ -17,7 +17,31 @@ COINS_PER_GENERATION = 16   # ₹16
 AUTO_RECHARGE_DAILY_LIMIT = 5000.0  # Safety cap per day
 AUTO_RECHARGE_HARD_CAP = 15000.0   # RBI AFA Limit for single transaction
 
+# Bonus Thresholds
+BONUS_TIER_1_MIN = 2999.0  # 10% Bonus
+BONUS_TIER_2_MIN = 4999.0  # 20% Bonus
+
 # ─── Internal helpers ─────────────────────────────────────────────────────────
+
+def get_bonus_units(base_amount):
+    """
+    Calculate bonus units based on the recharge amount.
+    - Below 2999: Round up to next whole number (e.g. 999 -> 1000)
+    - 2999 to 4998: 10% Bonus
+    - 4999 and above: 20% Bonus
+    """
+    amount = float(base_amount)
+    bonus = 0
+    
+    if amount >= BONUS_TIER_2_MIN:
+        bonus = amount * 0.20
+    elif amount >= BONUS_TIER_1_MIN:
+        bonus = amount * 0.10
+    elif amount >= 999:
+        # Mini-bonus for the starter pack (999 -> 1000)
+        bonus = 1.0 if amount < 1000 else 0
+        
+    return round(bonus, 2)
 
 # (Internal Razorpay helper moved to utils.razorpay_utils)
 
@@ -396,6 +420,9 @@ def create_coin_purchase_order(restaurant, amount):
     Implements upfront 18% GST collection.
     """
     base_amount = float(amount)
+    bonus_units = get_bonus_units(base_amount)
+    total_units = base_amount + bonus_units
+
     gst_rate = 0.18
     gst_amount = base_amount * gst_rate
     total_payable = base_amount + gst_amount
@@ -409,7 +436,9 @@ def create_coin_purchase_order(restaurant, amount):
         "payment_capture": 1,
         "notes": {
             "restaurant": restaurant,
-            "coins": base_amount,
+            "coins": total_units, # Note: Includes bonus
+            "base_amount": base_amount,
+            "bonus_units": bonus_units,
             "gst_amount": gst_amount,
             "total_payable": total_payable,
             "type": "coin_purchase"
@@ -460,17 +489,82 @@ def verify_coin_purchase(restaurant, razorpay_order_id, razorpay_payment_id, raz
         frappe.throw(_("Invalid coin amount in payment notes"))
 
     # 3. Credit the restaurant
+    bonus_units = float(notes.get("bonus_units", 0))
+    description = f"Manual Wallet Top-up - Ref: {razorpay_payment_id}"
+    if bonus_units > 0:
+        description += f" (Incl. ₹{bonus_units:g} Bonus)"
+
+    base_amount = float(notes.get("base_amount", 0))
+
     record_transaction(
         restaurant=restaurant,
         txn_type="Purchase",
         amount=coins,
-        description=f"Manual Wallet Top-up - Ref: {razorpay_payment_id}",
+        description=description,
         payment_id=razorpay_payment_id,
         gst_amount=gst_amount,
         total_paid=total_paid
     )
     
+    # 4. Process Referral Bonus if applicable (Amount >= 1000 and it's the first purchase)
+    if base_amount >= 1000:
+        process_referral_bonus(restaurant)
+    
     return {"success": True, "coins_added": coins}
+
+@frappe.whitelist(allow_guest=False)
+def process_referral_bonus(restaurant):
+	"""
+	Check and grant referral bonuses to both parties.
+	Triggered on the referee's first recharge of Rs. 1000+.
+	"""
+	res_doc = frappe.get_doc("Restaurant", restaurant)
+	
+	# 1. Must have been referred by someone
+	if not res_doc.referred_by_restaurant:
+		return
+	
+	# 2. Check if this is the FIRST non-free transaction (The current one is already recorded)
+	txn_count = frappe.db.count("Coin Transaction", {
+		"restaurant": restaurant,
+		"transaction_type": ["in", ["Purchase", "Autopay Recharge"]]
+	})
+	
+	# If count is 1, it means the current transaction is their first ever purchase
+	if txn_count != 1:
+		return
+		
+	# 3. Check if referral bonus was already granted (to prevent double-dipping)
+	bonus_exists = frappe.db.exists("Coin Transaction", {
+		"restaurant": restaurant,
+		"transaction_type": "Free Coins",
+		"description": ["like", "%Referral Bonus%"]
+	})
+	
+	if bonus_exists:
+		return
+		
+	# 4. Grant Bonus
+	bonus_amt = 500
+	referrer = res_doc.referred_by_restaurant
+	
+	# Credit Referrer
+	record_transaction(
+		restaurant=referrer,
+		txn_type="Free Coins",
+		amount=bonus_amt,
+		description=f"Referral Bonus: You referred {res_doc.restaurant_name}!",
+	)
+	
+	# Credit Referee (the one who just recharged)
+	record_transaction(
+		restaurant=restaurant,
+		txn_type="Free Coins",
+		amount=bonus_amt,
+		description=f"Referral Bonus: Welcome gift for using {referrer}'s code!",
+	)
+	
+	frappe.db.commit()
 
 @frappe.whitelist(allow_guest=False)
 def get_coin_transactions(restaurant, limit=20, offset=0):

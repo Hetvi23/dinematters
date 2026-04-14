@@ -82,6 +82,8 @@ interface Restaurant {
   total_orders: number
   total_revenue: number
   commission_earned: number
+  referral_code?: string
+  referred_by_restaurant?: string
 }
 
 function AdminRestaurantDetailsPage() {
@@ -610,6 +612,42 @@ function AdminRestaurantDetailsPage() {
                           <Badge variant="outline" className="text-primary border-primary/20">{restaurant.platform_fee_percent}%</Badge>
                         </div>
                      </div>
+                  </div>
+
+                  <div className="space-y-4 pt-4">
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                       <Zap className="h-3 w-3" /> Refer & Earn
+                    </p>
+                    <div className="space-y-3">
+                       <div className="space-y-1.5">
+                         <Label className="text-[10px] uppercase font-bold text-muted-foreground/60">Own Referral Code</Label>
+                         <div className="flex gap-2">
+                           <Input value={restaurant.referral_code || ''} readOnly className="h-8 bg-muted/30 font-mono text-xs" />
+                           <Button 
+                             variant="outline" 
+                             size="sm" 
+                             onClick={() => {
+                               if (restaurant.referral_code) {
+                                 navigator.clipboard.writeText(restaurant.referral_code)
+                                 toast.success('Code copied')
+                               }
+                             }}
+                             className="h-8 px-2"
+                           >
+                             <Save className="h-3.5 w-3.5" />
+                           </Button>
+                         </div>
+                       </div>
+                       <div className="space-y-1.5">
+                         <Label className="text-[10px] uppercase font-bold text-muted-foreground/60">Referred By (Restaurant ID)</Label>
+                         <Input 
+                           value={restaurant.referred_by_restaurant || ''} 
+                           onChange={(e) => setRestaurant({...restaurant, referred_by_restaurant: e.target.value})}
+                           placeholder="e.g. the-food-court"
+                           className="h-8 text-xs font-mono"
+                         />
+                       </div>
+                    </div>
                   </div>
 
                   <Separator />

@@ -36,35 +36,39 @@ interface Bundle {
   label: string
   icon: React.ReactNode
   badge?: string
+  bonus?: number
   highlight?: boolean
 }
 
 const BUNDLES: Bundle[] = [
   {
     id: '999',
-    coins: 999,
+    coins: 1000,
     price_inr: 999,
     label: 'Starter',
     icon: <Zap className="h-5 w-5" />,
     badge: undefined,
+    bonus: 1,
     highlight: false,
   },
   {
-    id: '2000',
-    coins: 2000,
-    price_inr: 2000,
+    id: '2999',
+    coins: 3300,
+    price_inr: 2999,
     label: 'Popular',
     icon: <Star className="h-5 w-5" />,
-    badge: 'POPULAR',
+    badge: '10% BONUS',
+    bonus: 301,
     highlight: true,
   },
   {
-    id: '5000',
-    coins: 5000,
-    price_inr: 5000,
+    id: '4999',
+    coins: 6000,
+    price_inr: 4999,
     label: 'Best Value',
     icon: <Rocket className="h-5 w-5" />,
-    badge: 'BEST VALUE',
+    badge: '20% BONUS',
+    bonus: 1001,
     highlight: false,
   },
 ]
@@ -99,16 +103,26 @@ export function AiRechargeModal({ open, onClose, restaurant, onSuccess }: CoinRe
   )
 
   const isCustom = selectedBundle === 'custom'
-  const customCoinCount = parseInt(customBalance || '0', 10)
-  const selectedCoins = isCustom ? customCoinCount : BUNDLES.find(b => b.id === selectedBundle)?.coins || 0
+  const customAmount = parseInt(customBalance || '0', 10)
+  
+  // Calculate bonus dynamically for custom amounts
+  const getBonus = (amt: number) => {
+    if (amt >= 4999) return Math.round(amt * 0.20)
+    if (amt >= 2999) return Math.round(amt * 0.10)
+    if (amt === 999) return 1
+    return 0
+  }
+
+  const basePrice = isCustom ? customAmount : BUNDLES.find(b => b.id === selectedBundle)?.price_inr || 0
+  const bonusUnits = isCustom ? getBonus(basePrice) : BUNDLES.find(b => b.id === selectedBundle)?.bonus || 0
+  const selectedCoins = basePrice + bonusUnits
 
   // Upfront GST Calculation: 18% on top of the base coin cost
-  const basePrice = selectedCoins
   const gstAmount = Math.round(basePrice * 0.18 * 100) / 100
   const totalPayable = basePrice + gstAmount
 
   const canPurchase = isCustom
-    ? customCoinCount >= 300
+    ? customAmount >= 300
     : selectedBundle !== ''
 
   const handlePurchase = async () => {
@@ -146,7 +160,7 @@ export function AiRechargeModal({ open, onClose, restaurant, onSuccess }: CoinRe
           currency: 'INR',
           order_id: razorpay_order_id,
           name: 'DineMatters Wallet',
-          description: `Top-up ₹${selectedCoins} Balance (₹${basePrice} + ₹${gstAmount} GST)`,
+          description: `Top-up ₹${selectedCoins} Balance (Price: ₹${basePrice} + GST: ₹${gstAmount})`,
           theme: { color: '#f97316' },
           handler: async (response: any) => {
             try {
@@ -236,6 +250,11 @@ export function AiRechargeModal({ open, onClose, restaurant, onSuccess }: CoinRe
               <div className="flex flex-col items-center">
                 <span className="text-2xl font-black tracking-tight">{bundle.coins.toLocaleString()}</span>
                 <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest -mt-1">Balance</span>
+                {bundle.bonus && bundle.bonus > 1 && (
+                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                    Incl. ₹{bundle.bonus} Bonus
+                  </span>
+                )}
               </div>
             </button>
           ))}
@@ -285,9 +304,9 @@ export function AiRechargeModal({ open, onClose, restaurant, onSuccess }: CoinRe
                     if (e.key === '-' || e.key === '+' || e.key === 'e') e.preventDefault()
                   }}
                   onClick={e => e.stopPropagation()}
-                  className={cn('w-24 text-right', customBalance && customCoinCount < 300 && customCoinCount > 0 ? 'border-red-400 focus-visible:ring-red-400' : '')}
+                  className={cn('w-24 text-right', customBalance && customAmount < 300 && customAmount > 0 ? 'border-red-400 focus-visible:ring-red-400' : '')}
                 />
-                <Label className="text-xs shrink-0">Balance</Label>
+                <Label className="text-xs shrink-0">{bonusUnits > 0 ? `+ ₹${bonusUnits} Bonus` : 'Balance'}</Label>
               </div>
             )}
           </button>
@@ -296,22 +315,34 @@ export function AiRechargeModal({ open, onClose, restaurant, onSuccess }: CoinRe
         {/* Summary Bar with GST Breakdown */}
         <div className="rounded-xl bg-muted/50 p-5 space-y-3 mt-2 border border-border/50">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Base Top-up Amount</span>
+            <span className="text-muted-foreground">Original Price</span>
             <span className="font-medium">₹{basePrice.toLocaleString()}</span>
           </div>
+          {bonusUnits > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium italic">Early Bird Bonus Credit</span>
+              <span className="font-medium text-emerald-600 dark:text-emerald-400">₹{bonusUnits.toLocaleString()}</span>
+            </div>
+          )}
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">GST (18%)</span>
             <span className="font-medium text-amber-600 dark:text-amber-400">+₹{gstAmount.toLocaleString()}</span>
           </div>
           <div className="h-px bg-border/50 w-full" />
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col">
-              <p className="text-sm font-black uppercase tracking-tight">Total Payable</p>
-              <p className="text-[10px] text-muted-foreground">Net of all taxes</p>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <p className="text-sm font-black uppercase tracking-tight">Total Payable</p>
+                <p className="text-[10px] text-muted-foreground">Net price to pay now</p>
+              </div>
+              <p className="text-3xl font-black text-primary tracking-tighter">
+                {totalPayable > 0 ? `₹${totalPayable.toLocaleString()}` : '—'}
+              </p>
             </div>
-            <p className="text-3xl font-black text-primary tracking-tighter">
-              {totalPayable > 0 ? `₹${totalPayable.toLocaleString()}` : '—'}
-            </p>
+            <div className="flex items-center justify-between bg-primary/10 dark:bg-primary/20 p-2 rounded-lg mt-1 border border-primary/20">
+               <span className="text-xs font-bold text-primary italic">Total Wallet Credit:</span>
+               <span className="text-lg font-black text-primary italic">₹{selectedCoins.toLocaleString()}</span>
+            </div>
           </div>
         </div>
 

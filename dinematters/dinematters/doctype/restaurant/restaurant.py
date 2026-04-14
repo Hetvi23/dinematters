@@ -34,6 +34,18 @@ class Restaurant(Document):
 		# Validate plan change (admin-only)
 		self.validate_plan_change()
 		
+		# Generate referral code if not exists
+		if not self.referral_code:
+			self.referral_code = self.generate_referral_code()
+		
+		# Handle referral code passed from UI (referred_by_restaurant_code)
+		if getattr(self, 'referred_by_restaurant_code', None):
+			referrer = frappe.db.get_value("Restaurant", {"referral_code": self.referred_by_restaurant_code}, "name")
+			if referrer:
+				self.referred_by_restaurant = referrer
+			else:
+				frappe.msgprint(_("Warning: Invalid referral code {0} ignored.").format(self.referred_by_restaurant_code))
+		
 		# Prevent non-admin reactivation if suspended for billing
 		self.validate_billing_reactivation()
 		
@@ -198,6 +210,25 @@ class Restaurant(Document):
 			counter += 1
 		
 		return restaurant_id
+	
+	def generate_referral_code(self):
+		"""Generate a premium unique referral code for the restaurant"""
+		import random
+		import string
+		
+		# Base part: "DINE" + first 4 chars of restaurant name (slugified)
+		name_part = self.restaurant_id[:4].upper() if self.restaurant_id else "DINE"
+		# Random part: 4 alphanumeric characters
+		random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+		
+		new_code = f"DINE-{name_part}-{random_part}"
+		
+		# Collision check
+		while frappe.db.exists("Restaurant", {"referral_code": new_code}):
+			random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+			new_code = f"DINE-{name_part}-{random_part}"
+			
+		return new_code
 	
 	def after_insert(self):
 		"""Auto-assign owner when restaurant is created"""

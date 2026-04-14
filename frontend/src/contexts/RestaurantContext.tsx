@@ -36,6 +36,7 @@ interface RestaurantContextType {
   }
   billingInfo: any | null
   googleMapsApiKey: string | null
+  referralCode: string | null
 }
 
 const RestaurantContext = createContext<RestaurantContextType | undefined>(undefined)
@@ -263,6 +264,7 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
         features,
         billingInfo,
         googleMapsApiKey,
+        referralCode: restaurantConfig?.subscription?.referral_code || null
       }}
     >
       {children}

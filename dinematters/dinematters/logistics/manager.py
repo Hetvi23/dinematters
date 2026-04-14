@@ -28,15 +28,12 @@ class LogisticsManager:
         For Self delivery: courier_fee = 0, no platform_fee coin deduction.
         """
         if self.is_self_delivery:
-            # Self delivery: restaurant sets their own delivery charge via markup
-            markup_type = self.restaurant.delivery_markup_type or "Fixed"
-            markup_val = flt(self.restaurant.delivery_markup_value or 0)
-            # For self delivery, markup IS the delivery charge (not on top of courier)
-            delivery_fee = markup_val  # Fixed is direct; % doesn't apply without a base
+            # Self delivery: restaurant sets their own flat delivery charge
+            delivery_fee = flt(self.restaurant.default_delivery_fee or 0)
             return {
                 "success": True,
                 "courier_fee": 0,
-                "markup": delivery_fee,
+                "markup": delivery_fee, # Legacy: For self, the fee IS the markup/revenue
                 "platform_fee": 0,          # No platform cut for self delivery
                 "delivery_fee": delivery_fee, # What the customer pays for delivery
                 "eta_mins": self.restaurant.estimated_prep_time or 30,
@@ -87,7 +84,7 @@ class LogisticsManager:
         """
         # ── Self / Manual Delivery ─────────────────────────────────────────────
         if self.is_self_delivery:
-            delivery_charge = flt(self.restaurant.delivery_markup_value or 0)
+            delivery_charge = flt(self.restaurant.default_delivery_fee or 0)
             return {
                 "success": True,
                 "delivery_id": f"SELF-{order.name}",

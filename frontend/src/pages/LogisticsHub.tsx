@@ -7,27 +7,10 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Truck, Briefcase, Percent, Info, Coins, CheckCircle2, Wallet, User } from 'lucide-react'
+import { Truck, Percent, Info, Coins, CheckCircle2, Wallet, User } from 'lucide-react'
 
 type Provider = 'Borzo' | 'Flash' | 'Self'
 
-const PROVIDER_INFO: Record<Provider, { label: string; badge: string; description: string }> = {
-  Borzo: {
-    label: 'Borzo (Local Courier)',
-    badge: 'DineMatters Managed',
-    description: 'DineMatters dispatches via Borzo. Coins deducted per delivery (Courier + ₹5 Platform Fee).'
-  },
-  Flash: {
-    label: 'uEngage Flash (Aggregator)',
-    badge: 'DineMatters Managed',
-    description: 'DineMatters dispatches via uEngage Flash aggregator. Coins deducted per delivery (Courier + ₹5 Platform Fee).'
-  },
-  Self: {
-    label: 'Self / Own Riders',
-    badge: 'Manual Delivery',
-    description: 'Your restaurant manages its own delivery staff. No external dispatch. No coins deducted.'
-  }
-}
 
 export default function LogisticsHub() {
   const { selectedRestaurant } = useRestaurant()
@@ -36,7 +19,7 @@ export default function LogisticsHub() {
     preferred_logistics_provider: 'Flash' as Provider,
     delivery_markup_type: 'Fixed',
     delivery_markup_value: 0,
-    default_packaging_fee: 0
+    default_delivery_fee: 0
   })
 
   const { data: restaurantDoc, isValidating, mutate } = useFrappeGetDoc(
@@ -51,7 +34,7 @@ export default function LogisticsHub() {
         preferred_logistics_provider: (restaurantDoc.preferred_logistics_provider || 'Flash') as Provider,
         delivery_markup_type: restaurantDoc.delivery_markup_type || 'Fixed',
         delivery_markup_value: restaurantDoc.delivery_markup_value || 0,
-        default_packaging_fee: restaurantDoc.default_packaging_fee || 0
+        default_delivery_fee: restaurantDoc.default_delivery_fee || 0
       })
     }
   }, [restaurantDoc])
@@ -70,7 +53,7 @@ export default function LogisticsHub() {
           preferred_logistics_provider: settings.preferred_logistics_provider,
           delivery_markup_type: settings.delivery_markup_type,
           delivery_markup_value: settings.delivery_markup_value,
-          default_packaging_fee: settings.default_packaging_fee
+          default_delivery_fee: settings.default_delivery_fee
         }
       })
       const body = response?.message ?? response
@@ -93,17 +76,17 @@ export default function LogisticsHub() {
   }
 
   const isSelf = settings.preferred_logistics_provider === 'Self'
-  const isManaged = !isSelf
   const platformFee = isSelf ? 0 : 5
   const courierEstimate = isSelf ? 0 : 40
 
   const markupAmount = isSelf
-    ? settings.delivery_markup_value // For self, markup IS the delivery charge
+    ? settings.default_delivery_fee // For self, this is the fee
     : settings.delivery_markup_type === 'Percentage'
     ? (courierEstimate * settings.delivery_markup_value) / 100
     : settings.delivery_markup_value
 
-  const totalCustomerPays = courierEstimate + markupAmount + platformFee + settings.default_packaging_fee
+  const packagingFee = restaurantDoc?.default_packaging_fee || 0
+  const totalCustomerPays = courierEstimate + markupAmount + platformFee + packagingFee
   const coinsDeducted = courierEstimate + platformFee
 
   if (isValidating && !restaurantDoc) {
@@ -266,8 +249,8 @@ export default function LogisticsHub() {
                   type="number"
                   min="0"
                   className="border-0 shadow-none focus-visible:ring-0 p-0"
-                  value={settings.delivery_markup_value || ''}
-                  onChange={e => handleNumberChange('delivery_markup_value', e.target.value)}
+                  value={isSelf ? (settings.default_delivery_fee || '') : (settings.delivery_markup_value || '')}
+                  onChange={e => handleNumberChange(isSelf ? 'default_delivery_fee' : 'delivery_markup_value', e.target.value)}
                 />
                 {!isSelf && settings.delivery_markup_type === 'Percentage' && (
                   <span className="text-muted-foreground ml-2 text-sm">%</span>
@@ -275,7 +258,7 @@ export default function LogisticsHub() {
               </div>
               <p className="text-xs text-muted-foreground">
                 {isSelf
-                  ? `₹${settings.delivery_markup_value} is shown to the customer as the delivery fee.`
+                  ? `₹${settings.default_delivery_fee} is shown to the customer as the delivery fee.`
                   : settings.delivery_markup_type === 'Fixed'
                   ? `₹${settings.delivery_markup_value} added to every delivery. Your margin.`
                   : `${settings.delivery_markup_value}% of courier cost added as your profit.`}
@@ -284,34 +267,6 @@ export default function LogisticsHub() {
           </CardContent>
         </Card>
 
-        {/* Packaging & Overhead */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Briefcase className="w-5 h-5 text-primary" />
-              <CardTitle>Packaging & Overhead</CardTitle>
-            </div>
-            <CardDescription>Fixed operational fee shown to the customer</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Packaging & Operation Overhead</Label>
-              <div className="flex items-center rounded-md border border-input bg-background overflow-hidden px-3 h-10">
-                <span className="text-muted-foreground mr-2 text-sm">₹</span>
-                <Input
-                  type="number"
-                  min="0"
-                  className="border-0 shadow-none focus-visible:ring-0 p-0"
-                  value={settings.default_packaging_fee || ''}
-                  onChange={e => handleNumberChange('default_packaging_fee', e.target.value)}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Shown as <strong>"Packaging and Extra Charges"</strong> on the customer menu.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Live Fee Breakdown */}
         <Card>
@@ -337,7 +292,10 @@ export default function LogisticsHub() {
             </div>
             <div className="flex justify-between py-1 border-b">
               <span className="text-muted-foreground">Packaging & Overhead</span>
-              <span>+ ₹{settings.default_packaging_fee}</span>
+              <div className="flex items-center gap-2">
+                <span>+ ₹{packagingFee}</span>
+                <a href="/admin/order-settings" className="text-[10px] text-primary hover:underline">Edit</a>
+              </div>
             </div>
             {!isSelf && (
               <div className="flex justify-between py-1 border-b">

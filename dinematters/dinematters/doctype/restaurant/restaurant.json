@@ -109,7 +109,9 @@
   "preferred_logistics_provider",
   "flash_store_id",
   "delivery_markup_type",
-  "delivery_markup_value"
+  "delivery_markup_value",
+  "referral_code",
+  "referred_by_restaurant"
  ],
  "fields": [
   {
@@ -793,6 +795,21 @@
    "fieldtype": "Float",
    "label": "Logistics Markup Value",
    "description": "Additional profit for the restaurant on top of the courier fee."
+  },
+  {
+   "fieldname": "referral_code",
+   "fieldtype": "Data",
+   "label": "Referral Code",
+   "read_only": 1,
+   "unique": 1,
+   "description": "Unique referral code for this restaurant"
+  },
+  {
+   "fieldname": "referred_by_restaurant",
+   "fieldtype": "Link",
+   "label": "Referred By",
+   "options": "Restaurant",
+   "description": "The restaurant that referred this one"
   }
  ],
  "index_web_pages_for_search": 1,

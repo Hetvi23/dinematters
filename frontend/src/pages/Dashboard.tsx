@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import { ReactNode, useState } from 'react'
 import { useFrappeGetDocList, useFrappeGetCall } from '@/lib/frappe'
 import { LogisticsHubCard } from '@/components/LogisticsHubCard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,17 +11,19 @@ import {
   XCircle, 
   AlertCircle, 
   Crown, 
-  Lock, 
-  ArrowRight,
+  Lock,
   Zap,
   Star,
   Activity,
   MapPin,
   QrCode,
-  Users
+  Users,
+  Copy,
+  Gift
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { useCurrency } from '@/hooks/useCurrency'
 import { cn } from '@/lib/utils'
@@ -185,7 +187,10 @@ function LockedInsight({ title, description, children, isUnlocked }: { title: st
 
 // Main Dashboard Component
 export default function Dashboard() {
-  const { selectedRestaurant, isGold, isDiamond } = useRestaurant()
+  const { selectedRestaurant, referralCode } = useRestaurant()
+  const [showReferralInfo, setShowReferralInfo] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const { isGold, isDiamond } = useRestaurant()
   const isAtLeastGold = isGold || isDiamond
   const { formatAmountNoDecimals } = useCurrency()
   const navigate = useNavigate()
@@ -281,22 +286,30 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Dynamic Upgrade Banner */}
-        {!isAtLeastGold && (
-           <div 
-             className="flex flex-1 sm:flex-initial items-center gap-3 sm:gap-4 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 p-3 sm:p-4 rounded-xl border border-orange-100 dark:border-orange-900/30 group cursor-pointer hover:shadow-md transition-all duration-300" 
-             onClick={() => navigate('/autopay-setup')}
-           >
-             <div className="h-10 w-10 bg-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-orange-500/20 group-hover:scale-110 transition-transform">
-               <Zap className="h-5 w-5 text-white animate-pulse" />
-             </div>
-             <div>
-               <p className="text-sm font-bold text-orange-700 dark:text-orange-400 uppercase tracking-wide text-[10px]">Ready to grow?</p>
-               <p className="text-xs font-bold text-foreground/90">Unlock Scan-to-Order Conversion</p>
-             </div>
-             <ArrowRight className="h-4 w-4 text-orange-400 ml-4 group-hover:translate-x-1 transition-transform" />
-           </div>
-        )}
+        {/* Merchant Referrals - Compact Header Version */}
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-indigo-900 to-indigo-800 p-4 text-white shadow-lg shadow-indigo-500/10 border border-indigo-700/30 flex items-center gap-4 group cursor-pointer hover:shadow-indigo-500/20 transition-all duration-300 max-w-sm"
+          onClick={() => setShowReferralInfo(true)}
+        >
+          <div className="absolute -top-2 -right-2 opacity-5">
+            <Users className="h-16 w-16" />
+          </div>
+          <div className="h-10 w-10 bg-indigo-500 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-110 transition-transform">
+             <Star className="h-5 w-5 text-indigo-100 fill-indigo-100" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] uppercase font-bold text-indigo-200/60 tracking-wider">Refer & Earn ₹500</p>
+              <div className="h-1 w-1 rounded-full bg-indigo-400/50" />
+              <p className="text-[10px] font-mono font-bold text-white tracking-widest">{referralCode || '...'}</p>
+            </div>
+            <p className="text-xs font-medium text-indigo-100/90 line-clamp-1">Share code with other merchants</p>
+          </div>
+          <div className="bg-emerald-500 p-2 rounded-lg shadow-lg shadow-emerald-500/20 group-hover:bg-emerald-400 transition-colors">
+            <svg className="h-4 w-4 fill-white" viewBox="0 0 24 24">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+            </svg>
+          </div>
+        </div>
       </div>
 
       {/* --- PRODUCTION ANALYTICS GRID --- */}
@@ -619,6 +632,107 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Refer & Earn Information Modal */}
+      <Dialog open={showReferralInfo} onOpenChange={setShowReferralInfo}>
+        <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-none shadow-2xl">
+          <div className="bg-gradient-to-br from-indigo-600 to-purple-700 p-8 text-white relative">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <Gift className="h-32 w-32" />
+            </div>
+            <div className="relative z-10 flex flex-col items-center text-center">
+              <div className="h-16 w-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-4 shadow-xl border border-white/30">
+                <Star className="h-8 w-8 text-white fill-white" />
+              </div>
+              <h2 className="text-2xl font-black tracking-tight mb-2">Refer & Earn ₹500</h2>
+              <p className="text-indigo-100/80 text-sm leading-relaxed">
+                Grow your network and get rewarded for every restaurant you bring to DineMatters.
+              </p>
+            </div>
+          </div>
+          
+          <div className="p-6 space-y-6 bg-card">
+            {/* Reward Summary */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-emerald-50 dark:bg-emerald-950/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-900/30 text-center">
+                <p className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 mb-1">You Get</p>
+                <p className="text-xl font-black text-emerald-700 dark:text-emerald-300">₹500</p>
+                <p className="text-[9px] text-emerald-600/70 font-medium">Wallet Credit</p>
+              </div>
+              <div className="bg-indigo-50 dark:bg-indigo-950/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/30 text-center">
+                <p className="text-[10px] uppercase font-bold text-indigo-600 dark:text-indigo-400 mb-1">They Get</p>
+                <p className="text-xl font-black text-indigo-700 dark:text-indigo-300">₹500</p>
+                <p className="text-[9px] text-indigo-600/70 font-medium">Joining Bonus</p>
+              </div>
+            </div>
+
+            {/* Code Selection */}
+            <div className="space-y-3">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest pl-1">Your Referral Code</p>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 bg-muted/50 border border-border h-14 rounded-xl flex items-center px-4 font-mono font-bold text-lg tracking-[0.2em] text-foreground">
+                  {referralCode || 'DINE-XXXX-XXXX'}
+                </div>
+                <Button 
+                  className={cn(
+                    "h-14 w-14 rounded-xl transition-all shadow-md",
+                    copied ? "bg-emerald-500 hover:bg-emerald-600" : "bg-primary hover:bg-primary/90"
+                  )}
+                  onClick={() => {
+                    navigator.clipboard.writeText(referralCode || '')
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 2000)
+                  }}
+                >
+                  {copied ? <CheckCircle className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                </Button>
+              </div>
+            </div>
+
+            {/* Info Points */}
+            <div className="space-y-3 pt-2">
+               <div className="flex items-start gap-3">
+                  <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-[10px] font-bold text-primary">1</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-snug">Share your code with any merchant or restaurant owner.</p>
+               </div>
+               <div className="flex items-start gap-3">
+                  <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-[10px] font-bold text-primary">2</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-snug">They enter your code during their registration or onboarding.</p>
+               </div>
+               <div className="flex items-start gap-3">
+                  <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-[10px] font-bold text-primary">3</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-snug">Both of you receive <span className="font-bold text-foreground">₹500 Credit</span> once they complete their first top-up of ₹1,000 or more.</p>
+               </div>
+            </div>
+          </div>
+
+          <DialogFooter className="p-6 pt-0 flex flex-col sm:flex-row gap-3">
+            <Button 
+              className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl h-12 flex-1 shadow-lg shadow-emerald-500/20 font-bold"
+              onClick={() => {
+                const text = `Hey! I'm using DineMatters for my restaurant and it's amazing. Use my referral code *${referralCode}* to get ₹500 bonus on your first recharge. Register at: https://dinematters.com`
+                window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                </svg>
+                Share on WhatsApp
+              </div>
+            </Button>
+            <Button variant="ghost" onClick={() => setShowReferralInfo(false)} className="rounded-xl h-12 text-muted-foreground flex-1">
+              Maybe Later
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

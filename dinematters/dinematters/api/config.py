@@ -241,6 +241,7 @@ def get_restaurant_config(restaurant_id):
 				"planType": restaurant_doc.plan_type or "SILVER",
 				"billingStatus": restaurant_doc.billing_status or "active",
 				"coinsBalance": float(restaurant_doc.coins_balance or 0),
+				"referral_code": restaurant_doc.referral_code,
 				"isActive": bool(restaurant_doc.is_active),
 				"deferredPlanType": restaurant_doc.deferred_plan_type,
 				"planChangeDate": restaurant_doc.plan_change_date,

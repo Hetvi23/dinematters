@@ -225,7 +225,7 @@ export default function OrderSettings() {
               <div className="space-y-0.5">
                 <Label>Enable Delivery</Label>
                 <p className="text-sm text-muted-foreground">
-                  Show delivery option on the ordering page
+                  Show delivery option on the ordering page. Configure providers in the <a href="/admin/logistics-hub" className="text-primary hover:underline font-medium">Logistics Hub</a>.
                 </p>
               </div>
               <Checkbox
@@ -237,19 +237,31 @@ export default function OrderSettings() {
             {settings.enable_delivery === 1 && (
               <>
                 <div className="space-y-2">
-                  <Label>Default Delivery Fee</Label>
-                  <div className="flex items-center rounded-md border border-input bg-background overflow-hidden">
+                  <div className="flex justify-between items-center">
+                    <Label>Default Delivery Fee</Label>
+                    {(restaurantDoc?.preferred_logistics_provider === 'Borzo' || restaurantDoc?.preferred_logistics_provider === 'Flash') && (
+                      <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                        Managed by Logistics Hub
+                      </span>
+                    )}
+                  </div>
+                  <div className={`flex items-center rounded-md border border-input bg-background overflow-hidden ${(restaurantDoc?.preferred_logistics_provider === 'Borzo' || restaurantDoc?.preferred_logistics_provider === 'Flash') ? 'opacity-50 grayscale select-none cursor-not-allowed' : ''}`}>
                     <span className="flex h-8 items-center border-r border-input px-3 text-sm leading-none text-muted-foreground font-medium">
                       ₹
                     </span>
                     <Input
                       type="number"
+                      disabled={restaurantDoc?.preferred_logistics_provider === 'Borzo' || restaurantDoc?.preferred_logistics_provider === 'Flash'}
                       className="h-8 border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:border-0"
                       value={settings.default_delivery_fee || ''}
                       onChange={(e) => handleNumberChange('default_delivery_fee', e.target.value)}
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">Applied to all delivery orders</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(restaurantDoc?.preferred_logistics_provider === 'Borzo' || restaurantDoc?.preferred_logistics_provider === 'Flash') 
+                      ? 'Fees are calculated dynamically based on courier cost + your markup.' 
+                      : 'Flat fee applied to all self-managed delivery orders.'}
+                  </p>
                 </div>
 
                 <div className="space-y-2">
