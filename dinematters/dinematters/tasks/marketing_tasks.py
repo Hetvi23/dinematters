@@ -20,6 +20,7 @@ Design decisions:
 
 import frappe
 import time
+import traceback
 from frappe.utils import now_datetime, getdate, add_days
 
 BATCH_SIZE = 50          # messages per batch to avoid API rate limits
@@ -769,8 +770,11 @@ def generate_daily_seo_blog():
         gen = ContentGenerator()
         
         # ✅ DYNAMIC KEYWORD GENERATION (High-End SEO Strategy)
-        # Fetch cuisine type from Restaurant if available
-        cuisine = frappe.db.get_value("Restaurant", res_id, "cuisine") or "Multi-cuisine"
+        # Fetch cuisine type from Restaurant if available (field may not exist on all installations)
+        try:
+            cuisine = frappe.db.get_value("Restaurant", res_id, "cuisine") or "Multi-cuisine"
+        except Exception:
+            cuisine = "Multi-cuisine"
         location_slug = res_city
         
         # Prepare dish objects for keyword generator
