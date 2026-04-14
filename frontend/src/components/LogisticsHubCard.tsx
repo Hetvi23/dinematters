@@ -11,6 +11,8 @@ interface Order {
   delivery_status?: string
   total: number
   delivery_fee?: number
+  delivery_courier_fee?: number
+  logistics_platform_fee?: number
 }
 
 interface LogisticsHubCardProps {
@@ -27,9 +29,13 @@ export function LogisticsHubCard({ orders, isLoading }: LogisticsHubCardProps) {
     !['delivered', 'cancelled', 'cancelled_by_manager', 'cancelled_by_client'].includes(o.delivery_status?.toLowerCase() || '')
   )
 
-  const todayDeliveryRevenue = orders
+  const todayDeliveryCost = orders
     .filter(o => o.order_type === 'delivery' && ['borzo', 'flash'].includes(o.delivery_partner || ''))
-    .reduce((sum, o) => sum + (o.delivery_fee || 0), 0)
+    .reduce((sum, o) => {
+      // Use exact cost breakdown if available, fallback to delivery fee for legacy
+      const cost = (o.delivery_courier_fee || 0) + (o.logistics_platform_fee || 0)
+      return sum + (cost > 0 ? cost : (o.delivery_fee || 0))
+    }, 0)
 
   const latestActive = activeDeliveries[0]
 
@@ -64,9 +70,9 @@ export function LogisticsHubCard({ orders, isLoading }: LogisticsHubCardProps) {
           <div className="space-y-1 text-right">
             <p className="text-xl font-black tracking-tight text-amber-400 flex items-center justify-end gap-1">
               <IndianRupee className="h-4 w-4" />
-              {formatAmountNoDecimals(todayDeliveryRevenue)}
+              {formatAmountNoDecimals(todayDeliveryCost)}
             </p>
-            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight">Logistic Cost (Today)</p>
+            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight">Today's Logistic Cost</p>
           </div>
         </div>
 

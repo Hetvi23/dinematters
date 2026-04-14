@@ -47,6 +47,13 @@ class Order(Document):
         self.tax_percent = result["taxRate"]
         self.delivery_fee = result["deliveryFee"]
         self.packaging_fee = result["packagingFee"]
+        
+        # Delivery breakdown for reporting
+        details = result.get("deliveryDetails", {})
+        self.delivery_courier_fee = flt(details.get("courier_fee", 0))
+        self.delivery_markup = flt(details.get("markup", 0))
+        self.logistics_platform_fee = flt(details.get("platform_fee", 0))
+        
         self.total = result["total"]
 
         # 5. Update Platform Fee (Dynamic commission on GMV)

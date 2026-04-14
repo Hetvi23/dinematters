@@ -46,7 +46,7 @@ def load_customization_options(product_doc):
 
 
 @frappe.whitelist(allow_guest=True)
-def add_to_cart(restaurant_id, dish_id, quantity=1, customizations=None, session_id=None, table_number=None):
+def add_to_cart(restaurant_id, dish_id, quantity=1, customizations=None, session_id=None, table_number=None, latitude=None, longitude=None):
 	"""
 	POST /api/v1/cart/add
 	Add item to cart
@@ -160,7 +160,7 @@ def add_to_cart(restaurant_id, dish_id, quantity=1, customizations=None, session
 			entry_doc.insert(ignore_permissions=True)
 		
 		# Get cart summary (for this restaurant)
-		cart_summary = get_cart_summary(user, session_id, restaurant)
+		cart_summary = get_cart_summary(user, session_id, restaurant, latitude=latitude, longitude=longitude)
 		
 		cart_item_data = {
 					"entryId": entry_id,
@@ -196,7 +196,7 @@ def add_to_cart(restaurant_id, dish_id, quantity=1, customizations=None, session
 
 
 @frappe.whitelist(allow_guest=True)
-def get_cart(restaurant_id, session_id=None, coupon_code=None, loyalty_coins=0, order_type=None):
+def get_cart(restaurant_id, session_id=None, coupon_code=None, loyalty_coins=0, order_type=None, latitude=None, longitude=None):
 	"""
 	GET /api/v1/cart
 	Get current cart with detailed pricing Breakdown
@@ -248,7 +248,9 @@ def get_cart(restaurant_id, session_id=None, coupon_code=None, loyalty_coins=0, 
 			coupon_code=coupon_code,
 			loyalty_coins=flt(loyalty_coins),
 			customer=customer_id,
-			delivery_type=order_type.capitalize() if order_type else None
+			delivery_type=order_type.capitalize() if order_type else None,
+			latitude=latitude,
+			longitude=longitude
 		)
 		
 		return {
@@ -443,7 +445,7 @@ def generate_session_id():
 	return ''.join(random.choices(string.ascii_letters + string.digits, k=32))
 
 
-def get_cart_summary(user, session_id, restaurant, coupon_code=None, loyalty_coins=0, order_type=None):
+def get_cart_summary(user, session_id, restaurant, coupon_code=None, loyalty_coins=0, order_type=None, latitude=None, longitude=None):
 	"""Calculate cart summary using centralized pricing engine."""
 	filters = {"restaurant": restaurant}
 	if user: filters["user"] = user
@@ -475,7 +477,9 @@ def get_cart_summary(user, session_id, restaurant, coupon_code=None, loyalty_coi
 		coupon_code=coupon_code,
 		loyalty_coins=loyalty_coins,
 		customer=customer_id,
-		delivery_type=order_type.capitalize() if order_type else None
+		delivery_type=order_type.capitalize() if order_type else None,
+		latitude=latitude,
+		longitude=longitude
 	)
 
 

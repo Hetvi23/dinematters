@@ -1252,7 +1252,7 @@ def _get_bill_details(order_doc, recalculated_subtotal=None):
 		bill_details.append({"label": "Taxes & Charges", "value": flt(order_doc.tax), "type": "tax"})
 		
 	if flt(getattr(order_doc, "packaging_fee", 0)) > 0:
-		bill_details.append({"label": "Packaging Charge", "value": flt(order_doc.packaging_fee), "type": "fee"})
+		bill_details.append({"label": "Packaging and Extra Charges", "value": flt(order_doc.packaging_fee), "type": "fee"})
 		
 	if flt(getattr(order_doc, "delivery_fee", 0)) > 0:
 		bill_details.append({"label": "Delivery Fee", "value": flt(order_doc.delivery_fee), "type": "fee"})

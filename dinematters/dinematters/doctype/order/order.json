@@ -32,6 +32,8 @@
   "delivery_fee",
   "packaging_fee",
   "logistics_platform_fee",
+  "delivery_courier_fee",
+  "delivery_markup",
   "total",
   "coupon",
   "loyalty_coins_redeemed",
@@ -271,6 +273,22 @@
    "label": "Logistics Platform Fee",
    "read_only": 1,
    "description": "Fee earned by DineMatters platform for delivery management"
+  },
+  {
+   "default": "0",
+   "fieldname": "delivery_courier_fee",
+   "fieldtype": "Currency",
+   "label": "Delivery Courier Fee",
+   "read_only": 1,
+   "description": "Actual courier cost before platform fee and markup"
+  },
+  {
+   "default": "0",
+   "fieldname": "delivery_markup",
+   "fieldtype": "Currency",
+   "label": "Delivery Markup",
+   "read_only": 1,
+   "description": "Restaurant profit markup on delivery"
   },
   {
    "fieldname": "total",
