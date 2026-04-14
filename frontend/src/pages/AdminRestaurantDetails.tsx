@@ -306,21 +306,15 @@ function AdminRestaurantDetailsPage() {
                   Upload Menu
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>AI Menu Extraction</DialogTitle>
-                  <DialogDescription>
-                    Upload menu images to automatically generate categories and products for {restaurant.restaurant_name}.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="mt-4">
-                  <MenuImageExtractorForm 
-                    restaurantId={restaurant.name} 
-                    onComplete={() => {
-                        toast.success('Menu extraction complete!')
-                    }}
-                  />
-                </div>
+              <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 border-none shadow-2xl">
+                <MenuImageExtractorForm 
+                  restaurantId={restaurant.name} 
+                  restaurantName={restaurant.restaurant_name}
+                  onComplete={() => {
+                      toast.success('Menu extraction complete!')
+                  }}
+                  onClose={() => setIsMenuModalOpen(false)}
+                />
               </DialogContent>
             </Dialog>
 

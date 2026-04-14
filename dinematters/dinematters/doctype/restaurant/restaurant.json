@@ -111,7 +111,13 @@
   "delivery_markup_type",
   "delivery_markup_value",
   "referral_code",
-  "referred_by_restaurant"
+  "referred_by_restaurant",
+  "section_break_google_growth",
+  "google_business_account_id",
+  "google_business_location_id",
+  "enable_google_sync",
+  "google_review_url",
+  "google_insights_data"
  ],
  "fields": [
   {

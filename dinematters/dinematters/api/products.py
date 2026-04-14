@@ -160,7 +160,8 @@ def get_products(restaurant_id, category=None, type=None, vegetarian=None, searc
 				"main_category as mainCategory",
 				"display_order",
 				"is_active",
-				"recommendations"
+				"recommendations",
+				"seo_slug"
 			],
 			filters=filters,
 			or_filters=or_filters if or_filters else None,
@@ -570,7 +571,8 @@ def format_product(product_doc):
 		"calories": cint(product_doc.calories) or 0,
 		"servingSize": product_doc.serving_size or "1",
 		"displayOrder": cint(product_doc.display_order) or 0,
-		"isActive": bool(product_doc.is_active) if hasattr(product_doc, 'is_active') else True
+		"isActive": bool(product_doc.is_active) if hasattr(product_doc, 'is_active') else True,
+		"seo_slug": product_doc.seo_slug
 	}
 	
 	# Optional fields
@@ -696,4 +698,42 @@ def format_product(product_doc):
 			pass
 	
 	return product
+
+@frappe.whitelist(allow_guest=True)
+def get_product_by_slug(restaurant_id, slug):
+	"""
+	GET /api/method/dinematters.dinematters.api.products.get_product_by_slug
+	Get single product by SEO slug
+	"""
+	try:
+		restaurant = validate_restaurant_for_api(restaurant_id)
+		
+		# Find product by slug
+		product = frappe.db.get_value(
+			"Menu Product",
+			{"restaurant": restaurant, "seo_slug": slug, "is_active": 1},
+			"name"
+		)
+		
+		if not product:
+			return {
+				"success": False,
+				"error": {
+					"code": "PRODUCT_NOT_FOUND",
+					"message": f"Product with slug '{slug}' not found"
+				}
+			}
+		
+		# Reuse get_product logic
+		return get_product(restaurant_id, product)
+		
+	except Exception as e:
+		frappe.log_error(f"Error in get_product_by_slug: {str(e)}")
+		return {
+			"success": False,
+			"error": {
+				"code": "PRODUCT_FETCH_ERROR",
+				"message": str(e)
+			}
+		}
 

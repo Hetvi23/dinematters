@@ -12,6 +12,7 @@
   "product_id",
   "category",
   "category_name",
+  "seo_slug",
   "column_break_1",
   "product_type",
   "main_category",
@@ -34,7 +35,10 @@
   "section_break_customizations",
   "customization_questions",
   "section_break_recommendations",
-  "recommendations"
+  "recommendations",
+  "section_break_google_sync",
+  "google_item_id",
+  "google_product_id"
  ],
  "fields": [
   {
@@ -45,7 +49,7 @@
    "in_list_view": 1,
    "label": "Product ID",
    "read_only": 1,
-   "unique": 1
+   "unique": 0
   },
   {
    "fieldname": "restaurant",
@@ -78,6 +82,14 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Category Name"
+  },
+  {
+   "description": "Clean URL for SEO (e.g., margherita-pizza). Auto-generated if left blank.",
+   "fieldname": "seo_slug",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "SEO Slug",
+   "unique": 1
   },
   {
    "fieldname": "column_break_1",
@@ -205,10 +217,27 @@
    "label": "Recommendations"
   },
   {
+   "description": "AI-generated recommendations for this product (stored as JSON array)",
    "fieldname": "recommendations",
    "fieldtype": "JSON",
-   "label": "Recommendations",
-   "description": "AI-generated recommendations for this product (stored as JSON array)"
+   "label": "Recommendations"
+  },
+  {
+   "fieldname": "section_break_google_sync",
+   "fieldtype": "Section Break",
+   "label": "Google Business Sync"
+  },
+  {
+   "fieldname": "google_item_id",
+   "fieldtype": "Data",
+   "label": "Google Menu Item ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "google_product_id",
+   "fieldtype": "Data",
+   "label": "Google Product ID",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,

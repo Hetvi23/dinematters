@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:category_id",
+ "autoname": "hash",
  "creation": "2024-01-15 10:00:00.000000",
  "doctype": "DocType",
  "editable_grid": 1,
@@ -37,7 +37,7 @@
    "in_list_view": 1,
    "label": "Category ID",
    "reqd": 1,
-   "unique": 1
+   "unique": 0
   },
   {
    "fieldname": "category_name",

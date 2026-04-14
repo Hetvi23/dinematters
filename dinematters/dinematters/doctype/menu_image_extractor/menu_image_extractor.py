@@ -51,8 +51,8 @@ class MenuImageExtractor(Document):
 		# Optional: Clear the table links too if we want to be thorough, 
 		# but keeping the rows (now with empty media_asset) provides a record of what was uploaded.
 
-def generate_product_id_from_name(product_name):
-	"""Generate a slug-like product_id from product_name"""
+def generate_product_id_from_name(product_name, restaurant=None):
+	"""Generate a slug-like product_id from product_name, unique within restaurant"""
 	if not product_name:
 		return None
 	
@@ -68,24 +68,24 @@ def generate_product_id_from_name(product_name):
 	if len(product_id) > 140:
 		product_id = product_id[:140].rstrip('-')
 	
-	# Ensure uniqueness by checking if it exists
-	base_id = product_id
-	counter = 1
-	while frappe.db.exists("Menu Product", product_id):
-		product_id = f"{base_id}-{counter}"
-		counter += 1
-		# Prevent infinite loop
-		if counter > 1000:
-			# Use timestamp as fallback
-			import time
-			product_id = f"{base_id}-{int(time.time())}"
-			break
+	# Ensure uniqueness within the restaurant by checking if it exists
+	if restaurant:
+		base_id = product_id
+		counter = 1
+		while frappe.db.get_value("Menu Product", {"product_id": product_id, "restaurant": restaurant}, "name"):
+			product_id = f"{base_id}-{counter}"
+			counter += 1
+			# Prevent infinite loop
+			if counter > 1000:
+				import time
+				product_id = f"{base_id}-{int(time.time())}"
+				break
 	
 	return product_id
 
 
-def generate_category_id_from_name(category_name):
-	"""Generate a slug-like category_id from category_name"""
+def generate_category_id_from_name(category_name, restaurant=None):
+	"""Generate a slug-like category_id from category_name, unique within restaurant"""
 	if not category_name:
 		return None
 	
@@ -100,6 +100,19 @@ def generate_category_id_from_name(category_name):
 	# Limit length to 140 characters (Frappe name field limit)
 	if len(category_id) > 140:
 		category_id = category_id[:140].rstrip('-')
+	
+	# Ensure uniqueness within the restaurant by checking if it exists
+	if restaurant:
+		base_id = category_id
+		counter = 1
+		while frappe.db.get_value("Menu Category", {"category_id": category_id, "restaurant": restaurant}, "name"):
+			category_id = f"{base_id}-{counter}"
+			counter += 1
+			# Prevent infinite loop
+			if counter > 1000:
+				import time
+				category_id = f"{base_id}-{int(time.time())}"
+				break
 	
 	return category_id
 
@@ -1013,72 +1026,68 @@ def process_extracted_data(data, extractor_doc):
 			
 			if not category_id or not category_name:
 				frappe.log_error(
-					f"Skipping category: still missing critical identity after fallback. id={category_id}, name={category_name}",
-					"Menu Category Creation Skip"
+					title="Menu Category Creation Skip",
+					message=f"Skipping category: still missing critical identity after fallback. id={category_id}, name={category_name}"
 				)
 				continue
 			
 			# Normalize name for mapping
 			norm_cat_name = str(category_name).strip().lower()
 			
-			# Check if category exists for THIS restaurant (by category_id AND restaurant)
-			existing_category = None
-			if frappe.db.exists("Menu Category", category_id):
-				existing_category = frappe.get_doc("Menu Category", category_id)
-				# Verify restaurant matches - if not, treat as new category
-				if existing_category.restaurant != restaurant:
-					existing_category = None  # Different restaurant, create new category
-			else:
+			# Check if category already exists for THIS restaurant (by category_id AND restaurant)
+			existing_category_name = frappe.db.get_value(
+				"Menu Category", 
+				{"category_id": category_id, "restaurant": restaurant}, 
+				"name"
+			)
+			
+			if not existing_category_name:
 				# Also check by category_name AND restaurant in case category_id changed
-				existing_by_name = frappe.db.get_value(
+				existing_category_name = frappe.db.get_value(
 					"Menu Category", 
 					{"category_name": category_name, "restaurant": restaurant}, 
 					"name"
 				)
-				if existing_by_name:
-					existing_category = frappe.get_doc("Menu Category", existing_by_name)
-					category_id = existing_category.name  # Use existing category_id
 			
-			if existing_category and existing_category.restaurant == restaurant:
-				# Update existing category (only if restaurant matches)
-				cat_doc = existing_category
+			if existing_category_name:
+				# Update existing category
+				cat_doc = frappe.get_doc("Menu Category", existing_category_name)
 				cat_doc.display_name = cat_data.get('displayName', category_name)
 				cat_doc.description = cat_data.get('description', '')
 				cat_doc.is_special = 1 if cat_data.get('isSpecial') else 0
 				
 				cat_doc.save(ignore_permissions=True)
-				stats['categories_created'] += 1  # Track as created for stats (could add categories_updated if needed)
-				category_map[category_name] = category_id
+				stats['categories_created'] += 1
+				category_map[category_name] = cat_doc.category_id
 			else:
-				# Create new category (either doesn't exist or belongs to different restaurant)
-				try:
-					cat_doc = frappe.new_doc("Menu Category")
-					cat_doc.category_id = category_id
-					cat_doc.restaurant = restaurant
-					cat_doc.category_name = category_name
-					cat_doc.display_name = cat_data.get('displayName', category_name)
-					cat_doc.description = cat_data.get('description', '')
-					cat_doc.is_special = 1 if cat_data.get('isSpecial') else 0
-					
-					cat_doc.save(ignore_permissions=True)
-					stats['categories_created'] += 1
-					category_map[category_name] = category_id
-				except frappe.exceptions.UniqueValidationError:
-					# Race condition: category was created by another process
-					# Just use the existing one
-					frappe.log_error(
-						f"Category {category_id} was created by another process. Using existing category.",
-						"Menu Category - Race Condition"
-					)
+				# Create new category
+				# IMPORTANT: Since category_id is no longer globally unique, 
+				# we just use the one provided (which generate_category_id_from_name ensures is unique for us)
+				# But if the API provided a conflicting one, let's double check
+				if frappe.db.get_value("Menu Category", {"category_id": category_id, "restaurant": restaurant}, "name"):
+					# This should be handled by the update logic above, but safety first
+					category_id = generate_category_id_from_name(category_name, restaurant=restaurant)
+
+				cat_doc = frappe.new_doc("Menu Category")
+				cat_doc.category_id = category_id
+				cat_doc.restaurant = restaurant
+				cat_doc.category_name = category_name
+				cat_doc.display_name = cat_data.get('displayName', category_name)
+				cat_doc.description = cat_data.get('description', '')
+				cat_doc.is_special = 1 if cat_data.get('isSpecial') else 0
 				
-				# Populate map with both original and normalized name for maximum fallback compatibility
+				cat_doc.save(ignore_permissions=True)
+				stats['categories_created'] += 1
 				category_map[category_name] = category_id
-				category_map[norm_cat_name] = category_id
+			
+			# Populate map with both original and normalized name for maximum fallback compatibility
+			category_map[category_name] = category_id
+			category_map[norm_cat_name] = category_id
 			
 		except Exception as e:
-			error_msg = f"Error creating/updating category {category_id or 'unknown'}: {str(e)[:140]}"
-			frappe.log_error(error_msg, "Menu Category Creation Error")
-			# Continue with next category instead of failing completely
+			raw_err = str(e)
+			error_msg = f"Error creating category {category_id or 'unknown'}: {raw_err[:100]}"
+			frappe.log_error(title="Menu Category Creation Error", message=f"{error_msg}\n\n{frappe.get_traceback()}")
 			continue
 	
 	# Create or update dishes/products
@@ -1089,38 +1098,34 @@ def process_extracted_data(data, extractor_doc):
 			continue
 		
 		product_name = dish_data.get('name')
-		
 		if not product_name:
 			stats['items_skipped'] += 1
 			continue
 		
-		# Generate product_id from product_name
-		product_id = generate_product_id_from_name(product_name)
+		product_id = dish_data.get('id') or generate_product_id_from_name(product_name, restaurant=restaurant)
 		
-		# Check if product exists for THIS restaurant (by product_id AND restaurant)
-		existing_product = None
-		if frappe.db.exists("Menu Product", product_id):
-			existing_product = frappe.get_doc("Menu Product", product_id)
-			# Verify restaurant matches - if not, treat as new product
-			if existing_product.restaurant != restaurant:
-				existing_product = None  # Different restaurant, create new product
-		else:
-			# Also check by product_name AND restaurant in case product_id changed
-			existing_by_name = frappe.db.get_value(
+		# Check if product exists for THIS restaurant
+		existing_product_name = frappe.db.get_value(
+			"Menu Product", 
+			{"product_id": product_id, "restaurant": restaurant}, 
+			"name"
+		)
+		
+		if not existing_product_name:
+			existing_product_name = frappe.db.get_value(
 				"Menu Product", 
 				{"product_name": product_name, "restaurant": restaurant}, 
 				"name"
 			)
-			if existing_by_name:
-				existing_product = frappe.get_doc("Menu Product", existing_by_name)
-				product_id = existing_product.name  # Use existing product_id
 		
-		if existing_product and existing_product.restaurant == restaurant:
-			# Update existing product (only if restaurant matches)
-			product_doc = existing_product
+		if existing_product_name:
+			# Update existing product
+			product_doc = frappe.get_doc("Menu Product", existing_product_name)
 			stats['items_updated'] += 1
 		else:
-			# Create new product (either doesn't exist or belongs to different restaurant)
+			# Create new product
+			# Re-generate product_id ensures it's unique within the restaurant
+			product_id = generate_product_id_from_name(product_name, restaurant=restaurant)
 			product_doc = frappe.new_doc("Menu Product")
 			product_doc.product_id = product_id
 			stats['items_created'] += 1
@@ -1133,13 +1138,10 @@ def process_extracted_data(data, extractor_doc):
 		product_doc.price = scrub_price(dish_data.get('price', 0))
 		product_doc.original_price = scrub_price(dish_data.get('originalPrice', 0))
 		
-		# Handle description: Only set if product doesn't already have one
-		# The API will generate descriptions only for items missing them when generate_descriptions=true
+		# Handle description
 		api_description = dish_data.get('description', '').strip()
 		if not product_doc.description or not product_doc.description.strip():
-			# Product doesn't have description - use API description (may be generated or extracted)
 			product_doc.description = api_description
-		# Else: Product already has description - preserve it (don't overwrite)
 		
 		product_doc.is_vegetarian = 1 if dish_data.get('isVegetarian') else 0
 		product_doc.has_no_media = 1 if dish_data.get('hasNoMedia') else 0
@@ -1150,16 +1152,20 @@ def process_extracted_data(data, extractor_doc):
 		
 		if category_name:
 			norm_dish_cat = str(category_name).strip().lower()
-			# Try original name first, then normalized
 			cat_to_link = category_map.get(category_name) or category_map.get(norm_dish_cat)
+			
+			if not cat_to_link:
+				# Deep lookup in DB for this restaurant if not in current map
+				cat_to_link = frappe.db.get_value("Menu Category", {"category_id": category_name, "restaurant": restaurant}, "category_id")
+				if not cat_to_link:
+					cat_to_link = frappe.db.get_value("Menu Category", {"category_name": category_name, "restaurant": restaurant}, "category_id")
 		
 		if cat_to_link:
-			product_doc.category = cat_to_link
-			product_doc.category_name = category_name or frappe.db.get_value("Menu Category", cat_to_link, "category_name")
+			product_doc.category = frappe.db.get_value("Menu Category", {"category_id": cat_to_link, "restaurant": restaurant}, "name")
+			product_doc.category_name = category_name or frappe.db.get_value("Menu Category", product_doc.category, "category_name")
 		elif category_name:
-			# If category name exists but wasn't in list, create it on the fly or at least set the name
 			product_doc.category_name = category_name
-			frappe.log_error(f"Dish '{product_name}' refers to unknown category '{category_name}'. Link failed.", "Menu Extraction - Link Warning")
+			frappe.log_error(title="Menu Extraction - Link Warning", message=f"Dish '{product_name}' refers to unknown category '{category_name}'. Link failed.")
 		
 		# Set main category
 		main_category = dish_data.get('mainCategory')
@@ -1179,68 +1185,34 @@ def process_extracted_data(data, extractor_doc):
 		# Handle media if present
 		media_list = dish_data.get('media', [])
 		if media_list and isinstance(media_list, list) and len(media_list) > 0:
-			# Clear existing media
 			product_doc.product_media = []
-			
 			media_added = 0
 			for idx, media_item in enumerate(media_list):
-				# Handle both string URLs and object formats
 				media_url = None
 				if isinstance(media_item, str):
 					media_url = media_item
 				elif isinstance(media_item, dict):
 					media_url = media_item.get('url') or media_item.get('media_url') or media_item.get('src')
 				
-				if not media_url:
-					continue
+				if not media_url: continue
 				
-				# Determine media type from URL
 				media_type = 'video' if any(ext in media_url.lower() for ext in ['.mp4', '.mov', '.avi', '.webm']) else 'image'
-				
 				media_row = product_doc.append('product_media', {})
 				media_row.media_url = media_url
 				media_row.media_type = media_type
 				media_row.display_order = idx + 1
 				media_added += 1
-			
-			if media_added == 0:
-				frappe.log_error(
-					f"No valid media URLs found for product {product_doc.product_name} (dish_id: {dish_data.get('id')}). Media list: {json.dumps(media_list[:3])}",
-					"Menu Product - Media Processing Warning"
-				)
 		
 		# Handle customizations if present
 		if dish_data.get('customizationQuestions'):
-			# Clear existing customizations
 			product_doc.customization_questions = []
-			
 			for custom_data in dish_data.get('customizationQuestions', []):
-				if not isinstance(custom_data, dict):
-					continue
-				
-				# Get options list
+				if not isinstance(custom_data, dict): continue
 				options_list = custom_data.get('options')
-				
-				# Ensure options_list is a list
-				if not isinstance(options_list, list):
-					options_list = []
-				
-				# Skip questions without options (options field is required in Customization Question)
-				if not options_list or len(options_list) == 0:
-					continue
-				
-				# Filter out invalid option entries (must have 'label' field)
+				if not isinstance(options_list, list) or len(options_list) == 0: continue
 				valid_options = [opt for opt in options_list if isinstance(opt, dict) and opt.get('label')]
+				if not valid_options: continue
 				
-				# Skip if no valid options after filtering (options field is required)
-				if not valid_options or len(valid_options) == 0:
-					frappe.log_error(
-						f"Skipping customization question '{custom_data.get('title', 'unknown')}' - no valid options found",
-						"Menu Product - Skip Customization Question"
-					)
-					continue
-				
-				# Create customization question row
 				custom_row = product_doc.append('customization_questions', {})
 				custom_row.question_id = custom_data.get('id', '')
 				custom_row.title = custom_data.get('title', '')
@@ -1249,56 +1221,29 @@ def process_extracted_data(data, extractor_doc):
 				custom_row.is_required = 1 if custom_data.get('required') else 0
 				custom_row.display_order = custom_data.get('displayOrder', 0)
 				
-				# Append options to the question (NESTED CHILD TABLE)
-				options_appended = 0
 				for opt_idx, option_data in enumerate(valid_options):
 					opt_row = custom_row.append('options', {})
 					opt_row.option_id = option_data.get('id') or f"opt_{opt_idx}_{int(time.time())}"
 					opt_row.label = option_data.get('label')
-					
-					# Sanitize price for options too
 					raw_opt_price = option_data.get('price', 0)
 					if isinstance(raw_opt_price, str):
 						raw_opt_price = re.sub(r'[^\d.]', '', raw_opt_price)
 						opt_row.price = float(raw_opt_price) if raw_opt_price else 0
 					else:
 						opt_row.price = raw_opt_price
-						
 					opt_row.is_default = 1 if option_data.get('isDefault') else 0
 					opt_row.is_vegetarian = 1 if option_data.get('isVegetarian') else 0
 					opt_row.display_order = option_data.get('displayOrder', opt_idx)
-					options_appended += 1
-				
-				# Safety check: if no options were actually appended, remove the question
-				# This prevents "Data missing in table: Options" error
-				if options_appended == 0:
-					# Remove the last appended row (the one without options)
-					product_doc.customization_questions.pop()
-					frappe.log_error(
-						f"Removed customization question '{custom_data.get('title', 'unknown')}' - no options could be appended",
-						"Menu Product - Remove Empty Customization Question"
-					)
 		
 		try:
 			product_doc.save(ignore_permissions=True)
 		except Exception as e:
-			# Truncate error message to avoid CharacterLengthExceededError (max 140 chars)
-			error_msg = str(e)
-			# Create a concise error message
-			if len(error_msg) > 100:
-				error_msg = error_msg[:100] + "..."
-			
-			# Truncate product name if too long
+			raw_err = str(e)
 			display_name = product_name[:30] + "..." if len(product_name) > 30 else product_name
-			log_message = f"Error saving {display_name}: {error_msg}"
-			
-			# Ensure log message doesn't exceed 140 characters
-			if len(log_message) > 140:
-				log_message = log_message[:137] + "..."
-			
-			frappe.log_error(log_message, "Menu Product Save Error")
+			error_msg = f"Error saving {display_name}: {raw_err[:100]}"
+			frappe.log_error(title="Menu Product Save Error", message=f"{error_msg}\n\n{frappe.get_traceback()}")
 			stats['items_skipped'] += 1
-			if not existing_product:
+			if not existing_product_name:
 				stats['items_created'] -= 1
 			else:
 				stats['items_updated'] -= 1
@@ -1327,7 +1272,7 @@ def approve_extracted_data(docname):
 				}
 			}
 
-		frappe.log_error(f"Approving extracted data for {docname}", "Menu Approval - Start")
+		frappe.log_error(title="Menu Approval - Start", message=f"Approving extracted data for {docname}")
 		if doc.extraction_status != "Pending Approval":
 			frappe.throw(_("Only documents with 'Pending Approval' status can be approved."))
 		
@@ -1396,12 +1341,12 @@ def approve_extracted_data(docname):
 					# Log if no categories found
 					if not data.get('categories'):
 						frappe.log_error(
-							f"No categories found in raw_response for {docname}. Raw data keys: {list(raw_data_obj.keys()) if isinstance(raw_data_obj, dict) else 'N/A'}",
-							"Menu Category Extraction Warning"
+							title="Menu Category Extraction Warning",
+							message=f"No categories found in raw_response for {docname}. Raw data keys: {list(raw_data_obj.keys()) if isinstance(raw_data_obj, dict) else 'N/A'}"
 						)
 				except Exception as e:
 					error_msg = f"Error parsing categories from raw_response for {docname}: {str(e)[:140]}"
-					frappe.log_error(error_msg, "Menu Category Parsing Error")
+					frappe.log_error(title="Menu Category Parsing Error", message=error_msg)
 					# Don't silently fail - log the error so we can debug
 			
 			# Get raw dishes data for media fallback
@@ -1420,7 +1365,7 @@ def approve_extracted_data(docname):
 							elif isinstance(raw_dishes, dict):
 								raw_dishes_map = raw_dishes
 				except Exception as e:
-					frappe.log_error(f"Error parsing raw_response for media fallback: {str(e)}", "Menu Approval - Media Fallback Error")
+					frappe.log_error(title="Menu Approval - Media Fallback Error", message=f"Error parsing raw_response for media fallback: {str(e)}")
 			
 			# Convert extracted dishes from child table
 			for dish_row in doc.extracted_dishes:
@@ -1485,8 +1430,8 @@ def approve_extracted_data(docname):
 			if unique_categories:
 				data['categories'] = list(unique_categories.values())
 				frappe.log_error(
-					f"Categories auto-extracted from dishes for {docname}: {len(data['categories'])} categories found",
-					"Menu Category Auto-Extraction from Dishes"
+					title="Menu Category Auto-Extraction from Dishes",
+					message=f"Categories auto-extracted from dishes for {docname}: {len(data['categories'])} categories found"
 				)
 		
 		if not data or (not data.get('categories') and not data.get('dishes')):
@@ -1525,7 +1470,7 @@ def approve_extracted_data(docname):
 		}
 		
 	except Exception as e:
-		frappe.log_error(frappe.get_traceback(), "Menu Approval Error")
+		frappe.log_error(title="Menu Approval Error", message=frappe.get_traceback())
 		frappe.throw(_("Approval failed: {0}").format(str(e)))
 
 
@@ -1604,7 +1549,7 @@ def generate_recommendations(docname):
 				}
 			}
 		except Exception as e:
-			frappe.log_error(frappe.get_traceback(), "Recommendations Engine Error")
+			frappe.log_error(title="Recommendations Engine Error", message=frappe.get_traceback())
 			frappe.throw(_("Recommendations Engine Failed: {0}").format(str(e)))
 		
 		if not result.get('success'):
@@ -1647,8 +1592,8 @@ def generate_recommendations(docname):
 				updated_count += 1
 			except Exception as e:
 				frappe.log_error(
-					f"Error updating recommendations for product {product_id}: {str(e)}",
-					"Menu Recommendations - Update Error"
+					title="Menu Recommendations - Update Error",
+					message=f"Error updating recommendations for product {product_id}: {str(e)}"
 				)
 				continue
 		
@@ -1672,6 +1617,6 @@ def generate_recommendations(docname):
 	except frappe.exceptions.ValidationError:
 		raise
 	except Exception as e:
-		frappe.log_error(frappe.get_traceback(), "Menu Recommendations Generation Error")
+		frappe.log_error(title="Menu Recommendations Generation Error", message=frappe.get_traceback())
 		frappe.throw(_("Recommendations generation failed: {0}").format(str(e)))
 

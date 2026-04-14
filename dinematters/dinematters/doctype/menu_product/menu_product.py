@@ -8,34 +8,26 @@ import re
 
 
 class MenuProduct(Document):
-	def before_insert(self):
-		"""Generate product_id from product_name and set as document name"""
-		if self.product_name:
-			# Generate product_id from product_name
-			product_id = self.generate_product_id_from_name(self.product_name)
-			self.product_id = product_id
-			# Set document name to product_id (for autoname)
-			self.name = product_id
-	
-	def before_save(self):
-		"""Update product_id from product_name if name changed"""
-		if self.product_name and (not self.product_id or self.has_value_changed('product_name')):
-			# Generate new product_id
-			new_product_id = self.generate_product_id_from_name(self.product_name)
-			
-			# Check if new product_id already exists for a different product
-			if frappe.db.exists("Menu Product", new_product_id) and self.name != new_product_id:
-				# Generate unique product_id by appending number
-				base_id = new_product_id
-				counter = 1
-				while frappe.db.exists("Menu Product", f"{base_id}-{counter}"):
-					counter += 1
-				new_product_id = f"{base_id}-{counter}"
-			
-			self.product_id = new_product_id
-			# Update document name if it changed
-			if self.name != new_product_id:
-				self.name = new_product_id
+	def validate(self):
+		"""Validate Product Media constraints and per-restaurant uniqueness"""
+		# Ensure product_id is set
+		if not self.product_id and self.product_name:
+			self.product_id = self.generate_product_id_from_name(self.product_name)
+		
+		# Check for duplicate product_id within the same restaurant
+		if self.product_id and self.restaurant:
+			duplicate = frappe.db.get_value(
+				"Menu Product",
+				{"product_id": self.product_id, "restaurant": self.restaurant, "name": ["!=", self.name]},
+				"name"
+			)
+			if duplicate:
+				frappe.throw(
+					_("Product ID '{0}' already exists for restaurant '{1}'").format(self.product_id, self.restaurant),
+					frappe.DuplicateEntryError
+				)
+		
+		self.validate_product_media()
 	
 	def after_save(self):
 		"""Clear top picks cache for the restaurant"""

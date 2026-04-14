@@ -59,6 +59,9 @@ const MarketingSegments = lazy(() => import('./pages/MarketingSegments'))
 const MarketingAnalytics = lazy(() => import('./pages/MarketingAnalytics'))
 const Events = lazy(() => import('./pages/Events'))
 const LogisticsHub = lazy(() => import('./pages/LogisticsHub'))
+const GoogleGrowth = lazy(() => import('./pages/GoogleGrowth'))
+const GoogleGrowthSync = lazy(() => import('./pages/GoogleGrowthSync'))
+const GoogleGrowthReviews = lazy(() => import('./pages/GoogleGrowthReviews'))
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -136,6 +139,13 @@ function AppContent() {
 								<Route path="/marketing/segments" element={<Layout><MarketingSegments /></Layout>} />
 								<Route path="/marketing/analytics" element={<Layout><MarketingAnalytics /></Layout>} />
 							</Route>
+                            
+                            {/* Google Growth (GOLD/DIAMOND) */}
+                            <Route element={<FeatureProtectedRoute feature="google_growth" />}>
+                                <Route path="/google-growth" element={<Layout><GoogleGrowth /></Layout>} />
+                                <Route path="/google-growth/sync" element={<Layout><GoogleGrowthSync /></Layout>} />
+                                <Route path="/google-growth/reviews" element={<Layout><GoogleGrowthReviews /></Layout>} />
+                            </Route>
 
 							<Route path="/billing" element={<Layout><PaymentSettings /></Layout>} />
 							<Route path="/billing/configure" element={<Layout><PaymentConfiguration /></Layout>} />

@@ -220,7 +220,10 @@ doc_events = {
 		"after_insert": "dinematters.dinematters.api.customers.update_customer_last_visited",
 	},
 	"Menu Product": {
-		"on_update": "dinematters.dinematters.api.realtime.notify_product_update",
+		"on_update": [
+            "dinematters.dinematters.api.realtime.notify_product_update",
+            "dinematters.dinematters.api.google_business.handle_product_update"
+        ],
 	},
 	"Cart Entry": {
 		"after_insert": "dinematters.dinematters.api.realtime.notify_cart_update",
@@ -255,6 +258,10 @@ scheduler_events = {
 		"*/30 * * * *": [
 			"dinematters.dinematters.tasks.marketing_tasks.fire_triggers",
 		],
+        # Google Growth: fetch insights daily
+        "0 1 * * *": [
+            "dinematters.dinematters.api.google_business.fetch_all_restaurant_insights"
+        ]
 	}
 }
 

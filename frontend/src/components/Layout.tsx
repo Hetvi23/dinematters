@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, Truck, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, ShieldAlert, Wallet, Crown, CreditCard, Settings, MessageSquare, Megaphone, Send, Zap, BarChart3, Menu, Search } from 'lucide-react'
+import { Home, ShoppingCart, Package, Truck, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, ShieldAlert, Wallet, Crown, CreditCard, Settings, MessageSquare, Megaphone, Send, Zap, BarChart3, Menu, Search, Globe } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
 import { AiRechargeModal } from '@/components/AiRechargeModal'
@@ -108,8 +108,8 @@ type NavGroup = {
 }
 type NavItem = NavLink | NavGroup
 
-const DIAMOND_ONLY_FEATURES = ['loyalty', 'coupons', 'pos_integration', 'customer', 'customer_pay_and_usage', 'marketing_studio']
-const GOLD_FEATURES = ['ordering', 'order_settings', 'analytics', 'ai_recommendations', 'custom_branding', 'table_booking', 'games', 'events', 'offers', 'experience_lounge', 'video_upload', 'branding', 'whatsapp_orders']
+const DIAMOND_ONLY_FEATURES = ['loyalty', 'coupons', 'pos_integration', 'customer', 'customer_pay_and_usage', 'marketing_studio', 'google_growth_sync', 'google_growth_ai']
+const GOLD_FEATURES = ['ordering', 'order_settings', 'analytics', 'ai_recommendations', 'custom_branding', 'table_booking', 'games', 'events', 'offers', 'experience_lounge', 'video_upload', 'branding', 'whatsapp_orders', 'google_growth']
 
 const navigation: NavItem[] = [
   { type: 'link', name: 'Dashboard', href: '/dashboard', icon: Home },
@@ -181,6 +181,18 @@ const navigation: NavItem[] = [
       { name: 'Automation', href: '/marketing/automation', icon: Zap, feature: 'marketing_studio' },
       { name: 'Segments', href: '/marketing/segments', icon: Users, feature: 'marketing_studio' },
       { name: 'Analytics', href: '/marketing/analytics', icon: TrendingUp, feature: 'marketing_studio' },
+    ],
+  },
+  {
+    type: 'group',
+    id: 'google-growth',
+    name: 'Google Growth',
+    icon: Globe,
+    feature: 'google_growth',
+    children: [
+      { name: 'Discovery Loop', href: '/google-growth', icon: Sparkles, feature: 'google_growth' },
+      { name: 'Menu & Product Sync', href: '/google-growth/sync', icon: Package, feature: 'google_growth_sync' },
+      { name: 'Reviews & AI Reply', href: '/google-growth/reviews', icon: Star, feature: 'google_growth_ai' },
     ],
   },
   // Admin-only link - will be filtered by admin check in render
