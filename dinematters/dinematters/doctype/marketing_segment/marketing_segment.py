@@ -187,8 +187,10 @@ class MarketingSegment(Document):
         return (result[0][0] or 0) if result else 0
 
     def _parse_manual_phones(self):
+        from dinematters.dinematters.utils.customer_helpers import normalize_phone
         raw = self.customer_ids or ""
-        return [x.strip() for x in raw.replace("\n", ",").split(",") if x.strip()]
+        phones = [x.strip() for x in raw.replace("\n", ",").split(",") if x.strip()]
+        return [normalize_phone(p) for p in phones if normalize_phone(p)]
 
     # ── Full list fetchers ───────────────────────────────────────────────────────
 

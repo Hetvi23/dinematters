@@ -301,6 +301,9 @@ def _fire_trigger_for_customer(trigger_name, customer_id):
     if not customer or not customer.phone or customer.opted_out_of_marketing:
         return
 
+    # Standardize dictionary keys to match batch trigger results
+    customer["customer"] = customer["name"]
+
     settings = frappe.get_single("Dinematters Settings")
     _fire_single_trigger(trigger, customer, settings, {})
     frappe.db.commit()
@@ -317,11 +320,21 @@ def handle_opt_out_reply(phone, keyword="STOP"):
     TRAI DND compliance.
     """
     customer_name = frappe.db.get_value("Customer", {"phone": phone}, "name")
+    
     if not customer_name:
-        # Try normalised phone (strip +91)
+        # Try normalized 10-digit phone
         phone_clean = phone.replace("+91", "").replace("+", "").strip()
-        phone_with_code = f"+91{phone_clean}"
-        customer_name = frappe.db.get_value("Customer", {"phone": phone_with_code}, "name")
+        if phone_clean.startswith("0"):
+            phone_clean = phone_clean[1:]
+        
+        customer_name = frappe.db.get_value("Customer", {"phone": phone_clean}, "name")
+
+    if not customer_name:
+        # Try with common prefixes
+        for variant in [f"+91{phone_clean}", f"0{phone_clean}"]:
+            customer_name = frappe.db.get_value("Customer", {"phone": variant}, "name")
+            if customer_name:
+                break
 
     if not customer_name:
         return False
