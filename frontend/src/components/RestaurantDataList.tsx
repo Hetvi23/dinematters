@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom'
 import { usePermissions } from '@/lib/permissions'
 import DynamicForm from './DynamicForm'
 import { useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 
 interface RestaurantDataListProps {
@@ -127,6 +127,7 @@ export default function RestaurantDataList({ doctype, restaurantId, titleField }
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create {doctype.replace(/_/g, ' ')}</DialogTitle>
+              <DialogDescription>Fill in the details to create a new {doctype.replace(/_/g, ' ')} for this restaurant.</DialogDescription>
             </DialogHeader>
             <DynamicForm
               doctype={doctype}
@@ -148,6 +149,7 @@ export default function RestaurantDataList({ doctype, restaurantId, titleField }
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit {doctype.replace(/_/g, ' ')}</DialogTitle>
+              <DialogDescription>Modify the existing details of the selected {doctype.replace(/_/g, ' ')}.</DialogDescription>
             </DialogHeader>
             <DynamicForm
               doctype={doctype}

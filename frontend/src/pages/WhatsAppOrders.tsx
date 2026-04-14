@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useFrappePostCall, useFrappeEventListener } from '@/lib/frappe'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -19,13 +19,14 @@ import {
   FilterX,
   Lock,
   ShieldCheck,
-  AlertCircle,
-  HelpCircle
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useDataTable } from '@/hooks/useDataTable'
+import { DataPagination } from '@/components/ui/DataPagination'
 import { OrderDetailsDialog } from '@/components/OrderDetailsDialog'
+import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { DatePicker } from '@/components/ui/date-picker'
 import { 
@@ -38,96 +39,63 @@ import {
 import { cn } from '@/lib/utils'
 
 export default function WhatsAppOrders() {
-  const { selectedRestaurant, restaurantConfig } = useRestaurant()
+  const { selectedRestaurant } = useRestaurant()
   const { formatAmountNoDecimals } = useCurrency()
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   
-  // App States
-  const [orders, setOrders] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
-  const [hasMore, setHasMore] = useState(false)
-  const [start, setStart] = useState(0)
-  const PAGE_LENGTH = 20
-
   // Filter states
-  const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState<'recent' | 'past'>('recent')
   const [dateFrom, setDateFrom] = useState<string>('')
   const [dateTo, setDateTo] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
 
-  const { call: getOrdersApi } = useFrappePostCall('dinematters.dinematters.api.whatsapp_ordering.get_whatsapp_orders')
+  const {
+    data: orders,
+    isLoading,
+    mutate,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    totalCount,
+    searchQuery,
+    setSearchQuery
+  } = useDataTable({
+    customEndpoint: 'dinematters.dinematters.api.whatsapp_ordering.get_whatsapp_orders',
+    paramNames: {
+      page: 'start_page',
+      pageSize: 'page_length',
+      search: 'search_query'
+    },
+    customParams: {
+      restaurant_id: selectedRestaurant,
+      status: statusFilter,
+      from_date: viewMode === 'recent' ? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0] : dateFrom,
+      to_date: dateTo,
+    },
+    initialPageSize: 20,
+    debugId: `whatsapp-orders-${selectedRestaurant}-${viewMode}`
+  })
+
   const { call: unlockLeadApi } = useFrappePostCall('dinematters.dinematters.api.whatsapp_ordering.unlock_whatsapp_lead')
   const { call: updateStatus } = useFrappePostCall('dinematters.dinematters.api.order_status.update_status')
   
   // ── Real-time Notifications ───────────────────────────────────────────────
-  useFrappeEventListener('whatsapp_intent', (data: any) => {
-    // Proactive alert for the merchant
+  useFrappeEventListener('whatsapp_intent', () => {
     toast.info(`New WhatsApp Order Intent!`, {
-      description: `${data.customer_name} is placing an order for approx. ${restaurantConfig?.pricing?.symbol || '₹'}${data.total}`,
+      description: `A customer is starting a WhatsApp order!`,
       duration: 10000,
       action: {
-        label: 'Refresh List',
-        onClick: () => fetchOrders(false)
+        label: 'Refresh',
+        onClick: () => mutate()
       }
     })
     
-    // Auto-refresh the list if we are in recent view
     if (viewMode === 'recent') {
-      setTimeout(() => fetchOrders(false), 1000)
+      setTimeout(() => mutate(), 1000)
     }
   })
-
-  // Fetch Logic
-  const fetchOrders = async (isLoadMore = false) => {
-    if (!selectedRestaurant) return
-    
-    setLoading(true)
-    const currentStart = isLoadMore ? start : 0
-    
-    // Calculate 24h ago if in recent mode
-    let effectiveFrom = dateFrom
-    if (viewMode === 'recent') {
-        const yesterday = new Date()
-        yesterday.setHours(yesterday.getHours() - 24)
-        effectiveFrom = yesterday.toISOString().split('T')[0] // We'll pass as Date string for simplicity
-    }
-
-    try {
-        const res: any = await getOrdersApi({
-            restaurant_id: selectedRestaurant,
-            search_query: searchQuery,
-            status: statusFilter,
-            from_date: effectiveFrom,
-            to_date: dateTo,
-            start: currentStart,
-            page_length: PAGE_LENGTH
-        })
-
-        if (res.message?.success) {
-            const newOrders = res.message.data || []
-            if (isLoadMore) {
-                setOrders(prev => [...prev, ...newOrders])
-            } else {
-                setOrders(newOrders)
-            }
-            setHasMore(res.message.has_more)
-            setStart(currentStart + PAGE_LENGTH)
-        }
-    } catch (error) {
-        console.error("Failed to fetch WhatsApp orders:", error)
-        toast.error("Failed to fetch leads")
-    } finally {
-        setLoading(false)
-    }
-  }
-
-  // Trigger fetch on filter changes
-  useEffect(() => {
-    setStart(0)
-    fetchOrders(false)
-  }, [selectedRestaurant, searchQuery, viewMode, dateFrom, dateTo, statusFilter])
 
   const handleOpenWhatsApp = (phone: string, orderNumber: string) => {
     const cleanPhone = phone.replace(/\D/g, '')
@@ -138,7 +106,6 @@ export default function WhatsAppOrders() {
 
   const handleUnlockLead = async (phone: string, orderId: string) => {
     try {
-      setLoading(true)
       const res: any = await unlockLeadApi({
         restaurant_id: selectedRestaurant,
         customer_phone: phone,
@@ -147,15 +114,12 @@ export default function WhatsAppOrders() {
 
       if (res.message?.success) {
         toast.success(res.message.message || "Lead Unlocked!")
-        // Locally update all orders with this phone number
-        setOrders(prev => prev.map(o => o.customer_phone === phone ? { ...o, is_unlocked: true } : o))
+        mutate()
       } else {
         toast.error(res.message?.error || "Failed to unlock lead")
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to unlock lead")
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -166,8 +130,7 @@ export default function WhatsAppOrders() {
         status: 'delivered'
       })
       toast.success('Order marked as completed')
-      // Locally update specifically to avoid full refetch
-      setOrders(prev => prev.map(o => o.name === orderId ? { ...o, status: 'delivered' } : o))
+      mutate()
     } catch (error: any) {
       toast.error(error.message || 'Failed to update order')
     }
@@ -201,14 +164,13 @@ export default function WhatsAppOrders() {
       case 'cancelled':
         return (
           <Badge variant="outline" className="bg-red-100 text-red-700 border-red-200 gap-1.5 font-bold">
-            <AlertCircle className="h-3 w-3" />
+            <ShieldCheck className="h-3 w-3 opacity-50" />
             Cancelled
           </Badge>
         )
       default:
         return (
           <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-200 gap-1.5 font-bold">
-            <HelpCircle className="h-3 w-3" />
             {status}
           </Badge>
         )
@@ -312,16 +274,17 @@ export default function WhatsAppOrders() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading && orders.length === 0 ? (
+                {isLoading && orders?.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                        <div className="flex flex-col items-center gap-2">
-                          <Clock className="h-6 w-6 animate-spin opacity-20" />
-                          <span>Fetching your WhatsApp leads...</span>
+                          <Skeleton className="h-10 w-full" />
+                          <Skeleton className="h-10 w-full" />
+                          <Skeleton className="h-10 w-full" />
                        </div>
                     </TableCell>
                   </TableRow>
-                ) : orders.length === 0 ? (
+                ) : orders?.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="h-64 text-center">
                        <div className="flex flex-col items-center justify-center gap-4 py-8">
@@ -341,7 +304,7 @@ export default function WhatsAppOrders() {
                   </TableRow>
                 ) : (
                   <>
-                    {orders.map((order) => (
+                    {orders?.map((order: any) => (
                       <TableRow key={order.name} className="hover:bg-muted/30 transition-colors group text-sm">
                         <TableCell className="font-medium">
                           <div className="flex flex-col">
@@ -363,7 +326,7 @@ export default function WhatsAppOrders() {
                               <Phone className="h-3 w-3 text-muted-foreground" />
                               <div className="relative">
                                 <span className={cn(
-                                  "font-mono text-xs transition-all duration-700",
+                                  "font-mono text-xs transition-with duration-700",
                                   !order.is_unlocked && "blur-[4.5px] select-none opacity-40 brightness-50"
                                 )}>
                                   {order.is_unlocked 
@@ -444,7 +407,7 @@ export default function WhatsAppOrders() {
                              >
                                 <CheckCircle2 className="h-4 w-4" />
                              </Button>
-  
+   
                              <Button
                                 variant="default"
                                 size="sm"
@@ -479,24 +442,21 @@ export default function WhatsAppOrders() {
                         </TableCell>
                       </TableRow>
                     ))}
-                    {hasMore && (
-                        <TableRow>
-                            <TableCell colSpan={7} className="p-4 text-center">
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    onClick={() => fetchOrders(true)}
-                                    disabled={loading}
-                                >
-                                    {loading ? "Loading..." : "Load More Orders"}
-                                </Button>
-                            </TableCell>
-                        </TableRow>
-                    )}
                   </>
                 )}
               </TableBody>
             </Table>
+          </div>
+          
+          <div className="p-4 border-t">
+            <DataPagination
+              currentPage={page}
+              totalCount={totalCount}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              isLoading={isLoading}
+            />
           </div>
         </CardContent>
       </Card>

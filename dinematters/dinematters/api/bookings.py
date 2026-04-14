@@ -772,7 +772,7 @@ def mark_completed(booking_id, restaurant_id):
 
 @frappe.whitelist()
 @require_plan('GOLD', 'DIAMOND')
-def get_admin_bookings(restaurant_id, date_from=None, date_to=None, status=None, page=1, limit=50):
+def get_admin_bookings(restaurant_id, date_from=None, date_to=None, status=None, page=1, limit=50, search_query=None):
 	"""
 	GET /api/method/dinematters.dinematters.api.bookings.get_admin_bookings
 	Get all bookings for restaurant admin dashboard
@@ -793,6 +793,13 @@ def get_admin_bookings(restaurant_id, date_from=None, date_to=None, status=None,
 			filters["date"] = [">=", date_from]
 		elif date_to:
 			filters["date"] = ["<=", date_to]
+
+		if search_query:
+			filters["or"] = {
+				"customer_name": ["like", f"%{search_query}%"],
+				"customer_phone": ["like", f"%{search_query}%"],
+				"booking_number": ["like", f"%{search_query}%"]
+			}
 		
 		# Pagination
 		page = int(page) or 1

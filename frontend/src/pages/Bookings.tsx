@@ -74,9 +74,9 @@ export default function Bookings() {
   useEffect(() => {
     if (selectedRestaurant) {
       loadBookings()
-      loadMonthlyBookings()
+      if (!searchQuery) loadMonthlyBookings()
     }
-  }, [selectedRestaurant, selectedDate, statusFilter, showPastBookings])
+  }, [selectedRestaurant, selectedDate, statusFilter, showPastBookings, searchQuery])
 
   // Format date without timezone conversion
   const formatDateForAPI = (date: Date): string => {
@@ -121,6 +121,7 @@ export default function Bookings() {
         date_from,
         date_to,
         status: statusFilter === 'all' ? undefined : statusFilter,
+        search_query: searchQuery || undefined,
         limit: 200
       })
       
@@ -187,19 +188,7 @@ export default function Bookings() {
     return hours * 60 + minutes
   }
 
-  const filteredBookings = bookings
-    .filter(booking => {
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase()
-        return (
-          booking.bookingNumber?.toLowerCase().includes(query) ||
-          booking.customerName?.toLowerCase().includes(query) ||
-          booking.customerPhone?.toLowerCase().includes(query)
-        )
-      }
-      return true
-    })
-    .sort((a, b) => {
+  const filteredBookings = bookings.sort((a, b) => {
       // Sort by time slot (earliest first)
       const timeA = parseTimeSlot(a.timeSlot)
       const timeB = parseTimeSlot(b.timeSlot)

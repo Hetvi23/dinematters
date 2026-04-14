@@ -4,6 +4,8 @@ import { useRestaurant } from '@/contexts/RestaurantContext'
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog'
 import { useCurrency } from '@/hooks/useCurrency'
 import { 
@@ -379,11 +381,15 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 border-none bg-slate-50 dark:bg-zinc-950 gap-0">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-4">
+            <DialogTitle className="sr-only">Order Information Fetching</DialogTitle>
+            <DialogDescription className="sr-only">We are retrieving the latest order status and items.</DialogDescription>
             <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
             <p className="text-sm font-medium text-muted-foreground italic">Fetching order details...</p>
           </div>
         ) : order ? (
           <div className="flex flex-col h-full bg-white dark:bg-zinc-900 shadow-xl overflow-hidden">
+            <DialogTitle className="sr-only">{order?.order_number || order?.name} Details</DialogTitle>
+            <DialogDescription className="sr-only">Comprehensive view of order summary, items, and delivery status.</DialogDescription>
             {/* Enterprise Header */}
             <div className="px-6 py-6 border-b bg-white dark:bg-zinc-900 sticky top-0 z-10">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

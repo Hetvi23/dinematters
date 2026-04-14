@@ -254,54 +254,109 @@ def get_restaurant_customers(restaurant_id, search=None, page=1, page_size=20):
 
 		page = max(1, int(page))
 		page_size = max(1, min(100, int(page_size)))
-		search_term = (search or "").strip().lower() if search else None
-
+		limit_start = (page - 1) * page_size
+		
+		# Collect all distinct platform customers with activity at this restaurant
+		# Using frappe.get_all is the most robust and compatible way.
 		customer_ids = set()
-		for doctype, field in [
-			("Order", "platform_customer"),
-			("Table Booking", "platform_customer"),
-			("Banquet Booking", "platform_customer")
-		]:
+		for doctype in ["Order", "Table Booking", "Banquet Booking"]:
 			rows = frappe.get_all(
 				doctype,
-				filters={"restaurant": restaurant, field: ["!=", ""]},
-				pluck=field
+				filters={"restaurant": restaurant, "platform_customer": ["!=", ""]},
+				pluck="platform_customer"
 			)
-			customer_ids.update(r for r in rows if r)
+			customer_ids.update(row for row in rows if row)
 
-		customers = []
-		for cid in customer_ids:
-			c = frappe.db.get_value(
-				"Customer",
-				cid,
-				["name", "phone", "customer_name", "email", "verified_at"],
-				as_dict=True
-			)
-			if not c:
-				continue
+		if not customer_ids:
+			return {"success": True, "data": {"customers": [], "isAdmin": "System Manager" in frappe.get_roles(), "totalCount": 0}}
 
+		# Filter customers by search if provided
+		customer_filters = {"name": ["in", list(customer_ids)]}
+		customer_or_filters = []
+		
+		if search:
+			customer_or_filters = [
+				["customer_name", "like", f"%{search}%"],
+				["phone", "like", f"%{search}%"]
+			]
+
+		# Fetch customer details with their last visited date.
+		customer_records = frappe.get_all(
+			"Customer",
+			filters=customer_filters,
+			or_filters=customer_or_filters if customer_or_filters else None,
+			fields=["name", "phone", "customer_name", "verified_at"]
+		)
+
+		# Get last visited date for each customer efficiently using bulk queries
+		activity_map = {}
+		for doctype_name in ["Order", "Table Booking", "Banquet Booking"]:
+			# Using backticks with DocType name is standard in Frappe DB
+			table_name = f"tab{doctype_name}"
+			# We use a simple SQL to get max creation date per platform_customer
+			activity = frappe.db.sql(f"""
+				SELECT platform_customer, MAX(creation) as max_date
+				FROM `{table_name}`
+				WHERE restaurant = %s AND platform_customer IN ({', '.join(['%s'] * len(customer_ids))})
+				GROUP BY platform_customer
+			""", [restaurant] + list(customer_ids), as_dict=True)
+			
+			for row in activity:
+				cid = row.platform_customer
+				mdate = str(row.max_date) if row.max_date else ""
+				if cid not in activity_map or mdate > activity_map[cid]:
+					activity_map[cid] = mdate
+
+		# Enrich with last_visited and sort
+		enriched_customers = []
+		for c in customer_records:
+			cid = c.get("name")
+			last_visited = activity_map.get(cid)
+			
+			enriched_customers.append({
+				**c,
+				"last_visited": last_visited
+			})
+
+		# Sort by last_visited
+		enriched_customers.sort(key=lambda x: (x.get("last_visited") or "", x.get("customer_name") or ""), reverse=True)
+		
+		total_count = len(enriched_customers)
+		
+		# Paginate memory-sorted list
+		paginated_customers = enriched_customers[limit_start : limit_start + page_size]
+
+		final_customers = []
+		for c in paginated_customers:
+			cid = c.get("name")
+			
+			# Fetch child records ONLY for paginated customers
 			order_fields = ["name", "order_number", "total", "status", "creation", "customer_phone"]
 			if frappe.db.has_column("Order", "customer_rating"):
 				order_fields.extend(["customer_rating", "customer_feedback"])
 			if frappe.db.has_column("Order", "food_rating"):
 				order_fields.extend(["food_rating", "service_rating"])
+				
 			orders = frappe.get_all(
 				"Order",
 				filters={"restaurant": restaurant, "platform_customer": cid},
-				fields=order_fields
+				fields=order_fields,
+				order_by="creation desc"
 			)
 			table_bookings = frappe.get_all(
 				"Table Booking",
 				filters={"restaurant": restaurant, "platform_customer": cid},
-				fields=["name", "booking_number", "date", "time_slot", "status", "creation", "customer_phone"]
+				fields=["name", "booking_number", "date", "time_slot", "status", "creation", "customer_phone"],
+				order_by="creation desc"
 			)
 			banquet_bookings = frappe.get_all(
 				"Banquet Booking",
 				filters={"restaurant": restaurant, "platform_customer": cid},
-				fields=["name", "booking_number", "date", "event_type", "status", "creation", "customer_phone"]
+				fields=["name", "booking_number", "date", "event_type", "status", "creation", "customer_phone"],
+				order_by="creation desc"
 			)
 
-			phone = c.phone
+			phone = c.get("phone")
 			if not phone and orders:
 				phone = orders[0].get("customer_phone")
 			if not phone and table_bookings:
@@ -309,42 +364,22 @@ def get_restaurant_customers(restaurant_id, search=None, page=1, page_size=20):
 			if not phone and banquet_bookings:
 				phone = banquet_bookings[0].get("customer_phone")
 
-			if search_term:
-				name_match = (c.customer_name or "").lower().find(search_term) >= 0
-				ph = (phone or "")
-				phone_match = search_term in ph or search_term in ph.lower()
-				if not name_match and not phone_match:
-					continue
-
-			last_dates = []
-			for o in orders:
-				if o.get("creation"):
-					last_dates.append(o["creation"])
-			for b in table_bookings + banquet_bookings:
-				if b.get("creation"):
-					last_dates.append(b["creation"])
-			last_visited = max(last_dates) if last_dates else None
-
-			customers.append({
-				"id": c.name,
+			final_customers.append({
+				"id": cid,
 				"phone": phone,
-				"customerName": c.customer_name,
-				"verifiedAt": str(c.verified_at) if c.verified_at else None,
-				"lastVisited": str(last_visited) if last_visited else None,
+				"customerName": c.get("customer_name"),
+				"verifiedAt": str(c.get("verified_at")) if c.get("verified_at") else None,
+				"lastVisited": str(c.get("last_visited")) if c.get("last_visited") else None,
 				"orders": orders,
 				"tableBookings": table_bookings,
 				"banquetBookings": banquet_bookings
 			})
 
-		customers.sort(key=lambda x: (x.get("lastVisited") or "", x.get("customerName") or ""), reverse=True)
-		total_count = len(customers)
-		start = (page - 1) * page_size
-		customers = customers[start:start + page_size]
-
 		is_admin = "System Manager" in frappe.get_roles()
-		return {"success": True, "data": {"customers": customers, "isAdmin": is_admin, "totalCount": total_count}}
+		
+		return {"success": True, "data": {"customers": final_customers, "isAdmin": is_admin, "totalCount": total_count}}
 	except Exception as e:
-		frappe.log_error(f"get_restaurant_customers error: {e}", "Customer_API")
+		frappe.log_error(f"get_restaurant_customers error: {e}", f"Customer_API_{restaurant_id}")
 		return {"success": False, "error": str(e)}
 
 

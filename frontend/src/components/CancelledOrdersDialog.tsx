@@ -4,6 +4,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog'
 import {
   Table,
@@ -42,7 +43,7 @@ export function CancelledOrdersDialog({ isOpen, onClose, orders }: CancelledOrde
               </div>
               <div>
                 <DialogTitle className="text-xl font-bold">Cancelled Orders</DialogTitle>
-                <p className="text-sm text-muted-foreground">Review recently cancelled orders for today</p>
+                <DialogDescription className="text-sm text-muted-foreground font-medium">Review recently cancelled orders for today</DialogDescription>
               </div>
             </div>
             <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50 font-bold px-3 py-1">

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { X, Filter, Plus, Search, Loader2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { useDocTypeMeta } from '@/lib/doctype'
 import { useFrappeGetDocList } from '@/lib/frappe'
 
@@ -112,7 +111,6 @@ export function ListFilters({
 
   return (
     <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-      {/* Search Bar */}
       <div className="relative flex-1 w-full sm:max-w-sm">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
@@ -120,8 +118,16 @@ export function ListFilters({
           placeholder={searchPlaceholder}
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="pl-9"
+          className="pl-9 pr-9"
         />
+        {searchQuery && (
+          <button
+            onClick={() => onSearchChange('')}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Filter Button */}
@@ -304,7 +310,7 @@ function LinkFieldSelect({
     doctype,
     {
       fields: ['name'],
-      filters: searchQuery ? { name: ['like', `%${searchQuery}%`] } : undefined,
+      filters: searchQuery ? [['name', 'like', `%${searchQuery}%`]] : undefined,
       limit: 100,
       orderBy: { field: 'name', order: 'asc' }
     },

@@ -29,7 +29,7 @@ def check_admin_access():
         }
 
 @frappe.whitelist()
-def get_all_restaurants():
+def get_all_restaurants(page=1, page_size=20, search=None):
     """
     Get all restaurants with their plan details
     Only accessible by admin users
@@ -43,12 +43,26 @@ def get_all_restaurants():
                 'error': 'Admin access required'
             }
         
+        page = int(page or 1)
+        page_size = int(page_size or 20)
+        limit_start = (page - 1) * page_size
+        
+        # Build searching logic
+        where_conditions = []
+        params = []
+        
+        if search:
+            where_conditions.append("(r.restaurant_name LIKE %s OR r.restaurant_id LIKE %s OR r.owner_email LIKE %s)")
+            search_val = f"%{search}%"
+            params.extend([search_val, search_val, search_val])
+            
+        where_clause = " WHERE " + " AND ".join(where_conditions) if where_conditions else ""
+        
         # Check if RestaurantConfig table exists
         config_table_exists = frappe.db.table_exists('RestaurantConfig')
         
         if config_table_exists:
-            # Get all restaurants with their subscription details
-            restaurants = frappe.db.sql("""
+            query = f"""
                 SELECT 
                     r.name,
                     r.restaurant_id,
@@ -63,11 +77,13 @@ def get_all_restaurants():
                     COALESCE(rc.subscription_plan, r.plan_type, 'SILVER') as plan_type
                 FROM `tabRestaurant` r
                 LEFT JOIN `tabRestaurantConfig` rc ON r.name = rc.parent
+                {{where_clause}}
                 ORDER BY r.creation DESC
-            """, as_dict=True)
+                LIMIT {{limit_start}}, {{page_size}}
+            """.format(where_clause=where_clause, limit_start=limit_start, page_size=page_size)
+            count_query = f"SELECT COUNT(*) FROM `tabRestaurant` r {where_clause}"
         else:
-            # Get restaurants without config table (use plan_type from Restaurant table)
-            restaurants = frappe.db.sql("""
+            query = f"""
                 SELECT 
                     r.name,
                     r.restaurant_id,
@@ -81,8 +97,14 @@ def get_all_restaurants():
                     COALESCE(r.monthly_minimum, 999) as monthly_minimum,
                     COALESCE(r.plan_type, 'SILVER') as plan_type
                 FROM `tabRestaurant` r
+                {{where_clause}}
                 ORDER BY r.creation DESC
-            """, as_dict=True)
+                LIMIT {{limit_start}}, {{page_size}}
+            """.format(where_clause=where_clause, limit_start=limit_start, page_size=page_size)
+            count_query = f"SELECT COUNT(*) FROM `tabRestaurant` r {where_clause}"
+        
+        restaurants = frappe.db.sql(query, tuple(params), as_dict=True)
+        total_count = frappe.db.sql(count_query, tuple(params))[0][0]
         
         # Convert is_active to integer for consistency
         for restaurant in restaurants:
@@ -94,7 +116,10 @@ def get_all_restaurants():
         return {
             'success': True,
             'data': {
-                'restaurants': restaurants
+                'restaurants': restaurants,
+                'total': total_count,
+                'page': page,
+                'page_size': page_size
             }
         }
         

@@ -1,17 +1,42 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useFrappeAuth, useFrappePostCall } from '@/lib/frappe'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { toast } from 'sonner'
-import { getFrappeError, cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Shield, Users, Crown, Star, RefreshCw, Power, PowerOff, Trash2, TrendingUp, Activity, Coins, Settings, Zap } from 'lucide-react'
+import { 
+  Shield, 
+  Crown, 
+  RefreshCw, 
+  Power, 
+  PowerOff, 
+  Trash2, 
+  TrendingUp, 
+  Activity, 
+  Coins, 
+  Settings, 
+  Zap, 
+  Search,
+  ArrowUpRight,
+  Building2,
+  Calendar,
+  Mail
+} from 'lucide-react'
+import { useDataTable } from '@/hooks/useDataTable'
+import { DataPagination } from '@/components/ui/DataPagination'
 
 interface Restaurant {
   name: string
@@ -30,8 +55,6 @@ interface Restaurant {
 export default function AdminRestaurantManagement() {
   const navigate = useNavigate()
   const { currentUser } = useFrappeAuth()
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([])
-  const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   
@@ -51,10 +74,37 @@ export default function AdminRestaurantManagement() {
   const [editName, setEditName] = useState('')
   const [editEmail, setEditEmail] = useState('')
 
+  useEffect(() => {
+    if (currentUser === 'Administrator') {
+      setIsAdmin(true)
+    } else {
+      setIsAdmin(false)
+    }
+  }, [currentUser])
+
+  const {
+    data: restaurants,
+    isLoading,
+    mutate: loadRestaurants,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    totalCount,
+    searchQuery,
+    setSearchQuery
+  } = useDataTable({
+    customEndpoint: 'dinematters.dinematters.api.admin.get_all_restaurants',
+    paramNames: {
+      page: 'page',
+      pageSize: 'page_size',
+      search: 'search'
+    },
+    initialPageSize: 20,
+    debugId: 'admin-restaurants'
+  })
+
   // APIs
-  const { call: getRestaurants } = useFrappePostCall<{ success: boolean, data: { restaurants: Restaurant[] } }>(
-    'dinematters.dinematters.api.admin.get_all_restaurants'
-  )
   const { call: updateRestaurantPlan } = useFrappePostCall<{ success: boolean, error?: string }>(
     'dinematters.dinematters.api.admin.update_restaurant_plan'
   )
@@ -71,46 +121,16 @@ export default function AdminRestaurantManagement() {
     'dinematters.dinematters.api.admin.admin_update_restaurant_settings'
   )
 
-  useEffect(() => {
-    if (currentUser === 'Administrator') {
-      setIsAdmin(true)
-    } else {
-      setIsAdmin(false)
-      setLoading(false)
-    }
-  }, [currentUser])
-
-  useEffect(() => {
-    if (isAdmin) {
-      loadRestaurants()
-    }
-  }, [isAdmin])
-
-  const loadRestaurants = async () => {
-    if (!isAdmin) return
-    try {
-      setLoading(true)
-      const result = await getRestaurants({}) as any
-      if (result?.message?.data?.restaurants) {
-        setRestaurants(result.message.data.restaurants)
-      }
-    } catch (error) {
-      toast.error('Failed to load restaurants', { description: getFrappeError(error) })
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handlePlanChange = async (restaurantName: string, newPlan: 'SILVER' | 'GOLD' | 'DIAMOND') => {
     try {
       setUpdating(restaurantName)
       const result = await updateRestaurantPlan({ restaurant_id: restaurantName, plan_type: newPlan }) as any
       if (result?.message?.success) {
-        toast.success(`Plan updated to ${newPlan}`)
-        await loadRestaurants()
+        toast.success(`Plan upgraded to ${newPlan}`)
+        loadRestaurants()
       }
     } catch (error) {
-      toast.error('Failed to update plan')
+      toast.error('Strategic update failed')
     } finally {
       setUpdating(null)
     }
@@ -123,10 +143,10 @@ export default function AdminRestaurantManagement() {
       const result = await toggleRestaurantStatus({ restaurant_id: restaurantName, is_active: newStatus }) as any
       if (result?.message?.success) {
         toast.success(`Restaurant ${newStatus ? 'activated' : 'deactivated'}`)
-        await loadRestaurants()
+        loadRestaurants()
       }
     } catch (error) {
-      toast.error('Failed to update status')
+      toast.error('Status synchronization failed')
     } finally {
       setUpdating(null)
     }
@@ -142,12 +162,12 @@ export default function AdminRestaurantManagement() {
         reason: coinReason
       }) as any
       if (result?.message?.success) {
-        toast.success(`Granted ${coinAmount} coins`)
+        toast.success(`Granted ${coinAmount} coins to treasury`)
         setIsCoinModalOpen(false)
-        await loadRestaurants()
+        loadRestaurants()
       }
     } catch (error) {
-      toast.error('Failed to grant coins')
+      toast.error('Treasury grant failed')
     } finally {
       setUpdating(null)
     }
@@ -167,12 +187,12 @@ export default function AdminRestaurantManagement() {
         }
       }) as any
       if (result?.message?.success) {
-        toast.success('Settings updated')
+        toast.success('Core settings updated')
         setIsSettingsModalOpen(false)
-        await loadRestaurants()
+        loadRestaurants()
       }
     } catch (error) {
-      toast.error('Failed to update settings')
+      toast.error('Settings update failed')
     } finally {
       setUpdating(null)
     }
@@ -184,33 +204,37 @@ export default function AdminRestaurantManagement() {
       setUpdating(restaurantToDelete.id)
       const result = await deleteRestaurant({ restaurant_id: restaurantToDelete.id }) as any
       if (result?.message?.success) {
-        toast.success(`Restaurant deleted`)
+        toast.success(`Restaurant purged from system`)
         setIsDeleteDialogOpen(false)
-        await loadRestaurants()
+        loadRestaurants()
       }
     } catch (error) {
-      toast.error('Failed to delete')
+      toast.error('System purge failed')
     } finally {
       setUpdating(null)
     }
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString()
+    return new Date(dateString).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
   }
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <Card className="w-full max-w-md border-destructive/20 shadow-lg">
-          <CardContent className="p-8 text-center">
-            <div className="mx-auto w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-6">
-              <Shield className="h-8 w-8 text-destructive" />
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center p-6">
+        <Card className="w-full max-w-md border-none shadow-2xl rounded-3xl overflow-hidden">
+          <div className="bg-red-600 h-2" />
+          <CardContent className="p-10 text-center">
+            <div className="mx-auto w-20 h-20 bg-red-100 rounded-2xl flex items-center justify-center mb-8">
+              <Shield className="h-10 w-10 text-red-600" />
             </div>
-            <h2 className="text-2xl font-bold mb-3">Access Denied</h2>
-            <p className="text-muted-foreground leading-relaxed text-sm">
-              You don't have permission to access this admin page.
+            <h2 className="text-3xl font-black tracking-tight mb-4">RESTRICTED ZONE</h2>
+            <p className="text-muted-foreground leading-relaxed font-medium">
+              You lack the administrative clearance required to access the central restaurant control hub.
             </p>
+            <Button onClick={() => navigate('/')} className="mt-8 rounded-xl px-10 h-12 font-bold uppercase tracking-widest text-xs">
+               Return Home
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -218,365 +242,309 @@ export default function AdminRestaurantManagement() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
+    <div className="p-4 sm:p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Shield className="h-6 w-6 text-primary" />
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Restaurant Management
-            </h1>
-          </div>
-          <p className="text-muted-foreground">
-            Manage all restaurants and their subscription plans from a central hub
+          <h2 className="text-2xl font-bold tracking-tight">Restaurant Management</h2>
+          <p className="text-muted-foreground text-sm">
+            Manage all restaurants in the ecosystem
           </p>
-        </div>
-
-        {/* Stats Cards - Restored Original Style */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-          <Card className="overflow-hidden relative group">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Total</p>
-                  <p className="text-3xl font-bold">{restaurants.length}</p>
-                </div>
-                <div className="p-3 bg-blue-500/10 rounded-xl text-blue-600">
-                  <Users className="h-6 w-6" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="overflow-hidden relative group">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Active</p>
-                  <p className="text-3xl font-bold">{restaurants.filter(r => r.is_active).length}</p>
-                </div>
-                <div className="p-3 bg-green-500/10 rounded-xl text-green-600">
-                  <Crown className="h-6 w-6" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="overflow-hidden relative group border-indigo-200 bg-indigo-50/10">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-indigo-600 mb-1">DIAMOND Plans</p>
-                  <p className="text-3xl font-bold text-indigo-700">{restaurants.filter(r => r.plan_type === 'DIAMOND').length}</p>
-                </div>
-                <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-600">
-                  <Zap className="h-6 w-6" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="overflow-hidden relative group">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">GOLD Plans</p>
-                  <p className="text-3xl font-bold">{restaurants.filter(r => r.plan_type === 'GOLD').length}</p>
-                </div>
-                <div className="p-3 bg-purple-500/10 rounded-xl text-purple-600">
-                  <Star className="h-6 w-6" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="overflow-hidden relative group">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">SILVER Plans</p>
-                  <p className="text-3xl font-bold">{restaurants.filter(r => r.plan_type === 'SILVER').length}</p>
-                </div>
-                <div className="p-3 bg-orange-500/10 rounded-xl text-orange-600">
-                  <Shield className="h-6 w-6" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Restaurants Table */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>All Restaurants</CardTitle>
-              <Button variant="outline" size="sm" onClick={loadRestaurants}>
-                <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
-                Refresh
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-8">
-                <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2" />
-                <p>Loading restaurants...</p>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>RESTAURANT</TableHead>
-                    <TableHead>ID</TableHead>
-                    <TableHead>OWNER EMAIL</TableHead>
-                    <TableHead>STATUS</TableHead>
-                    <TableHead>PLAN</TableHead>
-                    <TableHead className="text-right">COINS</TableHead>
-                    <TableHead>CREATED</TableHead>
-                    <TableHead>ACTIONS</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {restaurants.map((restaurant) => (
-                    <TableRow key={restaurant.name} className="hover:bg-muted/30 transition-colors group">
-                      <TableCell className="font-semibold">{restaurant.restaurant_name}</TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-xs">{restaurant.restaurant_id}</TableCell>
-                      <TableCell className="text-muted-foreground text-xs">{restaurant.owner_email || 'N/A'}</TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={restaurant.is_active ? 'default' : 'secondary'}
-                          className={cn(
-                            "shadow-none",
-                            restaurant.is_active ? "bg-green-500/10 text-green-600 border-green-200" : "bg-muted text-muted-foreground"
-                          )}
-                        >
-                          {restaurant.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant="outline"
-                          className={cn(
-                            "shadow-none",
-                            restaurant.plan_type === 'DIAMOND' ? "bg-indigo-500/10 text-indigo-600 border-indigo-200" :
-                            restaurant.plan_type === 'GOLD' ? "bg-primary/10 text-primary border-primary/20" : "bg-muted/50 text-muted-foreground border-transparent"
-                          )}
-                        >
-                          {restaurant.plan_type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-sm">
-                        {restaurant.coins_balance.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">{formatDate(restaurant.creation)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                           <Button
-                            variant="ghost" size="icon" className="h-8 w-8 text-orange-500 hover:bg-orange-50"
-                            onClick={() => {
-                              setSelectedRestaurant(restaurant)
-                              setCoinAmount('')
-                              setIsCoinModalOpen(true)
-                            }}
-                            title="Give Coins"
-                          >
-                            <Coins className="h-4 w-4" />
-                          </Button>
-                          
-                          <Button
-                            variant="ghost" size="icon" className="h-8 w-8 text-indigo-500 hover:bg-indigo-50"
-                            onClick={() => navigate(`/admin/restaurants/${restaurant.restaurant_id}`)}
-                            title="Manage Restaurant"
-                          >
-                            <Settings className="h-4 w-4" />
-                          </Button>
-
-                          <Button
-                            variant="ghost" size="icon"
-                            onClick={() => handleStatusToggle(restaurant.name, restaurant.is_active)}
-                            disabled={updating === restaurant.name}
-                            className={cn("h-8 w-8", restaurant.is_active ? "text-red-500 hover:bg-red-50" : "text-green-500 hover:bg-green-50")}
-                          >
-                            {restaurant.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-                          </Button>
-
-                          <Select
-                            value={restaurant.plan_type}
-                            onValueChange={(value: 'SILVER' | 'GOLD' | 'DIAMOND') => handlePlanChange(restaurant.name, value)}
-                            disabled={updating === restaurant.name}
-                          >
-                            <SelectTrigger className="h-8 w-20 text-[10px] font-bold">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="SILVER">SILVER</SelectItem>
-                              <SelectItem value="GOLD">GOLD</SelectItem>
-                              <SelectItem value="DIAMOND">DIAMOND</SelectItem>
-                            </SelectContent>
-                          </Select>
-
-                          <Button
-                            variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => {
-                              setRestaurantToDelete({ id: restaurant.restaurant_id, name: restaurant.restaurant_name })
-                              setVerificationInput('')
-                              setIsDeleteDialogOpen(true)
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Stats Summary - Restored Style */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <Card>
-            <CardHeader className="py-4">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                <CardTitle className="text-lg">Plan Distribution</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-indigo-500" /> DIAMOND Plans
-                  </span>
-                  <span className="font-bold">{restaurants.filter(r => r.plan_type === 'DIAMOND').length}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-primary" /> GOLD Plans
-                  </span>
-                  <span className="font-bold">{restaurants.filter(r => r.plan_type === 'GOLD').length}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-orange-400" /> SILVER Plans
-                  </span>
-                  <span className="font-bold">{restaurants.filter(r => r.plan_type === 'SILVER').length}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="py-4">
-              <div className="flex items-center gap-2">
-                <Activity className="h-4 w-4 text-green-600" />
-                <CardTitle className="text-lg">Operational Status</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 rounded-lg border bg-muted/20 text-center">
-                  <p className="text-xs text-muted-foreground uppercase font-semibold">Active</p>
-                  <p className="text-xl font-bold text-green-600">{restaurants.filter(r => r.is_active).length}</p>
-                </div>
-                <div className="p-3 rounded-lg border bg-muted/20 text-center">
-                  <p className="text-xs text-muted-foreground uppercase font-semibold">Inactive</p>
-                  <p className="text-xl font-bold text-destructive">{restaurants.filter(r => !r.is_active).length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
 
-      {/* Modals - Standard Styling */}
-      <Dialog open={isCoinModalOpen} onOpenChange={setIsCoinModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Grant Coins</DialogTitle>
-            <DialogDescription>Grant manual coins to {selectedRestaurant?.restaurant_name}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Amount</Label>
-              <Input type="number" value={coinAmount} onChange={(e) => setCoinAmount(e.target.value)} placeholder="Enter amount" />
-            </div>
-            <div className="space-y-2">
-              <Label>Reason</Label>
-              <Input value={coinReason} onChange={(e) => setCoinReason(e.target.value)} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCoinModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleGiveCoins}>Grant Coins</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Restaurant Settings (Admin)</DialogTitle>
-            <DialogDescription>Update administrative parameters for {selectedRestaurant?.restaurant_name}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Restaurant Name</Label>
-              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Owner Email</Label>
-              <Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
-            </div>
-            
-            {/* Subscription Settings */}
-            {selectedRestaurant?.plan_type !== 'SILVER' && (
-              <div className="space-y-2">
-                <Label>
-                  {selectedRestaurant?.plan_type === 'GOLD' ? 'Monthly Subscription Fee' : 'Monthly Minimum Floor'}
-                </Label>
-                <Input type="number" value={editMonthlyMinimum} onChange={(e) => setEditMonthlyMinimum(e.target.value)} />
-                <p className="text-[10px] text-muted-foreground italic">
-                  Default for {selectedRestaurant?.plan_type} plan.
-                </p>
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search restaurants..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 h-9"
+                />
               </div>
-            )}
-            
+              <Button 
+                variant="outline" 
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                onClick={() => loadRestaurants()}
+              >
+                 <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+              </Button>
+            </div>
+            <Select value={pageSize.toString()} onValueChange={(v) => setPageSize(parseInt(v))}>
+              <SelectTrigger className="h-9 w-[120px]">
+                <SelectValue placeholder="Page Size" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="20">20 Rows</SelectItem>
+                <SelectItem value="50">50 Rows</SelectItem>
+                <SelectItem value="100">100 Rows</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading && !restaurants.length ? (
+            <div className="py-20 flex justify-center">
+              <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+            </div>
+          ) : !restaurants || restaurants.length === 0 ? (
+            <div className="py-20 text-center text-muted-foreground">No restaurants found</div>
+          ) : (
+            <>
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Restaurant</TableHead>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Plan</TableHead>
+                      <TableHead className="text-right">Coins</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {restaurants.map((restaurant: any) => (
+                      <TableRow key={restaurant.name}>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-bold">{restaurant.restaurant_name}</span>
+                            <span className="text-xs text-muted-foreground">{restaurant.owner_email}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <code className="text-[10px] bg-muted px-1 rounded">{restaurant.restaurant_id}</code>
+                        </TableCell>
+                        <TableCell>
+                          {restaurant.is_active ? (
+                            <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">Online</Badge>
+                          ) : (
+                            <Badge variant="secondary">Offline</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                           <Badge variant={restaurant.plan_type === 'DIAMOND' ? 'default' : 'outline'}>
+                              {restaurant.plan_type}
+                           </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {restaurant.coins_balance.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                             <Button
+                                variant="ghost" size="icon" className="h-8 w-8 text-amber-600"
+                                onClick={() => {
+                                  setSelectedRestaurant(restaurant)
+                                  setCoinAmount('')
+                                  setIsCoinModalOpen(true)
+                                }}
+                              >
+                                <Coins className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost" size="icon" className="h-8 w-8"
+                                onClick={() => navigate(`/admin/restaurants/${restaurant.restaurant_id}`)}
+                              >
+                                <ArrowUpRight className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost" size="icon"
+                                onClick={() => handleStatusToggle(restaurant.name, restaurant.is_active)}
+                                disabled={updating === restaurant.name}
+                                className={cn("h-8 w-8", restaurant.is_active ? "text-red-500" : "text-green-500")}
+                              >
+                                {restaurant.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                              </Button>
+                              <DropdownMenu>
+                                 <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                       <Settings className="h-4 w-4" />
+                                    </Button>
+                                 </DropdownMenuTrigger>
+                                 <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => {
+                                       setSelectedRestaurant(restaurant)
+                                       setEditName(restaurant.restaurant_name)
+                                       setEditEmail(restaurant.owner_email || '')
+                                       setEditPlatformFee(restaurant.platform_fee_percent.toString())
+                                       setEditMonthlyMinimum(restaurant.monthly_minimum.toString())
+                                       setIsSettingsModalOpen(true)
+                                    }}>
+                                       <Settings className="h-4 w-4 mr-2" />
+                                       <span>Configure</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => {
+                                      setRestaurantToDelete({ id: restaurant.restaurant_id, name: restaurant.restaurant_name })
+                                      setVerificationInput('')
+                                      setIsDeleteDialogOpen(true)
+                                    }} className="text-red-600">
+                                       <Trash2 className="h-4 w-4 mr-2" />
+                                       <span>Delete</span>
+                                    </DropdownMenuItem>
+                                 </DropdownMenuContent>
+                              </DropdownMenu>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <DataPagination
+                currentPage={page}
+                totalCount={totalCount}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                isLoading={isLoading}
+              />
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+
+      {/* Grant Coins Modal */}
+      <Dialog open={isCoinModalOpen} onOpenChange={setIsCoinModalOpen}>
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden border-none shadow-3xl rounded-3xl">
+          <div className="bg-amber-500/5 p-8 pb-6 border-b border-amber-500/10">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black tracking-tight flex items-center gap-3">
+                 <Coins className="h-6 w-6 text-amber-600" />
+                 Treasury Grant
+              </DialogTitle>
+              <DialogDescription className="text-sm font-medium">Issue digital credits to {selectedRestaurant?.restaurant_name}</DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="p-8 space-y-6">
             <div className="space-y-2">
-              <Label>Platform Fee (Commission) %</Label>
-              <Input type="number" value={editPlatformFee} onChange={(e) => setEditPlatformFee(e.target.value)} />
-              <p className="text-[10px] text-muted-foreground italic">Percentage commission for {selectedRestaurant?.plan_type === 'DIAMOND' ? 'DIAMOND (Default 1.5%)' : 'orders'}.</p>
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Magnitude (Amount)</Label>
+              <Input 
+                type="number" 
+                value={coinAmount} 
+                onChange={(e) => setCoinAmount(e.target.value)} 
+                placeholder="0.00" 
+                className="h-12 rounded-2xl bg-muted/20 border-none font-black text-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Reason for Audit Trail</Label>
+              <Input value={coinReason} onChange={(e) => setCoinReason(e.target.value)} className="h-11 rounded-2xl bg-muted/20 border-none font-bold" />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsSettingsModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleUpdateSettings}>Save Changes</Button>
+          <DialogFooter className="p-8 bg-muted/10 border-t border-border/40">
+            <Button variant="ghost" onClick={() => setIsCoinModalOpen(false)} className="rounded-xl h-11 font-bold uppercase text-xs">Revoke</Button>
+            <Button onClick={handleGiveCoins} className="rounded-xl h-11 px-8 font-bold uppercase text-xs bg-black text-white hover:bg-black/90 shadow-xl shadow-black/10">Authorize Grant</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-destructive">Critical Deletion</DialogTitle>
-            <DialogDescription>
-              Permanently delete <strong>{restaurantToDelete?.name}</strong>? This action is irreversible.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>To confirm, type the ID: <span className="font-mono font-bold text-primary">{restaurantToDelete?.id}</span></Label>
-              <Input value={verificationInput} onChange={(e) => setVerificationInput(e.target.value)} />
+      {/* Advanced Settings Modal */}
+      <Dialog open={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen}>
+        <DialogContent className="sm:max-w-lg p-0 overflow-hidden border-none shadow-3xl rounded-3xl">
+           <div className="bg-primary/5 p-8 pb-6 border-b border-primary/10">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black tracking-tight">Core Configuration</DialogTitle>
+              <DialogDescription className="text-sm font-medium">Administrative parameters for {selectedRestaurant?.restaurant_name}</DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto">
+            <div className="grid grid-cols-2 gap-5">
+               <div className="space-y-2">
+                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Trade Name</Label>
+                 <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-11 rounded-2xl bg-muted/20 border-none font-bold" />
+               </div>
+               <div className="space-y-2">
+                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Controller Email</Label>
+                 <Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="h-11 rounded-2xl bg-muted/20 border-none font-bold" />
+               </div>
+            </div>
+            
+            <div className="space-y-6 pt-4 border-t border-border/40">
+               <div className="flex items-center gap-2 mb-4">
+                  <Coins className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-black uppercase tracking-widest">Financial Parameters</span>
+               </div>
+               
+               <div className="grid grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                      Monthly Floor (₹)
+                    </Label>
+                    <Input type="number" value={editMonthlyMinimum} onChange={(e) => setEditMonthlyMinimum(e.target.value)} className="h-11 rounded-2xl bg-muted/20 border-none font-bold" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Network Fee (%)</Label>
+                    <Input type="number" value={editPlatformFee} onChange={(e) => setEditPlatformFee(e.target.value)} className="h-11 rounded-2xl bg-muted/20 border-none font-bold" />
+                  </div>
+               </div>
+            </div>
+            
+            <div className="space-y-4 pt-4 border-t border-border/40">
+               <div className="flex items-center gap-2 mb-2">
+                  <Shield className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-black uppercase tracking-widest">Tier Evolution</span>
+               </div>
+               <div className="flex gap-2">
+                  {['SILVER', 'GOLD', 'DIAMOND'].map((tier) => (
+                     <button
+                        key={tier}
+                        type="button"
+                        onClick={() => handlePlanChange(selectedRestaurant!.name, tier as any)}
+                        className={cn(
+                           "flex-1 h-12 rounded-2xl text-[10px] font-black uppercase tracking-widest border-2 transition-all",
+                           selectedRestaurant?.plan_type === tier 
+                              ? "bg-primary text-white border-primary shadow-lg shadow-primary/20" 
+                              : "bg-white border-border/50 text-muted-foreground hover:border-primary/40"
+                        )}
+                        disabled={updating === selectedRestaurant?.name}
+                     >
+                        {tier}
+                     </button>
+                  ))}
+               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
-            <Button variant="destructive" disabled={verificationInput !== restaurantToDelete?.id} onClick={handleConfirmDelete}>Confirm Delete</Button>
+          <DialogFooter className="p-8 bg-muted/10 border-t border-border/40">
+            <Button variant="ghost" onClick={() => setIsSettingsModalOpen(false)} className="rounded-xl h-12 font-bold uppercase text-xs">Dismiss</Button>
+            <Button onClick={handleUpdateSettings} className="rounded-xl h-12 px-8 font-bold uppercase text-xs bg-primary text-white hover:bg-primary/90 shadow-xl shadow-primary/20">Commit Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden border-none shadow-3xl rounded-3xl">
+           <div className="bg-red-500/5 p-8 pb-6 border-b border-red-500/10">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black tracking-tight text-red-600">CRITICAL PURGE</DialogTitle>
+              <DialogDescription className="text-sm font-semibold">
+                This will permanently eradicate <strong>{restaurantToDelete?.name}</strong> and all associated meta-data from the shard cluster.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="p-8 space-y-6">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Security Verification (Type ID: <span className="font-mono font-bold text-red-600">{restaurantToDelete?.id}</span>)</Label>
+              <Input value={verificationInput} onChange={(e) => setVerificationInput(e.target.value)} className="h-12 rounded-2xl bg-red-50/50 border-red-100 text-red-900 font-bold" />
+            </div>
+          </div>
+          <DialogFooter className="p-8 bg-muted/10 border-t border-border/40">
+            <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} className="rounded-xl h-11 font-bold uppercase text-xs">Abort Purge</Button>
+            <Button 
+               variant="destructive" 
+               disabled={verificationInput !== restaurantToDelete?.id} 
+               onClick={handleConfirmDelete}
+               className="rounded-xl h-11 px-8 font-bold uppercase text-xs shadow-xl shadow-red-200"
+            >
+               Confirm Eradication
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
