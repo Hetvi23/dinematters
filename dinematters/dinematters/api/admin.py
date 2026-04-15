@@ -30,7 +30,7 @@ def check_admin_access():
         }
 
 @frappe.whitelist()
-def get_all_restaurants(page=1, page_size=20, search=None):
+def get_all_restaurants(page=1, page_size=20, search=None, filters=None):
     """
     Get all restaurants with their plan details
     Only accessible by admin users
@@ -56,6 +56,25 @@ def get_all_restaurants(page=1, page_size=20, search=None):
             where_conditions.append("(r.restaurant_name LIKE %s OR r.restaurant_id LIKE %s OR r.owner_email LIKE %s)")
             search_val = f"%{search}%"
             params.extend([search_val, search_val, search_val])
+        
+        if filters:
+            if isinstance(filters, str):
+                import json
+                filters = json.loads(filters)
+            
+            for f in filters:
+                if len(f) == 3:
+                    fieldname, operator, value = f
+                    # Security: Only allow specific fields for filtering
+                    if fieldname in ['is_active', 'plan_type', 'enable_floor_recovery']:
+                        if operator == '=':
+                            where_conditions.append(f"r.{fieldname} = %s")
+                            params.append(value)
+                        elif operator == 'in':
+                            if isinstance(value, list) and value:
+                                placeholders = ', '.join(['%s'] * len(value))
+                                where_conditions.append(f"r.{fieldname} IN ({placeholders})")
+                                params.extend(value)
             
         where_clause = " WHERE " + " AND ".join(where_conditions) if where_conditions else ""
         
@@ -75,6 +94,7 @@ def get_all_restaurants(page=1, page_size=20, search=None):
                     COALESCE(r.coins_balance, 0) as coins_balance,
                     COALESCE(r.platform_fee_percent, 1.5) as platform_fee_percent,
                     COALESCE(r.monthly_minimum, 999) as monthly_minimum,
+                    COALESCE(r.enable_floor_recovery, 1) as enable_floor_recovery,
                     COALESCE(rc.subscription_plan, r.plan_type, 'SILVER') as plan_type
                 FROM `tabRestaurant` r
                 LEFT JOIN `tabRestaurantConfig` rc ON r.name = rc.parent
@@ -96,6 +116,7 @@ def get_all_restaurants(page=1, page_size=20, search=None):
                     COALESCE(r.coins_balance, 0) as coins_balance,
                     COALESCE(r.platform_fee_percent, 1.5) as platform_fee_percent,
                     COALESCE(r.monthly_minimum, 999) as monthly_minimum,
+                    COALESCE(r.enable_floor_recovery, 1) as enable_floor_recovery,
                     COALESCE(r.plan_type, 'SILVER') as plan_type
                 FROM `tabRestaurant` r
                 {{where_clause}}
@@ -593,7 +614,7 @@ def admin_update_restaurant_settings(restaurant_id, updates):
         # Allow most fields for admin updates
         allowed_fields = [
             'platform_fee_percent', 'monthly_minimum', 'is_active', 'restaurant_name', 'owner_email',
-            'owner_phone', 'owner_name', 'plan_type', 'billing_status', 'mandate_status',
+            'owner_phone', 'owner_name', 'plan_type', 'billing_status', 'mandate_status', 'enable_floor_recovery',
             'pos_provider', 'pos_enabled', 'pos_app_key', 'pos_app_secret', 'pos_access_token', 'pos_merchant_id',
             'enable_loyalty', 'enable_takeaway', 'enable_delivery', 'enable_dine_in', 'no_ordering',
             'tax_rate', 'gst_number', 'default_delivery_fee', 'default_packaging_fee', 'minimum_order_value',
@@ -610,7 +631,7 @@ def admin_update_restaurant_settings(restaurant_id, updates):
                     except:
                         continue
                 elif field in ['is_active', 'enable_loyalty', 'enable_takeaway', 'enable_delivery', 
-                              'enable_dine_in', 'no_ordering', 'pos_enabled']:
+                              'enable_dine_in', 'no_ordering', 'pos_enabled', 'enable_floor_recovery']:
                     value = 1 if value in [True, 1, '1', 'true'] else 0
                 elif field in ['tables', 'estimated_prep_time']:
                     try:

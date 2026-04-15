@@ -33,8 +33,10 @@ import {
   ArrowUpRight,
   Building2,
   Calendar,
-  Mail
+  Mail,
+  Scale
 } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
 import { useDataTable } from '@/hooks/useDataTable'
 import { DataPagination } from '@/components/ui/DataPagination'
 
@@ -48,6 +50,7 @@ interface Restaurant {
   coins_balance: number
   platform_fee_percent: number
   monthly_minimum: number
+  enable_floor_recovery: number
   creation: string
   modified: string
 }
@@ -73,6 +76,7 @@ export default function AdminRestaurantManagement() {
   const [editMonthlyMinimum, setEditMonthlyMinimum] = useState('')
   const [editName, setEditName] = useState('')
   const [editEmail, setEditEmail] = useState('')
+  const [editFloorRecovery, setEditFloorRecovery] = useState(true)
 
   useEffect(() => {
     if (currentUser === 'Administrator') {
@@ -92,13 +96,16 @@ export default function AdminRestaurantManagement() {
     setPageSize,
     totalCount,
     searchQuery,
-    setSearchQuery
+    setSearchQuery,
+    filters,
+    setFilters
   } = useDataTable({
     customEndpoint: 'dinematters.dinematters.api.admin.get_all_restaurants',
     paramNames: {
       page: 'page',
       pageSize: 'page_size',
-      search: 'search'
+      search: 'search',
+      filters: 'filters'
     },
     initialPageSize: 20,
     debugId: 'admin-restaurants'
@@ -186,7 +193,8 @@ export default function AdminRestaurantManagement() {
           platform_fee_percent: editPlatformFee,
           monthly_minimum: editMonthlyMinimum,
           restaurant_name: editName,
-          owner_email: editEmail
+          owner_email: editEmail,
+          enable_floor_recovery: editFloorRecovery ? 1 : 0
         }
       }) as any
       if (result?.message?.success) {
@@ -197,7 +205,8 @@ export default function AdminRestaurantManagement() {
             restaurant_name: editName,
             owner_email: editEmail,
             platform_fee_percent: parseFloat(editPlatformFee),
-            monthly_minimum: parseFloat(editMonthlyMinimum)
+            monthly_minimum: parseFloat(editMonthlyMinimum),
+            enable_floor_recovery: editFloorRecovery ? 1 : 0
           })
         }
         setIsSettingsModalOpen(false)
@@ -286,16 +295,44 @@ export default function AdminRestaurantManagement() {
                  <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
               </Button>
             </div>
-            <Select value={pageSize.toString()} onValueChange={(v) => setPageSize(parseInt(v))}>
-              <SelectTrigger className="h-9 w-[120px]">
-                <SelectValue placeholder="Page Size" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="20">20 Rows</SelectItem>
-                <SelectItem value="50">50 Rows</SelectItem>
-                <SelectItem value="100">100 Rows</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+              <Select value={pageSize.toString()} onValueChange={(v) => setPageSize(parseInt(v))}>
+                <SelectTrigger className="h-9 w-[120px]">
+                  <SelectValue placeholder="Page Size" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="20">20 Rows</SelectItem>
+                  <SelectItem value="50">50 Rows</SelectItem>
+                  <SelectItem value="100">100 Rows</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select 
+                value={(() => {
+                  const f = filters.find(f => f.fieldname === 'enable_floor_recovery')
+                  if (!f) return 'all'
+                  return f.value === 1 ? 'enabled' : 'disabled'
+                })()} 
+                onValueChange={(v) => {
+                  if (v === 'all') {
+                    setFilters(filters.filter(f => f.fieldname !== 'enable_floor_recovery'))
+                  } else {
+                    const newFilters = filters.filter(f => f.fieldname !== 'enable_floor_recovery')
+                    newFilters.push({ fieldname: 'enable_floor_recovery', operator: '=', value: v === 'enabled' ? 1 : 0 })
+                    setFilters(newFilters)
+                  }
+                }}
+              >
+                <SelectTrigger className="h-9 w-[150px]">
+                  <SelectValue placeholder="Floor Recovery" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Recovery: All</SelectItem>
+                  <SelectItem value="enabled">Recovery: Enabled</SelectItem>
+                  <SelectItem value="disabled">Recovery: Disabled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -385,6 +422,7 @@ export default function AdminRestaurantManagement() {
                                        setEditEmail(restaurant.owner_email || '')
                                        setEditPlatformFee(restaurant.platform_fee_percent.toString())
                                        setEditMonthlyMinimum(restaurant.monthly_minimum.toString())
+                                        setEditFloorRecovery(!!restaurant.enable_floor_recovery)
                                        setIsSettingsModalOpen(true)
                                     }}>
                                        <Settings className="h-4 w-4 mr-2" />
@@ -519,6 +557,31 @@ export default function AdminRestaurantManagement() {
                     <Input type="number" value={editPlatformFee} onChange={(e) => setEditPlatformFee(e.target.value)} className="h-11 rounded-xl bg-background border-slate-300 font-bold text-foreground" />
                   </div>
                </div>
+            </div>
+
+            {/* Operational Controls Section */}
+            <div className="space-y-4 p-5 rounded-xl border bg-primary/5 border-primary/10">
+               <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <Scale className="h-4 w-4 text-primary" />
+                      <Label className="text-sm font-bold">Daily Floor Recovery</Label>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground font-medium">Control automatic nightly minimum fee deductions</p>
+                  </div>
+                  <Switch 
+                     checked={editFloorRecovery} 
+                     onCheckedChange={setEditFloorRecovery}
+                  />
+               </div>
+               {!editFloorRecovery && (
+                 <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2">
+                    <Zap className="h-3 w-3 text-amber-600 mt-0.5" />
+                    <p className="text-[9px] text-amber-700 font-bold leading-tight uppercase">
+                       Billing Alert: Nightly floor deduction is PAUSED for this restaurant.
+                    </p>
+                 </div>
+               )}
             </div>
             
             {/* Tier Evolution Section */}

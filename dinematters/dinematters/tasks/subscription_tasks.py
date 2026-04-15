@@ -15,7 +15,7 @@ def process_daily_subscription_floors():
     
     # 1. Fetch all paid restaurants (GOLD and DIAMOND)
     gold_diamond_restaurants = frappe.get_all("Restaurant", 
-        filters={"plan_type": ["in", ["GOLD", "DIAMOND"]], "is_active": 1}, 
+        filters={"plan_type": ["in", ["GOLD", "DIAMOND"]], "is_active": 1, "enable_floor_recovery": 1}, 
         fields=["name", "plan_type", "coins_balance", "timezone", "monthly_minimum"]
     )
     

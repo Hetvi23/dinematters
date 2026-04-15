@@ -340,7 +340,7 @@ export default function TieredSetupWizard() {
                         'enable_loyalty', 'pos_provider', 'pos_enabled', 'pos_app_key', 'pos_app_secret',
                         'pos_access_token', 'pos_merchant_id', 'pos_last_sync_at', 'pos_sync_status',
                         'logo', 'city_latitude', 'city_longitude',
-                        'razorpay_webhook_secret'
+                        'razorpay_webhook_secret', 'enable_floor_recovery'
                       ]
                     }
                     if (currentStep.id === 'config') {
