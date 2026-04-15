@@ -127,6 +127,9 @@ export default function AdminRestaurantManagement() {
       const result = await updateRestaurantPlan({ restaurant_id: restaurantName, plan_type: newPlan }) as any
       if (result?.message?.success) {
         toast.success(`Plan upgraded to ${newPlan}`)
+        if (selectedRestaurant) {
+          setSelectedRestaurant({ ...selectedRestaurant, plan_type: newPlan })
+        }
         loadRestaurants()
       }
     } catch (error) {
@@ -188,6 +191,15 @@ export default function AdminRestaurantManagement() {
       }) as any
       if (result?.message?.success) {
         toast.success('Core settings updated')
+        if (selectedRestaurant) {
+          setSelectedRestaurant({
+            ...selectedRestaurant,
+            restaurant_name: editName,
+            owner_email: editEmail,
+            platform_fee_percent: parseFloat(editPlatformFee),
+            monthly_minimum: parseFloat(editMonthlyMinimum)
+          })
+        }
         setIsSettingsModalOpen(false)
         loadRestaurants()
       }
@@ -412,108 +424,143 @@ export default function AdminRestaurantManagement() {
 
       {/* Grant Coins Modal */}
       <Dialog open={isCoinModalOpen} onOpenChange={setIsCoinModalOpen}>
-        <DialogContent className="sm:max-w-md p-0 overflow-hidden border-none shadow-3xl rounded-3xl">
-          <div className="bg-amber-500/5 p-8 pb-6 border-b border-amber-500/10">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-black tracking-tight flex items-center gap-3">
-                 <Coins className="h-6 w-6 text-amber-600" />
-                 Treasury Grant
-              </DialogTitle>
-              <DialogDescription className="text-sm font-medium">Issue digital credits to {selectedRestaurant?.restaurant_name}</DialogDescription>
+        <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden border-none shadow-2xl rounded-2xl">
+          <div className="p-6 pt-8 text-center">
+            <div className="mx-auto w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+              <Coins className="h-6 w-6 text-amber-600" />
+            </div>
+            <DialogHeader className="text-center">
+              <DialogTitle className="text-xl font-bold text-center w-full">Issue Credits</DialogTitle>
+              <DialogDescription className="text-sm text-center pt-2">
+                Manually add digital coins to <span className="font-bold text-foreground">"{selectedRestaurant?.restaurant_name}"</span>.
+              </DialogDescription>
             </DialogHeader>
           </div>
-          <div className="p-8 space-y-6">
+          <div className="px-8 pb-8 space-y-5">
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Magnitude (Amount)</Label>
+              <Label className="text-xs font-semibold text-muted-foreground">Magnitude (Amount)</Label>
               <Input 
                 type="number" 
                 value={coinAmount} 
                 onChange={(e) => setCoinAmount(e.target.value)} 
                 placeholder="0.00" 
-                className="h-12 rounded-2xl bg-muted/20 border-none font-black text-xl"
+                className="h-11 rounded-xl border-slate-300 focus-visible:ring-amber-500 font-bold text-lg bg-background text-foreground"
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Reason for Audit Trail</Label>
-              <Input value={coinReason} onChange={(e) => setCoinReason(e.target.value)} className="h-11 rounded-2xl bg-muted/20 border-none font-bold" />
+              <Label className="text-xs font-semibold text-muted-foreground">Reason for Audit Trail</Label>
+              <Input 
+                value={coinReason} 
+                onChange={(e) => setCoinReason(e.target.value)} 
+                placeholder="e.g., Marketing promotion"
+                className="h-11 rounded-xl border-slate-300 bg-background text-foreground" 
+              />
             </div>
           </div>
-          <DialogFooter className="p-8 bg-muted/10 border-t border-border/40">
-            <Button variant="ghost" onClick={() => setIsCoinModalOpen(false)} className="rounded-xl h-11 font-bold uppercase text-xs">Revoke</Button>
-            <Button onClick={handleGiveCoins} className="rounded-xl h-11 px-8 font-bold uppercase text-xs bg-black text-white hover:bg-black/90 shadow-xl shadow-black/10">Authorize Grant</Button>
+          <DialogFooter className="p-4 bg-muted/30 border-t flex flex-row gap-2 sm:justify-end">
+            <Button variant="ghost" onClick={() => setIsCoinModalOpen(false)} className="rounded-xl flex-1 sm:flex-none">Cancel</Button>
+            <Button 
+               onClick={handleGiveCoins} 
+               className="rounded-xl px-6 flex-1 sm:flex-none bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+            >
+               Authorize Grant
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Advanced Settings Modal */}
       <Dialog open={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen}>
-        <DialogContent className="sm:max-w-lg p-0 overflow-hidden border-none shadow-3xl rounded-3xl">
-           <div className="bg-primary/5 p-8 pb-6 border-b border-primary/10">
+        <DialogContent className="sm:max-w-lg p-0 overflow-hidden border-none shadow-2xl rounded-2xl">
+           <div className="p-6 pt-8 border-b bg-muted/10">
             <DialogHeader>
-              <DialogTitle className="text-2xl font-black tracking-tight">Core Configuration</DialogTitle>
-              <DialogDescription className="text-sm font-medium">Administrative parameters for {selectedRestaurant?.restaurant_name}</DialogDescription>
+              <div className="flex items-center gap-3 mb-1">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Settings className="h-5 w-5 text-primary" />
+                </div>
+                <DialogTitle className="text-xl font-bold">Core Configuration</DialogTitle>
+              </div>
+              <DialogDescription className="text-sm font-medium pl-10 text-muted-foreground">
+                Administrative parameters for <span className="text-foreground font-semibold">{selectedRestaurant?.restaurant_name}</span>
+              </DialogDescription>
             </DialogHeader>
           </div>
-          <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto">
-            <div className="grid grid-cols-2 gap-5">
+          <div className="p-8 space-y-8 max-h-[60vh] overflow-y-auto">
+            {/* Primary Details Section */}
+            <div className="grid grid-cols-2 gap-6">
                <div className="space-y-2">
-                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Trade Name</Label>
-                 <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-11 rounded-2xl bg-muted/20 border-none font-bold" />
+                 <Label className="text-xs font-semibold text-muted-foreground ml-1">Trade Name</Label>
+                 <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-11 rounded-xl border-slate-300 font-medium focus-visible:ring-primary/30 bg-background text-foreground" />
                </div>
                <div className="space-y-2">
-                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Controller Email</Label>
-                 <Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="h-11 rounded-2xl bg-muted/20 border-none font-bold" />
+                 <Label className="text-xs font-semibold text-muted-foreground ml-1">Controller Email</Label>
+                 <Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="h-11 rounded-xl border-slate-300 font-medium focus-visible:ring-primary/30 bg-background text-foreground" />
                </div>
             </div>
             
-            <div className="space-y-6 pt-4 border-t border-border/40">
-               <div className="flex items-center gap-2 mb-4">
-                  <Coins className="h-4 w-4 text-primary" />
-                  <span className="text-xs font-black uppercase tracking-widest">Financial Parameters</span>
+            {/* Financial Parameters Section */}
+            <div className="space-y-5 p-5 rounded-xl border bg-muted/5">
+               <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 bg-background rounded-md border shadow-sm">
+                    <Coins className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Financial Parameters</span>
                </div>
                
                <div className="grid grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    <Label className="text-xs font-semibold text-muted-foreground ml-1">
                       Monthly Floor (₹)
                     </Label>
-                    <Input type="number" value={editMonthlyMinimum} onChange={(e) => setEditMonthlyMinimum(e.target.value)} className="h-11 rounded-2xl bg-muted/20 border-none font-bold" />
+                    <Input type="number" value={editMonthlyMinimum} onChange={(e) => setEditMonthlyMinimum(e.target.value)} className="h-11 rounded-xl bg-background border-slate-300 font-bold text-foreground" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Network Fee (%)</Label>
-                    <Input type="number" value={editPlatformFee} onChange={(e) => setEditPlatformFee(e.target.value)} className="h-11 rounded-2xl bg-muted/20 border-none font-bold" />
+                    <Label className="text-xs font-semibold text-muted-foreground ml-1">Network Fee (%)</Label>
+                    <Input type="number" value={editPlatformFee} onChange={(e) => setEditPlatformFee(e.target.value)} className="h-11 rounded-xl bg-background border-slate-300 font-bold text-foreground" />
                   </div>
                </div>
             </div>
             
-            <div className="space-y-4 pt-4 border-t border-border/40">
+            {/* Tier Evolution Section */}
+            <div className="space-y-4">
                <div className="flex items-center gap-2 mb-2">
-                  <Shield className="h-4 w-4 text-primary" />
-                  <span className="text-xs font-black uppercase tracking-widest">Tier Evolution</span>
+                  <div className="p-1.5 bg-background rounded-md border shadow-sm">
+                    <Shield className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Platform Access Tier</span>
                </div>
-               <div className="flex gap-2">
-                  {['SILVER', 'GOLD', 'DIAMOND'].map((tier) => (
-                     <button
-                        key={tier}
-                        type="button"
-                        onClick={() => handlePlanChange(selectedRestaurant!.name, tier as any)}
-                        className={cn(
-                           "flex-1 h-12 rounded-2xl text-[10px] font-black uppercase tracking-widest border-2 transition-all",
-                           selectedRestaurant?.plan_type === tier 
-                              ? "bg-primary text-white border-primary shadow-lg shadow-primary/20" 
-                              : "bg-white border-border/50 text-muted-foreground hover:border-primary/40"
-                        )}
-                        disabled={updating === selectedRestaurant?.name}
-                     >
-                        {tier}
-                     </button>
-                  ))}
+               <div className="grid grid-cols-3 gap-3">
+                  {['SILVER', 'GOLD', 'DIAMOND'].map((tier) => {
+                     const isActive = selectedRestaurant?.plan_type === tier;
+                     return (
+                      <button
+                         key={tier}
+                         type="button"
+                         onClick={() => handlePlanChange(selectedRestaurant!.name, tier as any)}
+                         className={cn(
+                            "flex flex-col items-center justify-center py-4 px-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border-2 transition-all",
+                            isActive 
+                               ? "bg-primary/5 text-primary border-primary shadow-sm" 
+                               : "bg-white border-muted/60 text-muted-foreground hover:border-primary/20 hover:text-primary/70"
+                         )}
+                         disabled={updating === selectedRestaurant?.name}
+                      >
+                         {isActive && <div className="p-1 bg-primary text-white rounded-full mb-2"><Activity className="h-3 w-3" /></div>}
+                         {tier}
+                      </button>
+                     )
+                  })}
                </div>
             </div>
           </div>
-          <DialogFooter className="p-8 bg-muted/10 border-t border-border/40">
-            <Button variant="ghost" onClick={() => setIsSettingsModalOpen(false)} className="rounded-xl h-12 font-bold uppercase text-xs">Dismiss</Button>
-            <Button onClick={handleUpdateSettings} className="rounded-xl h-12 px-8 font-bold uppercase text-xs bg-primary text-white hover:bg-primary/90 shadow-xl shadow-primary/20">Commit Changes</Button>
+          <DialogFooter className="p-4 bg-muted/30 border-t flex flex-row gap-2 sm:justify-end">
+            <Button variant="ghost" onClick={() => setIsSettingsModalOpen(false)} className="rounded-xl flex-1 sm:flex-none">Cancel</Button>
+            <Button 
+              onClick={handleUpdateSettings} 
+              className="rounded-xl px-8 font-bold bg-primary text-white hover:bg-primary/90 shadow-sm flex-1 sm:flex-none"
+            >
+              Save Configuration
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

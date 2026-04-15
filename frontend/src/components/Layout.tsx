@@ -745,47 +745,48 @@ export default function Layout({ children }: LayoutProps) {
                         <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2 opacity-70" />
                       </SelectTrigger>
                       <SelectContent
-                        className="min-w-[240px] z-[60]"
+                        className="min-w-[220px] max-h-[450px] z-[60]"
                         onCloseAutoFocus={() => {
                           // When dropdown closes, allow sidebar to collapse if needed
                           setSelectOpen(false)
                         }}
                       >
-                        {restaurants.map((restaurant) => (
-                          <SelectItem key={restaurant.name} value={restaurant.name}>
-                            <div className="flex items-center gap-2 w-full">
-                              <Store className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                              <div className="flex flex-col min-w-0 flex-1">
-                                <span className="text-sm font-medium text-foreground truncate">{restaurant.restaurant_name}</span>
-                                {!restaurant.is_active && (
-                                  <span className="text-xs text-muted-foreground">Inactive</span>
-                                )}
-                              </div>
-                            </div>
-                          </SelectItem>
-                        ))}
-                        {restaurants.length > 3 && (
-                          <>
-                            <div className="border-t border-border my-1" />
-                            <SelectItem value="__search__" className="text-muted-foreground italic">
-                              <div className="flex items-center gap-2 w-full">
-                                <Search className="h-4 w-4 flex-shrink-0" />
-                                <span className="text-sm">Search / View All Restaurants...</span>
-                              </div>
-                            </SelectItem>
-                          </>
-                        )}
                         {isAdmin && (
                           <>
-                            <div className="border-t border-border my-1" />
-                            <SelectItem value="__create_new__" className="text-primary">
-                              <div className="flex items-center gap-2 w-full">
+                            <SelectItem value="__create_new__" className="text-primary font-bold focus:bg-primary/5 focus:text-primary mb-1">
+                              <div className="flex items-center gap-2 w-full py-0">
                                 <Plus className="h-4 w-4 text-primary flex-shrink-0" />
-                                <span className="text-sm font-medium">Create New Restaurant</span>
+                                <span className="text-sm">New Restaurant</span>
                               </div>
                             </SelectItem>
+                            <div className="border-t border-border/50 mx-1 mb-1" />
                           </>
                         )}
+                        
+                        <SelectItem value="__search__" className="text-muted-foreground italic focus:bg-muted/5 transition-colors">
+                          <div className="flex items-center gap-2 w-full py-0">
+                            <Search className="h-4 w-4 flex-shrink-0" />
+                            <span className="text-sm">Search / View All</span>
+                          </div>
+                        </SelectItem>
+
+                        <div className="border-t border-border/40 my-1" />
+                        
+                        <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                          {restaurants.map((restaurant) => (
+                            <SelectItem key={restaurant.name} value={restaurant.name} className="py-1.5 focus:bg-sidebar-accent">
+                              <div className="flex items-center gap-2 w-full">
+                                <Store className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                <div className="flex flex-col min-w-0 flex-1">
+                                  <span className="text-sm font-medium text-foreground truncate">{restaurant.restaurant_name}</span>
+                                  {!restaurant.is_active && (
+                                    <span className="text-[9px] font-bold text-red-500/60 uppercase">Inactive</span>
+                                  )}
+                                </div>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </div>
                       </SelectContent>
                     </Select>
                   ) : (
