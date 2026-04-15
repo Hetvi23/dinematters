@@ -10,6 +10,36 @@ from dinematters.dinematters.doctype.restaurant.qr_branding import build_table_q
 
 
 class Restaurant(Document):
+	def before_delete(self):
+		"""Cleanup linked records before deleting the restaurant"""
+		# 1. Cleanup User Permissions
+		permissions = frappe.get_all("User Permission", filters={
+			"allow": "Restaurant",
+			"for_value": self.name
+		})
+		for p in permissions:
+			frappe.delete_doc("User Permission", p.name, ignore_permissions=True)
+
+		# 2. Cleanup Restaurant Users
+		res_users = frappe.get_all("Restaurant User", filters={"restaurant": self.name})
+		for ru in res_users:
+			frappe.delete_doc("Restaurant User", ru.name, ignore_permissions=True)
+
+		# 3. Cleanup Restaurant Config
+		res_config = frappe.db.get_value("Restaurant Config", {"restaurant": self.name}, "name")
+		if res_config:
+			frappe.delete_doc("Restaurant Config", res_config, ignore_permissions=True)
+
+		# 4. Cleanup Home Features
+		home_feats = frappe.get_all("Home Feature", filters={"restaurant": self.name})
+		for hf in home_feats:
+			frappe.delete_doc("Home Feature", hf.name, ignore_permissions=True)
+
+		# 5. Cleanup Menu Products (optional but good for total cleanup)
+		menu_products = frappe.get_all("Menu Product", filters={"restaurant": self.name})
+		for mp in menu_products:
+			frappe.delete_doc("Menu Product", mp.name, ignore_permissions=True)
+
 	def autoname(self):
 		"""Auto-generate restaurant_id and set as name"""
 		if not self.restaurant_id and self.restaurant_name:

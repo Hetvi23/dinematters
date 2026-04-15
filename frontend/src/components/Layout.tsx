@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { RadioGroup, RadioGroupItem } from './ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { SuspendedOverlay } from './SuspendedOverlay'
@@ -321,7 +321,6 @@ export default function Layout({ children }: LayoutProps) {
 
   // API calls
   const { call: createRestaurant } = useFrappePostCall('frappe.client.insert')
-  const { call: generateQrCodes } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.generate_qr_codes_pdf')
   const { call: onboardOwner } = useFrappePostCall<{ success: boolean; message?: string; data?: { email_sent: boolean; onboard_link?: string } }>('dinematters.dinematters.api.admin.admin_onboard_restaurant_owner')
   const { call: createPaymentLink } = useFrappePostCall<{ success: boolean; payment_link_url?: string; amount?: number; owner_phone?: string; error?: string }>('dinematters.dinematters.api.admin.admin_create_wallet_payment_link')
 
@@ -347,7 +346,6 @@ export default function Layout({ children }: LayoutProps) {
         restaurant_name: '',
         owner_email: '',
         owner_phone: '',
-        tables: '',
         referral_code: ''
       })
       return
@@ -434,7 +432,7 @@ export default function Layout({ children }: LayoutProps) {
             }) as any
 
             if (plinkRes?.message?.success) {
-              const { payment_link_url, amount, owner_phone } = plinkRes.message
+              const { payment_link_url, amount, owner_phone, whatsapp_sent, whatsapp_error } = plinkRes.message
               const phone = (owner_phone || newRestaurantData.owner_phone || '').replace(/\D/g, '')
 
               const waText = encodeURIComponent(
@@ -444,10 +442,17 @@ export default function Layout({ children }: LayoutProps) {
                 `Once paid, your wallet will be automatically credited and you're good to go! 🚀`
               )
 
-              if (phone) {
+              if (whatsapp_sent) {
+                toast.success(`WhatsApp sent!`, {
+                  description: `Payment link for ₹${amount.toLocaleString()} sent automatically via Evolution API.`
+                })
+              } else if (phone) {
+                // Fallback to manual wa.me if auto-send failed or wasn't attempted
                 window.open(`https://wa.me/${phone}?text=${waText}`, '_blank', 'noopener,noreferrer')
                 toast.success(`WhatsApp opened!`, {
-                  description: `Payment link for ₹${amount.toLocaleString()} (${paymentTier}) ready to send.`
+                  description: whatsapp_error 
+                    ? `Auto-send failed (${whatsapp_error}). Manual link ready.` 
+                    : `Payment link for ₹${amount.toLocaleString()} (${paymentTier}) ready to send.`
                 })
               } else {
                 // No phone — copy link to clipboard as fallback
@@ -1774,7 +1779,7 @@ export default function Layout({ children }: LayoutProps) {
                     <div className="mt-3" onClick={(e) => e.stopPropagation()}>
                       <RadioGroup
                         value={paymentTier}
-                        onValueChange={(v) => setPaymentTier(v as 'SILVER' | 'GOLD' | 'DIAMOND')}
+                        onValueChange={(v: string) => setPaymentTier(v as 'SILVER' | 'GOLD' | 'DIAMOND')}
                         className="flex flex-col gap-2"
                         disabled={isCreating}
                       >

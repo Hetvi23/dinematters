@@ -894,6 +894,29 @@ def admin_create_wallet_payment_link(restaurant_id, tier):
 
         plink = client.payment_link.create(plink_payload)
 
+        # ── Automated WhatsApp Delivery ──────────────────────────────────
+        whatsapp_sent = False
+        whatsapp_error = None
+        
+        try:
+            from dinematters.dinematters.utils.whatsapp_utils import send_whatsapp_message
+            
+            # Construct message (re-using the description or custom text)
+            msg_text = (
+                f"Hi! 👋 Welcome to DineMatters.\n\n"
+                f"To activate your *{tier}* plan, please complete your wallet top-up of *₹{total_payable:,.2f}* (Incl. 18% GST) using the secure payment link below:\n\n"
+                f"💳 {plink.get('short_url')}\n\n"
+                f"Once paid, your wallet will be automatically credited and you're good to go! 🚀"
+            )
+            
+            success, err = send_whatsapp_message(raw_phone, msg_text)
+            if success:
+                whatsapp_sent = True
+            else:
+                whatsapp_error = err
+        except Exception as wa_err:
+            whatsapp_error = str(wa_err)
+
         return {
             'success': True,
             'payment_link_url': plink.get('short_url') or plink.get('id'),
@@ -901,7 +924,9 @@ def admin_create_wallet_payment_link(restaurant_id, tier):
             'amount': total_payable,
             'base_amount': base_amount,
             'owner_phone': raw_phone,
-            'restaurant_name': restaurant.restaurant_name
+            'restaurant_name': restaurant.restaurant_name,
+            'whatsapp_sent': whatsapp_sent,
+            'whatsapp_error': whatsapp_error
         }
 
     except Exception as e:

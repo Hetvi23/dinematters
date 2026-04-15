@@ -612,45 +612,9 @@ def _send_sms_fast2sms(phone, message, settings):
 def _send_whatsapp(phone, message, settings):
     """
     Send via Evolution API.
-    NOTE: For Meta-compliant outbound marketing, configure a pre-approved
-    WhatsApp Business template name in Dinematters Settings.
-    Until templates are registered, uses free-text (works within 24h service window).
     """
-    evolution_url = getattr(settings, "evolution_api_url", None)
-    evolution_key = getattr(settings, "evolution_api_key", None)
-    instance = getattr(settings, "evolution_api_instance", None) or "DineMatters"
-    wa_template_name = getattr(settings, "marketing_wa_template_name", None)
-
-    if not evolution_url or not evolution_key:
-        return False, "WhatsApp API not configured"
-
-    import requests
-    phone_clean = phone.replace("+", "").strip()
-
-    if wa_template_name:
-        # ✅ Template-based (Meta compliant for marketing window)
-        url = f"{evolution_url.rstrip('/')}/message/sendWhatsAppBusinessTemplate/{instance}"
-        payload = {
-            "number": phone_clean,
-            "template": {
-                "name": wa_template_name,
-                "language": {"code": "en"},
-                "components": [{"type": "body", "parameters": [{"type": "text", "text": message}]}]
-            }
-        }
-    else:
-        # Free-text (compliant within 24h customer-initiated window only)
-        url = f"{evolution_url.rstrip('/')}/message/sendText/{instance}"
-        payload = {"number": phone_clean, "text": message}
-
-    res = requests.post(
-        url,
-        headers={"apikey": evolution_key, "Content-Type": "application/json"},
-        json=payload, timeout=15
-    )
-    if res.status_code in [200, 201]:
-        return True, None
-    return False, f"Evolution API HTTP {res.status_code}: {res.text[:200]}"
+    from dinematters.dinematters.utils.whatsapp_utils import send_whatsapp_message
+    return send_whatsapp_message(phone, message, settings=settings)
 
 
 def _send_email(recipient_phone, message, settings, subject=None):
