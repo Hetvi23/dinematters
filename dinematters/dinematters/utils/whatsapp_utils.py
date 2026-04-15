@@ -15,7 +15,7 @@ def send_whatsapp_message(phone, message, settings=None):
         settings = frappe.get_single("Dinematters Settings")
 
     url = getattr(settings, "evolution_api_url", None)
-    api_key = getattr(settings, "evolution_api_key", None)
+    api_key = settings.get_password("evolution_api_key")
     instance = getattr(settings, "evolution_api_instance", None) or "DineMatters"
     marketing_template = getattr(settings, "marketing_wa_template_name", None)
 

@@ -318,12 +318,16 @@ def handle_payment_link_paid(payload):
 				)
 				return {"success": True, "message": "Already credited (idempotent skip)"}
 
+			description = f"Wallet Top-up via Admin Payment Link — {tier} Plan (₹{int(amount_inr)})"
+			if not tier:
+				description = f"Manual Wallet Recharge (₹{int(amount_inr)})"
+
 			from dinematters.dinematters.api.coin_billing import record_transaction
 			new_balance = record_transaction(
 				restaurant=restaurant_name,
 				txn_type="Purchase",
 				amount=amount_inr,
-				description=f"Wallet Top-up via Admin Payment Link — {tier} Plan (₹{int(amount_inr)})",
+				description=description,
 				payment_id=payment_id
 			)
 			frappe.db.commit()

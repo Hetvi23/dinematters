@@ -932,3 +932,79 @@ def admin_create_wallet_payment_link(restaurant_id, tier):
     except Exception as e:
         frappe.log_error(f"admin_create_wallet_payment_link failed for {restaurant_id}: {str(e)}", "Admin Payment Link")
         return {'success': False, 'error': str(e)}
+@frappe.whitelist()
+def admin_create_manual_recharge_link(restaurant_id, amount):
+    """
+    Generate a Razorpay payment link for a custom manual credit.
+    Includes 18% GST.
+    """
+    try:
+        # Admin access check
+        access_check = check_admin_access()
+        if not access_check.get('success') or not access_check.get('data', {}).get('allowed'):
+            return {'success': False, 'error': 'Admin access required'}
+
+        base_amount = float(amount)
+        if base_amount <= 0:
+            return {'success': False, 'error': 'Amount must be greater than 0'}
+
+        # Calculate GST
+        gst_rate = 0.18
+        gst_amount = round(base_amount * gst_rate, 2)
+        total_payable = base_amount + gst_amount
+        total_payable_paise = int(round(total_payable * 100))
+
+        # Get restaurant record
+        try:
+            restaurant = frappe.get_doc('Restaurant', {'restaurant_id': restaurant_id})
+        except Exception:
+            return {'success': False, 'error': 'Restaurant not found'}
+
+        # Build Razorpay Payment Link
+        client = get_razorpay_client()
+
+        # Clean phone
+        raw_phone = (restaurant.owner_phone or '').strip()
+        clean_phone = ''.join(filter(str.isdigit, raw_phone))
+        if clean_phone.startswith('91') and len(clean_phone) == 12:
+            clean_phone = clean_phone[2:]
+
+        plink_payload = {
+            "amount": total_payable_paise,
+            "currency": "INR",
+            "accept_partial": False,
+            "description": f"Manual Wallet Recharge — ₹{base_amount} + ₹{gst_amount} GST",
+            "customer": {
+                "name": restaurant.owner_name or restaurant.restaurant_name,
+                "email": restaurant.owner_email or "",
+                "contact": clean_phone or ""
+            },
+            "notify": {"sms": False, "email": False},
+            "reminder_enable": False,
+            "notes": {
+                "restaurant": restaurant.name,
+                "restaurant_id": restaurant_id,
+                "type": "wallet_topup_plink",
+                "is_manual": "yes",
+                "base_amount": base_amount,
+                "gst_amount": gst_amount,
+                "total_payable": total_payable
+            },
+            "callback_url": "https://backend.dinematters.com",
+            "callback_method": "get"
+        }
+
+        plink = client.payment_link.create(plink_payload)
+
+        return {
+            'success': True,
+            'payment_link_url': plink.get('short_url') or plink.get('id'),
+            'amount': total_payable,
+            'base_amount': base_amount,
+            'gst_amount': gst_amount,
+            'restaurant_name': restaurant.restaurant_name
+        }
+
+    except Exception as e:
+        frappe.log_error(f"Manual recharge link failed: {str(e)}", "admin.manual_recharge_link")
+        return {'success': False, 'error': str(e)}

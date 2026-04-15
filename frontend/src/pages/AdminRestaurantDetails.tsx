@@ -73,15 +73,15 @@ interface Restaurant {
   gst_number?: string
   default_delivery_fee: number
   default_packaging_fee: number
+  total_revenue: number
+  commission_earned: number
+  total_orders: number
   minimum_order_value: number
   estimated_prep_time: number
   timezone: string
   currency: string
   tables: number
   google_map_url?: string
-  total_orders: number
-  total_revenue: number
-  commission_earned: number
   referral_code?: string
   referred_by_restaurant?: string
 }
@@ -103,6 +103,10 @@ function AdminRestaurantDetailsPage() {
   const [onboardEmail, setOnboardEmail] = useState('')
   const [isOnboarding, setIsOnboarding] = useState(false)
   const [onboardResult, setOnboardResult] = useState<{message: string, link?: string, emailSent: boolean} | null>(null)
+  
+  const [manualRechargeAmount, setManualRechargeAmount] = useState('')
+  const [generatedRechargeLink, setGeneratedRechargeLink] = useState('')
+  const [isGeneratingRecharge, setIsGeneratingRecharge] = useState(false)
 
   // APIs
   const { call: getDetails } = useFrappePostCall<{ success: boolean, data: { restaurant: Restaurant } }>(
@@ -114,6 +118,14 @@ function AdminRestaurantDetailsPage() {
   const { call: onboardOwner } = useFrappePostCall<{ success: boolean, message?: string, error?: string }>(
     'dinematters.dinematters.api.admin.admin_onboard_restaurant_owner'
   )
+  const { call: createManualLink } = useFrappePostCall<{ 
+    success: boolean, 
+    payment_link_url?: string, 
+    amount?: number,
+    base_amount?: number,
+    gst_amount?: number,
+    error?: string 
+  }>('dinematters.dinematters.api.admin.admin_create_manual_recharge_link')
 
   const loadDetails = async () => {
     if (!id) return
@@ -767,7 +779,7 @@ function AdminRestaurantDetailsPage() {
                         <ShieldAlert className="h-3 w-3" /> Billing Reconciliation
                       </p>
                       <p className="text-[10px] text-indigo-600/80 leading-relaxed">
-                        Total Commission Earned from this restaurant: <span className="font-bold">₹{restaurant.commission_earned.toLocaleString()}</span>. 
+                        Total Commission Earned from this restaurant: <span className="font-bold">₹{(restaurant.commission_earned || 0).toLocaleString()}</span>. 
                         Reconciled every 24 hours.
                       </p>
                   </div>
@@ -816,7 +828,7 @@ function AdminRestaurantDetailsPage() {
                    <div className="grid grid-cols-2 gap-4">
                       <div className="p-4 rounded-xl border bg-muted/20">
                          <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Total Refilled</p>
-                         <p className="text-lg font-bold">₹{restaurant.total_revenue.toLocaleString()}</p>
+                         <p className="text-lg font-bold">₹{(restaurant.total_revenue || 0).toLocaleString()}</p>
                       </div>
                       <div className="p-4 rounded-xl border bg-muted/20">
                          <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Avg Consump.</p>
@@ -835,6 +847,105 @@ function AdminRestaurantDetailsPage() {
                         <li>Digital Menu Customizations (Premium Themes)</li>
                       </ul>
                    </div>
+                </CardContent>
+              </Card>
+
+              <Card className="md:col-span-1">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <CreditCard className="h-5 w-5 text-primary" />
+                    Manual Recharge Link
+                  </CardTitle>
+                  <CardDescription>Generate a one-time payment link with 18% GST included</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Base Amount (₹)</Label>
+                      <div className="flex gap-2">
+                        <Input 
+                          type="number"
+                          placeholder="e.g. 1000"
+                          value={manualRechargeAmount}
+                          onChange={(e) => {
+                            setManualRechargeAmount(e.target.value)
+                            setGeneratedRechargeLink('') // Reset link when amount changes
+                          }}
+                          className="font-bold text-lg"
+                        />
+                        <Button 
+                          onClick={async () => {
+                            if (!manualRechargeAmount || parseFloat(manualRechargeAmount) <= 0) {
+                              toast.error('Please enter a valid amount')
+                              return
+                            }
+                            try {
+                              setIsGeneratingRecharge(true)
+                              const res = await createManualLink({
+                                restaurant_id: id,
+                                amount: manualRechargeAmount
+                              }) as any
+                              if (res?.message?.success) {
+                                setGeneratedRechargeLink(res.message.payment_link_url)
+                                toast.success('Recharge link generated!')
+                              } else {
+                                throw new Error(res?.message?.error || 'Generation failed')
+                              }
+                            } catch (err: any) {
+                              toast.error('Failed to generate link', { description: err.message })
+                            } finally {
+                              setIsGeneratingRecharge(false)
+                            }
+                          }}
+                          disabled={isGeneratingRecharge || !manualRechargeAmount}
+                          className="bg-primary hover:bg-primary/90"
+                        >
+                          {isGeneratingRecharge ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
+                          Generate Link
+                        </Button>
+                      </div>
+                    </div>
+
+                    {manualRechargeAmount && parseFloat(manualRechargeAmount) > 0 && (
+                      <div className="p-4 rounded-xl border bg-primary/5 space-y-2 border-primary/20">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Base Credit:</span>
+                          <span className="font-bold">₹{parseFloat(manualRechargeAmount).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">GST (18%):</span>
+                          <span className="font-bold">₹{(parseFloat(manualRechargeAmount) * 0.18).toLocaleString()}</span>
+                        </div>
+                        <Separator className="bg-primary/20" />
+                        <div className="flex justify-between text-base">
+                          <span className="font-bold text-primary">Total Payable:</span>
+                          <span className="font-black text-primary text-lg">₹{(parseFloat(manualRechargeAmount) * 1.18).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {generatedRechargeLink && (
+                      <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Payment Link Ready</Label>
+                        <div className="flex gap-2">
+                          <Input value={generatedRechargeLink} readOnly className="font-mono text-[10px] bg-muted/30" />
+                          <Button 
+                            variant="secondary" 
+                            size="icon" 
+                            onClick={() => {
+                              navigator.clipboard.writeText(generatedRechargeLink)
+                              toast.success('Link copied to clipboard')
+                            }}
+                          >
+                            <Save className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground italic">
+                          Share this link with {restaurant.owner_name || 'the customer'}. Wallet credits automatically on payment.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </div>

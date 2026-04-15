@@ -520,30 +520,40 @@ export default function AdminRestaurantManagement() {
 
       {/* Delete Confirmation Modal */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-md p-0 overflow-hidden border-none shadow-3xl rounded-3xl">
-           <div className="bg-red-500/5 p-8 pb-6 border-b border-red-500/10">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-black tracking-tight text-red-600">CRITICAL PURGE</DialogTitle>
-              <DialogDescription className="text-sm font-semibold">
-                This will permanently eradicate <strong>{restaurantToDelete?.name}</strong> and all associated meta-data from the shard cluster.
+        <DialogContent className="sm:max-w-[440px] p-0 overflow-hidden border-none shadow-2xl rounded-2xl">
+           <div className="p-6 pt-8 text-center">
+            <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+              <Trash2 className="h-6 w-6 text-red-600" />
+            </div>
+            <DialogHeader className="text-center">
+              <DialogTitle className="text-xl font-bold text-center w-full">Delete Restaurant</DialogTitle>
+              <DialogDescription className="text-sm text-center pt-2">
+                This action is irreversible. All configurations, balances, and data for <span className="font-bold text-foreground">"{restaurantToDelete?.name}"</span> will be permanently removed.
               </DialogDescription>
             </DialogHeader>
           </div>
-          <div className="p-8 space-y-6">
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Security Verification (Type ID: <span className="font-mono font-bold text-red-600">{restaurantToDelete?.id}</span>)</Label>
-              <Input value={verificationInput} onChange={(e) => setVerificationInput(e.target.value)} className="h-12 rounded-2xl bg-red-50/50 border-red-100 text-red-900 font-bold" />
+          <div className="px-8 pb-8 space-y-4">
+            <div className="space-y-3">
+              <Label className="text-xs font-semibold text-muted-foreground">
+                To confirm, please type <span className="font-mono text-red-600 font-bold px-1 bg-red-50 rounded">{restaurantToDelete?.id}</span> below.
+              </Label>
+              <Input 
+                value={verificationInput} 
+                onChange={(e) => setVerificationInput(e.target.value)} 
+                placeholder="Type restaurant ID here"
+                className="h-11 rounded-xl border-muted focus-visible:ring-red-500 font-medium" 
+              />
             </div>
           </div>
-          <DialogFooter className="p-8 bg-muted/10 border-t border-border/40">
-            <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} className="rounded-xl h-11 font-bold uppercase text-xs">Abort Purge</Button>
+          <DialogFooter className="p-4 bg-muted/30 border-t flex flex-row gap-2 sm:justify-end">
+            <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} className="rounded-xl flex-1 sm:flex-none">Cancel</Button>
             <Button 
                variant="destructive" 
                disabled={verificationInput !== restaurantToDelete?.id} 
                onClick={handleConfirmDelete}
-               className="rounded-xl h-11 px-8 font-bold uppercase text-xs shadow-xl shadow-red-200"
+               className="rounded-xl px-6 flex-1 sm:flex-none bg-red-600 hover:bg-red-700 shadow-sm"
             >
-               Confirm Eradication
+               Delete Restaurant
             </Button>
           </DialogFooter>
         </DialogContent>
