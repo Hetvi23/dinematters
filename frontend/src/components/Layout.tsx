@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, Truck, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, ShieldAlert, Wallet, Crown, CreditCard, Settings, MessageSquare, Megaphone, Send, Zap, BarChart3, Menu, Search, Globe } from 'lucide-react'
+import { Home, ShoppingCart, Package, Truck, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, ShieldAlert, Wallet, Crown, CreditCard, Settings, MessageSquare, Megaphone, Send, Zap, BarChart3, Menu, Search, Globe, Mail, Smartphone } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
 import { AiRechargeModal } from '@/components/AiRechargeModal'
@@ -19,6 +19,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { SuspendedOverlay } from './SuspendedOverlay'
@@ -310,14 +312,18 @@ export default function Layout({ children }: LayoutProps) {
     restaurant_name: '',
     owner_email: '',
     owner_phone: '',
-    tables: '',
     referral_code: ''
   })
   const [isCreating, setIsCreating] = useState(false)
+  const [sendOnboarding, setSendOnboarding] = useState(false)
+  const [sendPaymentInfo, setSendPaymentInfo] = useState(false)
+  const [paymentTier, setPaymentTier] = useState<'SILVER' | 'GOLD' | 'DIAMOND'>('SILVER')
 
-  // API call for creating restaurant
+  // API calls
   const { call: createRestaurant } = useFrappePostCall('frappe.client.insert')
   const { call: generateQrCodes } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.generate_qr_codes_pdf')
+  const { call: onboardOwner } = useFrappePostCall<{ success: boolean; message?: string; data?: { email_sent: boolean; onboard_link?: string } }>('dinematters.dinematters.api.admin.admin_onboard_restaurant_owner')
+  const { call: createPaymentLink } = useFrappePostCall<{ success: boolean; payment_link_url?: string; amount?: number; owner_phone?: string; error?: string }>('dinematters.dinematters.api.admin.admin_create_wallet_payment_link')
 
 
   useEffect(() => {
@@ -360,7 +366,6 @@ export default function Layout({ children }: LayoutProps) {
 
   // Handle create restaurant submission
   const handleCreateRestaurant = async () => {
-    // Validate required fields
     if (!newRestaurantData.restaurant_name.trim()) {
       toast.error('Restaurant name is required')
       return
@@ -372,17 +377,13 @@ export default function Layout({ children }: LayoutProps) {
 
     setIsCreating(true)
     try {
-      // Parse tables as integer, default to 0 if empty
-      const tablesCount = newRestaurantData.tables ? parseInt(newRestaurantData.tables, 10) : 0
-
-      // Create restaurant document
+      // Create restaurant document (no tables field)
       const result = await createRestaurant({
         doc: {
           doctype: 'Restaurant',
           restaurant_name: newRestaurantData.restaurant_name.trim(),
           owner_email: newRestaurantData.owner_email.trim(),
           owner_phone: newRestaurantData.owner_phone.trim() || undefined,
-          tables: tablesCount || 0,
           referred_by_restaurant_code: newRestaurantData.referral_code.trim() || undefined,
           is_active: 1
         }
@@ -392,41 +393,91 @@ export default function Layout({ children }: LayoutProps) {
         const createdRestaurant = result.message
         const restaurantName = createdRestaurant.restaurant_name || createdRestaurant.name
         const restaurantDocName = createdRestaurant.name || createdRestaurant.restaurant_id
+        const restaurantId = createdRestaurant.restaurant_id || restaurantDocName
 
-        // Generate QR codes if tables are specified
-        if (tablesCount > 0) {
+        toast.success('Restaurant created successfully!')
+
+        // ── Post-creation: Send Onboarding Details ──────────────────────
+        if (sendOnboarding && newRestaurantData.owner_email.trim()) {
           try {
-            await generateQrCodes({ restaurant: restaurantDocName })
-            toast.success('Restaurant created and QR codes generated successfully!')
-          } catch (qrError: any) {
-            console.error('Error generating QR codes:', qrError)
-            toast.success('Restaurant created successfully!', {
-              description: 'Note: QR codes could not be generated. You can generate them later from the restaurant page.'
+            const onboardRes = await onboardOwner({
+              restaurant_id: restaurantId,
+              owner_name: '',
+              owner_email: newRestaurantData.owner_email.trim()
+            }) as any
+            if (onboardRes?.message?.success) {
+              const emailSent = onboardRes.message.data?.email_sent
+              if (emailSent) {
+                toast.success('Onboarding email sent!', {
+                  description: `Password setup link dispatched to ${newRestaurantData.owner_email}`
+                })
+              } else {
+                toast.warning('Onboarding link generated', {
+                  description: 'Email delivery failed. Copy the link from the restaurant details page.'
+                })
+              }
+            }
+          } catch (err) {
+            console.error('Onboarding error:', err)
+            toast.error('Could not send onboarding email', {
+              description: 'Restaurant was created. Retry from Restaurant Details page.'
             })
           }
-        } else {
-          toast.success('Restaurant created successfully!')
         }
 
-        // Create URL-friendly restaurant name
-        const urlFriendlyName = restaurantName.toLowerCase().replace(/\s+/g, '-')
+        // ── Post-creation: Send Payment Info via WhatsApp ───────────────
+        if (sendPaymentInfo && paymentTier !== 'SILVER') {
+          try {
+            const plinkRes = await createPaymentLink({
+              restaurant_id: restaurantId,
+              tier: paymentTier
+            }) as any
 
-        // Close modal
+            if (plinkRes?.message?.success) {
+              const { payment_link_url, amount, owner_phone } = plinkRes.message
+              const phone = (owner_phone || newRestaurantData.owner_phone || '').replace(/\D/g, '')
+
+              const waText = encodeURIComponent(
+                `Hi! 👋 Welcome to DineMatters.\n\n` +
+                `To activate your *${paymentTier}* plan, please complete your wallet top-up of *₹${amount.toLocaleString()}* (Incl. 18% GST) using the secure payment link below:\n\n` +
+                `💳 ${payment_link_url}\n\n` +
+                `Once paid, your wallet will be automatically credited and you're good to go! 🚀`
+              )
+
+              if (phone) {
+                window.open(`https://wa.me/${phone}?text=${waText}`, '_blank', 'noopener,noreferrer')
+                toast.success(`WhatsApp opened!`, {
+                  description: `Payment link for ₹${amount.toLocaleString()} (${paymentTier}) ready to send.`
+                })
+              } else {
+                // No phone — copy link to clipboard as fallback
+                navigator.clipboard.writeText(payment_link_url || '').catch(() => {})
+                toast.success(`Payment link copied!`, {
+                  description: `Phone not set. Link copied: ${payment_link_url}`
+                })
+              }
+            } else {
+              toast.error('Could not create payment link', {
+                description: plinkRes?.message?.error || 'Please create it from the restaurant details page.'
+              })
+            }
+          } catch (err) {
+            console.error('Payment link error:', err)
+            toast.error('Payment link creation failed')
+          }
+        }
+
+        // ── Close & Navigate ────────────────────────────────────────────
         setShowCreateModal(false)
-        setNewRestaurantData({ 
-          restaurant_name: '', 
-          owner_email: '', 
-          owner_phone: '', 
-          tables: '',
-          referral_code: ''
-        })
+        setNewRestaurantData({ restaurant_name: '', owner_email: '', owner_phone: '', referral_code: '' })
+        setSendOnboarding(false)
+        setSendPaymentInfo(false)
+        setPaymentTier('SILVER')
 
-        // Set the selected restaurant
         setSelectedRestaurant(restaurantDocName)
-        // Dispatch custom event to notify other components
         window.dispatchEvent(new CustomEvent('restaurant-selected'))
 
-        // Navigate to the new restaurant's setup wizard
+        const urlFriendlyName = restaurantName.toLowerCase().replace(/\s+/g, '-')
         setTimeout(() => {
           navigate(`/setup/${encodeURIComponent(urlFriendlyName)}`, { replace: true })
         }, 100)
@@ -1583,15 +1634,26 @@ export default function Layout({ children }: LayoutProps) {
       </Dialog>
 
       {/* Create New Restaurant Modal */}
-      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent className="sm:max-w-[500px]">
+      <Dialog open={showCreateModal} onOpenChange={(open) => {
+        if (!isCreating) {
+          setShowCreateModal(open)
+          if (!open) {
+            setSendOnboarding(false)
+            setSendPaymentInfo(false)
+            setPaymentTier('SILVER')
+          }
+        }
+      }}>
+        <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create New Restaurant</DialogTitle>
             <DialogDescription>
               Enter the basic information to create your restaurant
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+
+          <div className="space-y-4 py-2">
+            {/* Restaurant Name */}
             <div className="space-y-2">
               <Label htmlFor="restaurant_name">
                 Restaurant Name <span className="text-destructive">*</span>
@@ -1601,11 +1663,11 @@ export default function Layout({ children }: LayoutProps) {
                 value={newRestaurantData.restaurant_name}
                 onChange={(e) => setNewRestaurantData(prev => ({ ...prev, restaurant_name: e.target.value }))}
                 disabled={isCreating}
+                placeholder="e.g. Pizza Palace"
               />
-              <p className="text-xs text-muted-foreground">
-                Your restaurant's name as it will appear to customers (e.g., Pizza Palace)
-              </p>
             </div>
+
+            {/* Owner Email */}
             <div className="space-y-2">
               <Label htmlFor="owner_email">
                 Owner Email <span className="text-destructive">*</span>
@@ -1616,11 +1678,11 @@ export default function Layout({ children }: LayoutProps) {
                 value={newRestaurantData.owner_email}
                 onChange={(e) => setNewRestaurantData(prev => ({ ...prev, owner_email: e.target.value }))}
                 disabled={isCreating}
+                placeholder="owner@restaurant.com"
               />
-              <p className="text-xs text-muted-foreground">
-                Email address of the restaurant owner for system access (e.g., owner@restaurant.com)
-              </p>
             </div>
+
+            {/* Owner Phone */}
             <div className="space-y-2">
               <Label htmlFor="owner_phone">Owner Phone</Label>
               <Input
@@ -1629,26 +1691,12 @@ export default function Layout({ children }: LayoutProps) {
                 value={newRestaurantData.owner_phone}
                 onChange={(e) => setNewRestaurantData(prev => ({ ...prev, owner_phone: e.target.value }))}
                 disabled={isCreating}
+                placeholder="+91 98765 43210"
               />
-              <p className="text-xs text-muted-foreground">
-                Phone number of the restaurant owner (e.g., +1 (555) 123-4567)
-              </p>
+              <p className="text-xs text-muted-foreground">Required if sending payment info via WhatsApp.</p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="tables">Number of Tables</Label>
-              <Input
-                id="tables"
-                type="number"
-                min="0"
-                value={newRestaurantData.tables}
-                onChange={(e) => setNewRestaurantData(prev => ({ ...prev, tables: e.target.value }))}
-                disabled={isCreating}
-                placeholder="0"
-              />
-              <p className="text-xs text-muted-foreground">
-                Number of tables in your restaurant. QR codes will be automatically generated if specified.
-              </p>
-            </div>
+
+            {/* Referral Code */}
             <div className="space-y-2">
               <Label htmlFor="referral_code">Referral Code</Label>
               <Input
@@ -1658,12 +1706,147 @@ export default function Layout({ children }: LayoutProps) {
                 onChange={(e) => setNewRestaurantData(prev => ({ ...prev, referral_code: e.target.value }))}
                 disabled={isCreating}
               />
-              <p className="text-xs text-muted-foreground">
-                If referred by another merchant, enter their code here to give them ₹500.
-              </p>
+              <p className="text-xs text-muted-foreground">If referred by another merchant — gives them ₹500.</p>
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-border pt-2">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">After Creation Actions</p>
+
+              {/* Checkbox 1: Send Onboarding Details */}
+              <div className={cn(
+                "flex items-start gap-3 rounded-xl border p-3 transition-all cursor-pointer",
+                sendOnboarding
+                  ? "bg-blue-500/5 border-blue-200 dark:border-blue-800"
+                  : "bg-muted/30 border-border hover:bg-muted/50"
+              )}
+                onClick={() => !isCreating && setSendOnboarding(v => !v)}
+              >
+                <Checkbox
+                  id="send_onboarding"
+                  checked={sendOnboarding}
+                  onCheckedChange={(v) => setSendOnboarding(!!v)}
+                  disabled={isCreating}
+                  className="mt-0.5 shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-blue-500 shrink-0" />
+                    <Label htmlFor="send_onboarding" className="text-sm font-semibold cursor-pointer">
+                      Send Onboarding Details
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Sends a secure password-setup link to the owner's email so they can log in.
+                  </p>
+                </div>
+              </div>
+
+              {/* Checkbox 2: Send Payment Info */}
+              <div className={cn(
+                "flex items-start gap-3 rounded-xl border p-3 mt-2 transition-all cursor-pointer",
+                sendPaymentInfo
+                  ? "bg-green-500/5 border-green-200 dark:border-green-800"
+                  : "bg-muted/30 border-border hover:bg-muted/50"
+              )}
+                onClick={() => !isCreating && setSendPaymentInfo(v => !v)}
+              >
+                <Checkbox
+                  id="send_payment_info"
+                  checked={sendPaymentInfo}
+                  onCheckedChange={(v) => setSendPaymentInfo(!!v)}
+                  disabled={isCreating}
+                  className="mt-0.5 shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="h-4 w-4 text-green-500 shrink-0" />
+                    <Label htmlFor="send_payment_info" className="text-sm font-semibold cursor-pointer">
+                      Send Payment Info via WhatsApp
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Opens WhatsApp with a wallet purchase link based on the selected plan.
+                  </p>
+
+                  {/* Tier Selector — only visible when checkbox is checked */}
+                  {sendPaymentInfo && (
+                    <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+                      <RadioGroup
+                        value={paymentTier}
+                        onValueChange={(v) => setPaymentTier(v as 'SILVER' | 'GOLD' | 'DIAMOND')}
+                        className="flex flex-col gap-2"
+                        disabled={isCreating}
+                      >
+                        {/* Silver */}
+                        <label
+                          htmlFor="tier_silver"
+                          className={cn(
+                            "flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-all",
+                            paymentTier === 'SILVER'
+                              ? "bg-slate-100 dark:bg-slate-800 border-slate-400"
+                              : "border-border hover:bg-muted/50"
+                          )}
+                        >
+                          <RadioGroupItem value="SILVER" id="tier_silver" />
+                          <div className="flex items-center gap-2 flex-1">
+                            <Shield className="h-3.5 w-3.5 text-slate-500" />
+                            <span className="text-sm font-medium">Silver</span>
+                            <span className="ml-auto text-xs text-muted-foreground">Free — no link sent</span>
+                          </div>
+                        </label>
+
+                        {/* Gold */}
+                        <label
+                          htmlFor="tier_gold"
+                          className={cn(
+                            "flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-all",
+                            paymentTier === 'GOLD'
+                              ? "bg-amber-50 dark:bg-amber-950/30 border-amber-400"
+                              : "border-border hover:bg-muted/50"
+                          )}
+                        >
+                          <RadioGroupItem value="GOLD" id="tier_gold" />
+                          <div className="flex items-center gap-2 flex-1">
+                            <Star className="h-3.5 w-3.5 text-amber-500" />
+                            <span className="text-sm font-medium">Gold</span>
+                            <span className="ml-auto text-xs font-semibold text-amber-600">₹1,178.82 inkl. GST</span>
+                          </div>
+                        </label>
+
+                        {/* Diamond */}
+                        <label
+                          htmlFor="tier_diamond"
+                          className={cn(
+                            "flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-all",
+                            paymentTier === 'DIAMOND'
+                              ? "bg-indigo-50 dark:bg-indigo-950/30 border-indigo-400"
+                              : "border-border hover:bg-muted/50"
+                          )}
+                        >
+                          <RadioGroupItem value="DIAMOND" id="tier_diamond" />
+                          <div className="flex items-center gap-2 flex-1">
+                            <Zap className="h-3.5 w-3.5 text-indigo-500" />
+                            <span className="text-sm font-medium">Diamond</span>
+                            <span className="ml-auto text-xs font-semibold text-indigo-600">₹1,532.82 inkl. GST</span>
+                          </div>
+                        </label>
+                      </RadioGroup>
+
+                      {paymentTier !== 'SILVER' && (
+                        <p className="text-[10px] text-muted-foreground mt-2 flex items-center gap-1">
+                          <Smartphone className="h-3 w-3" />
+                          WhatsApp will open with the payment link pre-filled. Just hit Send.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="pt-2">
             <Button
               variant="outline"
               onClick={() => setShowCreateModal(false)}

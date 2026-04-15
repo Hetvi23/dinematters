@@ -271,11 +271,71 @@ def handle_refund_processed(payload):
 
 
 def handle_payment_link_paid(payload):
-	"""Handle payment_link.paid event"""
+	"""Handle payment_link.paid event.
+	Supports two flows:
+	  1. wallet_topup_plink — Admin-created link for wallet top-up (GOLD/DIAMOND).
+	     Auto-credits the restaurant wallet via record_transaction (idempotent).
+	  2. Legacy monthly revenue ledger payment links (existing behaviour).
+	"""
 	try:
+		event = payload.get("event")
 		payment_link_data = payload.get("payload", {}).get("payment_link", {}).get("entity", {})
 		payment_link_id = payment_link_data.get("id")
-		
+		notes = payment_link_data.get("notes", {}) or {}
+
+		# ── Wallet Top-up via Admin Payment Link ────────────────────────────
+		plink_type = notes.get("type")
+		if plink_type == "wallet_topup_plink":
+			restaurant_name = notes.get("restaurant")  # Frappe doc name
+			tier = notes.get("tier", "")
+
+			if not restaurant_name or not frappe.db.exists("Restaurant", restaurant_name):
+				frappe.log_error(
+					f"payment_link.paid: restaurant '{restaurant_name}' not found in notes for plink {payment_link_id}",
+					"razorpay.wallet_topup_plink"
+				)
+				return {"success": False, "error": "Restaurant not found"}
+
+			# Fetch the actual paid amount from Razorpay's event payload
+			amount_paid_paise = payment_link_data.get("amount_paid") or payment_link_data.get("amount") or 0
+			amount_inr = float(amount_paid_paise) / 100.0
+
+			# Get payment_id for idempotency (comes from the payment sub-entity)
+			payment_entity = payload.get("payload", {}).get("payment", {}).get("entity", {})
+			payment_id = payment_entity.get("id") or payment_link_id
+
+			# Idempotency guard: prevent double-credit for the same payment
+			already_credited = frappe.db.exists("Coin Transaction", {
+				"restaurant": restaurant_name,
+				"payment_id": payment_id,
+				"transaction_type": "Purchase"
+			})
+
+			if already_credited:
+				frappe.log_error(
+					f"Wallet topup already credited for payment {payment_id} / plink {payment_link_id}. Skipped.",
+					"razorpay.wallet_topup_plink.duplicate"
+				)
+				return {"success": True, "message": "Already credited (idempotent skip)"}
+
+			from dinematters.dinematters.api.coin_billing import record_transaction
+			new_balance = record_transaction(
+				restaurant=restaurant_name,
+				txn_type="Purchase",
+				amount=amount_inr,
+				description=f"Wallet Top-up via Admin Payment Link — {tier} Plan (₹{int(amount_inr)})",
+				payment_id=payment_id
+			)
+			frappe.db.commit()
+
+			frappe.log_error(
+				f"Wallet top-up credited: ₹{amount_inr} to {restaurant_name} (tier={tier}). "
+				f"New balance: {new_balance}. payment_id={payment_id}",
+				"razorpay.wallet_topup_plink.success"
+			)
+			return {"success": True, "wallet_credited": amount_inr, "new_balance": new_balance}
+
+		# ── Legacy: Monthly Revenue Ledger payment links ─────────────────────
 		ledgers = frappe.get_all("Monthly Revenue Ledger", filters={"payment_link_id": payment_link_id}, fields=["name"])
 		if ledgers:
 			frappe.db.set_value("Monthly Revenue Ledger", ledgers[0].name, {
@@ -283,10 +343,13 @@ def handle_payment_link_paid(payload):
 				"paid_date": datetime.now().date()
 			})
 			frappe.db.commit()
+
 		return {"success": True, "pl_paid": True}
+
 	except Exception as e:
 		frappe.log_error(f"Payment link handler failed: {str(e)}", "razorpay.webhook.pl_paid")
 		return {"error": str(e)}
+
 
 
 def handle_payment_failed(payload):

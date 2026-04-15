@@ -1,5 +1,6 @@
 import frappe
 from frappe import _
+from dinematters.dinematters.utils.razorpay_utils import get_razorpay_client
 
 @frappe.whitelist()
 def check_admin_access():
@@ -813,3 +814,96 @@ def send_onboarding_email(recipient, name, link):
     )
 
 
+@frappe.whitelist()
+def admin_create_wallet_payment_link(restaurant_id, tier):
+    """
+    Create a Razorpay Payment Link for wallet top-up based on subscription tier.
+    GOLD = ₹999, DIAMOND = ₹1299 (Silver is free — no link).
+    On payment, the webhook (payment_link.paid) auto-credits the wallet.
+
+    Returns:
+        success (bool)
+        payment_link_url (str): short URL for the payment link
+        amount (int): amount in INR
+        owner_phone (str): restaurant owner's phone for WhatsApp
+        restaurant_name (str): display name
+    """
+    try:
+        # Admin access check
+        access_check = check_admin_access()
+        if not access_check.get('success') or not access_check.get('data', {}).get('allowed'):
+            return {'success': False, 'error': 'Admin access required'}
+
+        # Tier → amount mapping (Silver is free — caller should not invoke for Silver)
+        TIER_AMOUNTS = {'GOLD': 999, 'DIAMOND': 1299}
+        base_amount = TIER_AMOUNTS.get(tier)
+        if not base_amount:
+            return {
+                'success': False,
+                'error': f'No payment required for {tier} tier'
+            }
+
+        # Calculate GST (consistent with coin_billing.py)
+        gst_rate = 0.18
+        gst_amount = round(base_amount * gst_rate, 2)
+        total_payable = base_amount + gst_amount
+        total_payable_paise = int(round(total_payable * 100))
+
+        # Get restaurant record
+        try:
+            restaurant = frappe.get_doc('Restaurant', {'restaurant_id': restaurant_id})
+        except Exception:
+            return {'success': False, 'error': 'Restaurant not found'}
+
+        # Build Razorpay Payment Link
+        client = get_razorpay_client()
+
+        # Clean phone: Razorpay requires digits only, 10-digit Indian format
+        raw_phone = (restaurant.owner_phone or '').strip()
+        clean_phone = ''.join(filter(str.isdigit, raw_phone))
+        # Normalize: strip leading 91/+91
+        if clean_phone.startswith('91') and len(clean_phone) == 12:
+            clean_phone = clean_phone[2:]
+
+        plink_payload = {
+            "amount": total_payable_paise,          # paise
+            "currency": "INR",
+            "accept_partial": False,
+            "description": f"DineMatters Wallet Top-up — {tier} Plan (₹{base_amount} + ₹{gst_amount} GST)",
+            "customer": {
+                "name": restaurant.owner_name or restaurant.restaurant_name,
+                "email": restaurant.owner_email or "",
+                "contact": clean_phone or ""
+            },
+            # Do NOT auto-notify — admin controls delivery via WhatsApp
+            "notify": {"sms": False, "email": False},
+            "reminder_enable": False,
+            "notes": {
+                "restaurant": restaurant.name,       # Frappe doc name (used by webhook)
+                "restaurant_id": restaurant_id,
+                "tier": tier,
+                "type": "wallet_topup_plink",         # Sentinel for webhook handler
+                "base_amount": base_amount,
+                "gst_amount": gst_amount,
+                "total_payable": total_payable
+            },
+            # Redirect merchant page on completion (no strict callback needed)
+            "callback_url": "https://backend.dinematters.com",
+            "callback_method": "get"
+        }
+
+        plink = client.payment_link.create(plink_payload)
+
+        return {
+            'success': True,
+            'payment_link_url': plink.get('short_url') or plink.get('id'),
+            'payment_link_id': plink.get('id'),
+            'amount': total_payable,
+            'base_amount': base_amount,
+            'owner_phone': raw_phone,
+            'restaurant_name': restaurant.restaurant_name
+        }
+
+    except Exception as e:
+        frappe.log_error(f"admin_create_wallet_payment_link failed for {restaurant_id}: {str(e)}", "Admin Payment Link")
+        return {'success': False, 'error': str(e)}
