@@ -847,9 +847,12 @@ def generate_daily_seo_blog():
         
         blog_post.insert(ignore_permissions=True)
         
-        # ✅ FORCE SAVE TAGS: Use direct DB update because _user_tags is an internal field
+        # ✅ FORCE SAVE TAGS: _user_tags expects a comma-separated string, not a list
         if meta.get("tags"):
-            frappe.db.set_value("Blog Post", blog_post.name, "_user_tags", meta.get("tags"))
+            tags = meta.get("tags")
+            if isinstance(tags, list):
+                tags = ",".join(str(t) for t in tags)
+            frappe.db.set_value("Blog Post", blog_post.name, "_user_tags", tags)
         
         frappe.db.commit()
         
