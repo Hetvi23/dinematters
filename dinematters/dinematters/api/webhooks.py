@@ -195,9 +195,22 @@ def handle_payment_captured(payload):
 					from dinematters.dinematters.api.coin_billing import _credit_autopay_coins
 					threshold = frappe.db.get_value("Restaurant", restaurant, "auto_recharge_threshold") or 300
 					recharge_amt = float(payment_data.get("amount") or 0) / 100.0
-					if recharge_amt > 0:
-						_credit_autopay_coins(restaurant, recharge_amt, payment_id, threshold)
-						return {"success": True, "message": f"Auto-recharge coins credited for {restaurant}"}
+					
+					# Derive base amount if GST was included
+					# In trigger_auto_recharge, we now store base_amount in notes
+					base_amount = notes.get("base_amount")
+					gst_amount = notes.get("gst_amount")
+					total_payable = notes.get("total_payable")
+
+					if not base_amount:
+						# Fallback for legacy or if notes missing: Assume 18% GST was included
+						base_amount = round(recharge_amt / 1.18, 2)
+						gst_amount = round(recharge_amt - base_amount, 2)
+						total_payable = recharge_amt
+
+					if base_amount > 0:
+						_credit_autopay_coins(restaurant, float(base_amount), payment_id, threshold, gst_amount=float(gst_amount or 0), total_paid=float(total_payable or recharge_amt))
+						return {"success": True, "message": f"Auto-recharge coins credited for {restaurant}", "credited": base_amount}
 			except Exception as e:
 				frappe.log_error(f"Auto-recharge webhook credit failed: {str(e)}", "razorpay.webhook.auto_recharge")
 				return {"error": str(e)}
@@ -300,6 +313,19 @@ def handle_payment_link_paid(payload):
 			amount_paid_paise = payment_link_data.get("amount_paid") or payment_link_data.get("amount") or 0
 			amount_inr = float(amount_paid_paise) / 100.0
 
+			# Prioritize base_amount from notes (GST exclusion logic)
+			base_amount = notes.get("base_amount")
+			gst_amount = notes.get("gst_amount")
+			total_payable = notes.get("total_payable")
+
+			if not base_amount:
+				# Fallback: Assume 18% GST was included in the total paid
+				base_amount = round(amount_inr / 1.18, 2)
+				gst_amount = round(amount_inr - base_amount, 2)
+				total_payable = amount_inr
+			
+			amount_to_credit = float(base_amount)
+
 			# Get payment_id for idempotency (comes from the payment sub-entity)
 			payment_entity = payload.get("payload", {}).get("payment", {}).get("entity", {})
 			payment_id = payment_entity.get("id") or payment_link_id
@@ -326,18 +352,20 @@ def handle_payment_link_paid(payload):
 			new_balance = record_transaction(
 				restaurant=restaurant_name,
 				txn_type="Purchase",
-				amount=amount_inr,
+				amount=amount_to_credit,
 				description=description,
-				payment_id=payment_id
+				payment_id=payment_id,
+				gst_amount=float(gst_amount or 0),
+				total_paid=float(total_payable or amount_inr)
 			)
 			frappe.db.commit()
 
 			frappe.log_error(
-				f"Wallet top-up credited: ₹{amount_inr} to {restaurant_name} (tier={tier}). "
+				f"Wallet top-up credited: ₹{amount_to_credit} (Paid ₹{amount_inr}) to {restaurant_name} (tier={tier}). "
 				f"New balance: {new_balance}. payment_id={payment_id}",
 				"razorpay.wallet_topup_plink.success"
 			)
-			return {"success": True, "wallet_credited": amount_inr, "new_balance": new_balance}
+			return {"success": True, "wallet_credited": amount_to_credit, "total_paid": amount_inr, "new_balance": new_balance}
 
 		# ── Legacy: Monthly Revenue Ledger payment links ─────────────────────
 		ledgers = frappe.get_all("Monthly Revenue Ledger", filters={"payment_link_id": payment_link_id}, fields=["name"])

@@ -151,12 +151,19 @@ def trigger_auto_recharge(restaurant):
         configured_recharge = float(res_doc.auto_recharge_amount or 1000)
         actual_top_up = max(configured_recharge, 300.0)
 
-        recharge_amt = debt_to_clear + actual_top_up
-        recharge_amt_paise = int(recharge_amt * 100)
+        base_amount = debt_to_clear + actual_top_up
+        
+        # Consistent 18% GST for all wallet transactions
+        gst_rate = 0.18
+        gst_amount = round(base_amount * gst_rate, 2)
+        total_payable = base_amount + gst_amount
+        recharge_amt_paise = int(round(total_payable * 100))
 
         # Safety: Hard Cap for RBI AFA (₹15,000)
-        if recharge_amt > AUTO_RECHARGE_HARD_CAP:
-            recharge_amt = AUTO_RECHARGE_HARD_CAP
+        if total_payable > AUTO_RECHARGE_HARD_CAP:
+            total_payable = AUTO_RECHARGE_HARD_CAP
+            base_amount = round(total_payable / (1 + gst_rate), 2)
+            gst_amount = total_payable - base_amount
             recharge_amt_paise = int(AUTO_RECHARGE_HARD_CAP * 100)
 
         # Guard: must have active mandate and saved token
@@ -186,6 +193,9 @@ def trigger_auto_recharge(restaurant):
             "notes": {
                 "restaurant": restaurant,
                 "type": "auto_recharge",
+                "base_amount": base_amount,
+                "gst_amount": gst_amount,
+                "total_payable": total_payable,
                 "debt_cleared": str(debt_to_clear),
                 "topup_added": str(actual_top_up)
             }
@@ -210,10 +220,13 @@ def trigger_auto_recharge(restaurant):
             "customer_id": res_doc.razorpay_customer_id,
             "token": res_doc.razorpay_token_id,
             "recurring": True,
-            "description": f"DineMatters Autopay: Rs.{recharge_amt:.0f} for {restaurant}",
+            "description": f"DineMatters Autopay: Rs.{total_payable:.0f} for {restaurant}",
             "notes": {
                 "restaurant": restaurant,
                 "type": "auto_recharge",
+                "base_amount": base_amount,
+                "gst_amount": gst_amount,
+                "total_payable": total_payable,
                 "debt_cleared": str(debt_to_clear),
                 "topup_added": str(actual_top_up)
             }
@@ -224,12 +237,12 @@ def trigger_auto_recharge(restaurant):
 
         frappe.log_error(
             f"Auto-recharge initiated for {restaurant}: order={order_id}, "
-            f"payment_id={razorpay_payment_id}, status={pay_status}, amount=Rs.{recharge_amt}",
+            f"payment_id={razorpay_payment_id}, status={pay_status}, amount=Rs.{total_payable}",
             "Autopay Info"
         )
 
         if pay_status in ["captured", "authorized"]:
-            _credit_autopay_coins(restaurant, recharge_amt, razorpay_payment_id, res_doc.auto_recharge_threshold)
+            _credit_autopay_coins(restaurant, base_amount, razorpay_payment_id, res_doc.auto_recharge_threshold, gst_amount=gst_amount, total_paid=total_payable)
 
         elif pay_status == "created":
             # Async banks (HDFC, Axis, etc.) - coins credited when webhook payment.captured fires
@@ -246,7 +259,7 @@ def trigger_auto_recharge(restaurant):
         frappe.log_error(f"Auto-recharge failed for {restaurant}: {str(e)}", "Autopay Error")
 
 
-def _credit_autopay_coins(restaurant, recharge_amt, payment_id, threshold):
+def _credit_autopay_coins(restaurant, recharge_amt, payment_id, threshold, gst_amount=0, total_paid=0):
     """Credit auto-recharge coins after confirmed payment. Idempotent."""
     already_credited = frappe.db.exists("Coin Transaction", {
         "restaurant": restaurant,
@@ -261,7 +274,9 @@ def _credit_autopay_coins(restaurant, recharge_amt, payment_id, threshold):
         txn_type="Autopay Recharge",
         amount=recharge_amt,
         description=f"Auto-Recharge triggered (Balance was below Rs.{threshold})",
-        payment_id=payment_id
+        payment_id=payment_id,
+        gst_amount=gst_amount,
+        total_paid=total_paid
     )
 
     frappe.db.sql("""
@@ -567,11 +582,25 @@ def process_referral_bonus(restaurant):
 	frappe.db.commit()
 
 @frappe.whitelist(allow_guest=False)
-def get_coin_transactions(restaurant, limit=20, offset=0):
-    """Fetch paginated coin transactions for a restaurant."""
+def get_coin_transactions(restaurant, limit=20, offset=0, from_date=None, to_date=None, type=None):
+    """Fetch paginated coin transactions for a restaurant with advanced filtering."""
+    filters = {"restaurant": restaurant}
+    
+    if from_date and to_date:
+        filters["creation"] = ["between", [f"{from_date} 00:00:00", f"{to_date} 23:59:59"]]
+    elif from_date:
+        filters["creation"] = [">=", f"{from_date} 00:00:00"]
+    elif to_date:
+        filters["creation"] = ["<=", f"{to_date} 23:59:59"]
+        
+    if type == 'credit':
+        filters["amount"] = [">", 0]
+    elif type == 'debit':
+        filters["amount"] = ["<", 0]
+
     return frappe.db.get_list("Coin Transaction",
-        filters={"restaurant": restaurant},
-        fields=["name", "transaction_type", "amount", "balance_after", "description", "payment_id", "creation"],
+        filters=filters,
+        fields=["name", "transaction_type", "amount", "gst_amount", "total_paid_inr", "balance_after", "description", "payment_id", "creation", "reference_doctype", "reference_name"],
         order_by="creation desc",
         limit_page_length=int(limit),
         limit_start=int(offset)
