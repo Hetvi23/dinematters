@@ -12,7 +12,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
-import { getFrappeError, cn } from '@/lib/utils'
+import { getFrappeError, cn, copyToClipboard } from '@/lib/utils'
 import { 
   Shield,
   ArrowLeft,
@@ -32,9 +32,10 @@ import {
   User,
   ShieldCheck,
   Save,
-  Undo2
+  Undo2,
+  ClipboardCopy
 } from 'lucide-react'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import MenuImageExtractorForm from '@/components/MenuImageExtractorForm'
 
 interface Restaurant {
@@ -107,6 +108,8 @@ function AdminRestaurantDetailsPage() {
   const [manualRechargeAmount, setManualRechargeAmount] = useState('')
   const [generatedRechargeLink, setGeneratedRechargeLink] = useState('')
   const [isGeneratingRecharge, setIsGeneratingRecharge] = useState(false)
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
+  const [linkToCopy, setLinkToCopy] = useState('')
 
   // APIs
   const { call: getDetails } = useFrappePostCall<{ success: boolean, data: { restaurant: Restaurant } }>(
@@ -243,8 +246,8 @@ function AdminRestaurantDetailsPage() {
   }
 
   const handleCopyLink = (link: string) => {
-    navigator.clipboard.writeText(link)
-    toast.success('Link copied to clipboard')
+    setLinkToCopy(link)
+    setIsLinkModalOpen(true)
   }
 
   const formatDate = (dateString: string) => {
@@ -632,10 +635,10 @@ function AdminRestaurantDetailsPage() {
                            <Button 
                              variant="outline" 
                              size="sm" 
-                             onClick={() => {
+                             onClick={async () => {
                                if (restaurant.referral_code) {
-                                 navigator.clipboard.writeText(restaurant.referral_code)
-                                 toast.success('Code copied')
+                                 const success = await copyToClipboard(restaurant.referral_code)
+                                 if (success) toast.success('Code copied')
                                }
                              }}
                              className="h-8 px-2"
@@ -932,9 +935,9 @@ function AdminRestaurantDetailsPage() {
                           <Button 
                             variant="secondary" 
                             size="icon" 
-                            onClick={() => {
-                              navigator.clipboard.writeText(generatedRechargeLink)
-                              toast.success('Link copied to clipboard')
+                            onClick={async () => {
+                              const success = await copyToClipboard(generatedRechargeLink)
+                              if (success) toast.success('Link copied to clipboard')
                             }}
                           >
                             <Save className="h-4 w-4" />
@@ -1190,6 +1193,52 @@ function AdminRestaurantDetailsPage() {
           </div>
         </div>
       )}
+      <Dialog open={isLinkModalOpen} onOpenChange={setIsLinkModalOpen}>
+        <DialogContent className="sm:max-w-md p-6 rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Share Link</DialogTitle>
+            <DialogDescription>
+              Copy and share this link manualy if automatic sharing fails.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-2 mt-4">
+            <div className="grid flex-1 gap-2">
+              <Label htmlFor="link" className="sr-only">
+                Link
+              </Label>
+              <Input
+                id="link"
+                readOnly
+                value={linkToCopy}
+                className="h-9 font-mono text-xs bg-muted/50"
+              />
+            </div>
+            <Button 
+              size="sm" 
+              className="px-3"
+              onClick={async () => {
+                const success = await copyToClipboard(linkToCopy)
+                if (success) {
+                  toast.success('Copied!')
+                }
+              }}
+            >
+              <span className="sr-only">Copy</span>
+              <ClipboardCopy className="h-4 w-4" />
+            </Button>
+          </div>
+          <DialogFooter className="sm:justify-start mt-6">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setIsLinkModalOpen(false)}
+              className="rounded-xl"
+            >
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

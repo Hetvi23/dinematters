@@ -36,7 +36,7 @@ import {
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 import { toast } from 'sonner'
-import { getFrappeError, cn } from '@/lib/utils'
+import { getFrappeError, cn, copyToClipboard } from '@/lib/utils'
 import DeliveryMap from './DeliveryMap'
 import {
   Select,
@@ -315,12 +315,16 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
 
   if (!orderId) return null
 
-  const handleCopyId = () => {
+  const handleCopyId = async () => {
     if (orderId) {
-      navigator.clipboard.writeText(orderId)
-      setCopied(true)
-      toast.success('Order ID copied to clipboard')
-      setTimeout(() => setCopied(false), 2000)
+      const success = await copyToClipboard(orderId)
+      if (success) {
+        setCopied(true)
+        toast.success('Order ID copied to clipboard')
+        setTimeout(() => setCopied(false), 2000)
+      } else {
+        toast.error('Failed to copy ID')
+      }
     }
   }
 

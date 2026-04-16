@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, Truck, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, ShieldAlert, Wallet, Crown, CreditCard, Settings, MessageSquare, Megaphone, Send, Zap, BarChart3, Menu, Search, Globe, Mail, Smartphone } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Home, ShoppingCart, Package, Truck, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, ShieldAlert, Wallet, Crown, CreditCard, Settings, MessageSquare, Megaphone, Send, Zap, BarChart3, Menu, Search, Globe, Mail, Smartphone, ClipboardCopy } from 'lucide-react'
+import { cn, copyToClipboard } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
 import { AiRechargeModal } from '@/components/AiRechargeModal'
 import { useState, useEffect, useMemo } from 'react'
@@ -214,6 +214,8 @@ export default function Layout({ children }: LayoutProps) {
   const [hoverDisabled, setHoverDisabled] = useState(false) // Temporarily disable hover after toggle
   const [selectOpen, setSelectOpen] = useState(false) // Track if restaurant select is open
   const [lockAnimating, setLockAnimating] = useState(false) // Track lock animation state
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
+  const [linkToCopy, setLinkToCopy] = useState('')
 
   // Wallet Balance in top bar
   const [showTopBarRecharge, setShowTopBarRecharge] = useState(false)
@@ -455,11 +457,9 @@ export default function Layout({ children }: LayoutProps) {
                     : `Payment link for ₹${amount.toLocaleString()} (${paymentTier}) ready to send.`
                 })
               } else {
-                // No phone — copy link to clipboard as fallback
-                navigator.clipboard.writeText(payment_link_url || '').catch(() => {})
-                toast.success(`Payment link copied!`, {
-                  description: `Phone not set. Link copied: ${payment_link_url}`
-                })
+                // No phone — show link modal as fallback
+                setLinkToCopy(payment_link_url || '')
+                setIsLinkModalOpen(true)
               }
             } else {
               toast.error('Could not create payment link', {
@@ -1896,6 +1896,52 @@ export default function Layout({ children }: LayoutProps) {
           restaurantName={restaurantDoc?.restaurant_name || currentRestaurant?.restaurant_name || "Your Restaurant"}
         />
       )}
+      <Dialog open={isLinkModalOpen} onOpenChange={setIsLinkModalOpen}>
+        <DialogContent className="sm:max-w-md p-6 rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Secure Payment Link</DialogTitle>
+            <DialogDescription>
+              Copy and share this payment link with the user.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-2 mt-4">
+            <div className="grid flex-1 gap-2">
+              <Label htmlFor="link" className="sr-only">
+                Link
+              </Label>
+              <Input
+                id="link"
+                readOnly
+                value={linkToCopy}
+                className="h-9 font-mono text-xs bg-muted/50"
+              />
+            </div>
+            <Button 
+              size="sm" 
+              className="px-3"
+              onClick={async () => {
+                const success = await copyToClipboard(linkToCopy)
+                if (success) {
+                  toast.success('Copied!')
+                }
+              }}
+            >
+              <span className="sr-only">Copy</span>
+              <ClipboardCopy className="h-4 w-4" />
+            </Button>
+          </div>
+          <DialogFooter className="sm:justify-start mt-6">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setIsLinkModalOpen(false)}
+              className="rounded-xl"
+            >
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

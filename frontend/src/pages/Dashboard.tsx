@@ -26,7 +26,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { useCurrency } from '@/hooks/useCurrency'
-import { cn } from '@/lib/utils'
+import { cn, copyToClipboard } from '@/lib/utils'
 
 // Enhanced Stat Card with Trends
 function StatCard({ 
@@ -678,10 +678,12 @@ export default function Dashboard() {
                     "h-14 w-14 rounded-xl transition-all shadow-md",
                     copied ? "bg-emerald-500 hover:bg-emerald-600" : "bg-primary hover:bg-primary/90"
                   )}
-                  onClick={() => {
-                    navigator.clipboard.writeText(referralCode || '')
-                    setCopied(true)
-                    setTimeout(() => setCopied(false), 2000)
+                  onClick={async () => {
+                    const success = await copyToClipboard(referralCode || '')
+                    if (success) {
+                      setCopied(true)
+                      setTimeout(() => setCopied(false), 2000)
+                    }
                   }}
                 >
                   {copied ? <CheckCircle className="h-5 w-5" /> : <Copy className="h-5 w-5" />}

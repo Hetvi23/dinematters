@@ -66,14 +66,63 @@ export function getFrappeError(error: any, defaultMessage: string = 'An error oc
   return defaultMessage;
 }
 
+/**
+ * Copies text to clipboard with a robust fallback for non-secure contexts and mobile devices.
+ */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  if (!text) return false;
 
+  // 1. Try modern API first
+  if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (err) {
+      console.warn('Modern clipboard API failed, trying fallback', err);
+    }
+  }
 
-
-
-
-
-
-
-
-
+  // 2. Fallback to execCommand('copy')
+  try {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    
+    // Ensure it's not read-only so it can be selected, but hide it
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    textArea.style.top = "0";
+    textArea.style.opacity = "0";
+    // For iOS, we need to prevent zooming and ensure it's in the viewport
+    textArea.style.fontSize = "12pt"; 
+    
+    document.body.appendChild(textArea);
+    
+    // Handle iOS selection quirk
+    const isiOS = navigator.userAgent.match(/ipad|iphone/i);
+    if (isiOS) {
+      const range = document.createRange();
+      range.selectNodeContents(textArea);
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+      textArea.setSelectionRange(0, 999999);
+    } else {
+      textArea.select();
+    }
+    
+    const successful = document.execCommand('copy');
+    document.body.removeChild(textArea);
+    
+    if (!successful) {
+      console.error('execCommand(copy) returned false');
+    }
+    
+    return successful;
+  } catch (err) {
+    console.error('Fallback clipboard copy failed:', err);
+    return false;
+  }
+}
 
