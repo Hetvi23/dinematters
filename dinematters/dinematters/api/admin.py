@@ -458,7 +458,48 @@ def delete_restaurant(restaurant_id):
                 'error': f'Restaurant {restaurant_id} not found'
             }
         
-        # List of DocTypes to clear where the field 'restaurant' matches the restaurant record ID
+        restaurant_name = restaurant.name
+        cleanup_report = []
+
+        # 1. Clear User Permissions (Crucial for Frappe integrity)
+        try:
+            # User Permissions link via 'allow'="Restaurant" and 'for_value'="[doc_name]"
+            user_perms = frappe.get_all("User Permission", 
+                filters={"allow": "Restaurant", "for_value": restaurant_name}, 
+                pluck="name")
+            
+            for perm in user_perms:
+                frappe.delete_doc("User Permission", perm, ignore_permissions=True)
+            
+            if user_perms:
+                cleanup_report.append(f"Deleted {len(user_perms)} User Permissions")
+        except Exception as e:
+            frappe.log_error("Restaurant Delete Error", f"Error clearing User Permissions: {str(e)}")
+            cleanup_report.append(f"FAILED to clear User Permissions: {str(e)}")
+
+        # 2. Clear Core Frappe Records (Comments, Communications, Logs, Versions)
+        # These tables are often linked and can block deletion
+        core_dt_map = {
+            "Comment": ["reference_doctype", "reference_name"],
+            "Communication": ["reference_doctype", "reference_name"],
+            "Version": ["ref_doctype", "docname"],
+            "Activity Log": ["reference_doctype", "reference_name"],
+            "Email Queue": ["reference_doctype", "reference_name"],
+            "File": ["attached_to_doctype", "attached_to_name"]
+        }
+
+        for cdt, fields in core_dt_map.items():
+            try:
+                dt_field, name_field = fields
+                records = frappe.get_all(cdt, filters={dt_field: "Restaurant", name_field: restaurant_name}, pluck="name")
+                for r in records:
+                    frappe.delete_doc(cdt, r, ignore_permissions=True, delete_permanently=True)
+                if records:
+                    cleanup_report.append(f"Deleted {len(records)} records from {cdt}")
+            except Exception:
+                pass # Silent ignore for minor core tables
+
+        # 3. List of known custom DocTypes to clear
         doctypes_to_clear = [
             "Restaurant Config", "Restaurant Media", "Restaurant Social Link",
             "Menu Category", "Menu Product", "Menu Product Addon", "Customization Option", "Customization Question",
@@ -475,35 +516,57 @@ def delete_restaurant(restaurant_id):
             "Legacy Member", "Legacy Signature Dish", "Legacy Testimonial", "Legacy Testimonial Image"
         ]
 
-        # For each DocType, delete all records linked to this restaurant
-        cleanup_report = []
-        
-        for dt in doctypes_to_clear:
+        # 4. Dynamically find ANY other doctype that links to Restaurant
+        # This catches any newly added doctypes automatically
+        try:
+            dynamic_links = frappe.get_all("DocField", filters={"fieldtype": "Link", "options": "Restaurant"}, pluck="parent")
+            custom_links = frappe.get_all("Custom Field", filters={"fieldtype": "Link", "options": "Restaurant"}, pluck="dt")
+            all_linked_dts = sorted(list(set(doctypes_to_clear + dynamic_links + custom_links)))
+        except Exception:
+            all_linked_dts = doctypes_to_clear
+
+        # 5. Iteratively clear all linked records
+        for dt in all_linked_dts:
+            if dt == "Restaurant": continue
             try:
                 # Check if the doctype exists in this installation
                 if not frappe.db.table_exists(dt):
                     continue
                 
-                # Find the names of records to delete using the primary restaurant name
-                records = frappe.get_all(dt, filters={'restaurant': restaurant.name}, pluck='name')
+                # Determine the correct field name that links to Restaurant
+                meta = frappe.get_meta(dt)
+                link_field = None
+                
+                if meta.has_field("restaurant"):
+                    link_field = "restaurant"
+                else:
+                    # Find any field that is a Link to Restaurant
+                    for df in meta.fields:
+                        if df.fieldtype == "Link" and df.options == "Restaurant":
+                            link_field = df.fieldname
+                            break
+                
+                if not link_field:
+                    continue
+
+                # Find all records linked to this restaurant
+                records = frappe.get_all(dt, filters={link_field: restaurant_name}, pluck='name')
                 
                 if records:
                     for record_name in records:
-                        # For each record, delete it and its files
-                        # delete_doc(dt, name, ignore_permissions=True, delete_permanently=True)
+                        # Use delete_doc to handle hooks and sub-records
                         frappe.delete_doc(dt, record_name, ignore_permissions=True, delete_permanently=True)
                     
                     cleanup_report.append(f"Deleted {len(records)} records from {dt}")
                     
             except Exception as inner_e:
                 frappe.log_error("Restaurant Delete Error", f"Error deleting from {dt}: {str(inner_e)}")
-                # Continue with others even if one fails
                 cleanup_report.append(f"FAILED to delete from {dt}: {str(inner_e)}")
 
         # Special handling for RestaurantConfig (linked via parent)
         if frappe.db.table_exists('RestaurantConfig'):
             try:
-                configs = frappe.get_all('RestaurantConfig', filters={'parent': restaurant.name}, pluck='name')
+                configs = frappe.get_all('RestaurantConfig', filters={'parent': restaurant_name}, pluck='name')
                 for cfg in configs:
                     frappe.delete_doc('RestaurantConfig', cfg, ignore_permissions=True)
                 if configs:
@@ -511,29 +574,16 @@ def delete_restaurant(restaurant_id):
             except Exception as e:
                 frappe.log_error("Restaurant Delete Error", f"Error deleting RestaurantConfig: {str(e)}")
 
-        # Delete any associated files in tabFile that were attached to these record types
-        # Note: This is partly handled by frappe.delete_doc if files are linked via fields,
-        # but manual cleanup ensures "every single entry" is gone.
-        try:
-            # We also clear files attached specifically to the Restaurant doc itself
-            frappe.db.sql("""
-                DELETE FROM `tabFile` 
-                WHERE (attached_to_doctype = 'Restaurant' AND attached_to_name = %s)
-            """, (restaurant.name,))
-        except Exception as e:
-            frappe.log_error("Restaurant Delete Error", f"Error cleaning up files: {str(e)}")
-
-        # Finally, delete the Restaurant record itself
-        restaurant_name = restaurant.name
+        # 6. Finally, delete the Restaurant record itself
         frappe.delete_doc('Restaurant', restaurant_name, ignore_permissions=True, delete_permanently=True)
         cleanup_report.append(f"Deleted Restaurant record: {restaurant_id}")
 
-        # Commit all changes
+        # Commit all changes to database
         frappe.db.commit()
 
         return {
             'success': True,
-            'message': f"Restaurant {restaurant_id} deleted successfully.",
+            'message': f"Restaurant {restaurant_id} and all related data deleted successfully.",
             'report': cleanup_report
         }
 
@@ -542,8 +592,10 @@ def delete_restaurant(restaurant_id):
         frappe.db.rollback()
         return {
             'success': False,
-            'error': str(e)
+            'error': f"Failed to delete restaurant: {str(e)}",
+            'partial_report': cleanup_report if 'cleanup_report' in locals() else []
         }
+
 
 @frappe.whitelist()
 def admin_give_coins(restaurant_id, amount, reason="Admin Grant"):
