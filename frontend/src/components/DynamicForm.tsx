@@ -66,68 +66,24 @@ export default function DynamicForm({
   const { permissions, isLoading: permLoading } = usePermissions(doctype)
 
   const hookEnabled = !!docname && mode !== 'create'
-  const { data: docData, isLoading: docLoading, error: docError, mutate: refreshDoc } = useFrappeGetDoc(doctype, docname || '', {
+  const {
+    data: docData,
+    isLoading: docLoading,
+    isValidating: docValidating,
+    mutate: refreshDoc,
+  } = useFrappeGetDoc(doctype, docname || '', {
     enabled: hookEnabled,
-    fields: ['*'] // Request all fields to ensure we get tagline, subtitle, etc.
+    fields: ['*'],
   })
 
-  useEffect(() => {
-    if (hookEnabled && refreshDoc) {
-      void (refreshDoc as any)()
-    }
-  }, [hookEnabled, refreshDoc, doctype, docname])
+  // NOTE: Do NOT force-call refreshDoc() on mount here.
+  // SWR already revalidates on mount via revalidateOnMount (default: true).
+  // Force-calling mutate() clears the cache and causes docData → undefined for the
+  // entire network round-trip, which is exactly why fields go blank on Prev/Next.
 
+  // isLoading = true only on the very first fetch (no cache). isValidating = true
+  // during any background revalidation (cache exists but server check is in flight).
   const isLoading = metaLoading || permLoading || (docLoading && mode !== 'create')
-
-
-  // Debug: Log hook state immediately
-  console.log(`[DynamicForm] ${doctype} - Hook state (immediate):`, {
-    doctype,
-    docname,
-    mode,
-    hookEnabled,
-    docLoading,
-    hasDocData: !!docData,
-    docError,
-    docDataKeys: docData ? Object.keys(docData) : [],
-    docDataSample: docData ? {
-      restaurant: docData.restaurant,
-      tagline: docData.tagline,
-      subtitle: docData.subtitle,
-      default_theme: docData.default_theme,
-      primary_color: docData.primary_color
-    } : null,
-    fullDocData: docData
-  })
-
-  // Debug: Log hook state in effect
-  useEffect(() => {
-    console.log(`[DynamicForm] ${doctype} - Hook state (effect):`, {
-      doctype,
-      docname,
-      mode,
-      hookEnabled,
-      docLoading,
-      hasDocData: !!docData,
-      docError,
-      docDataKeys: docData ? Object.keys(docData) : [],
-      docData: docData
-    })
-  }, [doctype, docname, mode, hookEnabled, docLoading, docData, docError])
-
-  // Debug logging
-  useEffect(() => {
-    if (doctype) {
-      console.log(`[DynamicForm] ${doctype}:`, {
-        metaLoading,
-        metaError,
-        hasMeta: !!meta,
-        fieldsCount: meta?.fields?.length || 0,
-        visibleFieldsCount: meta?.fields?.filter(f => !f.hidden).length || 0,
-        meta
-      })
-    }
-  }, [doctype, meta, metaLoading, metaError])
 
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [saving, setSaving] = useState(false)
@@ -143,7 +99,11 @@ export default function DynamicForm({
 
   // Identity state guard - prevent rendering stale data or blank frames while DocIdentity is changing
   const isDataStale = docData && (docData as any).name !== docname && mode !== 'create'
-  const isInitialLoad = mode !== 'create' && !docData && !formDataInitialized
+  // isInitialLoad: true only when there is TRULY no data and nothing initialized yet.
+  // We do NOT block rendering on docValidating — that is background revalidation while
+  // cached data is already in docData (stale-while-revalidate). Blocking on it would
+  // cause fields to go blank while SWR silently checks the server in the background.
+  const isInitialLoad = mode !== 'create' && !docData && !formDataInitialized && !docValidating
   const shouldShowSkeleton = !skipLoadingState && (isLoading || metaLoading || isDataStale || isInitialLoad)
   const initialDataRef = useRef(initialData || {})
   const hasUserDataRef = useRef(false)
@@ -166,24 +126,26 @@ export default function DynamicForm({
   useLayoutEffect(() => {
     // 1. IDENTITY CHECK - Did the document we are looking at change?
     const isNewIdentity = lastHydratedKeyRef.current !== currentDocKey
-    
+
     if (isNewIdentity) {
-      // Never overwrite user edits if they've started typing in a new form
-      if (hasUserDataRef.current) {
-        return
-      }
-      
-      // RESET: Wipe state for the new identity
+      // Identity changed (different doctype / docname = different wizard step or restaurant).
+      // ALWAYS reset — the user's unsaved edits from the OLD step are irrelevant here.
+      // The hasUserDataRef guard must NOT run here; only block re-hydration for SAME-identity
+      // SWR background revalidations (handled below by the !formDataInitialized check).
+      hasUserDataRef.current = false       // clear the unsaved-edits flag for the new identity
+      setAddressLatLngLocked(false)        // unlock lat/lng so step-1 lock doesn't bleed into step-2+
       setFormDataInitialized(false)
-      lastHydratedKeyRef.current = currentDocKey // Set immediately to prevent re-render loop during loading
+      lastHydratedKeyRef.current = currentDocKey  // update immediately to prevent re-render loop
       setFormData({})
       originalDataRef.current = {}
-      // We don't return here; we continue to check if data is available for the new identity immediately
+      // Do NOT return — fall through to hydrate immediately if data is already available
     }
 
-    // 2. HYDRATION: If we have data and need to hydrate
+    // 2. HYDRATION: Populate formData from the server document
+    //    Condition: we have data, we are in edit mode, AND we haven't hydrated for this key yet.
+    //    !formDataInitialized is the guard that prevents overwriting user edits during SWR
+    //    background revalidation of the SAME document.
     if (docData && mode !== 'create' && (lastHydratedKeyRef.current !== currentDocKey || !formDataInitialized)) {
-      // Load existing document data from backend
       const cleanDocData = { ...docData }
       delete cleanDocData.name
       delete cleanDocData.creation
@@ -193,7 +155,7 @@ export default function DynamicForm({
 
       const mergedData = { ...cleanDocData }
 
-      // Initialize missing fields from meta
+      // Fill in meta defaults for fields not present in the doc
       if (meta && meta.fields) {
         meta.fields.forEach(field => {
           if (!field.hidden && !(field.fieldname in mergedData)) {
@@ -204,7 +166,7 @@ export default function DynamicForm({
         })
       }
 
-      // Read-only field overrides
+      // Always apply read-only field overrides (e.g. restaurant from context)
       readOnlyFields.forEach(fieldname => {
         const value = initialData[fieldname] || initialDataRef.current[fieldname]
         if (value !== undefined && value !== null && value !== '') {
@@ -213,12 +175,12 @@ export default function DynamicForm({
       })
 
       setFormData(mergedData)
-      originalDataRef.current = { ...mergedData } 
+      originalDataRef.current = { ...mergedData }
       setFormDataInitialized(true)
       lastHydratedKeyRef.current = currentDocKey
-      hasUserDataRef.current = false 
-    } 
-    // 3. CREATE MODE: Initial setup
+      hasUserDataRef.current = false
+    }
+    // 3. CREATE MODE: Apply meta defaults when creating a new document
     else if (meta && !formDataInitialized && mode === 'create') {
       const defaults: Record<string, any> = { ...initialDataRef.current }
       meta.fields.forEach(field => {
@@ -227,9 +189,9 @@ export default function DynamicForm({
         }
       })
       setFormData(defaults)
-      originalDataRef.current = { ...defaults } 
+      originalDataRef.current = { ...defaults }
       setFormDataInitialized(true)
-      hasUserDataRef.current = false 
+      hasUserDataRef.current = false
     }
   }, [docData, meta, mode, formDataInitialized, docname, initialData, doctype, currentDocKey])
 

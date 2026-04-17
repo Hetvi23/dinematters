@@ -297,7 +297,7 @@ export default function TieredSetupWizard() {
                 />
               ) : (
                 <DynamicForm
-                  key={`wizard-form-${currentStep.id}-${selectedRestaurant}`}
+                  key={`wizard-form-${selectedRestaurant}`}
                   doctype={currentStep.doctype}
                   docname={(currentStep.id === 'restaurant' || currentStep.id === 'config') ? (selectedRestaurant ?? undefined) : undefined}
                   initialData={{ restaurant: selectedRestaurant }}
