@@ -125,9 +125,49 @@ def validate_product_belongs_to_restaurant(product_id, restaurant_id):
 	if not restaurant:
 		return False
 	
-	product_restaurant = frappe.db.get_value("Menu Product", product_id, "restaurant")
+	# Resolve product name if it's a slug/ID
+	actual_product = get_product_from_id(product_id, restaurant)
+	if not actual_product:
+		return False
+		
+	product_restaurant = frappe.db.get_value("Menu Product", actual_product, "restaurant")
 	
 	return product_restaurant == restaurant
+
+
+def get_product_from_id(product_id, restaurant=None):
+	"""
+	Get Menu Product name (docname) from product_id or slug.
+	If restaurant is provided, ensures the product belongs to that restaurant.
+	"""
+	if not product_id:
+		return None
+	
+	# 1. Try by name directly (hash)
+	if frappe.db.exists("Menu Product", product_id):
+		# If restaurant provided, verify it belongs
+		if restaurant:
+			if frappe.db.get_value("Menu Product", product_id, "restaurant") == restaurant:
+				return product_id
+			# If it's a valid hash but for wrong restaurant, continue to slug check
+		else:
+			return product_id
+		
+	# 2. Try by product_id field
+	filters = {"product_id": product_id}
+	if restaurant:
+		filters["restaurant"] = restaurant
+	
+	name = frappe.db.get_value("Menu Product", filters, "name")
+	
+	# 3. Try by seo_slug if still not found
+	if not name:
+		filters = {"seo_slug": product_id}
+		if restaurant:
+			filters["restaurant"] = restaurant
+		name = frappe.db.get_value("Menu Product", filters, "name")
+		
+	return name
 
 
 def validate_all_products_belong_to_restaurant(product_ids, restaurant_id):

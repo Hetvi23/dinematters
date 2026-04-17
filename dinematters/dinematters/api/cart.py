@@ -9,7 +9,11 @@ Matches format from BACKEND_API_DOCUMENTATION.md
 import frappe
 from frappe import _
 from frappe.utils import flt, now_datetime, get_datetime_str
-from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api, validate_product_belongs_to_restaurant
+from dinematters.dinematters.utils.api_helpers import (
+	validate_restaurant_for_api, 
+	validate_product_belongs_to_restaurant,
+	get_product_from_id
+)
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 import json
 import random
@@ -61,8 +65,11 @@ def add_to_cart(restaurant_id, dish_id, quantity=1, customizations=None, session
 		if not user and not session_id:
 			session_id = frappe.session.get("session_id") or generate_session_id()
 		
+		# Resolve product name if it's a slug/ID
+		actual_dish_id = get_product_from_id(dish_id, restaurant)
+		
 		# Validate product exists
-		if not frappe.db.exists("Menu Product", dish_id):
+		if not actual_dish_id:
 			return {
 				"success": False,
 				"error": {
@@ -71,6 +78,8 @@ def add_to_cart(restaurant_id, dish_id, quantity=1, customizations=None, session
 				}
 			}
 		
+		# Use actual document name for operations
+		dish_id = actual_dish_id
 		product = frappe.get_doc("Menu Product", dish_id)
 		
 		# Load customization options (nested child table)

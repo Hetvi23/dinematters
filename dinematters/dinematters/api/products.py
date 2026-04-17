@@ -9,7 +9,10 @@ Matches format from BACKEND_API_DOCUMENTATION.md
 import frappe
 from frappe import _
 from frappe.utils import flt, cint
-from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
+from dinematters.dinematters.utils.api_helpers import (
+	validate_restaurant_for_api,
+	get_product_from_id
+)
 from dinematters.dinematters.media.utils import get_media_asset_data
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 import json
@@ -493,7 +496,10 @@ def get_product(restaurant_id, product_id):
 		# Validate restaurant
 		restaurant = validate_restaurant_for_api(restaurant_id)
 		
-		if not frappe.db.exists("Menu Product", product_id):
+		# Resolve product name if it's a slug/ID
+		actual_product_id = get_product_from_id(product_id, restaurant)
+		
+		if not actual_product_id:
 			return {
 				"success": False,
 				"error": {
@@ -502,6 +508,8 @@ def get_product(restaurant_id, product_id):
 				}
 			}
 		
+		# Use actual document name for operations
+		product_id = actual_product_id
 		product_doc = frappe.get_doc("Menu Product", product_id)
 		
 		# Validate product belongs to restaurant

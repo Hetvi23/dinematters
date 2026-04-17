@@ -9,7 +9,11 @@ Matches format from BACKEND_API_DOCUMENTATION.md
 import frappe
 from frappe import _
 from frappe.utils import flt, cint, now_datetime, get_datetime_str, add_to_date
-from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api, validate_product_belongs_to_restaurant
+from dinematters.dinematters.utils.api_helpers import (
+	validate_restaurant_for_api, 
+	validate_product_belongs_to_restaurant,
+	get_product_from_id
+)
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 from dinematters.dinematters.utils.feature_gate import require_plan
 from dinematters.dinematters.utils.customer_helpers import (
@@ -175,9 +179,14 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 			quantity = cint(item.get("quantity", 1))
 			customizations = item.get("customizations", {})
 			
-			if not frappe.db.exists("Menu Product", dish_id):
+			# Resolve product name if it's a slug/ID
+			actual_dish_id = get_product_from_id(dish_id, restaurant)
+			
+			if not actual_dish_id:
 				return {"success": False, "error": {"code": "PRODUCT_NOT_FOUND", "message": f"Product {dish_id} not found"}}
 			
+			# Use actual document name for operations
+			dish_id = actual_dish_id
 			product = frappe.get_doc("Menu Product", dish_id)
 			load_customization_options(product)
 			
@@ -950,8 +959,14 @@ def update_order_items(order_id, items, restaurant_id):
 			quantity = cint(item.get("quantity", 1))
 			customizations = item.get("customizations", {})
 			
-			if not frappe.db.exists("Menu Product", dish_id):
+			# Resolve product name if it's a slug/ID
+			actual_dish_id = get_product_from_id(dish_id, restaurant)
+			
+			if not actual_dish_id:
 				return {"success": False, "error": {"code": "PRODUCT_NOT_FOUND", "message": f"Product {dish_id} not found"}}
+			
+			# Use actual document name for operations
+			dish_id = actual_dish_id
 			
 			product = frappe.get_doc("Menu Product", dish_id)
 			load_customization_options(product)
