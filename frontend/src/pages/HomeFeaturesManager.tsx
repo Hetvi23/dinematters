@@ -1,19 +1,21 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Trash2, Edit, Eye } from 'lucide-react'
+import { Trash2, Edit, Eye, CheckCircle2 } from 'lucide-react'
 import { uploadToR2 } from '@/lib/r2Upload'
 
 export default function HomeFeaturesManager() {
-  const { selectedRestaurant, restaurantConfig, isSilver } = useRestaurant()
+  const { selectedRestaurant, isSilver, refreshConfig } = useRestaurant()
   const [features, setFeatures] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<any | null>(null)
   const [saving, setSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Filter features based on membership tier
   const filteredFeatures = isSilver 
@@ -24,9 +26,8 @@ export default function HomeFeaturesManager() {
         return sharedFeatures.includes(f.id)
       })
 
-  const fetchFeatures = useCallback(async () => {
-    if (!selectedRestaurant) return
-    setLoading(true)
+  const fetchFeatures = useCallback(async (): Promise<any[] | null> => {
+    if (!selectedRestaurant) return null
     try {
       const response = await fetch(
         `/api/method/dinematters.dinematters.api.config.get_home_features?restaurant_id=${encodeURIComponent(selectedRestaurant)}`
@@ -34,22 +35,65 @@ export default function HomeFeaturesManager() {
       const json = await response.json()
       const payload = json?.message ?? json
       if (payload?.success) {
-        setFeatures(payload.data.features || [])
+        const data = payload.data.features || []
+        setFeatures(data)
+        return data
       }
     } catch (error) {
       console.error(error)
-    } finally {
-      setLoading(false)
     }
+    return null
   }, [selectedRestaurant])
 
+  // Always fetch fresh from API — never rely on the stale global restaurantConfig.homeFeatures
+  // The global config is a snapshot taken at page-load; it becomes stale the moment the user edits.
   useEffect(() => {
-    if (restaurantConfig?.homeFeatures) {
-      setFeatures(restaurantConfig.homeFeatures)
-      return
+    if (!selectedRestaurant) return
+    setLoading(true)
+    fetchFeatures().finally(() => setLoading(false))
+  }, [selectedRestaurant, fetchFeatures])
+
+  // Poll until a specific feature has the expected image URL reflected in the API.
+  // This bridges the gap between the Media Asset being "uploaded" (processing) and "ready".
+  const pollUntilImageReflected = useCallback(
+    async (featureName: string, expectedUrl: string, maxAttempts = 10, intervalMs = 1500) => {
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
+
+      let attempt = 0
+      const check = async () => {
+        attempt++
+        const data = await fetchFeatures()
+        if (!data) return
+
+        const found = data.find((f: any) => f.name === featureName)
+        const reflected = found?.imageSrc && (
+          found.imageSrc === expectedUrl ||
+          // CDN URL may differ slightly from the raw object key URL — treat any non-empty image as success
+          // after 3+ attempts (avoids infinite loops if URL transforms are applied)
+          (attempt >= 3 && found.imageSrc !== '')
+        )
+
+        if (reflected || attempt >= maxAttempts) {
+          // Final refresh to sync global context
+          await refreshConfig()
+          return
+        }
+
+        pollTimerRef.current = setTimeout(check, intervalMs)
+      }
+
+      // First check after a short delay to let the backend process
+      pollTimerRef.current = setTimeout(check, intervalMs)
+    },
+    [fetchFeatures, refreshConfig]
+  )
+
+  // Cleanup poll on unmount
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
     }
-    fetchFeatures()
-  }, [restaurantConfig, fetchFeatures])
+  }, [])
 
   const openEdit = (f: any) => {
     setEditing({ ...f, newImageFile: null })
@@ -99,138 +143,97 @@ export default function HomeFeaturesManager() {
       }
 
       let imageUrl = editing.imageSrc
+      let imageChanged = false
 
-      // If there's a new image file, upload it first
+      // ── Step 1: Upload new image if selected ──────────────────────────────
       if (editing.newImageFile) {
-        console.log('Starting CDN upload for file:', editing.newImageFile.name)
-        console.log('File details:', {
-          name: editing.newImageFile.name,
-          size: editing.newImageFile.size,
-          type: editing.newImageFile.type
-        })
-        
         try {
-          // Try CDN upload first
+          // Primary path: direct R2 CDN upload
           const uploadResult: any = await uploadFile(editing.newImageFile)
-          
-          // Add this debug to see if the issue is with the await
-          
-          if (uploadResult && typeof uploadResult === 'object') {
-          }
-          
-          if (uploadResult && uploadResult.primary_url) {
+          if (uploadResult?.primary_url) {
             imageUrl = uploadResult.primary_url
             docData.image_src = imageUrl
+            imageChanged = true
           } else {
-            console.error('CDN upload failed - no primary_url:', uploadResult)
-            console.error('Expected primary_url in result but got:', uploadResult)
-            throw new Error('Upload failed: No URL returned')
+            throw new Error('CDN upload returned no URL')
           }
         } catch (uploadError: any) {
-          console.error('CDN upload failed:', uploadError)
-          console.error('Upload error details:', {
-            message: uploadError.message,
-            stack: uploadError.stack,
-            name: uploadError.name,
-            toString: uploadError.toString()
+          console.error('CDN upload failed, trying fallback:', uploadError.message)
+
+          // Fallback: regular Frappe /upload_file
+          const formData = new FormData()
+          formData.append('file', editing.newImageFile)
+          formData.append('doctype', 'Home Feature')
+          formData.append('docname', editing.name)
+          formData.append('fieldname', 'image_src')
+
+          const csrf = (window as any).frappe?.csrf_token || (window as any).csrf_token
+          const uploadResponse = await fetch('/api/method/upload_file', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Frappe-CSRF-Token': csrf },
           })
-          
-          // Check if it's a network error
-          if (uploadError.name === 'TypeError' && uploadError.message.includes('fetch')) {
-            console.error('This appears to be a network error - check CORS or connectivity')
+
+          if (!uploadResponse.ok) {
+            throw new Error('Fallback upload failed: ' + uploadResponse.statusText)
           }
-          
-          // Fallback to regular Frappe upload
-          try {
-            const formData = new FormData()
-            formData.append('file', editing.newImageFile)
-            formData.append('doctype', 'Home Feature')
-            formData.append('docname', editing.name)
-            formData.append('fieldname', 'image_src')
-            
-            const csrf = (window as any).frappe?.csrf_token || (window as any).csrf_token
-            const uploadResponse = await fetch('/api/method/upload_file', {
-              method: 'POST',
-              body: formData,
-              headers: {
-                'X-Frappe-CSRF-Token': csrf
-              }
-            })
-            
-            
-            if (uploadResponse.ok) {
-              const uploadResult = await uploadResponse.json()
-              
-              if (uploadResult.message && uploadResult.message.file_url) {
-                imageUrl = uploadResult.message.file_url
-                docData.image_src = imageUrl
-              } else {
-                console.error('Fallback upload failed - no file URL:', uploadResult)
-                throw new Error('Fallback upload failed: No file URL returned')
-              }
-            } else {
-              const errorText = await uploadResponse.text()
-              console.error('Fallback upload HTTP error:', errorText)
-              throw new Error('Fallback upload failed: ' + uploadResponse.statusText)
-            }
-          } catch (fallbackError: any) {
-            console.error('Fallback upload also failed:', fallbackError)
-            throw new Error('Failed to upload image: Both CDN and regular upload failed')
-          }
+          const uploadJson = await uploadResponse.json()
+          const fileUrl = uploadJson?.message?.file_url
+          if (!fileUrl) throw new Error('Fallback upload returned no file URL')
+
+          imageUrl = fileUrl
+          docData.image_src = imageUrl
+          imageChanged = true
         }
       } else if (editing.imageSrc) {
         docData.image_src = editing.imageSrc
       }
 
+      // ── Step 2: Persist doc changes ───────────────────────────────────────
       const csrf = (window as any).frappe?.csrf_token || (window as any).csrf_token
-      const updateDocPromise = fetch('/api/method/dinematters.dinematters.api.documents.update_document', {
+      const updateResp = await fetch('/api/method/dinematters.dinematters.api.documents.update_document', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'X-Frappe-CSRF-Token': csrf
+          'X-Frappe-CSRF-Token': csrf,
         },
         body: JSON.stringify({
           doctype: 'Home Feature',
           name: editing.name,
-          doc_data: docData
-        })
-      }).then(resp => resp.json())
-
-      const [json] = await Promise.all([updateDocPromise])
-
+          doc_data: docData,
+        }),
+      })
+      const json = await updateResp.json()
       if (!json.success && json.error) throw new Error(json.error.message || JSON.stringify(json))
 
-      // After updating the document, also trigger Media Asset sync
-      if (imageUrl && imageUrl !== editing.imageSrc) {
-        try {
-          const syncResponse = await fetch('/api/method/dinematters.dinematters.doctype.home_feature.home_feature.update_media_assets_from_ui', {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'X-Frappe-CSRF-Token': csrf
-            },
-            body: JSON.stringify({
-              home_feature_name: editing.name,
-              image_src: imageUrl
-            })
-          })
-          
-          const syncResult = await syncResponse.json()
-          if (syncResult.message?.success) {
-          }
-        } catch (syncError) {
-          console.error('Failed to sync Media Assets:', syncError)
-        }
-      }
-
-      setFeatures(prev => prev.map(p => p.name === editing.name ? {
-        ...p,
-        title: editing.title,
-        subtitle: editing.subtitle,
-        imageSrc: imageUrl
-      } : p))
+      // ── Step 3: Optimistic UI update so user sees change immediately ──────
+      const savedName = editing.name
+      setFeatures(prev =>
+        prev.map(p =>
+          p.name === savedName
+            ? { ...p, title: editing.title, subtitle: editing.subtitle, imageSrc: imageUrl }
+            : p
+        )
+      )
       setEditing(null)
-      await fetchFeatures()
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
+
+      // ── Step 4: Refresh from server ───────────────────────────────────────
+      // Kick off an immediate fresh fetch so the list reflects the latest data.
+      // If an image was changed, also start polling because the Media Asset
+      // processing job runs asynchronously (status goes uploaded -> ready).
+      if (imageChanged) {
+        // Immediate fetch to update local list
+        await fetchFeatures()
+        // Then poll until the CDN URL is reflected through the Media Asset pipeline
+        pollUntilImageReflected(savedName, imageUrl)
+      } else {
+        // No image change — a single fetch is enough
+        await fetchFeatures()
+        // Still refresh the global context so other pages don't show stale data
+        refreshConfig()
+      }
     } catch (e: any) {
       console.error('Save failed', e)
       alert('Save failed: ' + (e.message || e))
@@ -246,6 +249,14 @@ export default function HomeFeaturesManager() {
         {isSilver && <span className="ml-2 text-sm text-muted-foreground">(Silver Plan - Limited Features)</span>}
       </h2>
       {!selectedRestaurant && <div className="text-sm text-muted-foreground">Select a restaurant first</div>}
+
+      {/* Save success toast */}
+      {saveSuccess && (
+        <div className="mb-4 flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <span>Feature saved successfully! Image will appear once processing completes.</span>
+        </div>
+      )}
       
       {isSilver && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">

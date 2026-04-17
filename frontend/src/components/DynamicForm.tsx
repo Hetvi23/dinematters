@@ -742,7 +742,7 @@ export default function DynamicForm({
           return null
         }
 
-        // Special handling for hero_video - render as file upload instead of URL input
+        // Special handling for hero_video - render as file upload with proper existing-state UI
         if (field.fieldname === 'hero_video') {
           return (
             <div key={field.fieldname} className="space-y-2">
@@ -750,7 +750,67 @@ export default function DynamicForm({
                 {field.label.replace('URL', '')}
                 {field.required && <span className="text-destructive">*</span>}
               </Label>
-              <div className="flex items-center gap-2">
+
+              {value ? (
+                /* ── Existing video — preview card identical to Attach Image pattern ── */
+                <div className="space-y-2">
+                  <div className="flex items-start gap-3 p-3 border rounded-md bg-muted/30">
+                    <video
+                      src={value.startsWith('http') ? value : `/${value}`}
+                      className="h-16 w-28 object-cover rounded border bg-black shrink-0"
+                      muted
+                      playsInline
+                      preload="metadata"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">File uploaded</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {value.split('/').pop()?.split('?')[0] || value}
+                      </p>
+                    </div>
+                    {!isReadOnly && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleFieldChange(field.fieldname, '')}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  {/* Allow replacing without removing first */}
+                  {!isReadOnly && (
+                    <Input
+                      type="file"
+                      accept="video/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        if (!docname) { toast.error('Please save the document before uploading files'); return }
+                        try {
+                          const result = await uploadToR2({ ownerDoctype: doctype, ownerName: docname, mediaRole: 'restaurant_config_hero_video', file })
+                          const uploadedUrl = result.primary_url || ''
+                          handleFieldChange(field.fieldname, uploadedUrl)
+                          if (uploadedUrl) {
+                            try {
+                              await updateDoc({ doctype, name: docname, doc_data: { [field.fieldname]: uploadedUrl } })
+                              toast.success('Video replaced and saved successfully')
+                              if (refreshDoc) await refreshDoc()
+                            } catch (saveError: any) {
+                              toast.error(saveError?.message || 'Video uploaded but failed to save')
+                            }
+                          }
+                        } catch (error: any) {
+                          toast.error(error?.message || 'Failed to upload video')
+                        } finally { e.target.value = '' }
+                      }}
+                      className="cursor-pointer"
+                    />
+                  )}
+                </div>
+              ) : (
+                /* ── No video yet — plain file picker ─────────────────────── */
                 <Input
                   id={field.fieldname}
                   type="file"
@@ -758,66 +818,32 @@ export default function DynamicForm({
                   onChange={async (e) => {
                     const file = e.target.files?.[0]
                     if (!file) return
-
-                    if (!docname) {
-                      toast.error('Please save the document before uploading files')
-                      return
-                    }
-
+                    if (!docname) { toast.error('Please save the document before uploading files'); return }
                     try {
-                      const result = await uploadToR2({
-                        ownerDoctype: doctype,
-                        ownerName: docname,
-                        mediaRole: 'restaurant_config_hero_video',
-                        file,
-                      })
-
+                      const result = await uploadToR2({ ownerDoctype: doctype, ownerName: docname, mediaRole: 'restaurant_config_hero_video', file })
                       const uploadedUrl = result.primary_url || ''
                       handleFieldChange(field.fieldname, uploadedUrl)
-
-                      // Auto-save the field to database immediately
-                        // console.log Removed - Production Build
-                      if (docname && uploadedUrl) {
+                      if (uploadedUrl) {
                         try {
-                          const saveResult = await updateDoc({
-                            doctype,
-                            name: docname,
-                            doc_data: { [field.fieldname]: uploadedUrl }
-                          })
-                          console.log('[DynamicForm] Auto-save result:', saveResult)
+                          await updateDoc({ doctype, name: docname, doc_data: { [field.fieldname]: uploadedUrl } })
                           toast.success('Video uploaded and saved successfully')
-                          // Refresh the document to show updated data
-                          if (refreshDoc) {
-                            await refreshDoc()
-                          }
+                          if (refreshDoc) await refreshDoc()
                         } catch (saveError: any) {
-                          console.error('[DynamicForm] Auto-save error:', saveError)
                           toast.error(saveError?.message || 'Video uploaded but failed to save')
                         }
-                      } else {
-                        console.warn('[DynamicForm] Skipping auto-save - missing docname or uploadedUrl')
-                        toast.success('Video uploaded successfully')
                       }
                     } catch (error: any) {
                       toast.error(error?.message || 'Failed to upload video')
-                    } finally {
-                      e.target.value = ''
-                    }
+                    } finally { e.target.value = '' }
                   }}
                   readOnly={isReadOnly}
                   required={field.required}
                   disabled={isReadOnly}
                   className="cursor-pointer"
                 />
-                {value && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>Uploaded: {value.split('/').pop()}</span>
-                  </div>
-                )}
-              </div>
-              {field.description && (
-                <p className="text-xs text-muted-foreground">Choose a video file from your local system</p>
               )}
+
+              <p className="text-xs text-muted-foreground">Upload a hero video file (mp4/webm) or attach a URL</p>
             </div>
           )
         }
@@ -1122,12 +1148,11 @@ export default function DynamicForm({
                         // console.log Removed - Production Build
                         if (docname && uploadedUrl) {
                           try {
-                            const saveResult = await updateDoc({
+                            await updateDoc({
                               doctype,
                               name: docname,
                               doc_data: { [field.fieldname]: uploadedUrl }
                             })
-                            // console.log Removed - Production Build
                             toast.success('File uploaded and saved successfully')
                             // Refresh the document to show updated data
                             if (refreshDoc) {

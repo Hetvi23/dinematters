@@ -51,14 +51,15 @@ def get_media_asset_data(owner_doctype, owner_name, media_role, fallback_url=Non
 			"srcset": None
 		}
 	
-	# Try to get Media Asset
+	# Try to get Media Asset (accept both 'uploaded' and 'ready' so a freshly-uploaded
+	# asset is surfaced immediately while the processing job is still running)
 	media_asset = frappe.db.get_value(
 		"Media Asset",
 		{
 			"owner_doctype": owner_doctype,
 			"owner_name": owner_name,
 			"media_role": media_role,
-			"status": "ready"
+			"status": ["in", ["uploaded", "ready"]]
 		},
 		["name", "primary_url", "blur_placeholder", "media_kind"],
 		as_dict=True
@@ -187,13 +188,15 @@ def get_media_assets_batch(owner_doctype, owner_names, media_roles):
 		return {}
 	
 	# 1. Fetch all matching Media Assets in one query
+	# Accept both 'uploaded' (processing in queue) and 'ready' so freshly-uploaded
+	# assets are returned immediately rather than waiting for the worker to finish.
 	assets = frappe.get_all(
 		"Media Asset",
 		filters={
 			"owner_doctype": owner_doctype,
 			"owner_name": ["in", owner_names],
 			"media_role": ["in", media_roles],
-			"status": "ready"
+			"status": ["in", ["uploaded", "ready"]]
 		},
 		fields=["name", "owner_name", "media_role", "primary_url", "blur_placeholder", "media_kind"]
 	)

@@ -173,7 +173,13 @@ def confirm_upload(upload_id, owner_doctype, owner_name, media_role, alt_text=No
 	# Get file extension
 	file_extension = os.path.splitext(upload_session.filename)[1].lstrip('.')
 	
-	# Create Media Asset
+	# Construct CDN URL immediately — persisted into the record so it's
+	# available to API queries without waiting for the async processing job.
+	from dinematters.dinematters.media.storage import get_cdn_url
+	cdn_url = get_cdn_url(upload_session.object_key)
+
+	# Create Media Asset with primary_url set from the start so that
+	# get_media_assets_batch / get_media_asset_data can surface it immediately.
 	media_asset = frappe.get_doc({
 		"doctype": "Media Asset",
 		"media_id": upload_id,
@@ -188,6 +194,7 @@ def confirm_upload(upload_id, owner_doctype, owner_name, media_role, alt_text=No
 		"source_size_bytes": verification.get("size") or upload_session.size_bytes,
 		"storage_provider": "cloudflare_r2",
 		"raw_object_key": upload_session.object_key,
+		"primary_url": cdn_url,
 		"status": "uploaded",
 		"alt_text": alt_text,
 		"caption": caption,
@@ -202,7 +209,7 @@ def confirm_upload(upload_id, owner_doctype, owner_name, media_role, alt_text=No
 	frappe.db.set_value("Media Upload Session", {"upload_id": upload_id}, "status", "confirmed")
 	frappe.db.commit()
 	
-	# Enqueue processing job
+	# Enqueue processing job — will generate variants, optimise image, and flip status to "ready"
 	frappe.enqueue(
 		"dinematters.dinematters.media.jobs.process_media_asset",
 		media_asset_name=media_asset.name,
@@ -211,10 +218,6 @@ def confirm_upload(upload_id, owner_doctype, owner_name, media_role, alt_text=No
 		is_async=True,
 		now=False
 	)
-	
-	# Construct CDN URL immediately (don't wait for processing)
-	from dinematters.dinematters.media.storage import get_cdn_url
-	cdn_url = get_cdn_url(upload_session.object_key)
 	
 	return {
 		"name": media_asset.name,
