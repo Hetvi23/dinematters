@@ -611,7 +611,7 @@ export default function OrderDetail() {
               {order.order_items.map((item: any, index: number) => (
                 <div key={index} className="flex justify-between items-center border-b pb-4 last:border-0">
                   <div>
-                    <p className="font-medium">{item.product || 'N/A'}</p>
+                    <p className="font-medium">{item.product_name || item.product || 'N/A'}</p>
                     <p className="text-sm text-muted-foreground">Quantity: {item.quantity || 1}</p>
                     {item.unit_price && (
                       <p className="text-sm text-muted-foreground">Unit Price: {formatAmount(item.unit_price)}</p>

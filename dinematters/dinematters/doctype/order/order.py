@@ -21,6 +21,9 @@ class Order(Document):
         # Prepare items in the format expected by the utility
         pricing_items = []
         for item in self.get("order_items"):
+            if not item.product_name and item.product:
+                item.product_name = frappe.db.get_value("Menu Product", item.product, "product_name")
+            
             pricing_items.append({
                 "quantity": item.quantity or 1,
                 "unitPrice": item.unit_price,
