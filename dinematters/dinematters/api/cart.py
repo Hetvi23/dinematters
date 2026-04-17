@@ -147,7 +147,8 @@ def add_to_cart(restaurant_id, dish_id, quantity=1, customizations=None, session
 			entry_id = entry_doc.entry_id
 		else:
 			# Create new entry
-			entry_id = generate_entry_id(dish_id)
+			# Use the product slug (product_id) for the entryId to ensure frontend match
+			entry_id = generate_entry_id(product.product_id or dish_id)
 			# Parse table_number from QR code if provided
 			parsed_table_number = None
 			if table_number:
@@ -173,7 +174,7 @@ def add_to_cart(restaurant_id, dish_id, quantity=1, customizations=None, session
 		
 		cart_item_data = {
 					"entryId": entry_id,
-					"dishId": dish_id,
+					"dishId": product.product_id,
 					"quantity": cint(quantity) if not existing_entry else entry_doc.quantity,
 					"customizations": customizations,
 					"unitPrice": unit_price,
@@ -234,7 +235,7 @@ def get_cart(restaurant_id, session_id=None, coupon_code=None, loyalty_coins=0, 
 			
 			items.append({
 				"entryId": entry.entry_id,
-				"dishId": entry.product,
+				"dishId": product.product_id,
 				"dish": format_product(product),
 				"quantity": entry.quantity,
 				"customizations": customizations,
@@ -443,7 +444,10 @@ def find_existing_cart_entry(user, session_id, restaurant, dish_id, customizatio
 
 
 def generate_entry_id(dish_id):
-	"""Generate unique entry ID: {dishId}-{timestamp}-{random}"""
+	"""
+	Generate unique entry ID: {dishId}-{timestamp}-{random}
+	dish_id should be the SEO slug (product_id) for frontend consistency.
+	"""
 	timestamp = int(datetime.now().timestamp())
 	random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
 	return f"{dish_id}-{timestamp}-{random_str}"
@@ -465,10 +469,14 @@ def get_cart_summary(user, session_id, restaurant, coupon_code=None, loyalty_coi
 	# Prepare items for pricing utility
 	items = []
 	for entry in entries:
+		# Map back to slug (product_id) for pricing engine and frontend consistency
+		product_data = frappe.db.get_value("Menu Product", entry.product, ["product_id", "product_name"], as_dict=True)
+		slug_id = product_data.get("product_id") if product_data else entry.product
+		
 		items.append({
 			"quantity": entry.quantity,
 			"unitPrice": entry.unit_price,
-			"dishId": entry.product
+			"dishId": slug_id
 		})
 	
 	# Use the pricing engine
