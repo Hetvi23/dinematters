@@ -122,6 +122,7 @@ const navigation: NavItem[] = [
     icon: Store,
     children: [
       { name: 'Setup Wizard', href: '/setup', icon: Sparkles },
+      { name: 'Team Management', href: '/team', icon: Users, adminOnly: true },
       { name: 'POS Integration', href: '/pos-integration', icon: Settings, feature: 'pos_integration' },
       { name: 'Manage Offer and Coupons', href: '/coupons', icon: Tag, feature: 'coupons' },
       { name: 'Manage QR Code', href: '/qr-codes', icon: QrCode },
@@ -206,7 +207,7 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
-  const { selectedRestaurant, setSelectedRestaurant, restaurants, isGold, isDiamond, planType, coinsBalance, billingStatus, isActive, refreshConfig, billingInfo } = useRestaurant()
+  const { selectedRestaurant, setSelectedRestaurant, restaurants, isGold, isDiamond, planType, coinsBalance, billingStatus, isActive, refreshConfig, billingInfo, isAdmin: isRestaurantAdmin } = useRestaurant()
   const { formatAmountNoDecimals } = useCurrency()
   const [sidebarOpen, setSidebarOpen] = useState(false) // Mobile sidebar
   const [sidebarExpanded, setSidebarExpanded] = useState(true) // Desktop sidebar expanded/collapsed
@@ -220,8 +221,10 @@ export default function Layout({ children }: LayoutProps) {
   // Wallet Balance in top bar
   const [showTopBarRecharge, setShowTopBarRecharge] = useState(false)
 
-  // Admin access state - using exact same pattern as TestApiCalls.tsx
-  const [isAdmin, setIsAdmin] = useState(false)
+  // Admin access state - system admin (Administrator) for Restaurant Management nav
+  const [isSystemAdmin, setIsSystemAdmin] = useState(false)
+  // Combined isAdmin: true if system admin OR Restaurant Admin via plan context
+  const isAdmin = isSystemAdmin || isRestaurantAdmin
 
   // Sync balance when updated from other components (like Recharge Modal)
   useEffect(() => {
@@ -333,9 +336,9 @@ export default function Layout({ children }: LayoutProps) {
 
     // Simple check: if user is Administrator, set admin to true
     if (currentUser === 'Administrator') {
-      setIsAdmin(true)
+      setIsSystemAdmin(true)
     } else {
-      setIsAdmin(false)
+      setIsSystemAdmin(false)
     }
   }, [currentUser])
 

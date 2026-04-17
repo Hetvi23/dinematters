@@ -62,6 +62,7 @@ const LogisticsHub = lazy(() => import('./pages/LogisticsHub'))
 const GoogleGrowth = lazy(() => import('./pages/GoogleGrowth'))
 const GoogleGrowthSync = lazy(() => import('./pages/GoogleGrowthSync'))
 const GoogleGrowthReviews = lazy(() => import('./pages/GoogleGrowthReviews'))
+const TeamManagement = lazy(() => import('./pages/TeamManagement'))
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -151,6 +152,7 @@ function AppContent() {
 							<Route path="/billing/configure" element={<Layout><PaymentConfiguration /></Layout>} />
 							<Route path="/ledger" element={<Layout><LedgerPage /></Layout>} />
 							<Route path="/autopay-setup" element={<Layout><AutopaySetupPage /></Layout>} />
+							<Route path="/team" element={<Layout><TeamManagement /></Layout>} />
 
 							<Route path="/products" element={<Layout><Products /></Layout>} />
 							<Route path="/products/new" element={<Layout><ProductNew /></Layout>} />

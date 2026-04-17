@@ -37,6 +37,10 @@ interface RestaurantContextType {
   billingInfo: any | null
   googleMapsApiKey: string | null
   referralCode: string | null
+  /** Role of the current user for the selected restaurant */
+  userRole: 'Restaurant Admin' | 'Restaurant Staff' | null
+  /** True if current user is Restaurant Admin (or system Administrator) */
+  isAdmin: boolean
 }
 
 const RestaurantContext = createContext<RestaurantContextType | undefined>(undefined)
@@ -205,6 +209,10 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
   const isDiamond = planType === 'DIAMOND'
   const isGold = planType === 'GOLD'
   const isSilver = planType === 'SILVER'
+
+  // User role for the selected restaurant (populated by get_restaurant_config)
+  const userRole = (restaurantConfig?.subscription?.userRole as 'Restaurant Admin' | 'Restaurant Staff' | null) ?? null
+  const isAdmin = userRole === 'Restaurant Admin' || userRole === null // null = guest/admin/no config yet
   
   const features = restaurantConfig?.subscription?.features ? {
     ordering: restaurantConfig.subscription.features.ordering ?? false,
@@ -264,7 +272,9 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
         features,
         billingInfo,
         googleMapsApiKey,
-        referralCode: restaurantConfig?.subscription?.referral_code || null
+        referralCode: restaurantConfig?.subscription?.referral_code || null,
+        userRole,
+        isAdmin,
       }}
     >
       {children}

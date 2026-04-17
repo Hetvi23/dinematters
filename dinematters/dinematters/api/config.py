@@ -15,6 +15,20 @@ from dinematters.dinematters.utils.currency_helpers import get_restaurant_curren
 import json
 
 
+def _get_user_role_for_restaurant(user, restaurant):
+	"""Return 'Restaurant Admin' or 'Restaurant Staff' for the current user, or None for guests."""
+	if not user or user == "Guest":
+		return None
+	if user == "Administrator":
+		return "Restaurant Admin"
+	role = frappe.db.get_value(
+		"Restaurant User",
+		{"user": user, "restaurant": restaurant, "is_active": 1},
+		"role"
+	)
+	return role or "Restaurant Staff"
+
+
 @frappe.whitelist(allow_guest=True)
 def get_restaurant_config(restaurant_id):
 	"""
@@ -255,6 +269,8 @@ def get_restaurant_config(restaurant_id):
 				"lastAutoRechargeDate": restaurant_doc.last_auto_recharge_date,
 				"monthly_minimum": float(restaurant_doc.monthly_minimum or 0),
 				"platform_fee_percent": float(restaurant_doc.platform_fee_percent or 0),
+				# Current user's role for this restaurant (Admin vs Staff)
+				"userRole": _get_user_role_for_restaurant(frappe.session.user, restaurant),
 				"features": {
 					# Transactional (DIAMOND only)
 					"ordering": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
