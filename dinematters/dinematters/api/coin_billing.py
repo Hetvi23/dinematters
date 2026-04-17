@@ -658,3 +658,23 @@ def process_monthly_subscription_coin_refill():
         )
     
     frappe.db.commit()
+
+@frappe.whitelist()
+def run_safeguard_test():
+    """
+    Verification test for production safety.
+    Attempts to 'accidentally' reset the balance to 0 via a standard save().
+    """
+    doc = frappe.get_doc("Restaurant", "flapjack-waffle-and-more")
+    original_balance = doc.coins_balance
+    
+    # Simulate the bug: setting balance to 0 during a settings save
+    doc.coins_balance = 0 
+    doc.save(ignore_permissions=True)
+    frappe.db.commit()
+    
+    new_balance = frappe.db.get_value("Restaurant", "flapjack-waffle-and-more", "coins_balance")
+    if float(new_balance or 0) == float(original_balance or 0):
+        return f"SUCCESS: Safeguard active. Attempted reset to 0 was REJECTED. Balance preserved at {new_balance}."
+    else:
+        return f"FAILURE: Safeguard MISSING. Balance was reset to {new_balance}."

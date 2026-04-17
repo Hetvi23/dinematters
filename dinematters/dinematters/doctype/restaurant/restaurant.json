@@ -111,6 +111,7 @@
   "flash_store_id",
   "delivery_markup_type",
   "delivery_markup_value",
+  "max_delivery_distance",
   "referral_code",
   "referred_by_restaurant",
   "section_break_google_growth",
@@ -810,6 +811,13 @@
    "fieldtype": "Float",
    "label": "Logistics Markup Value",
    "description": "Additional profit for the restaurant on top of the courier fee."
+  },
+  {
+   "default": "10.0",
+   "fieldname": "max_delivery_distance",
+   "fieldtype": "Float",
+   "label": "Maximum Delivery Distance (km)",
+   "description": "Maximum road distance (approximate) for delivery serviceability."
   },
   {
    "fieldname": "referral_code",

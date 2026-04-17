@@ -245,6 +245,16 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 			delivery_type=delivery_type
 		)
 
+		# Validate Serviceability (Distance Check)
+		if order_type == "delivery" and not pricing_result.get("serviceable"):
+			return {
+				"success": False,
+				"error": {
+					"code": "OUT_OF_RANGE",
+					"message": pricing_result.get("distanceError") or _("This restaurant does not deliver to your location.")
+				}
+			}
+
 		# Map pricing results back to variables used in order_doc creation
 		subtotal = pricing_result["subtotal"]
 		discount = pricing_result["discount"]

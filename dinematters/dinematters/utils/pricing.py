@@ -2,8 +2,9 @@ import frappe
 from frappe.utils import flt, cint
 from dinematters.dinematters.api.coupons import get_coupon_details
 from dinematters.dinematters.utils.loyalty import get_loyalty_balance, is_loyalty_enabled
+from dinematters.dinematters.utils.geoutils import calculate_distance, estimate_road_distance
 
-def calculate_cart_totals(restaurant, items, coupon_code=None, loyalty_coins=0, customer=None, delivery_type="Dine-in"):
+def calculate_cart_totals(restaurant, items, coupon_code=None, loyalty_coins=0, customer=None, delivery_type="Dine-in", latitude=None, longitude=None):
 	"""
 	Authoritative pricing calculation engine.
 	restaurant: Restaurant ID or name
@@ -12,7 +13,16 @@ def calculate_cart_totals(restaurant, items, coupon_code=None, loyalty_coins=0, 
 	loyalty_coins: Optional number of loyalty coins to redeem
 	customer: Optional Customer ID (for loyalty and coupon limits)
 	delivery_type: Optional (Dine-in, Takeaway, Delivery)
+	latitude: Latitude of delivery location
+	longitude: Longitude of delivery location
 	"""
+    
+	# 0. Global Context
+	restaurant_doc = frappe.get_doc("Restaurant", restaurant)
+	max_dist = flt(restaurant_doc.max_delivery_distance or 10.0)
+	serviceable = True
+	road_distance = 0
+	distance_error = None
 	
 	# 1. Calculate Subtotal
 	subtotal = 0
@@ -63,22 +73,30 @@ def calculate_cart_totals(restaurant, items, coupon_code=None, loyalty_coins=0, 
 	packaging_fee = 0
 	delivery_details = {}
 
-	# Fetch configuration for labeling
-	restaurant_doc = frappe.get_doc("Restaurant", restaurant)
-
 	if delivery_type == "Delivery":
-		# Dynamic Delivery Fee Calculation
-		location_data = items[0].get("delivery_location") if items and isinstance(items[0], dict) else None
-		
-		# If we have location, try to get a real quote
-		if location_data and location_data.get("latitude") and location_data.get("longitude"):
+		# A. Distance Check & Serviceability
+		# Logic: Use explicitly passed lat/lng or extract from items metadata
+		cust_lat = latitude or (items[0].get("delivery_location", {}).get("latitude") if items else None)
+		cust_lng = longitude or (items[0].get("delivery_location", {}).get("longitude") if items else None)
+
+		if cust_lat is not None and cust_lng is not None and restaurant_doc.latitude is not None and restaurant_doc.longitude is not None:
+			straight_dist = calculate_distance(restaurant_doc.latitude, restaurant_doc.longitude, cust_lat, cust_lng)
+			road_distance = round(estimate_road_distance(straight_dist), 2)
+			
+			if road_distance > max_dist:
+				serviceable = False
+				distance_error = f"Location is {road_distance}km away. Max delivery distance is {max_dist}km."
+
+		# B. Dynamic Delivery Fee Calculation
+		# If we have location and is serviceable, try to get a real quote
+		if serviceable and cust_lat and cust_lng:
 			from dinematters.dinematters.logistics.manager import LogisticsManager
 			try:
 				manager = LogisticsManager(restaurant)
 				quote_res = manager.get_quote({
-					"address": location_data.get("address"),
-					"latitude": location_data.get("latitude"),
-					"longitude": location_data.get("longitude"),
+					"address": items[0].get("delivery_location", {}).get("address") if items else None,
+					"latitude": cust_lat,
+					"longitude": cust_lng,
 					"items": items,
 					"total": subtotal
 				})
@@ -91,8 +109,8 @@ def calculate_cart_totals(restaurant, items, coupon_code=None, loyalty_coins=0, 
 			except Exception:
 				delivery_fee = flt(restaurant_doc.default_delivery_fee or 0)
 		else:
-			# No location provided, use static default
-			delivery_fee = flt(restaurant_doc.default_delivery_fee or 0)
+			# No location provided or not serviceable, use static default if serviceable, else 0
+			delivery_fee = flt(restaurant_doc.default_delivery_fee or 0) if serviceable else 0
 			
 		packaging_fee = flt(restaurant_doc.default_packaging_fee or 0)
 	elif delivery_type == "Takeaway":
@@ -143,6 +161,9 @@ def calculate_cart_totals(restaurant, items, coupon_code=None, loyalty_coins=0, 
 		"packagingFee": packaging_fee,
 		"total": total,
 		"payableAmount": max(0, total),
+		"serviceable": serviceable,
+		"distance": road_distance,
+		"distanceError": distance_error,
 		"billDetails": bill_details,
 		"currency": currency_info.get("currency", "INR"),
 		"currencySymbol": currency_info.get("symbol", "₹"),

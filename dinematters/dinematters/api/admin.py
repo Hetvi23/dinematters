@@ -677,7 +677,7 @@ def admin_update_restaurant_settings(restaurant_id, updates):
             if field in allowed_fields:
                 # Handle type conversions for numeric/boolean fields
                 if field in ['platform_fee_percent', 'monthly_minimum', 'tax_rate', 'default_delivery_fee', 
-                            'default_packaging_fee', 'minimum_order_value', 'coins_balance']:
+                            'default_packaging_fee', 'minimum_order_value']:
                     try:
                         value = float(value)
                     except:

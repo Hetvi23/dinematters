@@ -4,13 +4,14 @@ import { useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe';
 import Layout from '../components/Layout';
 import RazorpayCheckout from '../components/RazorpayCheckout';
 import { OTPVerification } from '../components/OTPVerification';
+import AddressAutocomplete from '../components/ui/AddressAutocomplete';
 import { useRestaurant } from '../contexts/RestaurantContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Separator } from '../components/ui/separator';
-import { ArrowLeft, ShoppingCart, User, Phone, Mail } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, User, Phone, Mail, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { getStoredVerifiedPhone, setVerifiedPhone, normalizePhone, isVerifiedExpired } from '../utils/otpStorage';
 
@@ -30,6 +31,19 @@ interface CartItem {
   amount: number;
 }
 
+interface PricingResult {
+  success: boolean;
+  data: CartItem[];
+  subtotal: number;
+  discount: number;
+  tax: number;
+  delivery_fee: number;
+  total: number;
+  serviceable: boolean;
+  distance?: number;
+  distanceError?: string;
+}
+
 const Payment: React.FC = () => {
   const { restaurantId } = useParams<{ restaurantId: string }>();
   const navigate = useNavigate();
@@ -46,8 +60,17 @@ const Payment: React.FC = () => {
   // Order state
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [totalAmount, setTotalAmount] = useState(0);
+  const [deliveryFee, setDeliveryFee] = useState(0);
   const [showPayment, setShowPayment] = useState(false);
   const [showOTPStep, setShowOTPStep] = useState(false);
+
+  // Delivery state
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryLat, setDeliveryLat] = useState<number | null>(null);
+  const [deliveryLng, setDeliveryLng] = useState<number | null>(null);
+  const [isServiceable, setIsServiceable] = useState(true);
+  const [distanceError, setDistanceError] = useState<string | null>(null);
+  const [deliveryDistance, setDeliveryDistance] = useState<number | null>(null);
 
   const { restaurantConfig } = useRestaurant();
   const verifyMyUser = restaurantConfig?.settings?.verifyMyUser === true;
@@ -55,23 +78,32 @@ const Payment: React.FC = () => {
   // API calls
   const { data: restaurant } = useFrappeGetDoc('Restaurant', restaurantId);
   
-  const { call: getCartItems } = useFrappePostCall<{success: boolean, data: CartItem[]}>(
+  const { call: getCartItems } = useFrappePostCall<PricingResult>(
     'dinematters.dinematters.api.cart.get_cart'
   );
   const { call: checkVerified } = useFrappePostCall<{success: boolean, verified: boolean}>(
     'dinematters.dinematters.api.otp.check_verified'
   );
 
-  // Load cart items on component mount
+  // Load cart items when restaurant or delivery location changes
   useEffect(() => {
     if (restaurantId) {
       loadCartItems();
     }
-  }, [restaurantId]);
+  }, [restaurantId, deliveryLat, deliveryLng]);
 
   const loadCartItems = async () => {
     try {
-      const response = await getCartItems({ restaurant_id: restaurantId });
+      const params: any = { restaurant_id: restaurantId };
+      if (deliveryLat && deliveryLng) {
+        params.latitude = deliveryLat;
+        params.longitude = deliveryLng;
+      }
+      if (!tableNumber) {
+        params.delivery_type = 'Delivery';
+      }
+
+      const response = await getCartItems(params);
       
       if (response?.success && response.data) {
         const items: OrderItem[] = response.data.map(item => ({
@@ -83,7 +115,11 @@ const Payment: React.FC = () => {
         }));
         
         setOrderItems(items);
-        setTotalAmount(items.reduce((sum, item) => sum + item.amount, 0));
+        setTotalAmount(response.total);
+        setDeliveryFee(response.delivery_fee || 0);
+        setIsServiceable(response.serviceable !== false);
+        setDistanceError(response.distanceError || null);
+        setDeliveryDistance(response.distance || null);
       } else {
         toast.error('Failed to load cart items');
       }
@@ -103,6 +139,16 @@ const Payment: React.FC = () => {
 
     if (!customerPhone.trim()) {
       toast.error('Please enter your phone number');
+      return;
+    }
+
+    if (!tableNumber && !deliveryLat) {
+      toast.error('Please select a valid delivery address');
+      return;
+    }
+
+    if (!isServiceable) {
+      toast.error(distanceError || 'Out of delivery range');
       return;
     }
 
@@ -246,7 +292,19 @@ const Payment: React.FC = () => {
                   <span>₹{totalAmount.toFixed(2)}</span>
                 </div>
                 
-                <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded">
+                <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded space-y-1">
+                  {deliveryDistance && (
+                    <div className="flex justify-between text-xs text-blue-700 font-medium">
+                      <span>Delivery Distance</span>
+                      <span>{deliveryDistance.toFixed(1)} km</span>
+                    </div>
+                  )}
+                  {deliveryFee > 0 && (
+                    <div className="flex justify-between text-xs text-blue-700 font-medium">
+                      <span>Delivery Fee</span>
+                      <span>₹{deliveryFee.toFixed(2)}</span>
+                    </div>
+                  )}
                   <p>• Platform fee (1.5%): ₹{(totalAmount * 0.015).toFixed(2)}</p>
                   <p>• Restaurant receives: ₹{(totalAmount * 0.985).toFixed(2)}</p>
                 </div>
@@ -315,6 +373,33 @@ const Payment: React.FC = () => {
                         />
                       </div>
                     </div>
+
+                    {!tableNumber && (
+                      <div className="space-y-2">
+                        <AddressAutocomplete
+                          label="Delivery Address *"
+                          value={deliveryAddress}
+                          onChange={setDeliveryAddress}
+                          onLocationSelect={(data) => {
+                            setDeliveryAddress(data.address);
+                            setDeliveryLat(data.latitude);
+                            setDeliveryLng(data.longitude);
+                          }}
+                          required
+                        />
+                        {!isServiceable && distanceError && (
+                          <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/10 p-2 rounded">
+                            <AlertCircle className="h-3 w-3 mt-0.5" />
+                            <span>{distanceError}</span>
+                          </div>
+                        )}
+                        {isServiceable && deliveryDistance && (
+                          <p className="text-[10px] text-muted-foreground ml-1">
+                            Estimated distance: {deliveryDistance.toFixed(1)} km
+                          </p>
+                        )}
+                      </div>
+                    )}
                     
                     <div className="space-y-2">
                       <Label htmlFor="customerEmail">Email (Optional)</Label>
@@ -331,8 +416,13 @@ const Payment: React.FC = () => {
                       </div>
                     </div>
                     
-                    <Button type="submit" className="w-full" size="lg">
-                      Proceed to Payment
+                    <Button 
+                      type="submit" 
+                      className="w-full" 
+                      size="lg"
+                      disabled={!isServiceable && !tableNumber}
+                    >
+                      {isServiceable || !!tableNumber ? 'Proceed to Payment' : 'Out of delivery range'}
                     </Button>
                   </form>
                 </CardContent>

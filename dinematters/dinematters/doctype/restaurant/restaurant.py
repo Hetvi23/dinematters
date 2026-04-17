@@ -63,6 +63,34 @@ class Restaurant(Document):
 		
 		# Validate plan change (admin-only)
 		self.validate_plan_change()
+	
+	def before_save(self):
+		"""
+		Safeguard: Prevent accidental wallet balance resets during standard doc.save() calls.
+		Forces the balance to stay synced with the database unless explicitly authorized.
+		"""
+		if not self.is_new():
+			# Fetch current balance directly from DB to avoid any cached/stale values
+			db_balance = frappe.db.get_value("Restaurant", self.name, "coins_balance")
+			
+			# If the document object has a different balance than the DB, 
+			# and it's not explicitly authorized (via record_transaction), REVERT IT to DB value.
+			# This prevents the "silent 0" bug when saving from stale UI or partial updates.
+			if db_balance is not None and float(self.coins_balance or 0) != float(db_balance):
+				if not getattr(self, "_ignore_balance_guard", False):
+					# Log the attempted overwrite for audit
+					frappe.log_error(
+						title="Billing Guard Intervention",
+						message=(
+							f"Prevented silent balance reset for restaurant '{self.name}'.\n"
+							f"Database value: {db_balance}\n"
+							f"Attempted value: {self.coins_balance}\n"
+							f"User: {frappe.session.user}\n"
+							f"The balance has been preserved."
+						)
+					)
+					# Force reset back to the source of truth
+					self.coins_balance = db_balance
 		
 		# Generate referral code if not exists
 		if not self.referral_code:
