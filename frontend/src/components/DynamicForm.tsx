@@ -71,10 +71,22 @@ export default function DynamicForm({
     isLoading: docLoading,
     isValidating: docValidating,
     mutate: refreshDoc,
-  } = useFrappeGetDoc(doctype, docname || '', {
-    enabled: hookEnabled,
-    fields: ['*'],
-  })
+  } = useFrappeGetDoc(
+    doctype,
+    // When hookEnabled is false, pass empty string so the SDK auto-generates
+    // a null SWR key (falsy name → no fetch). When true, pass the real docname.
+    hookEnabled ? (docname || '') : '',
+    // 3rd arg = swrKey override. Pass `undefined` so the SDK auto-generates a
+    // stable key from [doctype, name]. If we pass an object here it becomes the
+    // cache key and new objects on every render = cache always missed.
+    undefined,
+    // 4th arg = SWR options (revalidateOnMount, dedupingInterval, etc.)
+    {
+      revalidateOnMount: true,
+      revalidateOnFocus: false,    // Don't refetch when user switches browser tabs
+      dedupingInterval: 5000,     // Dedupe identical requests within 5s window
+    }
+  )
 
   // NOTE: Do NOT force-call refreshDoc() on mount here.
   // SWR already revalidates on mount via revalidateOnMount (default: true).
