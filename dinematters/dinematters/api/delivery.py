@@ -32,6 +32,17 @@ def get_delivery_quote(order_id):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+def _push_delivery_update(order_name, fields):
+    """
+    Push a delivery status change to both:
+    1. Administrator room (merchant dashboard)
+    2. Customer-specific channel (ONO menu in-progress page)
+    """
+    payload = {"order_id": order_name, **fields}
+    frappe.publish_realtime("order_update", payload, user="Administrator")
+    frappe.publish_realtime(f"delivery_update_{order_name}", payload)
+
+
 @frappe.whitelist()
 def assign_delivery(order_id, delivery_mode, partner_name=None, rider_name=None, rider_phone=None, eta=None):
     """Entry point for all delivery assignments (Manual or Integrated)"""
@@ -46,6 +57,14 @@ def assign_delivery(order_id, delivery_mode, partner_name=None, rider_name=None,
                 "delivery_rider_name": rider_name,
                 "delivery_rider_phone": rider_phone,
                 "delivery_eta": eta,
+            })
+            frappe.db.commit()
+            # Push realtime update so customer in-progress page refreshes instantly
+            _push_delivery_update(order.name, {
+                "delivery_status": "assigned",
+                "rider_name": rider_name or "",
+                "rider_phone": rider_phone or "",
+                "tracking_url": "",
             })
             return {"success": True, "message": _("Manual delivery assigned")}
 
@@ -62,6 +81,13 @@ def assign_delivery(order_id, delivery_mode, partner_name=None, rider_name=None,
                     "delivery_tracking_url": res.get("tracking_url"),
                     "delivery_fee": res.get("delivery_fee"),
                     "logistics_platform_fee": res.get("logistics_platform_fee")
+                })
+                frappe.db.commit()
+                _push_delivery_update(order.name, {
+                    "delivery_status": res.get("status") or "",
+                    "rider_name": "",
+                    "rider_phone": "",
+                    "tracking_url": res.get("tracking_url") or "",
                 })
                 return res
             else:
@@ -122,7 +148,13 @@ def sync_delivery_status(order_id):
                 update_data["rider_last_updated"] = frappe.utils.now_datetime()
                 
             order.db_set(update_data)
-            frappe.publish_realtime("order_update", {"order_id": order_id}, user="Administrator")
+            frappe.db.commit()
+            _push_delivery_update(order_id, {
+                "delivery_status": res.get("status") or "",
+                "rider_name": res.get("rider_name") or "",
+                "rider_phone": res.get("rider_phone") or "",
+                "tracking_url": res.get("tracking_url") or "",
+            })
             return res
         else:
             return {"success": False, "error": res.get("error")}
