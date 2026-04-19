@@ -81,8 +81,16 @@ def _process_gateway_event(data, provider_hint=None):
 
     # 2. Resolve Restaurant
     if provider_name == "Petpooja":
-        client_order_id = data.get("clientorderID")
-        restaurant_name = frappe.db.get_value("Order", client_order_id, "restaurant")
+        client_order_id = data.get("clientorderID") or data.get("orderID")
+        rest_id = data.get("restID")
+        
+        if client_order_id:
+            restaurant_name = frappe.db.get_value("Order", client_order_id, "restaurant")
+        
+        if not restaurant_name and rest_id:
+            # Fallback to restID (Merchant ID) if no order context or order not found
+            restaurant_name = frappe.db.get_value("Restaurant", {"pos_merchant_id": rest_id}, "name")
+            
     elif provider_name == "Restroworks":
         merchant_id = data.get("merchant_id")
         restaurant_name = frappe.db.get_value("Restaurant", {"pos_merchant_id": merchant_id}, "name")

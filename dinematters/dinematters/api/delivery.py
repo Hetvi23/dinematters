@@ -135,13 +135,41 @@ def sync_delivery_status(order_id):
 def handle_unified_webhook():
     """Universal gateway for all logistics webhooks (Flash, Borzo, etc)"""
     try:
-        provider_name = frappe.request.args.get("provider")
+        # Frappe merges URL query params (?provider=flash) into frappe.form_dict for
+        # whitelisted POST calls — frappe.request.args is often empty in this context.
+        provider_name = (
+            frappe.form_dict.get("provider")
+            or frappe.request.args.get("provider")
+            or ""
+        ).lower().strip()
         raw_body = frappe.request.get_data()
         
+        # ── Flash webhook authentication ───────────────────────────────────────
+        # NOTE: We do NOT use the "Authorization" header here because Frappe's
+        # global validate_auth() middleware intercepts it and raises AuthenticationError.
+        # The uEngage dashboard lets you set any custom header key — we use X-Flash-Token
+        # (or whatever key is configured in Dinematters Settings > flash_webhook_header_key).
+        if provider_name == "flash":
+            settings = frappe.get_single("Dinematters Settings")
+            header_key = getattr(settings, "flash_webhook_header_key", None)
+            if header_key:
+                expected_value = settings.get_password("flash_webhook_header_value") or ""
+                # Try exact key, then lowercase, then stripped
+                received_value = (
+                    frappe.request.headers.get(header_key)
+                    or frappe.request.headers.get(header_key.lower())
+                    or frappe.request.headers.get(header_key.replace(" ", "-"))
+                    or ""
+                )
+                if expected_value and received_value != expected_value:
+                    frappe.response.http_status_code = 401
+                    return {"error": "Unauthorized", "message": "Authentication is required."}
+
         # Determine order from payload based on provider
         data = json.loads(raw_body.decode('utf-8'))
         delivery_id = None
         status = None
+        tracking_url = None
         lat = lng = None
         rider_name = rider_phone = None
 
@@ -157,42 +185,70 @@ def handle_unified_webhook():
             lng = flt(courier.get("longitude"))
         
         elif provider_name == "flash":
-            # uEngage Flash payload structure
+            # uEngage Flash payload structure (Callback API spec)
             flash_data = data.get("data", {})
             delivery_id = flash_data.get("taskId")
-            status = data.get("status_code") # e.g. DISPATCHED, DELIVERED
+            status = data.get("status_code")  # e.g. DISPATCHED, DELIVERED, ALLOTTED
             rider_name = flash_data.get("rider_name")
             rider_phone = flash_data.get("rider_contact")
-            lat = flt(flash_data.get("latitude"))
-            lng = flt(flash_data.get("longitude"))
+            tracking_url = flash_data.get("tracking_url")
+            lat = flt(flash_data.get("latitude")) if flash_data.get("latitude") else None
+            lng = flt(flash_data.get("longitude")) if flash_data.get("longitude") else None
 
         if not delivery_id:
-            return {"status": "error", "message": "Missing delivery id"}
+            return {"status": True, "message": "Webhook Processed"}
 
         order_name = frappe.db.get_value("Order", {"delivery_id": delivery_id}, "name")
         if not order_name:
-            return {"status": "success", "message": "Order not found in this bench"}
+            # Flash requires HTTP 200 + specific body even for unknown orders
+            return {"status": True, "message": "Webhook Processed"}
 
         order = frappe.get_doc("Order", order_name)
         
-        # Update metrics
-        if status: order.delivery_status = status
-        if rider_name: order.delivery_rider_name = rider_name
-        if rider_phone: order.delivery_rider_phone = rider_phone
+        # Update delivery fields
+        update_fields = {}
+        if status:
+            update_fields["delivery_status"] = status
+            # Auto-mark order as completed when delivered
+            if status == "DELIVERED" and order.status not in ["completed", "cancelled"]:
+                update_fields["status"] = "completed"
+        if rider_name:
+            update_fields["delivery_rider_name"] = rider_name
+        if rider_phone:
+            update_fields["delivery_rider_phone"] = rider_phone
+        if tracking_url:
+            update_fields["delivery_tracking_url"] = tracking_url
         if lat and lng:
-            order.rider_latitude = lat
-            order.rider_longitude = lng
-            order.rider_last_updated = frappe.utils.now_datetime()
+            update_fields["rider_latitude"] = lat
+            update_fields["rider_longitude"] = lng
+            update_fields["rider_last_updated"] = frappe.utils.now_datetime()
 
-        order.save(ignore_permissions=True)
+        if update_fields:
+            order.db_set(update_fields, update_modified=True)
+
         frappe.db.commit()
-        
-        # Push real-time update to dashboard
-        frappe.publish_realtime("order_update", {"order_id": order_name}, user="Administrator")
 
-        # Standardize success response for logistics providers (Required by uEngage Flash)
+        # Push real-time update to:
+        # 1. The restaurant dashboard (Administrator room)
+        # 2. The specific customer's room (by order_id) so the ONO menu in-progress page updates live
+        realtime_payload = {
+            "order_id": order_name,
+            "delivery_status": status,
+            "rider_name": rider_name or "",
+            "rider_phone": rider_phone or "",
+            "tracking_url": tracking_url or "",
+            "rider_lat": str(lat) if lat else "",
+            "rider_lng": str(lng) if lng else "",
+        }
+        frappe.publish_realtime("order_update", realtime_payload, user="Administrator")
+        # Customer-facing room: keyed by order_name so the ONO in-progress page can subscribe
+        frappe.publish_realtime(f"delivery_update_{order_name}", realtime_payload)
+
+        # Flash requires exactly this response shape
         return {"status": True, "message": "Webhook Processed"}
 
     except Exception as e:
-        frappe.log_error(frappe.get_traceback(), _("Unified Logstics Webhook Error"))
-        return {"status": "error", "message": str(e)}
+        frappe.log_error(frappe.get_traceback(), _("Unified Logistics Webhook Error"))
+        # Return 200 to prevent Flash from retrying on our own bugs
+        return {"status": True, "message": "Webhook Processed"}
+

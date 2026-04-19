@@ -47,6 +47,8 @@
   "flash_access_token",
   "flash_store_id",
   "flash_mode",
+  "flash_webhook_header_key",
+  "flash_webhook_header_value",
   "section_platform_logistics",
   "platform_delivery_convenience_fee"
  ],
@@ -292,7 +294,7 @@
    "fieldname": "flash_store_id",
    "fieldtype": "Data",
    "label": "Flash Store ID (Global)",
-   "description": "Single Store ID from uEngage Flash dashboard. All restaurant deliveries are routed through this DineMatters account."
+   "description": "Store ID from uEngage Flash dashboard. Production Store ID: 68035. All restaurant deliveries are routed through this DineMatters aggregator account."
   },
   {
    "default": "Sandbox",
@@ -300,6 +302,18 @@
    "fieldtype": "Select",
    "label": "Flash Mode",
    "options": "Sandbox\nProduction"
+  },
+  {
+   "fieldname": "flash_webhook_header_key",
+   "fieldtype": "Data",
+   "label": "Flash Webhook Header Key",
+   "description": "Header Key configured in uEngage Dashboard > Configuration > Configure Webhook (e.g. Authorization). Used to verify incoming Flash status callbacks."
+  },
+  {
+   "fieldname": "flash_webhook_header_value",
+   "fieldtype": "Password",
+   "label": "Flash Webhook Header Value (Secret)",
+   "description": "Header Value / secret token configured in uEngage Dashboard > Configure Webhook (e.g. Bearer xxx). Keep this private."
   },
   {
    "fieldname": "section_platform_logistics",
