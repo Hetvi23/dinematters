@@ -86,9 +86,12 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
 
   const [assigningDelivery, setAssigningDelivery] = useState(false)
   const [cancellingDelivery, setCancellingDelivery] = useState(false)
+  const [progressingDelivery, setProgressingDelivery] = useState(false)
   const [deliveryMode, setDeliveryMode] = useState<'auto' | 'manual'>('manual')
   const [manualForm, setManualForm] = useState({ rider_name: '', rider_phone: '', eta: '' })
   const [deliveryPanelOpen, setDeliveryPanelOpen] = useState(true)
+  const [isEditingRiderInfo, setIsEditingRiderInfo] = useState(false)
+  const [editRiderForm, setEditRiderForm] = useState({ rider_name: '', rider_phone: '', eta: '' })
 
   // Fetch restaurant logistics config
   const { data: restaurantDoc } = useFrappeGetDoc(
@@ -117,6 +120,8 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
   const { call: assignDeliveryAPI } = useFrappePostCall('dinematters.dinematters.api.delivery.assign_delivery')
   const { call: cancelDeliveryAPI } = useFrappePostCall('dinematters.dinematters.api.delivery.cancel_delivery')
   const { call: updateOrderItemsAPI } = useFrappePostCall('dinematters.dinematters.api.orders.update_order_items')
+  const { call: updateDeliveryInfoAPI } = useFrappePostCall('dinematters.dinematters.api.delivery.update_delivery_info')
+  const { call: markSelfDeliveryStatusAPI } = useFrappePostCall('dinematters.dinematters.api.delivery.mark_self_delivery_status')
 
   // Product List for Search
   const { data: allProductsData } = useFrappeGetDocList(
@@ -276,7 +281,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
       if (!result?.success) throw new Error(result?.error || 'Failed to assign delivery')
       
       toast.success(isSelfDelivery ? 'Rider assigned manually' : `Delivery booked via ${logisticsProvider}`)
-      window.location.reload()
+      mutate()
     } catch (e: any) {
       toast.error('Failed to assign delivery', { description: getFrappeError(e) })
     } finally {
@@ -297,11 +302,48 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
       if (!result?.success) throw new Error(result?.error || 'Failed to cancel delivery')
       
       toast.success('Delivery cancelled successfully')
-      window.location.reload()
+      mutate()
     } catch (e: any) {
       toast.error('Failed to cancel delivery', { description: getFrappeError(e) })
     } finally {
       setCancellingDelivery(false)
+    }
+  }
+
+  const handleSelfDeliveryProgress = async (newStatus: 'DISPATCHED' | 'DELIVERED') => {
+    if (!order?.name) return
+    const label = newStatus === 'DISPATCHED' ? 'Mark as Picked Up' : 'Mark as Delivered'
+    if (!confirm(`${label}? This will update the customer tracking status.`)) return
+    setProgressingDelivery(true)
+    try {
+      const res = await markSelfDeliveryStatusAPI({ order_id: order.name, new_status: newStatus })
+      const result = (res as any)?.message || res
+      if (!result?.success) throw new Error(result?.error || 'Failed to update status')
+      toast.success(newStatus === 'DELIVERED' ? '✅ Order marked as Delivered!' : '🛵 Marked as Picked Up')
+      mutate()
+    } catch (e: any) {
+      toast.error('Failed to update delivery status', { description: getFrappeError(e) })
+    } finally {
+      setProgressingDelivery(false)
+    }
+  }
+
+  const handleUpdateRiderInfo = async () => {
+    if (!order?.name) return
+    try {
+      const res = await updateDeliveryInfoAPI({
+        order_id: order.name,
+        rider_name: editRiderForm.rider_name || undefined,
+        rider_phone: editRiderForm.rider_phone || undefined,
+        eta: editRiderForm.eta || undefined,
+      })
+      const result = (res as any)?.message || res
+      if (!result?.success) throw new Error(result?.error || 'Failed to update rider info')
+      toast.success('Rider info updated')
+      setIsEditingRiderInfo(false)
+      mutate()
+    } catch (e: any) {
+      toast.error('Failed to update rider info', { description: getFrappeError(e) })
     }
   }
 
@@ -605,18 +647,87 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                               </p>
                             )}
                             {order.delivery_eta && (
-                              <p className="text-[10px] font-bold text-muted-foreground mt-1">ETA: {order.delivery_eta}</p>
+                              <p className="text-[10px] font-bold text-muted-foreground mt-1">ETA: {order.delivery_eta} mins</p>
                             )}
                           </div>
 
-                          <div className="flex flex-col gap-2">
-                            {order.delivery_status !== 'cancelled' && order.delivery_status !== 'delivered' && (
+                          <div className="flex flex-col gap-2 items-end">
+                            {order.delivery_status !== 'cancelled' && order.delivery_status !== 'DELIVERED' && order.delivery_status !== 'delivered' && (
                               <Button size="sm" variant="destructive" onClick={handleCancelDelivery} disabled={cancellingDelivery} className="h-7 text-[10px] font-bold uppercase">
                                 {cancellingDelivery ? 'Cancelling...' : 'Cancel'}
                               </Button>
                             )}
+                            {/* Self delivery: edit rider info toggle */}
+                            {(order.delivery_partner === 'manual') && order.delivery_status !== 'DELIVERED' && order.delivery_status !== 'delivered' && order.delivery_status !== 'cancelled' && (
+                              <Button
+                                size="sm" variant="outline"
+                                onClick={() => {
+                                  setEditRiderForm({
+                                    rider_name: order.delivery_rider_name || '',
+                                    rider_phone: order.delivery_rider_phone || '',
+                                    eta: order.delivery_eta || '',
+                                  })
+                                  setIsEditingRiderInfo((v: boolean) => !v)
+                                }}
+                                className="h-7 text-[10px] font-bold uppercase border-blue-300 text-blue-700 dark:text-blue-400"
+                              >
+                                {isEditingRiderInfo ? 'Cancel Edit' : 'Edit Rider'}
+                              </Button>
+                            )}
                           </div>
                         </div>
+
+                        {/* ── Inline edit rider form (self-delivery only) ── */}
+                        {isEditingRiderInfo && (order.delivery_partner === 'manual') && (
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-800/50">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black uppercase text-muted-foreground">Rider Name</label>
+                              <input className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                                value={editRiderForm.rider_name} onChange={e => setEditRiderForm((f: any) => ({...f, rider_name: e.target.value}))} placeholder="Rider Name" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black uppercase text-muted-foreground">Rider Phone</label>
+                              <input className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                                value={editRiderForm.rider_phone} onChange={e => setEditRiderForm((f: any) => ({...f, rider_phone: e.target.value}))} placeholder="Rider Phone" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black uppercase text-muted-foreground">ETA (mins)</label>
+                              <input className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                                value={editRiderForm.eta} onChange={e => setEditRiderForm((f: any) => ({...f, eta: e.target.value}))} placeholder="e.g. 25" />
+                            </div>
+                            <div className="sm:col-span-3 flex justify-end">
+                              <Button size="sm" onClick={handleUpdateRiderInfo} className="h-8 text-xs font-bold uppercase tracking-wider bg-blue-600 hover:bg-blue-700">
+                                <Save className="w-3.5 h-3.5 mr-1.5" /> Update Rider Info
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── Self delivery status progression ── */}
+                        {(order.delivery_partner === 'manual') && order.delivery_status !== 'DELIVERED' && order.delivery_status !== 'delivered' && order.delivery_status !== 'cancelled' && (
+                          <div className="flex gap-2 pt-1">
+                            {(order.delivery_status === 'assigned' || order.delivery_status === 'ACCEPTED') && (
+                              <Button
+                                size="sm" variant="outline"
+                                onClick={() => handleSelfDeliveryProgress('DISPATCHED')}
+                                disabled={progressingDelivery}
+                                className="flex-1 h-8 text-xs font-bold uppercase tracking-wider border-orange-300 text-orange-700 hover:bg-orange-50 dark:text-orange-400"
+                              >
+                                <Truck className="w-3.5 h-3.5 mr-1.5" />
+                                {progressingDelivery ? 'Updating...' : 'Mark Picked Up 🛵'}
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              onClick={() => handleSelfDeliveryProgress('DELIVERED')}
+                              disabled={progressingDelivery}
+                              className="flex-1 h-8 text-xs font-bold uppercase tracking-wider bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                              {progressingDelivery ? 'Updating...' : 'Mark Delivered ✅'}
+                            </Button>
+                          </div>
+                        )}
 
                         {order.delivery_rider_name && (
                           <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-800/50">
@@ -639,8 +750,8 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                       </div>
                     )}
 
-                    {/* Integrated Live Map */}
-                    {(order.delivery_latitude || order.delivery_location_pin || order.rider_latitude) && (
+                    {/* Integrated Live Map — always show for delivery orders when restaurant co-ords exist */}
+                    {restaurantInfo.latitude && restaurantInfo.longitude && (
                       <div className="mt-2">
                         <DeliveryMap
                           restaurantName={restaurantInfo.name}

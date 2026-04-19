@@ -284,3 +284,75 @@ def handle_unified_webhook():
         # Return 200 to prevent Flash from retrying on our own bugs
         return {"status": True, "message": "Webhook Processed"}
 
+
+@frappe.whitelist()
+def update_delivery_info(order_id, rider_name=None, rider_phone=None, eta=None):
+    """
+    Update rider details after self-delivery assignment without cancelling and re-assigning.
+    Pushes a realtime event so the customer in-progress page refreshes instantly.
+    """
+    try:
+        order = frappe.get_doc("Order", order_id)
+        validate_restaurant_for_api(order.restaurant, frappe.session.user)
+
+        update_fields = {}
+        if rider_name is not None:
+            update_fields["delivery_rider_name"] = rider_name
+        if rider_phone is not None:
+            update_fields["delivery_rider_phone"] = rider_phone
+        if eta is not None:
+            update_fields["delivery_eta"] = eta
+
+        if not update_fields:
+            return {"success": True, "message": _("Nothing to update")}
+
+        order.db_set(update_fields)
+        frappe.db.commit()
+        _push_delivery_update(order.name, {
+            "delivery_status": order.delivery_status or "",
+            "rider_name": rider_name if rider_name is not None else (order.delivery_rider_name or ""),
+            "rider_phone": rider_phone if rider_phone is not None else (order.delivery_rider_phone or ""),
+            "tracking_url": order.delivery_tracking_url or "",
+        })
+        return {"success": True, "message": _("Rider info updated")}
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), _("Update Delivery Info Error"))
+        return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist()
+def mark_self_delivery_status(order_id, new_status):
+    """
+    Progress self / manual delivery:
+      assigned → DISPATCHED → DELIVERED (auto-completes order)
+    Pushes realtime to both merchant dashboard and customer in-progress page.
+    """
+    ALLOWED = {"DISPATCHED", "DELIVERED"}
+    if new_status not in ALLOWED:
+        return {"success": False, "error": _("Invalid status. Must be DISPATCHED or DELIVERED.")}
+
+    try:
+        order = frappe.get_doc("Order", order_id)
+        validate_restaurant_for_api(order.restaurant, frappe.session.user)
+
+        if order.status in ["completed", "cancelled"]:
+            return {"success": False, "error": _("Order is already completed or cancelled")}
+
+        update_fields = {"delivery_status": new_status}
+        if new_status == "DELIVERED":
+            update_fields["status"] = "completed"
+
+        order.db_set(update_fields)
+        frappe.db.commit()
+        _push_delivery_update(order.name, {
+            "delivery_status": new_status,
+            "rider_name": order.delivery_rider_name or "",
+            "rider_phone": order.delivery_rider_phone or "",
+            "tracking_url": "",
+        })
+        return {"success": True, "message": _(f"Delivery marked as {new_status.title()}")}
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), _("Mark Self Delivery Status Error"))
+        return {"success": False, "error": str(e)}
