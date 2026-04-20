@@ -64,7 +64,7 @@ export default function WhatsAppOrders() {
   } = useDataTable({
     customEndpoint: 'dinematters.dinematters.api.whatsapp_ordering.get_whatsapp_orders',
     paramNames: {
-      page: 'start_page',
+      page: 'page',
       pageSize: 'page_length',
       search: 'search_query'
     },
@@ -223,7 +223,7 @@ export default function WhatsAppOrders() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="Pending Verification">New Intent (Lead)</SelectItem>
+                    <SelectItem value="pending_verification">New Intent (Lead)</SelectItem>
                     <SelectItem value="confirmed">Confirmed</SelectItem>
                     <SelectItem value="delivered">Completed</SelectItem>
                     <SelectItem value="cancelled">Cancelled</SelectItem>

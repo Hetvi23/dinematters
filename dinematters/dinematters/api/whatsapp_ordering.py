@@ -78,7 +78,7 @@ def get_whatsapp_orders(
     status=None,
     from_date=None,
     to_date=None,
-    start=0,
+    page=1,
     page_length=20
 ):
     """
@@ -117,17 +117,22 @@ def get_whatsapp_orders(
         # Get count for pagination
         total_count = frappe.db.count("Order", filters)
         
+        # Handle pagination (page to offset)
+        limit_start = (cint(page) - 1) * cint(page_length)
+        if limit_start < 0:
+            limit_start = 0
+
         # Fetch data
         orders = frappe.get_all(
             "Order",
             fields=[
                 "name", "order_number", "status", "total", 
                 "creation", "customer_name", "customer_phone", 
-                "table_number"
+                "table_number", "order_type"
             ],
             filters=filters,
             order_by="creation desc",
-            start=start,
+            start=limit_start,
             page_length=page_length
         )
 
@@ -152,7 +157,7 @@ def get_whatsapp_orders(
             "success": True,
             "data": orders,
             "total_count": total_count,
-            "has_more": (cint(start) + cint(page_length)) < total_count
+            "has_more": (cint(limit_start) + cint(page_length)) < total_count
         }
         
     except Exception as e:
@@ -173,23 +178,34 @@ def unlock_whatsapp_lead(restaurant_id: str, customer_phone: str, order_id=None)
         if frappe.db.exists("WhatsApp Lead Unlock", {"restaurant": restaurant_id, "customer_phone": customer_phone}):
             return {"success": True, "message": "Lead already unlocked."}
             
-        # 2. Deduct 1 Coin
-        # We use a specific txn_type for clear reporting
-        deduct_coins(
-            restaurant=restaurant_id,
-            amount=1,
-            type="Lead Unlock",
-            description=f"Unlocked WhatsApp lead: {customer_phone}",
-            ref_doctype="Order" if order_id else None,
-            ref_name=order_id
-        )
+        # 2. Check Plan Type for Lead Unlock Fee
+        plan_type = frappe.db.get_value("Restaurant", restaurant_id, "plan_type")
+
+        # DIAMOND gets lead unlocks for free.
+        # PRO (GOLD) pays 1 coin per unlock.
+        if plan_type == "DIAMOND":
+            amount_to_deduct = 0
+        else:
+            amount_to_deduct = 1
+
+        # 3. Deduct Coins if applicable
+        if amount_to_deduct > 0:
+            deduct_coins(
+                restaurant=restaurant_id,
+                amount=amount_to_deduct,
+                type="Lead Unlock",
+                description=f"Unlocked WhatsApp lead: {customer_phone}",
+                ref_doctype="Order" if order_id else None,
+                ref_name=order_id
+            )
         
-        # 3. Record the unlock
+        # 4. Record the unlock
         unlock = frappe.get_doc({
             "doctype": "WhatsApp Lead Unlock",
             "restaurant": restaurant_id,
             "customer_phone": customer_phone,
-            "order_reference": order_id
+            "order_reference": order_id,
+            "was_free": 1 if plan_type == "DIAMOND" else 0
         })
         unlock.insert(ignore_permissions=True)
         frappe.db.commit()
@@ -405,7 +421,7 @@ def log_whatsapp_order(
             # - status Pending Verification: signals merchant is waiting for WhatsApp msg
             # - payment_status pending: honest representation — we don't know if WA was sent
             "payment_method":   "pay_at_counter",
-            "status":           "Pending Verification",
+            "status":           "pending_verification",
             "payment_status":   "pending",
             "is_whatsapp_order": 1,
             "estimated_delivery": estimated_delivery,

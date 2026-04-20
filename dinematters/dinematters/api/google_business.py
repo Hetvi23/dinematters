@@ -23,20 +23,25 @@ def handle_product_update(doc, method=None):
     - Generates slug if missing.
     - Syncs to Google if enabled.
     """
-    if not doc.seo_slug:
-        doc.seo_slug = generate_seo_slug(doc.product_name)
-        # We use db_set to avoid re-triggering hooks if possible, 
-        # but since we're in on_update, we might need doc.save() or just db_set.
-        doc.db_set("seo_slug", doc.seo_slug, update_modified=False)
+    try:
+        if not doc.seo_slug:
+            doc.seo_slug = generate_seo_slug(doc.product_name)
+            # Use db_set to avoid re-triggering the on_update hook
+            doc.db_set("seo_slug", doc.seo_slug, update_modified=False)
 
-    restaurant = frappe.get_cached_doc("Restaurant", doc.restaurant)
-    if restaurant.enable_google_sync:
-        # Enqueue sync to avoid slowing down save
-        frappe.enqueue(
-            "dinematters.dinematters.api.google_business.sync_menu_to_google",
-            restaurant_id=doc.restaurant,
-            now=frappe.flags.in_test
-        )
+        # Use get_doc (not cached) to ensure fresh data with all fields
+        restaurant = frappe.get_doc("Restaurant", doc.restaurant)
+        # Use getattr with default to safely access the field
+        if getattr(restaurant, "enable_google_sync", False):
+            # Enqueue sync to avoid slowing down save
+            frappe.enqueue(
+                "dinematters.dinematters.api.google_business.sync_menu_to_google",
+                restaurant_id=doc.restaurant,
+                now=frappe.flags.in_test
+            )
+    except Exception as e:
+        # Non-critical: log and continue — do NOT let this break product saves
+        frappe.log_error("handle_product_update Error", str(e))
 
 def fetch_all_restaurant_insights():
     """

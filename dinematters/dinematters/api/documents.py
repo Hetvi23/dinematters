@@ -34,7 +34,7 @@ def create_document(doctype, doc_data):
 			'name': doc.name
 		}
 	except frappe.ValidationError as e:
-		frappe.log_error(f"Validation error creating {doctype}: {str(e)}")
+		frappe.log_error(f"Create Validation: {doctype}", str(e))
 		return {
 			'success': False,
 			'error': {
@@ -43,7 +43,7 @@ def create_document(doctype, doc_data):
 			}
 		}
 	except frappe.PermissionError as e:
-		frappe.log_error(f"Permission error creating {doctype}: {str(e)}")
+		frappe.log_error(f"Create Permission: {doctype}", str(e))
 		return {
 			'success': False,
 			'error': {
@@ -52,7 +52,7 @@ def create_document(doctype, doc_data):
 			}
 		}
 	except Exception as e:
-		frappe.log_error(str(e), title=f"Create Error: {doctype}")
+		frappe.log_error(f"Create Error: {doctype}", str(e))
 		return {
 			'success': False,
 			'error': {
@@ -107,7 +107,7 @@ def update_document(doctype, name, doc_data):
 			'name': doc.name
 		}
 	except frappe.ValidationError as e:
-		frappe.log_error(str(e), title=f"Update Validation: {doctype}")
+		frappe.log_error(f"Update Validation: {doctype}", str(e))
 		return {
 			'success': False,
 			'error': {
@@ -116,7 +116,7 @@ def update_document(doctype, name, doc_data):
 			}
 		}
 	except frappe.PermissionError as e:
-		frappe.log_error(f"Permission error updating {doctype} {name}: {str(e)}")
+		frappe.log_error(f"Update Permission: {doctype}", str(e))
 		return {
 			'success': False,
 			'error': {
@@ -125,7 +125,7 @@ def update_document(doctype, name, doc_data):
 			}
 		}
 	except Exception as e:
-		frappe.log_error(str(e), title=f"Update Error: {doctype}")
+		frappe.log_error(f"Update Error: {doctype}", str(e))
 		return {
 			'success': False,
 			'error': {
@@ -188,10 +188,10 @@ def get_doc_list(doctype, filters=None, fields=None, limit_page_length=20, order
 		return result
 		
 	except frappe.PermissionError as e:
-		frappe.log_error(f"Permission error in get_doc_list: {str(e)}")
+		frappe.log_error("get_doc_list Permission Error", str(e))
 		frappe.throw(_("You do not have permission to access this document type"))
 	except Exception as e:
-		frappe.log_error(f"Error in get_doc_list: {str(e)}")
+		frappe.log_error("get_doc_list Error", str(e))
 		frappe.throw(_("Failed to fetch documents: {0}").format(str(e)))
 
 
@@ -213,10 +213,10 @@ def get_doc(doctype, name):
 		return doc.as_dict()
 		
 	except frappe.PermissionError as e:
-		frappe.log_error(f"Permission error in get_doc: {str(e)}")
+		frappe.log_error("get_doc Permission Error", str(e))
 		frappe.throw(_("You do not have permission to access this document"))
 	except Exception as e:
-		frappe.log_error(f"Error in get_doc: {str(e)}")
+		frappe.log_error("get_doc Error", str(e))
 		frappe.throw(_("Failed to fetch document: {0}").format(str(e)))
 
 
@@ -243,13 +243,13 @@ def insert_doc(doc):
 		return new_doc.as_dict()
 		
 	except frappe.ValidationError as e:
-		frappe.log_error(f"Validation error in insert_doc: {str(e)}")
+		frappe.log_error("insert_doc Validation Error", str(e))
 		frappe.throw(str(e))
 	except frappe.PermissionError as e:
-		frappe.log_error(f"Permission error in insert_doc: {str(e)}")
+		frappe.log_error("insert_doc Permission Error", str(e))
 		frappe.throw(_("You do not have permission to create this document"))
 	except Exception as e:
-		frappe.log_error(f"Error in insert_doc: {str(e)}")
+		frappe.log_error("insert_doc Error", str(e))
 		frappe.throw(_("Failed to create document: {0}").format(str(e)))
 
 
@@ -273,13 +273,13 @@ def delete_doc(doctype, name):
 		}
 		
 	except frappe.PermissionError as e:
-		frappe.log_error(f"Permission error in delete_doc: {str(e)}")
+		frappe.log_error("delete_doc Permission Error", str(e))
 		frappe.throw(_("You do not have permission to delete this document"))
 	except frappe.LinkExistsError as e:
-		frappe.log_error(f"Link exists error in delete_doc: {str(e)}")
+		frappe.log_error("delete_doc Link Exists Error", str(e))
 		frappe.throw(_("Cannot delete {0} {1} because it is linked with other documents").format(doctype, name))
 	except Exception as e:
-		frappe.log_error(f"Error in delete_doc: {str(e)}")
+		frappe.log_error("delete_doc Error", str(e))
 		frappe.throw(_("Failed to delete document: {0}").format(str(e)))
 
 

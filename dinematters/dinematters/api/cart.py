@@ -537,7 +537,7 @@ def parse_table_number_from_qr(qr_data, restaurant_id):
 		
 		return None
 	except Exception as e:
-		frappe.log_error(f"Error parsing table number from QR: {str(e)}", "Table Number Parse")
+		frappe.log_error("QR Table Number Parse Error", str(e))
 		return None
 
 

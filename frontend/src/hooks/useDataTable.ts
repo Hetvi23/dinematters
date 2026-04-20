@@ -85,8 +85,26 @@ export function useDataTable(options: UseDataTableOptions) {
 
     // Handle standard production-grade API response structure
     const result = (response as any)?.message || response
-    data = result?.data?.items || result?.data?.[Object.keys(result?.data || {}).find(k => Array.isArray(result?.data?.[k])) || ''] || []
-    totalCount = result?.data?.pagination?.total || result?.data?.total || result?.data?.totalCount || result?.total || data.length
+    
+    // Robust data extraction
+    if (Array.isArray(result?.data)) {
+      data = result.data
+    } else if (result?.data?.items && Array.isArray(result.data.items)) {
+      data = result.data.items
+    } else {
+      // Fallback: find first array property in data
+      const firstArrayKey = Object.keys(result?.data || {}).find(k => Array.isArray(result?.data?.[k]))
+      data = firstArrayKey ? result?.data?.[firstArrayKey] : []
+    }
+
+    // Robust total count extraction
+    totalCount = result?.total_count || 
+                 result?.total || 
+                 result?.data?.total || 
+                 result?.data?.totalCount || 
+                 result?.data?.pagination?.total || 
+                 data.length
+
     isLoading = loading
     mutate = refresh
   } else if (doctype) {

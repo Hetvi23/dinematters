@@ -649,9 +649,8 @@ export default function Layout({ children }: LayoutProps) {
       const status = String(order.status || '').trim().toLowerCase()
       const isWhatsApp = Boolean(order.is_whatsapp_order)
 
-      // Only count 'Pending Verification' (Awaiting Msg) as actionable badge alerts
-      // Using .toLowerCase() means we check for 'pending verification'
-      return status === 'pending verification' && isWhatsApp
+      // Only count 'pending_verification' (Awaiting Msg) as actionable badge alerts
+      return status === 'pending_verification' && isWhatsApp
     }).length
   }, [orders])
 
