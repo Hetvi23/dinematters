@@ -80,7 +80,7 @@ def get_restaurant_config(restaurant_id):
 				"subtitle": "",
 				"description": restaurant_doc.description,
 				"primary_color": "#DB782F",
-				"default_theme": "light",
+				"default_theme": "dark",
 				"logo": restaurant_doc.logo,
 				"hero_video": "",
 				"apple_touch_icon": "",
@@ -192,7 +192,7 @@ def get_restaurant_config(restaurant_id):
 			},
 			"branding": {
 				"primaryColor": primary_color,
-				"defaultTheme": config.get("default_theme", "light"),
+				"defaultTheme": config.get("default_theme", "dark"),
 				"logo": logo,
 				"logoBlurPlaceholder": logo_blur,
 				"logoVariants": logo_variants,

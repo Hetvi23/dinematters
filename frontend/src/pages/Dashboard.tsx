@@ -250,12 +250,19 @@ export default function Dashboard() {
     }).reduce((sum, o) => sum + (o.total || 0), 0) || 0
   })
 
-  // Top Products (Mocked for now since Order Items aren't fetched, but using what we have)
-  const topProducts = products?.slice(0, 4).map(p => ({
-    name: p.product_name,
-    count: Math.floor(Math.random() * 50) + 10, // Mock count for UI demo
-    total: 100
-  })).sort((a,b) => b.count - a.count) || []
+  // Top Products — real order-count data from analyticsData.topPerformers
+  // Falls back to menu products slice ONLY when no analytics data available
+  const topProducts = (analyticsData?.topPerformers && analyticsData.topPerformers.length > 0)
+    ? analyticsData.topPerformers.map((p: any) => ({
+        name: p.item_name || p.name || 'Unknown',
+        count: p.order_count ?? p.views ?? 0,
+        total: p.total_revenue ?? 100
+      }))
+    : (products?.slice(0, 4).map(p => ({
+        name: p.product_name || p.name,
+        count: 0,
+        total: 0
+      })) || [])
 
   const getStatusIcon = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -440,21 +447,41 @@ export default function Dashboard() {
               <RevenueTrendChart data={dailyRevenue} />
               <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
                  <div className="p-3 bg-muted/30 rounded-xl border border-border/40">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wide">Peak Day</p>
-                    <p className="text-sm font-bold">Saturday</p>
-                 </div>
+                     <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wide">Peak Day</p>
+                     <p className="text-sm font-bold">
+                       {analyticsData?.traffic?.peakDay || <span className="text-muted-foreground text-xs italic">No data yet</span>}
+                     </p>
+                  </div>
                  <div className="p-3 bg-muted/30 rounded-xl border border-border/40">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wide">Ticket Size</p>
-                    <p className="text-sm font-bold">{formatAmountNoDecimals(analyticsData?.enhanced?.avgOrderValue || 0)}</p>
-                 </div>
+                     <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wide">Ticket Size</p>
+                     <p className="text-sm font-bold">{formatAmountNoDecimals(analyticsData?.enhanced?.avgOrderValue || 0)}</p>
+                  </div>
                  <div className="p-3 bg-muted/30 rounded-xl border border-border/40">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wide">Scan Efficiency</p>
-                    <p className="text-sm font-bold text-primary">High</p>
-                 </div>
-                 <div className="p-3 bg-muted/30 rounded-xl border border-border/40">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wide">Churn Risk</p>
-                    <p className="text-sm font-bold text-emerald-500">Low</p>
-                 </div>
+                     <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wide">Scan Efficiency</p>
+                     <p className={cn(
+                       "text-sm font-bold",
+                       analyticsData?.enhanced?.scanEfficiency === 'High' && 'text-primary',
+                       analyticsData?.enhanced?.scanEfficiency === 'Medium' && 'text-amber-500',
+                       analyticsData?.enhanced?.scanEfficiency === 'Low' && 'text-rose-500',
+                       !analyticsData?.enhanced?.scanEfficiency && 'text-muted-foreground'
+                     )}>
+                       {analyticsData?.enhanced?.scanEfficiency || '—'}
+                     </p>
+                  </div>
+                  <div className="p-3 bg-muted/30 rounded-xl border border-border/40">
+                     <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wide">Churn Risk</p>
+                     <p className={cn(
+                       "text-sm font-bold",
+                       analyticsData?.enhanced?.churnRiskColor === 'emerald' && 'text-emerald-500',
+                       analyticsData?.enhanced?.churnRiskColor === 'amber' && 'text-amber-500',
+                       analyticsData?.enhanced?.churnRiskColor === 'rose' && 'text-rose-500',
+                       !analyticsData?.enhanced?.churnRiskLabel && 'text-muted-foreground'
+                     )}>
+                       {analyticsData?.enhanced?.churnRiskLabel
+                         ? `${analyticsData.enhanced.churnRiskLabel} ${analyticsData.enhanced.churnRate > 0 ? `(${analyticsData.enhanced.churnRate}%)` : ''}`
+                         : '—'}
+                     </p>
+                  </div>
               </div>
             </LockedInsight>
           </CardContent>

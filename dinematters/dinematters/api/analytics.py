@@ -305,6 +305,7 @@ def log_event(restaurant_id, event_type, event_value=None, session_id=None, plat
 def get_dashboard_summary(restaurant_id):
 	"""
 	Returns a tiered summary of analytics for the merchant dashboard.
+	ALL values are computed from real data – no mocks, no Math.random().
 	"""
 	try:
 		# Ensure restaurant_id is lowercase (DocNames in DineMatters are lowercase slugs)
@@ -312,15 +313,13 @@ def get_dashboard_summary(restaurant_id):
 		
 		# Validate restaurant & check subscription tier
 		restaurant = frappe.get_doc("Restaurant", restaurant_id)
-		# Assume plan is stored on Restaurant or available via a helper
 		from dinematters.dinematters.utils.feature_gate import get_restaurant_plan
-		plan = get_restaurant_plan(restaurant_id) # Returns 'SILVER', 'GOLD', or 'DIAMOND'
+		plan = get_restaurant_plan(restaurant_id)  # 'SILVER', 'GOLD', or 'DIAMOND'
 
-		# Use tomorrow's date for end_date to include all events from today (April 10)
 		end_date = add_days(today(), 1)
-		start_date_7d = add_days(today(), -7) # Exactly 7 days ago
+		start_date_7d = add_days(today(), -7)
 
-		# 1. Traffic Stats (Always available, but SILVER leads with this)
+		# ── 1. Traffic Stats (all tiers) ─────────────────────────────────────
 		traffic_stats = frappe.db.sql("""
 			SELECT 
 				COUNT(*) as total_views,
@@ -331,7 +330,7 @@ def get_dashboard_summary(restaurant_id):
 			AND creation BETWEEN %s AND %s
 		""", (restaurant_id, start_date_7d, end_date), as_dict=True)[0]
 
-		# Calculate growth (current 7d vs previous 7d)
+		# Growth vs previous 7d
 		start_date_prev = add_days(start_date_7d, -7)
 		prev_traffic = frappe.db.sql("""
 			SELECT COUNT(*) as total_views
@@ -345,7 +344,6 @@ def get_dashboard_summary(restaurant_id):
 		if prev_traffic.total_views > 0:
 			growth = ((traffic_stats.total_views - prev_traffic.total_views) / prev_traffic.total_views) * 100
 
-		# 2. Lifetime Analytics (Production-Grade Optimization: Index ensures this is fast)
 		lifetime_scans = frappe.db.count("Analytics Event", {
 			"restaurant": restaurant_id,
 			"event_type": "menu_view"
@@ -362,7 +360,7 @@ def get_dashboard_summary(restaurant_id):
 			}
 		}
 
-		# 1.1 Calculate Peak Hour (Production Insight)
+		# ── 1.1 Peak Hour (real, from Analytics Events) ──────────────────────
 		peak_hour_data = frappe.db.sql("""
 			SELECT HOUR(creation) as hour, COUNT(*) as count
 			FROM `tabAnalytics Event`
@@ -374,24 +372,37 @@ def get_dashboard_summary(restaurant_id):
 		if peak_hour_data:
 			h = peak_hour_data[0].hour
 			am_pm = "AM" if h < 12 else "PM"
-			display_h = h % 12
-			if display_h == 0: display_h = 12
+			display_h = h % 12 or 12
 			summary["traffic"]["peakHour"] = f"{display_h} {am_pm}"
 			summary["traffic"]["peakHourLabel"] = "Most busy time"
 
-		# 1.2 Top Category by Scans (Tease for SILVER, data for GOLD)
-		# We'll use the 'Top Category' logic but specifically from analytics events if available, 
-		# otherwise fallback to Menu Category list
+		# ── 1.2 Peak Day (real, from Order data — 7 days) ────────────────────
+		# DAYNAME() returns 'Monday', 'Tuesday' etc. — real, not hardcoded.
+		peak_day_data = frappe.db.sql("""
+			SELECT DAYNAME(creation) as day_name, COUNT(*) as order_count
+			FROM `tabOrder`
+			WHERE restaurant = %s
+			AND creation BETWEEN %s AND %s
+			AND status NOT IN ('cancelled', 'pending_verification')
+			GROUP BY DAYOFWEEK(creation), day_name
+			ORDER BY order_count DESC
+			LIMIT 1
+		""", (restaurant_id, start_date_7d, end_date), as_dict=True)
+
+		summary["traffic"]["peakDay"] = peak_day_data[0].day_name if peak_day_data else None
+		summary["traffic"]["peakDayOrders"] = peak_day_data[0].order_count if peak_day_data else 0
+
+		# ── 1.3 Top Category by Scans ─────────────────────────────────────────
 		summary["traffic"]["topCategory"] = frappe.db.sql("""
 			SELECT event_value, COUNT(*) as count
 			FROM `tabAnalytics Event`
 			WHERE restaurant = %s AND event_type = 'category_view'
 			GROUP BY event_value ORDER BY count DESC LIMIT 1
-		""", (restaurant_id), as_dict=True)
+		""", (restaurant_id,), as_dict=True)
 
-		# 2. GOLD/DIAMOND Features (Revenue, Conversion, etc.)
+		# ── 2. GOLD/DIAMOND Features ──────────────────────────────────────────
 		if plan in ['GOLD', 'DIAMOND']:
-			# Get order stats
+			# Order revenue stats
 			order_stats = frappe.db.sql("""
 				SELECT 
 					COUNT(*) as total_orders,
@@ -399,16 +410,69 @@ def get_dashboard_summary(restaurant_id):
 				FROM `tabOrder`
 				WHERE restaurant = %s
 				AND creation BETWEEN %s AND %s
+				AND status NOT IN ('cancelled', 'pending_verification')
 			""", (restaurant_id, start_date_7d, end_date), as_dict=True)[0]
 
+			total_orders = order_stats.total_orders or 0
+			revenue = flt(order_stats.revenue or 0)
+			scans = traffic_stats.total_views or 1
+
 			summary["enhanced"] = {
-				"totalOrders": order_stats.total_orders,
-				"revenue": flt(order_stats.revenue),
-				"conversionRate": round((order_stats.total_orders / traffic_stats.total_views * 100), 2) if traffic_stats.total_views > 0 else 0
+				"totalOrders": total_orders,
+				"revenue": revenue,
+				"conversionRate": round((total_orders / scans * 100), 2) if scans > 0 else 0,
+				"avgOrderValue": round(revenue / total_orders, 2) if total_orders > 0 else 0,
 			}
-			
-			# Item views vs Orders (locked for SILVER)
-			summary["topPerformers"] = frappe.db.sql("""
+
+			# ── 2.1 Top Products — real order item counts (NOT Math.random) ──
+			# Joins Order Items → Menu Product to get product_name and count sold.
+			top_products_raw = frappe.db.sql("""
+				SELECT 
+					oi.product_name as item_name,
+					COUNT(*) as order_count,
+					SUM(oi.quantity) as total_qty,
+					SUM(oi.total_price) as total_revenue
+				FROM `tabOrder Item` oi
+				INNER JOIN `tabOrder` o ON o.name = oi.parent
+				WHERE o.restaurant = %s
+				AND o.creation BETWEEN %s AND %s
+				AND o.status NOT IN ('cancelled', 'pending_verification')
+				GROUP BY oi.product_name
+				ORDER BY order_count DESC
+				LIMIT 8
+			""", (restaurant_id, start_date_7d, end_date), as_dict=True)
+
+			# Fallback: if product_name is empty, use product (slug) as display name.
+			# NOTE: oi.item_name does NOT exist in tabOrder Item — use only product_name or product.
+			if not top_products_raw:
+				top_products_raw = frappe.db.sql("""
+					SELECT 
+						COALESCE(oi.product_name, oi.product) as item_name,
+						COUNT(*) as order_count,
+						SUM(oi.quantity) as total_qty,
+						SUM(oi.total_price) as total_revenue
+					FROM `tabOrder Item` oi
+					INNER JOIN `tabOrder` o ON o.name = oi.parent
+					WHERE o.restaurant = %s
+					AND o.creation BETWEEN %s AND %s
+					GROUP BY item_name
+					ORDER BY order_count DESC
+					LIMIT 8
+				""", (restaurant_id, start_date_7d, end_date), as_dict=True)
+
+			summary["topPerformers"] = [
+				{
+					"item_name": row.item_name or "Unknown Item",
+					"views": row.order_count,
+					"order_count": row.order_count,
+					"total_qty": row.total_qty,
+					"total_revenue": flt(row.total_revenue),
+				}
+				for row in top_products_raw
+			]
+
+			# ── 2.2 Item Views — fallback if no order data available ─────────
+			item_view_performers = frappe.db.sql("""
 				SELECT 
 					event_value as item_name,
 					COUNT(*) as views
@@ -420,14 +484,108 @@ def get_dashboard_summary(restaurant_id):
 				LIMIT 8
 			""", (restaurant_id, start_date_7d, end_date), as_dict=True)
 
-			# Engagement Metrics (Conversion)
-			order_stats = summary.get("enhanced", {})
-			scans = summary.get("traffic", {}).get("totalViews", 0)
-			
-			summary["enhanced"]["conversionRate"] = round((order_stats.get("total_orders", 0) / scans * 100), 2) if scans > 0 else 0
-			summary["enhanced"]["avgOrderValue"] = flt(order_stats.get("revenue", 0) / order_stats.get("total_orders", 1)) if order_stats.get("total_orders", 0) > 0 else 0
+			# Prefer order-based; fall back to view-based if no orders yet
+			if not summary["topPerformers"] and item_view_performers:
+				summary["topPerformers"] = [
+					{"item_name": r.item_name, "views": r.views, "order_count": 0,
+					 "total_qty": 0, "total_revenue": 0.0}
+					for r in item_view_performers
+				]
+
+			# ── 2.3 Churn Risk — real computation (prev 7d vs current 7d) ────
+			prev_customers_raw = frappe.db.sql("""
+				SELECT COUNT(DISTINCT COALESCE(platform_customer, customer_phone)) as cnt
+				FROM `tabOrder`
+				WHERE restaurant = %s
+				AND creation BETWEEN %s AND %s
+				AND status NOT IN ('cancelled', 'pending_verification')
+			""", (restaurant_id, start_date_prev, start_date_7d), as_dict=True)
+
+			curr_customers_raw = frappe.db.sql("""
+				SELECT COUNT(DISTINCT COALESCE(platform_customer, customer_phone)) as cnt
+				FROM `tabOrder`
+				WHERE restaurant = %s
+				AND creation BETWEEN %s AND %s
+				AND status NOT IN ('cancelled', 'pending_verification')
+			""", (restaurant_id, start_date_7d, end_date), as_dict=True)
+
+			prev_count = (prev_customers_raw[0].cnt or 0) if prev_customers_raw else 0
+			curr_count = (curr_customers_raw[0].cnt or 0) if curr_customers_raw else 0
+
+			if prev_count > 0:
+				churn_rate = max(0, round((prev_count - curr_count) / prev_count * 100, 1))
+			else:
+				churn_rate = 0
+
+			if churn_rate < 20:
+				churn_label, churn_color = "Low", "emerald"
+			elif churn_rate < 50:
+				churn_label, churn_color = "Medium", "amber"
+			else:
+				churn_label, churn_color = "High", "rose"
+
+			summary["enhanced"]["churnRate"] = churn_rate
+			summary["enhanced"]["churnRiskLabel"] = churn_label
+			summary["enhanced"]["churnRiskColor"] = churn_color
+
+			# ── 2.4 Scan Efficiency (real conversion rate bucketed) ───────────
+			conv = summary["enhanced"]["conversionRate"]
+			if conv >= 10:
+				scan_efficiency = "High"
+			elif conv >= 3:
+				scan_efficiency = "Medium"
+			else:
+				scan_efficiency = "Low"
+			summary["enhanced"]["scanEfficiency"] = scan_efficiency
 
 		return summary
 	except Exception as e:
 		frappe.log_error(f"Error in get_dashboard_summary: {str(e)}")
+		return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist()
+def get_top_products(restaurant_id, days=7, limit=8):
+	"""
+	Standalone endpoint: top products by order count over the last N days.
+	Returns real data from Order Items — no mocked values.
+	"""
+	try:
+		restaurant_id = restaurant_id.lower() if restaurant_id else restaurant_id
+		days = int(days) if days else 7
+		limit = int(limit) if limit else 8
+
+		end_date = add_days(today(), 1)
+		start_date = add_days(today(), -days)
+
+		# Primary: use product_name (human-readable, set by EC-17 migration)
+		rows = frappe.db.sql("""
+			SELECT 
+				COALESCE(oi.product_name, oi.product) as item_name,
+				COUNT(*) as order_count,
+				SUM(oi.quantity) as total_qty,
+				SUM(oi.total_price) as total_revenue
+			FROM `tabOrder Item` oi
+			INNER JOIN `tabOrder` o ON o.name = oi.parent
+			WHERE o.restaurant = %s
+			AND o.creation BETWEEN %s AND %s
+			AND o.status NOT IN ('cancelled', 'pending_verification')
+			GROUP BY item_name
+			ORDER BY order_count DESC
+			LIMIT %s
+		""", (restaurant_id, start_date, end_date, limit), as_dict=True)
+
+		return {
+			"success": True,
+			"data": [
+				{
+					"name": r.item_name or "Unknown",
+					"count": r.order_count,
+					"total": flt(r.total_revenue),
+				}
+				for r in rows
+			]
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in get_top_products: {str(e)}")
 		return {"success": False, "error": str(e)}

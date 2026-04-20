@@ -96,6 +96,16 @@
    "label": "Opt-Out Keyword Received",
    "read_only": 1,
    "description": "The keyword the customer replied (e.g. STOP) that triggered the opt-out."
+  },
+  {
+   "fieldname": "push_fcm_tokens",
+   "fieldtype": "Small Text",
+   "label": "Push FCM Tokens",
+   "description": "JSON array of FCM device tokens for web push notifications (free, stored automatically).",
+   "read_only": 1,
+   "hidden": 1,
+   "in_list_view": 0,
+   "no_copy": 1
   }
  ],
  "index_web_pages_for_search": 1,

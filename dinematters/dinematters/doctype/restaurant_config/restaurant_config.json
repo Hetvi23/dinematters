@@ -113,7 +113,8 @@
    "fieldname": "default_theme",
    "fieldtype": "Select",
    "label": "Default Theme",
-   "options": "light\ndark"
+   "options": "light\ndark",
+    "default": "dark"
   },
   {
    "fieldname": "logo",
@@ -337,17 +338,17 @@
    "fieldname": "google_review_link",
    "fieldtype": "Data",
    "label": "Google Review Link",
-    "options": "URL",
-    "description": "Link to redirect to Google review page",
-    "length": 1000
+   "options": "URL",
+   "description": "Link to redirect to Google review page",
+   "length": 1000
   },
   {
    "fieldname": "instagram_profile_link",
    "fieldtype": "Data",
    "label": "Instagram Profile Link",
-    "options": "URL",
-    "description": "Link to Instagram profile",
-    "length": 1000
+   "options": "URL",
+   "description": "Link to Instagram profile",
+   "length": 1000
   },
   {
    "fieldname": "column_break_social_media",
@@ -357,9 +358,9 @@
    "fieldname": "facebook_profile_link",
    "fieldtype": "Data",
    "label": "Facebook Profile Link",
-    "options": "URL",
-    "description": "Link to Facebook profile",
-    "length": 1000
+   "options": "URL",
+   "description": "Link to Facebook profile",
+   "length": 1000
   },
   {
    "fieldname": "whatsapp_phone_number",
@@ -383,6 +384,16 @@
    "options": "URL",
    "description": "Link to Zomato restaurant page",
    "length": 1000
+  },
+  {
+   "fieldname": "merchant_push_tokens",
+   "fieldtype": "Small Text",
+   "label": "Merchant Push Tokens",
+   "description": "JSON array of FCM device tokens for merchant dashboard push notifications (new orders).",
+   "read_only": 1,
+   "hidden": 1,
+   "in_list_view": 0,
+   "no_copy": 1
   }
  ],
  "index_web_pages_for_search": 1,

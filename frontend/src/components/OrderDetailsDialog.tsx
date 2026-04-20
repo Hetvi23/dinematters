@@ -8,13 +8,13 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { useCurrency } from '@/hooks/useCurrency'
-import { 
-  ShoppingBag, 
-  Clock, 
-  User, 
+import {
+  ShoppingBag,
+  Clock,
+  User,
   CreditCard,
-  MapPin, 
-  Truck, 
+  MapPin,
+  Truck,
   HelpCircle,
   Copy,
   CheckCircle2,
@@ -71,7 +71,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
   const [productSearchTerm, setProductSearchTerm] = useState('')
   const [selectedProductForCustomization, setSelectedProductForCustomization] = useState<any>(null)
   const [tempCustomizations, setTempCustomizations] = useState<Record<string, any>>({})
-  
+
   const { data: order, isLoading, mutate } = useFrappeGetDoc('Order', orderId || '', {
     fields: ['*'],
     enabled: open && !!orderId
@@ -114,7 +114,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
   const providerBadge = {
     Borzo: { color: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900', icon: <Truck className="w-3 h-3" /> },
     Flash: { color: 'bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900', icon: <Zap className="w-3 h-3" /> },
-    Self:  { color: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900',     icon: <User className="w-3 h-3" /> },
+    Self: { color: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900', icon: <User className="w-3 h-3" /> },
   }[logisticsProvider]
 
   const { call: assignDeliveryAPI } = useFrappePostCall('dinematters.dinematters.api.delivery.assign_delivery')
@@ -140,8 +140,8 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
   const filteredSearchProducts = useMemo(() => {
     if (!productSearchTerm.trim()) return allProducts.slice(0, 10)
     const term = productSearchTerm.toLowerCase()
-    return allProducts.filter(p => 
-      p.product_name.toLowerCase().includes(term) || 
+    return allProducts.filter(p =>
+      p.product_name.toLowerCase().includes(term) ||
       p.product_id.toLowerCase().includes(term) ||
       (p.category_name || '').toLowerCase().includes(term)
     ).slice(0, 50)
@@ -214,7 +214,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
 
   const handleConfirmCustomization = () => {
     if (!selectedProductForCustomization) return
-    
+
     setEditItems(prev => [
       ...prev,
       {
@@ -225,7 +225,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
         customizations: tempCustomizations
       }
     ])
-    
+
     setSelectedProductForCustomization(null)
     setTempCustomizations({})
     setShowProductSearch(false)
@@ -250,7 +250,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
 
       const result = (res as any)?.message || res
       if (!result?.success) throw new Error(result?.error || 'Failed to update order items')
-      
+
       toast.success('Order updated successfully')
       mutate()
       setIsEditing(false)
@@ -279,7 +279,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
       const res = await assignDeliveryAPI(payload)
       const result = (res as any)?.message || res
       if (!result?.success) throw new Error(result?.error || 'Failed to assign delivery')
-      
+
       toast.success(isSelfDelivery ? 'Rider assigned manually' : `Delivery booked via ${logisticsProvider}`)
       mutate()
     } catch (e: any) {
@@ -294,13 +294,13 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
     if (!confirm("Are you sure you want to cancel the delivery assignment?")) return;
     setCancellingDelivery(true)
     try {
-      const res = await cancelDeliveryAPI({ 
+      const res = await cancelDeliveryAPI({
         order_id: order.name,
-        delivery_id: order.delivery_id 
+        delivery_id: order.delivery_id
       })
       const result = (res as any)?.message || res
       if (!result?.success) throw new Error(result?.error || 'Failed to cancel delivery')
-      
+
       toast.success('Delivery cancelled successfully')
       mutate()
     } catch (e: any) {
@@ -381,10 +381,10 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
         return { color: 'text-green-600 bg-green-50 border-green-200 dark:bg-green-900/30 dark:border-green-800 dark:text-green-400', icon: CheckCircle2, label: 'Delivered' }
       }
       // For active delivery statuses (assigned, departed, etc.)
-      return { 
-        color: 'text-primary bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30', 
-        icon: Truck, 
-        label: deliveryStatus 
+      return {
+        color: 'text-primary bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30',
+        icon: Truck,
+        label: deliveryStatus
       }
     }
 
@@ -450,7 +450,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                     <h2 className="text-2xl font-display font-black tracking-tight text-foreground">
                       {order?.order_number || order?.name}
                     </h2>
-                    <button 
+                    <button
                       onClick={handleCopyId}
                       className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors text-muted-foreground"
                       title="Copy Order ID"
@@ -459,16 +459,16 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                     </button>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-3">
                   <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 font-bold text-xs uppercase tracking-wider shadow-sm ${statusConfig.color}`}>
                     <StatusIcon className="w-4 h-4" />
                     {statusConfig.label}
                   </div>
-                  
+
                   {!isEditing && order?.status !== 'cancelled' && order?.status !== 'billed' && order?.status !== 'delivered' && (
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={handleStartEdit}
                       className="rounded-xl border-2 font-black text-[10px] uppercase h-8 px-3"
                     >
@@ -563,234 +563,234 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                   </div>
 
                   {deliveryPanelOpen && (
-                  <div className="p-4 space-y-4">
-                    {!order.delivery_id && order.status !== 'cancelled' && (
-                      <div className="p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-700 space-y-4">
-                        {/* Provider info row */}
-                        <div className="flex items-center gap-2 pb-2 border-b border-zinc-200 dark:border-zinc-700">
-                          <span className="text-[10px] text-muted-foreground font-medium">Config:</span>
-                          <span className={cn(
-                            'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold border uppercase tracking-wide',
-                            providerBadge.color
-                          )}>
-                            {providerBadge.icon}
-                            {isSelfDelivery ? 'Self / Own Riders' : `${logisticsProvider} — Managed`}
-                          </span>
-                        </div>
+                    <div className="p-4 space-y-4">
+                      {!order.delivery_id && order.status !== 'cancelled' && (
+                        <div className="p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-700 space-y-4">
+                          {/* Provider info row */}
+                          <div className="flex items-center gap-2 pb-2 border-b border-zinc-200 dark:border-zinc-700">
+                            <span className="text-[10px] text-muted-foreground font-medium">Config:</span>
+                            <span className={cn(
+                              'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold border uppercase tracking-wide',
+                              providerBadge.color
+                            )}>
+                              {providerBadge.icon}
+                              {isSelfDelivery ? 'Self / Own Riders' : `${logisticsProvider} — Managed`}
+                            </span>
+                          </div>
 
-                        {/* ── SELF / MANUAL UI ── */}
-                        {isSelfDelivery && (
-                          <div className="space-y-3">
-                            <p className="text-[10px] text-muted-foreground">Assign your own rider. No API dispatch. No wallet balance deducted.</p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {/* ── SELF / MANUAL UI ── */}
+                          {isSelfDelivery && (
+                            <div className="space-y-3">
+                              <p className="text-[10px] text-muted-foreground">Assign your own rider. No API dispatch. No wallet balance deducted.</p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-black uppercase text-muted-foreground">Rider Name</label>
+                                  <input className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary" value={manualForm.rider_name} onChange={e => setManualForm({ ...manualForm, rider_name: e.target.value })} placeholder="Rider Name" />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-black uppercase text-muted-foreground">Rider Phone</label>
+                                  <input className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary" value={manualForm.rider_phone} onChange={e => setManualForm({ ...manualForm, rider_phone: e.target.value })} placeholder="Rider Phone" />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-black uppercase text-muted-foreground">ETA (mins)</label>
+                                  <input className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary" value={manualForm.eta} onChange={e => setManualForm({ ...manualForm, eta: e.target.value })} placeholder="e.g. 30" />
+                                </div>
+                              </div>
+                              <div className="flex justify-end">
+                                <Button size="sm" onClick={handleAssignDelivery} disabled={assigningDelivery} className="h-8 text-xs font-bold uppercase tracking-wider bg-blue-600 hover:bg-blue-700">
+                                  <User className="w-3.5 h-3.5 mr-1.5" />
+                                  {assigningDelivery ? 'Assigning...' : 'Assign Delivery'}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* ── BORZO / FLASH INTEGRATED UI ── */}
+                          {!isSelfDelivery && (
+                            <div className="space-y-3">
+                              <div className="flex justify-end">
+                                <Button
+                                  size="sm"
+                                  onClick={handleAssignDelivery}
+                                  disabled={assigningDelivery}
+                                  className="h-8 text-xs font-bold uppercase tracking-wider bg-indigo-600 hover:bg-indigo-700"
+                                >
+                                  <Zap className="w-3.5 h-3.5 mr-1.5" />
+                                  {assigningDelivery ? 'Booking...' : `Book via ${logisticsProvider}`}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {(order.delivery_id || order.delivery_partner) && (
+                        <div className="flex flex-col gap-4 p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="text-xs font-black uppercase tracking-tighter text-muted-foreground mb-1">Assigned Partner</p>
+                              <p className="text-sm font-bold flex items-center gap-1.5">
+                                {order.delivery_partner === 'borzo' ? <><Truck className="w-3.5 h-3.5" /> Borzo Delivery</> :
+                                  order.delivery_partner === 'flash' ? <><Zap className="w-3.5 h-3.5 text-indigo-600" /> Flash Delivery</> :
+                                    order.delivery_partner === 'manual' || order.delivery_mode === 'manual' ? <><User className="w-3.5 h-3.5 text-blue-600" /> Manual Delivery</> :
+                                      'Unassigned'}
+                              </p>
+
+                              {order.delivery_id && order.delivery_partner !== 'manual' && order.delivery_mode !== 'manual' && (
+                                <p className="text-[10px] font-mono mt-1 bg-gray-100 dark:bg-zinc-700 px-1.5 py-0.5 rounded inline-block">
+                                  ID: {order.delivery_id} | Status: <span className="font-bold text-primary">{order.delivery_status}</span>
+                                </p>
+                              )}
+                              {(order.delivery_partner === 'manual' || order.delivery_mode === 'manual') && (
+                                <p className="text-[10px] font-bold mt-1 bg-gray-100 dark:bg-zinc-700 px-1.5 py-0.5 rounded inline-block">
+                                  Status: <span className="text-primary">{order.delivery_status || 'Assigned'}</span>
+                                </p>
+                              )}
+                              {order.delivery_eta && (
+                                <p className="text-[10px] font-bold text-muted-foreground mt-1">ETA: {order.delivery_eta} mins</p>
+                              )}
+                            </div>
+
+                            <div className="flex flex-col gap-2 items-end">
+                              {order.delivery_status !== 'cancelled' && order.delivery_status !== 'DELIVERED' && order.delivery_status !== 'delivered' && (
+                                <Button size="sm" variant="destructive" onClick={handleCancelDelivery} disabled={cancellingDelivery} className="h-7 text-[10px] font-bold uppercase">
+                                  {cancellingDelivery ? 'Cancelling...' : 'Cancel'}
+                                </Button>
+                              )}
+                              {/* Self delivery: edit rider info toggle */}
+                              {(order.delivery_partner === 'manual') && order.delivery_status !== 'DELIVERED' && order.delivery_status !== 'delivered' && order.delivery_status !== 'cancelled' && (
+                                <Button
+                                  size="sm" variant="outline"
+                                  onClick={() => {
+                                    setEditRiderForm({
+                                      rider_name: order.delivery_rider_name || '',
+                                      rider_phone: order.delivery_rider_phone || '',
+                                      eta: order.delivery_eta || '',
+                                    })
+                                    setIsEditingRiderInfo((v: boolean) => !v)
+                                  }}
+                                  className="h-7 text-[10px] font-bold uppercase border-blue-300 text-blue-700 dark:text-blue-400"
+                                >
+                                  {isEditingRiderInfo ? 'Cancel Edit' : 'Edit Rider'}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* ── Inline edit rider form (self-delivery only) ── */}
+                          {isEditingRiderInfo && (order.delivery_partner === 'manual') && (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-800/50">
                               <div className="space-y-1">
                                 <label className="text-[10px] font-black uppercase text-muted-foreground">Rider Name</label>
-                                <input className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary" value={manualForm.rider_name} onChange={e => setManualForm({...manualForm, rider_name: e.target.value})} placeholder="Rider Name" />
+                                <input className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                                  value={editRiderForm.rider_name} onChange={e => setEditRiderForm((f: any) => ({ ...f, rider_name: e.target.value }))} placeholder="Rider Name" />
                               </div>
                               <div className="space-y-1">
                                 <label className="text-[10px] font-black uppercase text-muted-foreground">Rider Phone</label>
-                                <input className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary" value={manualForm.rider_phone} onChange={e => setManualForm({...manualForm, rider_phone: e.target.value})} placeholder="Rider Phone" />
+                                <input className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                                  value={editRiderForm.rider_phone} onChange={e => setEditRiderForm((f: any) => ({ ...f, rider_phone: e.target.value }))} placeholder="Rider Phone" />
                               </div>
                               <div className="space-y-1">
                                 <label className="text-[10px] font-black uppercase text-muted-foreground">ETA (mins)</label>
-                                <input className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary" value={manualForm.eta} onChange={e => setManualForm({...manualForm, eta: e.target.value})} placeholder="e.g. 30" />
+                                <input className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                                  value={editRiderForm.eta} onChange={e => setEditRiderForm((f: any) => ({ ...f, eta: e.target.value }))} placeholder="e.g. 25" />
+                              </div>
+                              <div className="sm:col-span-3 flex justify-end">
+                                <Button size="sm" onClick={handleUpdateRiderInfo} className="h-8 text-xs font-bold uppercase tracking-wider bg-blue-600 hover:bg-blue-700">
+                                  <Save className="w-3.5 h-3.5 mr-1.5" /> Update Rider Info
+                                </Button>
                               </div>
                             </div>
-                            <div className="flex justify-end">
-                              <Button size="sm" onClick={handleAssignDelivery} disabled={assigningDelivery} className="h-8 text-xs font-bold uppercase tracking-wider bg-blue-600 hover:bg-blue-700">
-                                <User className="w-3.5 h-3.5 mr-1.5" />
-                                {assigningDelivery ? 'Assigning...' : 'Assign Delivery'}
-                              </Button>
-                            </div>
-                          </div>
-                        )}
+                          )}
 
-                        {/* ── BORZO / FLASH INTEGRATED UI ── */}
-                        {!isSelfDelivery && (
-                          <div className="space-y-3">
-                            <div className="flex justify-end">
+                          {/* ── Self delivery status progression ── */}
+                          {(order.delivery_partner === 'manual') && order.delivery_status !== 'DELIVERED' && order.delivery_status !== 'delivered' && order.delivery_status !== 'cancelled' && (
+                            <div className="flex gap-2 pt-1">
+                              {(order.delivery_status === 'assigned' || order.delivery_status === 'ACCEPTED') && (
+                                <Button
+                                  size="sm" variant="outline"
+                                  onClick={() => handleSelfDeliveryProgress('DISPATCHED')}
+                                  disabled={progressingDelivery}
+                                  className="flex-1 h-8 text-xs font-bold uppercase tracking-wider border-orange-300 text-orange-700 hover:bg-orange-50 dark:text-orange-400"
+                                >
+                                  <Truck className="w-3.5 h-3.5 mr-1.5" />
+                                  {progressingDelivery ? 'Updating...' : 'Mark Picked Up 🛵'}
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
-                                onClick={handleAssignDelivery}
-                                disabled={assigningDelivery}
-                                className="h-8 text-xs font-bold uppercase tracking-wider bg-indigo-600 hover:bg-indigo-700"
-                              >
-                                <Zap className="w-3.5 h-3.5 mr-1.5" />
-                                {assigningDelivery ? 'Booking...' : `Book via ${logisticsProvider}`}
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {(order.delivery_id || order.delivery_partner) && (
-                      <div className="flex flex-col gap-4 p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="text-xs font-black uppercase tracking-tighter text-muted-foreground mb-1">Assigned Partner</p>
-                            <p className="text-sm font-bold flex items-center gap-1.5">
-                              {order.delivery_partner === 'borzo' ? <><Truck className="w-3.5 h-3.5" /> Borzo Delivery</> :
-                               order.delivery_partner === 'flash' ? <><Zap className="w-3.5 h-3.5 text-indigo-600" /> Flash Delivery</> :
-                               order.delivery_partner === 'manual' || order.delivery_mode === 'manual' ? <><User className="w-3.5 h-3.5 text-blue-600" /> Manual Delivery</> :
-                               'Unassigned'}
-                            </p>
-
-                            {order.delivery_id && order.delivery_partner !== 'manual' && order.delivery_mode !== 'manual' && (
-                              <p className="text-[10px] font-mono mt-1 bg-gray-100 dark:bg-zinc-700 px-1.5 py-0.5 rounded inline-block">
-                                ID: {order.delivery_id} | Status: <span className="font-bold text-primary">{order.delivery_status}</span>
-                              </p>
-                            )}
-                            {(order.delivery_partner === 'manual' || order.delivery_mode === 'manual') && (
-                              <p className="text-[10px] font-bold mt-1 bg-gray-100 dark:bg-zinc-700 px-1.5 py-0.5 rounded inline-block">
-                                Status: <span className="text-primary">{order.delivery_status || 'Assigned'}</span>
-                              </p>
-                            )}
-                            {order.delivery_eta && (
-                              <p className="text-[10px] font-bold text-muted-foreground mt-1">ETA: {order.delivery_eta} mins</p>
-                            )}
-                          </div>
-
-                          <div className="flex flex-col gap-2 items-end">
-                            {order.delivery_status !== 'cancelled' && order.delivery_status !== 'DELIVERED' && order.delivery_status !== 'delivered' && (
-                              <Button size="sm" variant="destructive" onClick={handleCancelDelivery} disabled={cancellingDelivery} className="h-7 text-[10px] font-bold uppercase">
-                                {cancellingDelivery ? 'Cancelling...' : 'Cancel'}
-                              </Button>
-                            )}
-                            {/* Self delivery: edit rider info toggle */}
-                            {(order.delivery_partner === 'manual') && order.delivery_status !== 'DELIVERED' && order.delivery_status !== 'delivered' && order.delivery_status !== 'cancelled' && (
-                              <Button
-                                size="sm" variant="outline"
-                                onClick={() => {
-                                  setEditRiderForm({
-                                    rider_name: order.delivery_rider_name || '',
-                                    rider_phone: order.delivery_rider_phone || '',
-                                    eta: order.delivery_eta || '',
-                                  })
-                                  setIsEditingRiderInfo((v: boolean) => !v)
-                                }}
-                                className="h-7 text-[10px] font-bold uppercase border-blue-300 text-blue-700 dark:text-blue-400"
-                              >
-                                {isEditingRiderInfo ? 'Cancel Edit' : 'Edit Rider'}
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* ── Inline edit rider form (self-delivery only) ── */}
-                        {isEditingRiderInfo && (order.delivery_partner === 'manual') && (
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-800/50">
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-black uppercase text-muted-foreground">Rider Name</label>
-                              <input className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                                value={editRiderForm.rider_name} onChange={e => setEditRiderForm((f: any) => ({...f, rider_name: e.target.value}))} placeholder="Rider Name" />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-black uppercase text-muted-foreground">Rider Phone</label>
-                              <input className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                                value={editRiderForm.rider_phone} onChange={e => setEditRiderForm((f: any) => ({...f, rider_phone: e.target.value}))} placeholder="Rider Phone" />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-black uppercase text-muted-foreground">ETA (mins)</label>
-                              <input className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                                value={editRiderForm.eta} onChange={e => setEditRiderForm((f: any) => ({...f, eta: e.target.value}))} placeholder="e.g. 25" />
-                            </div>
-                            <div className="sm:col-span-3 flex justify-end">
-                              <Button size="sm" onClick={handleUpdateRiderInfo} className="h-8 text-xs font-bold uppercase tracking-wider bg-blue-600 hover:bg-blue-700">
-                                <Save className="w-3.5 h-3.5 mr-1.5" /> Update Rider Info
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* ── Self delivery status progression ── */}
-                        {(order.delivery_partner === 'manual') && order.delivery_status !== 'DELIVERED' && order.delivery_status !== 'delivered' && order.delivery_status !== 'cancelled' && (
-                          <div className="flex gap-2 pt-1">
-                            {(order.delivery_status === 'assigned' || order.delivery_status === 'ACCEPTED') && (
-                              <Button
-                                size="sm" variant="outline"
-                                onClick={() => handleSelfDeliveryProgress('DISPATCHED')}
+                                onClick={() => handleSelfDeliveryProgress('DELIVERED')}
                                 disabled={progressingDelivery}
-                                className="flex-1 h-8 text-xs font-bold uppercase tracking-wider border-orange-300 text-orange-700 hover:bg-orange-50 dark:text-orange-400"
+                                className="flex-1 h-8 text-xs font-bold uppercase tracking-wider bg-green-600 hover:bg-green-700 text-white"
                               >
-                                <Truck className="w-3.5 h-3.5 mr-1.5" />
-                                {progressingDelivery ? 'Updating...' : 'Mark Picked Up 🛵'}
+                                <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                                {progressingDelivery ? 'Updating...' : 'Mark Delivered ✅'}
                               </Button>
-                            )}
-                            <Button
-                              size="sm"
-                              onClick={() => handleSelfDeliveryProgress('DELIVERED')}
-                              disabled={progressingDelivery}
-                              className="flex-1 h-8 text-xs font-bold uppercase tracking-wider bg-green-600 hover:bg-green-700 text-white"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-                              {progressingDelivery ? 'Updating...' : 'Mark Delivered ✅'}
+                            </div>
+                          )}
+
+                          {order.delivery_rider_name && (
+                            <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-800/50">
+                              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-black">
+                                {order.delivery_rider_name.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-black uppercase text-blue-600">Active Rider</p>
+                                <p className="text-xs font-bold leading-none">{order.delivery_rider_name}</p>
+                                <p className="text-[10px] font-mono text-muted-foreground mt-0.5">{order.delivery_rider_phone}</p>
+                              </div>
+                            </div>
+                          )}
+
+                          {order.delivery_tracking_url && order.delivery_status !== 'cancelled' && (
+                            <Button variant="outline" size="sm" asChild className="h-8 text-xs font-bold uppercase w-full">
+                              <a href={order.delivery_tracking_url} target="_blank" rel="noopener noreferrer">Track Rider</a>
                             </Button>
-                          </div>
-                        )}
+                          )}
+                        </div>
+                      )}
 
-                        {order.delivery_rider_name && (
-                          <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-800/50">
-                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-black">
-                              {order.delivery_rider_name.charAt(0).toUpperCase()}
+                      {/* Integrated Live Map — always show for delivery orders when restaurant co-ords exist */}
+                      {restaurantInfo.latitude && restaurantInfo.longitude && (
+                        <div className="mt-2">
+                          <DeliveryMap
+                            restaurantName={restaurantInfo.name}
+                            pickupLocation={restaurantInfo.latitude && restaurantInfo.longitude ? {
+                              lat: parseFloat(restaurantInfo.latitude),
+                              lng: parseFloat(restaurantInfo.longitude)
+                            } : undefined}
+                            dropLocation={order.delivery_latitude && order.delivery_longitude ? {
+                              lat: parseFloat(order.delivery_latitude),
+                              lng: parseFloat(order.delivery_longitude)
+                            } : order.delivery_location_pin && String(order.delivery_location_pin).includes(',') ? {
+                              lat: parseFloat(String(order.delivery_location_pin).split(',')[0]),
+                              lng: parseFloat(String(order.delivery_location_pin).split(',')[1])
+                            } : undefined}
+                            riderLocation={order.rider_latitude && order.rider_longitude ? {
+                              lat: parseFloat(order.rider_latitude),
+                              lng: parseFloat(order.rider_longitude)
+                            } : undefined}
+                            riderLastUpdated={order.rider_last_updated}
+                          />
+                        </div>
+                      )}
+
+                      <div className="flex gap-4 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                        <div className="mt-1">
+                          <MapPin className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <p className="text-xs font-bold uppercase tracking-tighter text-muted-foreground">Drop Location</p>
+                          <p className="text-xs font-medium leading-relaxed">{[order.delivery_house_number ? `#${order.delivery_house_number}` : '', order.delivery_address, order.delivery_landmark, order.delivery_city, order.delivery_zip_code].filter(Boolean).join(', ')}</p>
+                          {order.delivery_instructions && (
+                            <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-800/50">
+                              <p className="text-[10px] font-black uppercase text-amber-600 mb-0.5">Instructions</p>
+                              <p className="text-xs font-medium italic">"{order.delivery_instructions}"</p>
                             </div>
-                            <div>
-                              <p className="text-[10px] font-black uppercase text-blue-600">Active Rider</p>
-                              <p className="text-xs font-bold leading-none">{order.delivery_rider_name}</p>
-                              <p className="text-[10px] font-mono text-muted-foreground mt-0.5">{order.delivery_rider_phone}</p>
-                            </div>
-                          </div>
-                        )}
-
-                        {order.delivery_tracking_url && order.delivery_status !== 'cancelled' && (
-                          <Button variant="outline" size="sm" asChild className="h-8 text-xs font-bold uppercase w-full">
-                            <a href={order.delivery_tracking_url} target="_blank" rel="noopener noreferrer">Track Rider</a>
-                          </Button>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Integrated Live Map — always show for delivery orders when restaurant co-ords exist */}
-                    {restaurantInfo.latitude && restaurantInfo.longitude && (
-                      <div className="mt-2">
-                        <DeliveryMap
-                          restaurantName={restaurantInfo.name}
-                          pickupLocation={restaurantInfo.latitude && restaurantInfo.longitude ? { 
-                            lat: parseFloat(restaurantInfo.latitude), 
-                            lng: parseFloat(restaurantInfo.longitude) 
-                          } : undefined}
-                          dropLocation={order.delivery_latitude && order.delivery_longitude ? {
-                            lat: parseFloat(order.delivery_latitude),
-                            lng: parseFloat(order.delivery_longitude)
-                          } : order.delivery_location_pin && String(order.delivery_location_pin).includes(',') ? {
-                            lat: parseFloat(String(order.delivery_location_pin).split(',')[0]),
-                            lng: parseFloat(String(order.delivery_location_pin).split(',')[1])
-                          } : undefined}
-                          riderLocation={order.rider_latitude && order.rider_longitude ? {
-                            lat: parseFloat(order.rider_latitude),
-                            lng: parseFloat(order.rider_longitude)
-                          } : undefined}
-                          riderLastUpdated={order.rider_last_updated}
-                        />
-                      </div>
-                    )}
-
-                    <div className="flex gap-4 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-                      <div className="mt-1">
-                        <MapPin className="w-4 h-4 text-muted-foreground" />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <p className="text-xs font-bold uppercase tracking-tighter text-muted-foreground">Drop Location</p>
-                        <p className="text-xs font-medium leading-relaxed">{[order.delivery_house_number ? `#${order.delivery_house_number}` : '', order.delivery_address, order.delivery_landmark, order.delivery_city, order.delivery_zip_code].filter(Boolean).join(', ')}</p>
-                        {order.delivery_instructions && (
-                          <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-800/50">
-                            <p className="text-[10px] font-black uppercase text-amber-600 mb-0.5">Instructions</p>
-                            <p className="text-xs font-medium italic">"{order.delivery_instructions}"</p>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
                   )}
                 </div>
               )}
@@ -806,8 +806,8 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                   </div>
                   <div className="flex items-center gap-2">
                     {isEditing && (
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
                         variant="default"
                         onClick={() => setShowProductSearch(true)}
                         className="h-8 text-[10px] font-black uppercase tracking-wider rounded-lg"
@@ -821,7 +821,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                     </span>
                   </div>
                 </div>
-                
+
                 <div className="divide-y divide-gray-100 dark:divide-zinc-800">
                   {isEditing ? (
                     editItems.map((item: any, index: number) => {
@@ -833,14 +833,14 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1">
-                                  <button 
+                                  <button
                                     onClick={() => handleQuantityChange(index, -1)}
                                     className="w-6 h-6 flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
                                   >
                                     <Minus className="w-3.5 h-3.5" />
                                   </button>
                                   <span className="w-8 text-center font-black text-sm">{item.quantity || 1}</span>
-                                  <button 
+                                  <button
                                     onClick={() => handleQuantityChange(index, 1)}
                                     className="w-6 h-6 flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
                                   >
@@ -849,7 +849,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                                 </div>
                                 <span className="text-base font-bold text-foreground truncate">{item.product_name || item.dishId}</span>
                               </div>
-                              
+
                               {hasCustomizations && (
                                 <div className="mt-2 ml-16 space-y-1">
                                   {Object.entries(item.customizations).map(([question, options]: [string, any]) => {
@@ -866,7 +866,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                             </div>
                             <div className="text-right flex flex-col items-end gap-2">
                               {/* Remove Button */}
-                              <button 
+                              <button
                                 onClick={() => handleRemoveItem(index)}
                                 className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                                 title="Remove Item"
@@ -894,7 +894,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                                 </div>
                                 <span className="text-base font-bold text-foreground truncate">{item.product_name || item.product || 'Unnamed Item'}</span>
                               </div>
-                              
+
                               {hasCustomizations && (
                                 <div className="mt-2 ml-8 space-y-1">
                                   {Object.entries(customizations).map(([question, options]: [string, any]) => {
@@ -928,7 +928,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                     <div className="flex items-center gap-3">
                       <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input 
+                        <Input
                           placeholder="Search menu products..."
                           value={productSearchTerm}
                           onChange={e => setProductSearchTerm(e.target.value)}
@@ -943,7 +943,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
 
                     <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1">
                       {filteredSearchProducts.map(p => (
-                        <div 
+                        <div
                           key={p.product_id}
                           onClick={() => handleAddProduct(p)}
                           className="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800 cursor-pointer hover:border-primary transition-all group shadow-sm"
@@ -981,7 +981,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                         <X className="w-5 h-5" />
                       </Button>
                     </div>
-                    
+
                     <div className="p-6 max-h-[60vh] overflow-y-auto space-y-6">
                       {JSON.parse(selectedProductForCustomization.customization_questions || '[]').map((q: any) => (
                         <div key={q.question_id} className="space-y-3">
@@ -991,10 +991,10 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             {q.options?.map((opt: any) => {
-                              const isSelected = q.question_type === 'single' 
+                              const isSelected = q.question_type === 'single'
                                 ? tempCustomizations[q.question_id] === opt.option_id
                                 : (tempCustomizations[q.question_id] || []).includes(opt.option_id)
-                                
+
                               return (
                                 <button
                                   key={opt.option_id}
@@ -1011,8 +1011,8 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                                   }}
                                   className={cn(
                                     "flex flex-col items-start p-3 rounded-xl border-2 text-left transition-all",
-                                    isSelected 
-                                      ? "border-primary bg-primary/5 dark:bg-primary/10" 
+                                    isSelected
+                                      ? "border-primary bg-primary/5 dark:bg-primary/10"
                                       : "border-zinc-100 dark:border-zinc-800 hover:border-zinc-200"
                                   )}
                                 >
@@ -1025,7 +1025,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                         </div>
                       ))}
                     </div>
-                    
+
                     <div className="p-6 bg-zinc-50 dark:bg-zinc-800/50 flex gap-3">
                       <Button variant="outline" onClick={() => setSelectedProductForCustomization(null)} className="flex-1 rounded-xl font-bold">Cancel</Button>
                       <Button onClick={handleConfirmCustomization} className="flex-1 rounded-xl font-black uppercase tracking-wider">Confirm</Button>
@@ -1038,7 +1038,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start pb-4">
                 {/* Method Info */}
                 <div className="space-y-4">
-                   <div className="bg-zinc-50 dark:bg-zinc-800/40 p-5 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-700">
+                  <div className="bg-zinc-50 dark:bg-zinc-800/40 p-5 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-700">
                     <div className="flex items-center gap-2 mb-3">
                       <CreditCard className="w-5 h-5 text-muted-foreground" />
                       <span className="text-xs font-black uppercase tracking-wider text-muted-foreground">Payment Method</span>
@@ -1055,7 +1055,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                       </div>
                     </div>
                   </div>
-                  
+
                   {order.coupon && (
                     <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-2xl border border-green-100 dark:border-green-800/50">
                       <div className="flex items-center justify-between mb-2">
@@ -1115,7 +1115,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
 
                   {order.tax > 0 && (
                     <div className="flex justify-between items-center text-sm px-1">
-                      <span className="text-muted-foreground font-medium">Taxes (18%)</span>
+                      <span className="text-muted-foreground font-medium">Taxes</span>
                       <span className="font-bold text-foreground">{formatAmount(order.tax)}</span>
                     </div>
                   )}
@@ -1147,49 +1147,49 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
                 </div>
               </div>
             </div>
-            
+
             {/* Action Bar */}
             <div className="p-4 border-t bg-white dark:bg-zinc-900 flex justify-end gap-3 sticky bottom-0">
-                {isEditing ? (
-                  <>
-                    <button 
-                      onClick={handleCancelEdit}
-                      disabled={isSaving}
-                      className="px-6 py-2.5 rounded-xl font-bold text-sm bg-gray-100 dark:bg-zinc-800 text-foreground hover:bg-gray-200 dark:hover:bg-zinc-700 transition-all border-b-4 border-gray-200 dark:border-zinc-700 active:border-b-0 active:translate-y-1"
-                    >
-                      Discard Changes
-                    </button>
-                    <button 
-                      onClick={handleSaveOrder}
-                      disabled={isSaving}
-                      className="px-6 py-2.5 rounded-xl font-black text-[10px] uppercase bg-primary text-white hover:bg-primary/90 border-b-4 border-primary/20 active:border-b-0 active:translate-y-1 flex items-center gap-2"
-                    >
-                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                      {isSaving ? 'Updating...' : 'Save Order Changes'}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button 
-                      onClick={() => onOpenChange(false)}
-                      className="px-6 py-2.5 rounded-xl font-bold text-sm bg-gray-100 dark:bg-zinc-800 text-foreground hover:bg-gray-200 dark:hover:bg-zinc-700 transition-all border-b-4 border-gray-200 dark:border-zinc-700 active:border-b-0 active:translate-y-1"
-                    >
-                      Close Window
-                    </button>
-                    <button 
-                      onClick={() => print(order, { type: 'KOT' })}
-                      className="px-6 py-2.5 rounded-xl font-black text-[10px] uppercase bg-purple-100 text-purple-700 hover:bg-purple-200 border-b-4 border-purple-200 active:border-b-0 active:translate-y-1"
-                    >
-                      Print KOT
-                    </button>
-                    <button 
-                      onClick={() => print(order, { type: 'RECEIPT', restaurant: restaurantConfig?.restaurant })}
-                      className="px-6 py-2.5 rounded-xl font-black text-[10px] uppercase bg-zinc-900 text-white hover:bg-black border-b-4 border-zinc-950 active:border-b-0 active:translate-y-1"
-                    >
-                      Print Receipt
-                    </button>
-                  </>
-                )}
+              {isEditing ? (
+                <>
+                  <button
+                    onClick={handleCancelEdit}
+                    disabled={isSaving}
+                    className="px-6 py-2.5 rounded-xl font-bold text-sm bg-gray-100 dark:bg-zinc-800 text-foreground hover:bg-gray-200 dark:hover:bg-zinc-700 transition-all border-b-4 border-gray-200 dark:border-zinc-700 active:border-b-0 active:translate-y-1"
+                  >
+                    Discard Changes
+                  </button>
+                  <button
+                    onClick={handleSaveOrder}
+                    disabled={isSaving}
+                    className="px-6 py-2.5 rounded-xl font-black text-[10px] uppercase bg-primary text-white hover:bg-primary/90 border-b-4 border-primary/20 active:border-b-0 active:translate-y-1 flex items-center gap-2"
+                  >
+                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    {isSaving ? 'Updating...' : 'Save Order Changes'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => onOpenChange(false)}
+                    className="px-6 py-2.5 rounded-xl font-bold text-sm bg-gray-100 dark:bg-zinc-800 text-foreground hover:bg-gray-200 dark:hover:bg-zinc-700 transition-all border-b-4 border-gray-200 dark:border-zinc-700 active:border-b-0 active:translate-y-1"
+                  >
+                    Close Window
+                  </button>
+                  <button
+                    onClick={() => print(order, { type: 'KOT' })}
+                    className="px-6 py-2.5 rounded-xl font-black text-[10px] uppercase bg-purple-100 text-purple-700 hover:bg-purple-200 border-b-4 border-purple-200 active:border-b-0 active:translate-y-1"
+                  >
+                    Print KOT
+                  </button>
+                  <button
+                    onClick={() => print(order, { type: 'RECEIPT', restaurant: restaurantConfig?.restaurant })}
+                    className="px-6 py-2.5 rounded-xl font-black text-[10px] uppercase bg-zinc-900 text-white hover:bg-black border-b-4 border-zinc-950 active:border-b-0 active:translate-y-1"
+                  >
+                    Print Receipt
+                  </button>
+                </>
+              )}
             </div>
           </div>
         ) : (
@@ -1201,7 +1201,7 @@ export function OrderDetailsDialog({ orderId, open, onOpenChange }: OrderDetails
               <h3 className="text-xl font-black text-foreground">Order Not Found</h3>
               <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">We couldn't retrieve the details for this order. It may have been deleted or the ID is incorrect.</p>
             </div>
-            <button 
+            <button
               onClick={() => onOpenChange(false)}
               className="px-8 py-3 bg-primary text-white font-black rounded-xl"
             >

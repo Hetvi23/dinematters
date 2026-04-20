@@ -204,6 +204,8 @@ doc_events = {
 		"after_insert": [
 			"dinematters.dinematters.api.customers.update_customer_last_visited",
 			"dinematters.dinematters.api.realtime.notify_order_update",
+			# Push notification to merchant dashboard (free FCM, background-safe)
+			"dinematters.dinematters.api.realtime.notify_new_order_to_merchant",
 			# Marketing Studio: fire 'On Order Complete' triggers
 			"dinematters.dinematters.tasks.marketing_tasks.fire_order_complete_triggers"
 		],
