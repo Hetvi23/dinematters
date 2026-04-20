@@ -73,6 +73,18 @@ bench --site "$SITE" enable-scheduler || true
 echo "Building Merchant Dashboard..."
 cd "$APP_PATH/frontend"
 
+# Ensure Node 20+ is used (Required by @firebase/ai)
+export NVM_DIR="/home/frappe/.nvm"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+    echo "Loading NVM..."
+    . "$NVM_DIR/nvm.sh"
+    # Use Node 20 if available, otherwise just use whatever node is current (hoping it's 20+)
+    nvm use 20 || nvm use default || echo "NVM use failed, continuing with system node..."
+fi
+
+NODE_VERSION=$(node -v)
+echo "Using Node version: $NODE_VERSION"
+
 # Use yarn if available, fallback to npm
 if [ -f "yarn.lock" ]; then
     yarn install --frozen-lockfile --quiet
