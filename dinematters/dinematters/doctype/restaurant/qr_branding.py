@@ -11,12 +11,6 @@ from io import BytesIO
 import frappe
 from frappe.utils import get_url
 
-# Test background image overrides for development (only for testing)
-# In production, use Restaurant Gallery, Media Assets, or Home Feature images
-TEST_BACKGROUND_IMAGE_OVERRIDES = {
-	"unvind": "/home/frappe/frappe-bench/apps/dinematters/image.png",
-	"test": "/home/frappe/frappe-bench/apps/dinematters/image.png",
-}
 
 def normalize_qr_color(color):
 	default_color = "#DB782F"
@@ -39,22 +33,35 @@ def safe_restaurant_path(value):
 	return re.sub(r"[^a-z0-9-]", "", (value or "restaurant").lower()) or "restaurant"
 
 
-def resolve_qr_branding(restaurant_doc):
+def resolve_qr_branding(restaurant_doc, override_background_url=None):
 	from dinematters.dinematters.media.utils import get_media_asset_data
 
 	config_name = frappe.db.get_value("Restaurant Config", {"restaurant": restaurant_doc.name}, "name")
 	primary_color = None
 	logo_url = ""
-	background_image_url = ""
+	background_image_url = override_background_url or ""
 
 	if config_name:
+		# Use a safer fetch for primary_color and logo
 		config_values = frappe.db.get_value(
 			"Restaurant Config",
 			config_name,
 			["primary_color", "logo"],
 			as_dict=True,
 		) or {}
+		
 		primary_color = config_values.get("primary_color")
+		
+		# Attempt to get qr_background safely
+		try:
+			background_image_url = frappe.db.get_value("Restaurant Config", config_name, "qr_background")
+		except Exception:
+			# Field doesn't exist yet, fallback to override or empty
+			pass
+
+		if not background_image_url:
+			background_image_url = override_background_url or ""
+		
 		logo_url = get_media_asset_data(
 			"Restaurant Config",
 			config_name,
@@ -67,62 +74,15 @@ def resolve_qr_branding(restaurant_doc):
 
 	# For SILVER users, ALWAYS use Dinematters logo (override any custom logo)
 	if restaurant_doc.plan_type == 'SILVER':
-		# Use Dinematters logo for SILVER users (uploaded to CDN)
 		logo_url = "/files/dinematters-logoddffe5.svg"
-		# Fallback to local file if CDN file doesn't exist
 		if not frappe.db.exists("File", {"file_url": logo_url}):
 			logo_url = "/dinematters/images/dinematters-logo.svg"
 
-	for media_role in ["restaurant_gallery_image", "restaurant_banner"]:
-		background_image_url = frappe.db.get_value(
-			"Media Asset",
-			{
-				"owner_doctype": "Restaurant",
-				"owner_name": restaurant_doc.name,
-				"media_role": media_role,
-				"status": "ready",
-				"is_active": 1,
-				"is_deleted": 0,
-			},
-			"primary_url",
-		)
-		if background_image_url:
-			break
-
-	# Fallback to Home Feature "The Place" image if no restaurant gallery/banner
-	if not background_image_url:
-		# First try to get from Media Asset (more reliable than image_src field)
-		home_feature_name = frappe.db.get_value(
-			"Home Feature",
-			{
-				"restaurant": restaurant_doc.name,
-				"title": "The Place",
-			},
-			"name",
-		)
-		if home_feature_name:
-			# Get the Media Asset for this Home Feature
-			home_feature_asset = frappe.db.get_value(
-				"Media Asset",
-				{
-					"owner_doctype": "Home Feature",
-					"owner_name": home_feature_name,
-					"media_role": "home_feature_image",
-					"status": "ready",
-					"is_active": 1,
-				},
-				"primary_url",
-			)
-			if home_feature_asset and not home_feature_asset.endswith('.svg'):
-				background_image_url = home_feature_asset
-			# Fallback to image_src field if no Media Asset
-			elif not home_feature_asset:
-				home_feature_image = frappe.db.get_value("Home Feature", home_feature_name, "image_src")
-				if home_feature_image and not home_feature_image.endswith('.svg'):
-					background_image_url = get_url(home_feature_image) if home_feature_image.startswith("/") else home_feature_image
-
-	if not background_image_url:
-		background_image_url = TEST_BACKGROUND_IMAGE_OVERRIDES.get(restaurant_doc.name) or TEST_BACKGROUND_IMAGE_OVERRIDES.get(restaurant_doc.restaurant_id)
+	# ─────────────────────────────────────────────────────────────────
+	# LEGACY BACKGROUND LOGIC REMOVED
+	# We no longer fallback to gallery images or home features.
+	# QR background is now explicitly provided or white.
+	# ─────────────────────────────────────────────────────────────────
 
 	return {
 		"restaurant_name": restaurant_doc.restaurant_name or restaurant_doc.name,
@@ -192,10 +152,8 @@ def read_logo_bytes(logo_url):
 				download_object(object_key, temp_path)
 				# Check if it's an SVG file
 				if object_key.endswith('.svg') or temp_path.endswith('.svg'):
-					# For SVG files, read directly and convert to PNG using a different approach
 					return convert_svg_to_png(temp_path)
 				else:
-					# For raster images, use PIL
 					with Image.open(temp_path) as img:
 						img = img.convert("RGBA")
 						img.thumbnail((320, 320), Image.Resampling.LANCZOS)
@@ -209,14 +167,10 @@ def read_logo_bytes(logo_url):
 		# Handle local file paths
 		resolved_url = logo_url
 		if resolved_url.startswith("/"):
-			# For local files, check if they exist and open directly
 			if os.path.exists(resolved_url):
-				# Check if it's an SVG file
 				if resolved_url.endswith('.svg'):
-					# For SVG files, read directly and convert to PNG
 					return convert_svg_to_png(resolved_url)
 				else:
-					# For raster images, use PIL
 					with Image.open(resolved_url) as img:
 						img = img.convert("RGBA")
 						img.thumbnail((320, 320), Image.Resampling.LANCZOS)
@@ -224,15 +178,12 @@ def read_logo_bytes(logo_url):
 						img.save(buffer, format="PNG")
 						return buffer.getvalue()
 			else:
-				# Try to get URL if local file doesn't exist
 				resolved_url = get_url(resolved_url)
 
 		# Handle HTTP URLs (for localhost or other accessible URLs)
 		with urllib.request.urlopen(resolved_url, timeout=10) as response:
 			content = response.read()
-			# Check if it's an SVG file by content type or extension
 			if resolved_url.endswith('.svg') or b'<svg' in content[:100]:
-				# Save SVG to temp file and convert
 				with tempfile.NamedTemporaryFile(delete=False, suffix='.svg') as temp_file:
 					temp_file.write(content)
 					temp_path = temp_file.name
@@ -242,7 +193,6 @@ def read_logo_bytes(logo_url):
 					if os.path.exists(temp_path):
 						os.remove(temp_path)
 			else:
-				# For raster images, use PIL
 				with Image.open(BytesIO(content)) as img:
 					img = img.convert("RGBA")
 					img.thumbnail((320, 320), Image.Resampling.LANCZOS)
@@ -250,38 +200,35 @@ def read_logo_bytes(logo_url):
 					img.save(buffer, format="PNG")
 					return buffer.getvalue()
 	except Exception as e:
-		print(f"Error reading logo {logo_url}: {e}")
+		frappe.log_error(f"Error reading logo {logo_url}: {e}", "QR Logo Read Error")
 		return None
 
 
 def convert_svg_to_png(svg_path):
 	"""Convert SVG to PNG using cairosvg or fallback method"""
 	try:
-		# Try using cairosvg if available
 		import cairosvg
 		png_bytes = cairosvg.svg2png(url=svg_path, output_width=320, output_height=320)
 		return png_bytes
 	except ImportError:
-		# Fallback: use a simple method to create a placeholder
-		# For now, we'll create a simple colored square as placeholder
+		# cairosvg not installed — warn admin and create placeholder
+		frappe.log_error(
+			"cairosvg is not installed. SVG logos cannot be converted. Run: pip install cairosvg",
+			"QR SVG Conversion Missing Dependency"
+		)
 		from PIL import Image, ImageDraw, ImageFont
-		img = Image.new('RGBA', (320, 320), (255, 87, 34, 255))  # Orange background
+		img = Image.new('RGBA', (320, 320), (255, 87, 34, 255))
 		draw = ImageDraw.Draw(img)
-		
-		# Draw a simple "D" for Dinematters
 		try:
 			font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 120)
-		except:
+		except Exception:
 			font = ImageFont.load_default()
-		
 		draw.text((80, 100), "D", fill=(255, 255, 255, 255), font=font)
-		
 		buffer = BytesIO()
 		img.save(buffer, format="PNG")
 		return buffer.getvalue()
 	except Exception as e:
-		print(f"Error converting SVG to PNG: {e}")
-		# Return a simple placeholder
+		frappe.log_error(f"Error converting SVG to PNG: {e}", "QR SVG Conversion Error")
 		from PIL import Image, ImageDraw
 		img = Image.new('RGBA', (320, 320), (255, 87, 34, 255))
 		buffer = BytesIO()
@@ -296,9 +243,8 @@ def read_background_image_bytes(image_url, size=(940, 980)):
 	try:
 		from PIL import Image, ImageEnhance, ImageOps
 		
-		# Handle local file paths first (before any frappe-dependent operations)
+		# Handle local file paths first
 		if image_url.startswith("/"):
-			# For local files, check if they exist and open directly
 			if os.path.exists(image_url):
 				with Image.open(image_url) as img:
 					img = img.convert("RGB")
@@ -308,21 +254,17 @@ def read_background_image_bytes(image_url, size=(940, 980)):
 					img.save(buffer, format="JPEG", quality=75, optimize=True)
 					return buffer.getvalue()
 			else:
-				# Try to get URL if local file doesn't exist
 				image_url = get_url(image_url) if image_url.startswith("/") else image_url
 		
-		# For non-local files or if local file doesn't exist, try CDN/HTTP handling
+		# For non-local files, try CDN/HTTP handling
 		try:
 			from dinematters.dinematters.media.storage import download_object
 			from dinematters.dinematters.media.config import get_cdn_config
 			
-			# Handle CDN URLs by extracting object key and downloading from R2
 			cdn_config = get_cdn_config()
 			cdn_base = cdn_config["base_url"]
 			if image_url.startswith(cdn_base):
-				# Extract object key from CDN URL
 				object_key = image_url[len(cdn_base):].lstrip('/')
-				# Download from R2 to temp file
 				with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as temp_file:
 					temp_path = temp_file.name
 				try:
@@ -338,10 +280,9 @@ def read_background_image_bytes(image_url, size=(940, 980)):
 					if os.path.exists(temp_path):
 						os.remove(temp_path)
 		except Exception:
-			# If CDN handling fails, fall back to HTTP
 			pass
 		
-		# Handle HTTP URLs (for localhost or other accessible URLs)
+		# Handle HTTP URLs
 		resolved_url = get_url(image_url) if image_url.startswith("/") else image_url
 		with urllib.request.urlopen(resolved_url, timeout=10) as response:
 			with Image.open(BytesIO(response.read())) as img:
@@ -352,7 +293,7 @@ def read_background_image_bytes(image_url, size=(940, 980)):
 				img.save(buffer, format="JPEG", quality=75, optimize=True)
 				return buffer.getvalue()
 	except Exception as e:
-		print(f"Error reading image {image_url}: {e}")
+		frappe.log_error(f"Error reading image {image_url}: {e}", "QR Background Image Error")
 		return None
 
 
@@ -428,14 +369,23 @@ def generate_svg_card(qr_data, restaurant_name, brand_color, table_number, logo_
 		f"{inner_markup}</svg>"
 	)
 	footer = "Powered by Dinematters"
+	cutout_markup = '<rect x="300" y="530" width="600" height="600" rx="46" fill="white" fill-opacity="0.98" stroke="#F0E8F3" stroke-width="4"/>'
+	
+	banner_markup = ""
+	if background_image_bytes:
+		# Lighter overlay for better readability over images
+		banner_markup = '<rect x="52" y="1320" width="1096" height="228" rx="0" fill="white" fill-opacity="0.85"/>'
+
 	return (
 		'<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600">'
 		'<rect width="1200" height="1600" rx="72" fill="#FFFFFF"/>'
 		f'<rect x="52" y="52" width="1096" height="1496" rx="56" fill="#FFFFFF" stroke="{brand_color}" stroke-width="18"/>'
-		f'<text x="600" y="210" text-anchor="middle" font-family="Baskerville, Georgia, Times New Roman, serif" font-size="44" font-weight="600" fill="{brand_color}">Table {table_number}</text>'
-		f'{background_markup}<rect x="130" y="360" width="940" height="980" rx="48" fill="none" stroke="{brand_color}" stroke-opacity="0.28" stroke-width="3"/>{cutout_markup}{qr_group}{logo_overlay_markup}'
-		f'<text x="600" y="1365" text-anchor="middle" font-family="Baskerville, Georgia, Times New Roman, serif" font-size="42" font-weight="600" fill="#555555">Scan to order</text>'
-		f'<text x="600" y="1450" text-anchor="middle" font-family="Baskerville, Georgia, Times New Roman, serif" font-size="36" fill="#666666">{html.escape(footer)}</text>'
+		f'{background_markup}'
+		f'<text x="600" y="210" text-anchor="middle" font-family="Baskerville, Georgia, Times New Roman, serif" font-size="52" font-weight="700" fill="{brand_color}">Table {table_number}</text>'
+		f'<rect x="130" y="360" width="940" height="980" rx="48" fill="none" stroke="{brand_color}" stroke-opacity="0.28" stroke-width="3"/>'
+		f'{banner_markup}{cutout_markup}{qr_group}{logo_overlay_markup}'
+		f'<text x="600" y="1385" text-anchor="middle" font-family="Baskerville, Georgia, Times New Roman, serif" font-size="48" font-weight="700" fill="#222222">Scan to order</text>'
+		f'<text x="600" y="1465" text-anchor="middle" font-family="Baskerville, Georgia, Times New Roman, serif" font-size="34" font-weight="500" fill="#666666">{html.escape(footer)}</text>'
 		'</svg>'
 	).encode("utf-8")
 
@@ -444,7 +394,6 @@ def build_artistic_qr_image(qr_data, logo_bytes, background_image_bytes):
 	import segno
 	from PIL import Image
 
-	# Use logo for the artistic QR center
 	if not logo_bytes:
 		return None
 		
@@ -452,13 +401,11 @@ def build_artistic_qr_image(qr_data, logo_bytes, background_image_bytes):
 	target_stream = BytesIO()
 	qr = segno.make(qr_data, error="h")
 	
-	# Generate artistic QR with logo as background
 	qr.to_artistic(background=logo_stream, target=target_stream, scale=8, kind="png", border=0)
 	
 	target_stream.seek(0)
 	qr_img = Image.open(target_stream).convert("RGB")
 	
-	# Convert to RGBA and ensure white background
 	final_img = Image.new("RGBA", qr_img.size, "white")
 	final_img.paste(qr_img, (0, 0))
 
@@ -484,13 +431,19 @@ def generate_png_card(qr_data, restaurant_name, brand_color, table_number, logo_
 	else:
 		draw.rounded_rectangle((52, 52, 1148, 1548), radius=56, fill="white")
 
-	title_font = load_font(72, bold=True)
-	subtitle_font = load_font(46, bold=True)
-	footer_font = load_font(66, bold=True)
-	brand_font = load_font(56, bold=False)
+	title_font = load_font(64, bold=True)
+	footer_font = load_font(60, bold=True)
+	brand_font = load_font(44, bold=False)
 
-	bottom_band = Image.new("RGBA", (1096, 220), (0, 0, 0, 170))
-	canvas.paste(bottom_band, (52, 1328), bottom_band)
+	if background_image_bytes:
+		# Subtle white overlay for text readability over images
+		overlay = Image.new("RGBA", (1096, 250), (255, 255, 255, 210))
+		canvas.paste(overlay, (52, 1298), overlay)
+	
+	# Draw table title
+	title_text = f"Table {table_number}"
+	title_w, _ = measure_text(draw, title_text, title_font)
+	draw.text(((1200 - title_w) / 2, 110), title_text, fill=brand_color, font=title_font)
 
 	# Generate QR code with logo embedded if both logo and background exist
 	qr_img = None
@@ -498,12 +451,11 @@ def generate_png_card(qr_data, restaurant_name, brand_color, table_number, logo_
 	
 	if logo_bytes and background_image_bytes:
 		try:
-			# Use artistic QR with logo in center
 			qr_img = build_artistic_qr_image(qr_data, logo_bytes, background_image_bytes)
 			qr_img = qr_img.resize((520, 520), Image.Resampling.LANCZOS)
 			logo_applied_in_qr = True
 		except Exception as e:
-			print(f"Artistic QR failed: {e}")
+			frappe.log_error(f"Artistic QR failed: {e}", "QR Artistic Generation")
 			qr_img = None
 	
 	# Fallback to regular QR if artistic failed or no logo/background
@@ -534,13 +486,13 @@ def generate_png_card(qr_data, restaurant_name, brand_color, table_number, logo_
 			logo_card.paste(logo_img, (logo_x, logo_y), logo_img)
 			canvas.paste(logo_card, (510, 750), logo_card)
 
-	scan_text = f"Scan to order - Table {table_number}"
+	scan_text = "Scan to order"
 	scan_width, _ = measure_text(draw, scan_text, footer_font)
-	draw_text_with_shadow(draw, ((1200 - scan_width) / 2, 1370), scan_text, footer_font, fill="#FFFFFF", shadow_fill=(0, 0, 0, 210), shadow_offset=(3, 4))
+	draw.text(((1200 - scan_width) / 2, 1340), scan_text, fill="#222222", font=footer_font)
 
 	brand_text = "Powered by Dinematters"
 	brand_width, _ = measure_text(draw, brand_text, brand_font)
-	draw_text_with_shadow(draw, ((1200 - brand_width) / 2, 1450), brand_text, brand_font, fill="#F3F3F3", shadow_fill=(0, 0, 0, 210), shadow_offset=(3, 4))
+	draw.text(((1200 - brand_width) / 2, 1435), brand_text, fill="#666666", font=brand_font)
 
 	buffer = BytesIO()
 	canvas.save(buffer, format="PNG", optimize=True)
@@ -560,13 +512,15 @@ def upload_content_bytes(content, suffix, object_key, content_type):
 			os.remove(temp_path)
 
 
-def ensure_table_qr_assets(restaurant_doc, table_number, force=False, branding=None, logo_bytes=None, background_image_bytes=None):
+def ensure_table_qr_assets(restaurant_doc, table_number, force=False, branding=None, logo_bytes=None, background_image_bytes=None, override_background_url=None):
 	from dinematters.dinematters.media.storage import get_cdn_url, verify_object_exists
 
 	# Use provided branding or fetch it (for backward compatibility)
 	if branding is None:
-		branding = resolve_qr_branding(restaurant_doc)
+		branding = resolve_qr_branding(restaurant_doc, override_background_url=override_background_url)
 	
+	background_image_url = branding.get("background_image_url") or override_background_url
+
 	qr_url = build_table_qr_url(restaurant_doc, table_number)
 	cache_key = build_table_qr_cache_key(restaurant_doc, table_number, qr_url, branding, force=force)
 	object_keys = build_table_qr_object_keys(restaurant_doc, table_number, cache_key)
@@ -624,25 +578,388 @@ def ensure_table_qr_assets(restaurant_doc, table_number, force=False, branding=N
 	}
 
 
-def build_table_qr_assets(restaurant_doc, force=False):
+def build_table_qr_assets(restaurant_doc, force=False, override_background_url=None):
 	if not restaurant_doc.restaurant_id:
 		frappe.throw("Restaurant ID is required to generate QR codes")
 	if not restaurant_doc.tables or restaurant_doc.tables <= 0:
 		frappe.throw("Number of tables must be greater than 0")
 
 	# Download branding images once and reuse for all tables
-	branding = resolve_qr_branding(restaurant_doc)
+	branding = resolve_qr_branding(restaurant_doc, override_background_url=override_background_url)
 	logo_bytes = read_logo_bytes(branding.get("logo_url"))
 	background_image_bytes = read_background_image_bytes(branding.get("background_image_url"))
 	
-	return [
-		ensure_table_qr_assets(
+	assets = []
+	for i in range(1, restaurant_doc.tables + 1):
+		asset = ensure_table_qr_assets(
 			restaurant_doc, 
-			table_number, 
-			force=force,
-			branding=branding,
-			logo_bytes=logo_bytes,
-			background_image_bytes=background_image_bytes
-		) 
-		for table_number in range(1, restaurant_doc.tables + 1)
-	]
+			i, 
+			force=force, 
+			branding=branding, 
+			logo_bytes=logo_bytes, 
+			background_image_bytes=background_image_bytes,
+			override_background_url=override_background_url
+		)
+		assets.append(asset)
+	return assets
+
+
+# ─────────────────────────────────────────────────────────────────
+# PDF Generation — Multi-layout support  (1-per-page or 2×2 grid)
+# ─────────────────────────────────────────────────────────────────
+
+def generate_pdf_from_assets(assets, layout="2x2"):
+	"""
+	Generate a PDF from QR assets.
+	layout: '1x1' (one card per A4 page) or '2x2' (four cards per A4 page — industry standard)
+	Returns: bytes of the PDF
+	"""
+	import os
+	import tempfile
+	from io import BytesIO
+	from dinematters.dinematters.media.storage import download_object
+	from reportlab.lib.pagesizes import A4, landscape
+	from reportlab.lib.units import inch
+	from reportlab.pdfgen import canvas as rl_canvas
+	from reportlab.lib.utils import ImageReader
+	from PIL import Image
+
+	pdf_buffer = BytesIO()
+
+	if layout == "2x2":
+		# Landscape A4 for 2×2 grid — 4 QR cards per page
+		page_width, page_height = landscape(A4)
+		
+		# GEOMETRY FIX: Landscape A4 is 8.27 inches high. 
+		# Two cards at 3.8" + margins will fit perfectly.
+		card_width = 3.3 * inch
+		card_height = 3.7 * inch
+		
+		pdf_canvas_obj = rl_canvas.Canvas(pdf_buffer, pagesize=landscape(A4))
+		
+		# Margins for perfect centering
+		total_w = 2 * card_width
+		total_h = 2 * card_height
+		margin_x = (page_width - total_w) / 3
+		margin_y = (page_height - total_h) / 3
+
+		positions_per_page = [
+			(margin_x, page_height - margin_y - card_height),
+			(margin_x * 2 + card_width, page_height - margin_y - card_height),
+			(margin_x, margin_y),
+			(margin_x * 2 + card_width, margin_y),
+		]
+
+		for page_start in range(0, len(assets), 4):
+			page_assets = assets[page_start:page_start + 4]
+
+			for slot_idx, asset in enumerate(page_assets):
+				x_pos, y_pos = positions_per_page[slot_idx]
+				card_buffer = _download_asset_as_jpeg(asset, download_object, Image)
+				if card_buffer:
+					# Subtle light grey boundary cut-line for merchant convenience
+					pdf_canvas_obj.setStrokeColorRGB(0.9, 0.9, 0.9)
+					pdf_canvas_obj.setLineWidth(0.5)
+					pdf_canvas_obj.rect(x_pos - 1, y_pos - 1, card_width + 2, card_height + 2, fill=0, stroke=1)
+					
+					pdf_canvas_obj.drawImage(ImageReader(card_buffer), x_pos, y_pos, width=card_width, height=card_height)
+
+			# Footer positioned at very bottom
+			pdf_canvas_obj.setFont("Helvetica", 7)
+			pdf_canvas_obj.setFillColorRGB(0.5, 0.5, 0.5)
+			pdf_canvas_obj.drawCentredString(page_width / 2, 0.2 * inch, "Generated by Dinematters • Print and trim along light lines")
+			pdf_canvas_obj.showPage()
+
+	else:
+		# 1×1: One card centred per A4 page
+		page_width, page_height = A4
+		card_width = 4.4 * inch
+		card_height = 5.85 * inch
+
+		pdf_canvas_obj = rl_canvas.Canvas(pdf_buffer, pagesize=A4)
+
+		for index, asset in enumerate(assets, start=1):
+			card_buffer = _download_asset_as_jpeg(asset, download_object, Image)
+			x = (page_width - card_width) / 2
+			y = (page_height - card_height) / 2 + 0.1 * inch
+
+			if card_buffer:
+				pdf_canvas_obj.drawImage(ImageReader(card_buffer), x, y, width=card_width, height=card_height)
+
+			pdf_canvas_obj.setFont("Helvetica", 9)
+			pdf_canvas_obj.setFillColorRGB(0.4, 0.4, 0.4)
+			pdf_canvas_obj.drawCentredString(page_width / 2, y - 0.18 * inch, asset["qr_data"])
+
+			if index < len(assets):
+				pdf_canvas_obj.showPage()
+
+	pdf_canvas_obj.save()
+	pdf_buffer.seek(0)
+	return pdf_buffer.getvalue()
+
+
+def _download_asset_as_jpeg(asset, download_object_fn, Image):
+	"""Download a PNG asset from R2 and return as JPEG BytesIO. Returns None on failure (safe for multi-card pages)."""
+	import tempfile
+	temp_path = None
+	try:
+		with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
+			temp_path = temp_file.name
+		download_object_fn(asset["png_object_key"], temp_path)
+
+		card_buffer = BytesIO()
+		with Image.open(temp_path) as img:
+			if img.mode in ('RGBA', 'LA', 'P'):
+				rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+				if img.mode == 'P':
+					img = img.convert('RGBA')
+				rgb_img.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+				img = rgb_img
+			else:
+				img = img.convert('RGB')
+
+			img.save(card_buffer, format='JPEG', quality=88, optimize=True)
+			card_buffer.seek(0)
+		return card_buffer
+	except Exception as e:
+		frappe.log_error(
+			f"Failed to render QR card for table {asset.get('table_number', '?')}: {e}",
+			"QR PDF Card Render Error"
+		)
+		return None
+	finally:
+		if temp_path and os.path.exists(temp_path):
+			os.remove(temp_path)
+
+
+# ─────────────────────────────────────────────────────────────────
+# Special QR Codes — Takeaway & Delivery
+# Each encodes: {base_url}/{restaurant_id}?order_type=takeaway|delivery
+# Branding, caching, and storage are identical to table QR cards.
+# ─────────────────────────────────────────────────────────────────
+
+SPECIAL_QR_CONFIGS = {
+	"takeaway": {
+		"label": "Takeaway",
+		"subtitle": "Scan to place a takeaway order",
+		"footer": "Order Takeaway • Powered by Dinematters",
+	},
+	"delivery": {
+		"label": "Delivery",
+		"subtitle": "Scan to order doorstep delivery",
+		"footer": "Order Delivery • Powered by Dinematters",
+	},
+}
+
+
+def build_special_qr_url(restaurant_doc, order_type):
+	from dinematters.dinematters.utils.config_helpers import get_app_base_url
+	base_url = get_app_base_url()
+	return f"{base_url.rstrip('/')}/{restaurant_doc.restaurant_id}?order_type={order_type}"
+
+
+def build_special_qr_object_keys(restaurant_doc, order_type, cache_key):
+	restaurant_key = safe_restaurant_path(restaurant_doc.restaurant_id or restaurant_doc.name)
+	base_path = f"restaurants/{restaurant_key}/restaurant/{restaurant_key}/special_qr/{order_type}/{cache_key}"
+	return {
+		"svg": f"{base_path}/card.svg",
+		"png": f"{base_path}/card.png",
+	}
+
+
+def generate_special_svg_card(qr_data, restaurant_name, brand_color, order_type, logo_bytes, background_image_bytes):
+	import qrcode
+	from qrcode.image.svg import SvgPathImage
+
+	cfg = SPECIAL_QR_CONFIGS.get(order_type, SPECIAL_QR_CONFIGS["takeaway"])
+
+	qr = qrcode.QRCode(version=None, error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=16, border=4, image_factory=SvgPathImage)
+	qr.add_data(qr_data)
+	qr.make(fit=True)
+	buf = BytesIO()
+	qr.make_image(fill_color=brand_color, back_color="white").save(buf)
+	view_box, inner_markup = extract_svg_payload(buf.getvalue().decode("utf-8"))
+
+	bg_markup = ""
+	logo_markup = ""
+	if background_image_bytes:
+		b64 = base64.b64encode(background_image_bytes).decode("ascii")
+		bg_markup = (
+			'<defs><clipPath id="sp-clip"><rect x="130" y="360" width="940" height="980" rx="48" ry="48"/></clipPath></defs>'
+			f'<image x="130" y="360" width="940" height="980" href="data:image/png;base64,{b64}" preserveAspectRatio="xMidYMid slice" clip-path="url(#sp-clip)"/>'
+			'<rect x="130" y="360" width="940" height="980" rx="48" fill="#000000" opacity="0.08"/>'
+		)
+	if logo_bytes and not background_image_bytes:
+		lb64 = base64.b64encode(logo_bytes).decode("ascii")
+		logo_markup = (
+			'<rect x="510" y="750" width="180" height="180" rx="42" fill="white" stroke="#E7E7E7" stroke-width="8"/>'
+			f'<image x="535" y="775" width="130" height="130" href="data:image/png;base64,{lb64}" preserveAspectRatio="xMidYMid meet"/>'
+		)
+	cutout = '<rect x="300" y="530" width="600" height="600" rx="46" fill="white" fill-opacity="0.96" stroke="#F0E8F3" stroke-width="4"/>'
+	qr_svg = f'<svg x="340" y="570" width="520" height="520" viewBox="{html.escape(view_box)}">{inner_markup}</svg>'
+	return (
+		'<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600">'
+		'<rect width="1200" height="1600" rx="72" fill="#FFFFFF"/>'
+		f'<rect x="52" y="52" width="1096" height="1496" rx="56" fill="#FFFFFF" stroke="{brand_color}" stroke-width="18"/>'
+		f'<text x="600" y="175" text-anchor="middle" font-family="Baskerville,Georgia,serif" font-size="50" font-weight="700" fill="{brand_color}">{html.escape(restaurant_name)}</text>'
+		f'<text x="600" y="255" text-anchor="middle" font-family="Baskerville,Georgia,serif" font-size="58" font-weight="700" fill="#222222">{cfg["label"]} QR</text>'
+		f'{bg_markup}'
+		f'<rect x="130" y="360" width="940" height="980" rx="48" fill="none" stroke="{brand_color}" stroke-opacity="0.28" stroke-width="3"/>'
+		f'{cutout}{qr_svg}{logo_markup}'
+		f'<text x="600" y="1365" text-anchor="middle" font-family="Baskerville,Georgia,serif" font-size="42" font-weight="600" fill="#555555">{cfg["subtitle"]}</text>'
+		f'<text x="600" y="1450" text-anchor="middle" font-family="Baskerville,Georgia,serif" font-size="36" fill="#666666">{html.escape(cfg["footer"])}</text>'
+		'</svg>'
+	).encode("utf-8")
+
+
+def generate_special_png_card(qr_data, restaurant_name, brand_color, order_type, logo_bytes, background_image_bytes):
+	import qrcode
+	from PIL import Image, ImageDraw, ImageOps
+
+	cfg = SPECIAL_QR_CONFIGS.get(order_type, SPECIAL_QR_CONFIGS["takeaway"])
+
+	def draw_shadow(draw_obj, pos, text, font, fill, shadow=(0, 0, 0, 170), offset=(3, 4)):
+		x, y = pos
+		draw_obj.text((x + offset[0], y + offset[1]), text, fill=shadow, font=font)
+		draw_obj.text((x, y), text, fill=fill, font=font)
+
+	canvas = Image.new("RGBA", (1200, 1600), "white")
+	draw = ImageDraw.Draw(canvas)
+
+	if background_image_bytes:
+		with Image.open(BytesIO(background_image_bytes)) as bg:
+			bg = bg.convert("RGBA")
+			bg = ImageOps.fit(bg, (1096, 1496), method=Image.Resampling.LANCZOS, centering=(0.5, 0.78))
+			canvas.paste(bg, (52, 52), bg)
+	else:
+		draw.rounded_rectangle((52, 52, 1148, 1548), radius=56, fill="white")
+
+	title_font = load_font(48, bold=True)
+	label_font = load_font(64, bold=True)
+	sub_font = load_font(40, bold=True)
+	footer_font = load_font(38, bold=False)
+
+	if background_image_bytes:
+		# Light overlay for readability
+		overlay = Image.new("RGBA", (1096, 280), (255, 255, 255, 210))
+		canvas.paste(overlay, (52, 1278), overlay)
+
+	name_w, _ = measure_text(draw, restaurant_name, title_font)
+	draw.text(((1200 - name_w) / 2, 105), restaurant_name, fill=brand_color, font=title_font)
+
+	label_text = f"{cfg['label']} QR"
+	label_w, _ = measure_text(draw, label_text, label_font)
+	draw.text(((1200 - label_w) / 2, 185), label_text, fill="#222222", font=label_font)
+
+	# QR code
+	qr_img = None
+	if logo_bytes and background_image_bytes:
+		try:
+			qr_img = build_artistic_qr_image(qr_data, logo_bytes, background_image_bytes)
+			qr_img = qr_img.resize((520, 520), Image.Resampling.LANCZOS)
+		except Exception:
+			qr_img = None
+
+	if qr_img is None:
+		qr = qrcode.QRCode(version=None, error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=20, border=4)
+		qr.add_data(qr_data)
+		qr.make(fit=True)
+		qr_img = qr.make_image(fill_color=brand_color, back_color="white").convert("RGBA")
+		qr_img = qr_img.resize((520, 520), Image.Resampling.NEAREST)
+
+	canvas.paste(qr_img, (340, 540), qr_img if qr_img.mode == 'RGBA' else None)
+
+	if logo_bytes and not background_image_bytes:
+		with Image.open(BytesIO(logo_bytes)) as logo_img:
+			logo_img = logo_img.convert("RGBA")
+			logo_img.thumbnail((130, 130), Image.Resampling.LANCZOS)
+			logo_card = Image.new("RGBA", (180, 180), (255, 255, 255, 0))
+			logo_draw = ImageDraw.Draw(logo_card)
+			logo_draw.rounded_rectangle((4, 4, 176, 176), radius=42, fill="white", outline="#E7E7E7", width=8)
+			lx, ly = (180 - logo_img.width) // 2, (180 - logo_img.height) // 2
+			logo_card.paste(logo_img, (lx, ly), logo_img)
+			canvas.paste(logo_card, (510, 710), logo_card)
+
+	sub_w, _ = measure_text(draw, cfg["subtitle"], sub_font)
+	draw.text(((1200 - sub_w) / 2, 1315), cfg["subtitle"], fill="#222222", font=sub_font)
+
+	footer_w, _ = measure_text(draw, cfg["footer"], footer_font)
+	draw.text(((1200 - footer_w) / 2, 1405), cfg["footer"], fill="#666666", font=footer_font)
+
+	buf = BytesIO()
+	canvas.save(buf, format="PNG", optimize=True)
+	return buf.getvalue()
+
+
+def ensure_special_qr_asset(restaurant_doc, order_type, force=False):
+	"""
+	Generate and cache a PNG + SVG QR card for a special order type (takeaway / delivery).
+	Returns asset dict with png_url, svg_url, qr_data, object keys.
+	"""
+	from dinematters.dinematters.media.storage import get_cdn_url, verify_object_exists
+
+	if order_type not in SPECIAL_QR_CONFIGS:
+		frappe.throw(f"Invalid order_type '{order_type}'. Allowed: {list(SPECIAL_QR_CONFIGS.keys())}")
+
+	branding = resolve_qr_branding(restaurant_doc)
+	qr_url = build_special_qr_url(restaurant_doc, order_type)
+
+	payload = "|".join([
+		"special-v1",
+		str(restaurant_doc.restaurant_id or ""),
+		order_type,
+		qr_url,
+		str(branding.get("restaurant_name") or ""),
+		str(branding.get("primary_color") or ""),
+		str(branding.get("logo_url") or ""),
+		str(branding.get("background_image_url") or ""),
+	])
+	cache_key = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+	object_keys = build_special_qr_object_keys(restaurant_doc, order_type, cache_key)
+
+	if not force:
+		if (verify_object_exists(object_keys["svg"]).get("exists") and
+				verify_object_exists(object_keys["png"]).get("exists")):
+			return {
+				"order_type": order_type,
+				"label": SPECIAL_QR_CONFIGS[order_type]["label"],
+				"qr_data": qr_url,
+				"cache_key": cache_key,
+				"svg_url": get_cdn_url(object_keys["svg"]),
+				"png_url": get_cdn_url(object_keys["png"]),
+				"svg_object_key": object_keys["svg"],
+				"png_object_key": object_keys["png"],
+			}
+
+	logo_bytes = read_logo_bytes(branding.get("logo_url"))
+	bg_bytes = read_background_image_bytes(branding.get("background_image_url"))
+
+	svg_bytes = generate_special_svg_card(qr_url, branding["restaurant_name"], branding["primary_color"], order_type, logo_bytes, bg_bytes)
+	png_bytes = generate_special_png_card(qr_url, branding["restaurant_name"], branding["primary_color"], order_type, logo_bytes, bg_bytes)
+
+	svg_url = upload_content_bytes(svg_bytes, ".svg", object_keys["svg"], "image/svg+xml")
+	png_url = upload_content_bytes(png_bytes, ".png", object_keys["png"], "image/png")
+
+	return {
+		"order_type": order_type,
+		"label": SPECIAL_QR_CONFIGS[order_type]["label"],
+		"qr_data": qr_url,
+		"cache_key": cache_key,
+		"svg_url": svg_url,
+		"png_url": png_url,
+		"svg_object_key": object_keys["svg"],
+		"png_object_key": object_keys["png"],
+	}
+
+def build_special_qr_assets(restaurant_doc, force=False):
+	"""
+	Aggregation helper to build all special QRs (takeaway, delivery) for a restaurant.
+	"""
+	if not restaurant_doc.restaurant_id:
+		frappe.throw("Restaurant ID is required to generate QR codes")
+	
+	assets = []
+	for st in ["takeaway", "delivery"]:
+		asset = ensure_special_qr_asset(restaurant_doc, st, force=force)
+		assets.append(asset)
+	return assets

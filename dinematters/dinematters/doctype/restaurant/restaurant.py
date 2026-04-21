@@ -6,7 +6,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import get_url
-from dinematters.dinematters.doctype.restaurant.qr_branding import build_table_qr_assets
+from dinematters.dinematters.doctype.restaurant.qr_branding import build_table_qr_assets, generate_pdf_from_assets
 
 
 class Restaurant(Document):
@@ -445,64 +445,32 @@ class Restaurant(Document):
 			)
 			return None
 
-	def generate_table_qr_codes_pdf(self):
-		"""Generate PDF with QR codes for all tables"""
+	def generate_table_qr_codes_pdf(self, layout="2x2", background_image=None, qr_type="dine_in"):
+		"""
+		Generate PDF with QR codes for all tables or special order types.
+		layout: '1x1' or '2x2'
+		background_image: optional URL
+		qr_type: 'dine_in' (default) or 'takeaway'
+		"""
 		try:
-			import os
-			import tempfile
-			from io import BytesIO
-			from dinematters.dinematters.media.storage import download_object
-			from reportlab.lib.pagesizes import A4
-			from reportlab.lib.units import inch
-			from reportlab.pdfgen import canvas
-			from reportlab.lib.utils import ImageReader
+			import time
+			from dinematters.dinematters.doctype.restaurant.qr_branding import (
+				build_table_qr_assets, 
+				build_special_qr_assets,
+				generate_pdf_from_assets
+			)
 
-			assets = build_table_qr_assets(self, force=True)
+			if qr_type == "takeaway":
+				assets = build_special_qr_assets(self, force=True)
+				file_name = f"{self.restaurant_id}_takeaway_qr_codes.pdf"
+			else:
+				assets = build_table_qr_assets(self, force=True, override_background_url=background_image)
+				file_name = f"{self.restaurant_id}_table_qr_codes.pdf"
 
-			pdf_buffer = BytesIO()
-			pdf_canvas = canvas.Canvas(pdf_buffer, pagesize=A4)
+			# Delegate all PDF rendering to qr_branding module
+			pdf_bytes = generate_pdf_from_assets(assets, layout=layout)
 
-			page_width, page_height = A4
-			card_width = 4.4 * inch
-			card_height = 5.85 * inch
-
-			for index, asset in enumerate(assets, start=1):
-				with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
-					temp_path = temp_file.name
-				try:
-					download_object(asset["png_object_key"], temp_path)
-					# Compress image to reduce PDF size
-					from PIL import Image
-					with Image.open(temp_path) as img:
-						# Convert to RGB and compress as JPEG
-						if img.mode in ('RGBA', 'LA', 'P'):
-							rgb_img = Image.new('RGB', img.size, (255, 255, 255))
-							if img.mode == 'P':
-								img = img.convert('RGBA')
-							rgb_img.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
-							img = rgb_img
-						else:
-							img = img.convert('RGB')
-						
-						card_buffer = BytesIO()
-						img.save(card_buffer, format='JPEG', quality=85, optimize=True)
-						card_buffer.seek(0)
-				finally:
-					if os.path.exists(temp_path):
-						os.remove(temp_path)
-				x = (page_width - card_width) / 2
-				y = (page_height - card_height) / 2 + 0.1 * inch
-				pdf_canvas.drawImage(ImageReader(card_buffer), x, y, width=card_width, height=card_height)
-				pdf_canvas.setFont("Helvetica", 10)
-				pdf_canvas.drawCentredString(page_width / 2, y - 0.18 * inch, asset["qr_data"])
-				if index < len(assets):
-					pdf_canvas.showPage()
-
-			pdf_canvas.save()
-			pdf_buffer.seek(0)
-
-			file_name = f"{self.restaurant_id}_table_qr_codes.pdf"
-
+			# Delete existing PDF files for this restaurant
 			existing_files = frappe.get_all(
 				"File",
 				{
@@ -512,7 +480,6 @@ class Restaurant(Document):
 				},
 				["name"],
 			)
-
 			for file_doc in existing_files:
 				try:
 					frappe.delete_doc("File", file_doc.name, ignore_permissions=True, force=True)
@@ -522,15 +489,13 @@ class Restaurant(Document):
 						f"Error deleting existing QR code file {file_doc.name}: {str(e)}",
 						"QR Code File Deletion",
 					)
-			
-			# Clear the qr_codes_pdf_url field when PDF is deleted
+
+			# Clear URL field before creating new file
 			try:
 				if frappe.db.has_column("Restaurant", "qr_codes_pdf_url"):
 					self.db_set("qr_codes_pdf_url", "", update_modified=False)
 			except Exception:
 				pass
-
-			import time
 
 			timestamp = int(time.time())
 
@@ -538,7 +503,7 @@ class Restaurant(Document):
 				{
 					"doctype": "File",
 					"file_name": file_name,
-					"content": pdf_buffer.getvalue(),
+					"content": pdf_bytes,
 					"is_private": 0,
 					"attached_to_doctype": "Restaurant",
 					"attached_to_name": self.name,
@@ -548,7 +513,7 @@ class Restaurant(Document):
 
 			self._last_table_qr_assets = assets
 			frappe.msgprint(
-				f"✅ QR codes PDF generated successfully for {self.tables} tables. File: {file_name}",
+				f"✅ QR codes PDF generated successfully for {self.tables} tables ({layout} layout). File: {file_name}",
 				indicator="green",
 			)
 
@@ -567,7 +532,7 @@ class Restaurant(Document):
 			return file_url
 
 		except ImportError:
-			frappe.throw(_("Required libraries not installed. Please install: pip install qrcode[pil] reportlab"))
+			frappe.throw(_("Required libraries not installed. Please install: pip install qrcode[pil] reportlab cairosvg"))
 		except Exception as e:
 			frappe.log_error(f"Error generating QR codes PDF: {str(e)}", "Restaurant QR Code Generation")
 			frappe.msgprint(
@@ -696,6 +661,17 @@ class Restaurant(Document):
 			"tables": len(assets),
 			"items": assets,
 		}
+
+	@frappe.whitelist()
+	def get_special_qr_assets(self, force=False):
+		from dinematters.dinematters.doctype.restaurant.qr_branding import build_special_qr_assets
+		assets = build_special_qr_assets(self, force=frappe.utils.cint(force))
+		return {
+			"restaurant": self.name,
+			"restaurant_id": self.restaurant_id,
+			"tables": len(assets),
+			"items": assets,
+		}
 	
 @frappe.whitelist()
 def get_qr_codes_pdf_url(restaurant):
@@ -732,23 +708,32 @@ def delete_qr_codes_pdf(restaurant):
 			"message": "QR codes PDF deleted successfully"
 		}
 	except Exception as e:
-		frappe.log_error(f"Error deleting QR codes PDF: {str(e)}", "QR Code Deletion")
-		return {
-			"status": "error",
-			"message": str(e)
-		}
+		frappe.log_error(f"Error deleting QR codes PDF: {str(e)}", "Restaurant QR Code Deletion")
+		return {"status": "error", "message": str(e)}
 
 
 @frappe.whitelist()
-def generate_qr_codes_pdf(restaurant):
-	"""Generate QR codes PDF for a restaurant"""
+def get_special_qr_assets(restaurant, force=0):
+	restaurant_doc = frappe.get_doc("Restaurant", restaurant)
+	return restaurant_doc.get_special_qr_assets(force=force)
+
+
+@frappe.whitelist()
+def generate_qr_codes_pdf(restaurant, layout="2x2", background_image=None, qr_type="dine_in"):
+	"""
+	Generate QR codes PDF for a restaurant.
+	layout: '1x1' (one per page) or '2x2' (four per landscape page — default)
+	background_image: optional absolute URL for the background
+	qr_type: 'dine_in' or 'takeaway'
+	"""
 	try:
 		restaurant_doc = frappe.get_doc("Restaurant", restaurant)
-		pdf_url = restaurant_doc.generate_table_qr_codes_pdf()
+		pdf_url = restaurant_doc.generate_table_qr_codes_pdf(layout=layout, background_image=background_image, qr_type=qr_type)
 		return {
 			"status": "success",
-			"message": f"QR codes PDF generated successfully",
-			"pdf_url": pdf_url
+			"message": f"QR codes PDF generated successfully ({layout} layout)",
+			"pdf_url": pdf_url,
+			"layout": layout,
 		}
 	except Exception as e:
 		frappe.log_error(f"Error generating QR codes PDF: {str(e)}", "QR Code Generation")
@@ -756,6 +741,152 @@ def generate_qr_codes_pdf(restaurant):
 			"status": "error",
 			"message": str(e)
 		}
+
+
+@frappe.whitelist(allow_guest=True)
+def record_qr_scan(restaurant_id, table_number=None, order_type=None):
+	"""
+	Record a QR scan event for analytics.
+	Called from ONO Menu landing page when table_no or order_type is in URL.
+	"""
+	try:
+		if not restaurant_id:
+			return {"success": False, "error": "Missing restaurant_id"}
+		
+		restaurant_name = frappe.db.get_value("Restaurant", {"restaurant_id": restaurant_id}, "name")
+		if not restaurant_name:
+			return {"success": False, "error": f"Restaurant {restaurant_id} not found"}
+
+		# table_number validation (if provided)
+		table_val = None
+		if table_number:
+			table_number_int = frappe.utils.cint(table_number)
+			max_tables = frappe.db.get_value("Restaurant", restaurant_name, "tables") or 0
+			if table_number_int > 0 and table_number_int <= max_tables:
+				table_val = str(table_number_int)
+
+		# Log as analytics event
+		session_id = frappe.local.request.headers.get("X-Session-Id", "anonymous") if frappe.local.request else "anonymous"
+		
+		# Event value format: "T{num}" for table, or "{order_type}" for special QRs
+		event_value = f"T{table_val}" if table_val else (order_type or "unknown")
+		
+		doc = frappe.get_doc({
+			"doctype": "Analytics Event",
+			"restaurant": restaurant_name,
+			"event_type": "qr_scan",
+			"event_value": event_value,
+			"session_id": session_id,
+			"platform": "qr",
+		})
+		doc.insert(ignore_permissions=True)
+		frappe.db.commit()
+
+		return {"success": True}
+	except Exception as e:
+		frappe.log_error(f"Error recording QR scan: {str(e)}", "QR Scan Analytics")
+		return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist()
+def get_qr_scan_analytics(restaurant, days=30):
+	"""
+	Get QR scan analytics for the restaurant dashboard.
+	Returns: total scans, per-table breakdown, daily trend, top tables.
+	"""
+	try:
+		restaurant_doc = frappe.get_doc("Restaurant", restaurant)
+		restaurant_name = restaurant_doc.name
+		days_int = frappe.utils.cint(days) or 30
+
+		from frappe.utils import add_days, today
+		end_date = add_days(today(), 1)
+		start_date = add_days(today(), -days_int)
+
+		# Total scans in period
+		total_scans = frappe.db.count("Analytics Event", {
+			"restaurant": restaurant_name,
+			"event_type": "qr_scan",
+			"creation": ["between", [start_date, end_date]],
+		})
+
+		# Lifetime scans
+		lifetime_scans = frappe.db.count("Analytics Event", {
+			"restaurant": restaurant_name,
+			"event_type": "qr_scan",
+		})
+
+		# Per-table breakdown
+		per_table = frappe.db.sql("""
+			SELECT
+				event_value AS table_number,
+				COUNT(*) AS scan_count
+			FROM `tabAnalytics Event`
+			WHERE restaurant = %s
+			  AND event_type = 'qr_scan'
+			  AND creation BETWEEN %s AND %s
+			GROUP BY event_value
+			ORDER BY scan_count DESC
+		""", (restaurant_name, start_date, end_date), as_dict=True)
+
+		# Daily trend (last 14 days)
+		daily = frappe.db.sql("""
+			SELECT
+				DATE(creation) AS scan_date,
+				COUNT(*) AS scan_count
+			FROM `tabAnalytics Event`
+			WHERE restaurant = %s
+			  AND event_type = 'qr_scan'
+			  AND creation BETWEEN %s AND %s
+			GROUP BY DATE(creation)
+			ORDER BY scan_date ASC
+		""", (restaurant_name, add_days(today(), -14), end_date), as_dict=True)
+
+		# Average daily scans
+		avg_daily = round(total_scans / days_int, 1) if days_int > 0 else 0
+
+		# Separate per_table into tables and special QRs
+		table_stats = []
+		special_stats = {}
+		
+		# Initial values for order types from known config
+		from dinematters.dinematters.doctype.restaurant.qr_branding import SPECIAL_QR_CONFIGS
+		for kt in SPECIAL_QR_CONFIGS.keys():
+			special_stats[kt] = 0
+
+		for r in per_table:
+			val = r.table_number # Actually event_value
+			if val and val.startswith("T") and val[1:].isdigit():
+				table_stats.append({"tableNumber": int(val[1:]), "scanCount": r.scan_count})
+			elif val in special_stats:
+				special_stats[val] = r.scan_count
+			elif val and val.isdigit():
+				# Backward compatibility for old scans that were just the number
+				table_stats.append({"tableNumber": int(val), "scanCount": r.scan_count})
+
+		# Re-sort table stats by scan count
+		table_stats.sort(key=lambda x: x["scanCount"], reverse=True)
+		top_table_obj = table_stats[0] if table_stats else None
+
+		return {
+			"success": True,
+			"data": {
+				"totalScans": total_scans,
+				"lifetimeScans": lifetime_scans,
+				"avgDailyScans": avg_daily,
+				"topTable": top_table_obj,
+				"perTable": table_stats,
+				"perOrderType": special_stats,
+				"dailyTrend": [
+					{"date": str(r.scan_date), "scanCount": r.scan_count}
+					for r in daily
+				],
+				"periodDays": days_int,
+			},
+		}
+	except Exception as e:
+		frappe.log_error(f"Error getting QR scan analytics: {str(e)}", "QR Analytics")
+		return {"success": False, "error": str(e)}
 
 
 def create_restaurant_config(self):

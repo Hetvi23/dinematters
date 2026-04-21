@@ -500,31 +500,45 @@ def cint(value):
 def parse_table_number_from_qr(qr_data, restaurant_id):
 	"""
 	Parse table number from QR code data.
-	QR code format: restaurant-id/table-number
-	Returns table number (int) or None if invalid
+	QR code format: restaurant-id/table-number  OR  base_url/restaurant-id/table-number
+
+	Security rule: if the QR data contains a restaurant-id segment that does NOT match
+	the current restaurant, we reject it entirely — we must NOT fall through to the
+	plain-number parser, as that would allow cross-restaurant table spoofing.
+
+	Returns table number (int > 0) or None if invalid.
 	"""
 	try:
 		if not qr_data:
 			return None
-		
-		# Check if QR data matches format: restaurant-id/table-number
+
+		# Check if QR data matches URL format (contains slashes)
 		if "/" in qr_data:
 			parts = qr_data.split("/")
-			if len(parts) == 2:
-				qr_restaurant_id = parts[0]
-				table_num_str = parts[1]
-				
-				# Validate restaurant ID matches
-				if qr_restaurant_id == restaurant_id:
+			# Handle full URL: base_url/restaurant-id/table-number
+			# Handle short format: restaurant-id/table-number
+			if len(parts) >= 2:
+				# restaurant_id is the second-to-last, table is the last
+				qr_restaurant_id = parts[-2]
+				table_num_str = parts[-1]
+
+				# If this segment looks like a restaurant slug (not a domain/protocol)
+				# match it against the current restaurant.
+				# A domain part will contain "." or be "http:"; restaurant IDs won't.
+				if "." not in qr_restaurant_id and qr_restaurant_id not in ("http:", "https:", ""):
+					if qr_restaurant_id != restaurant_id:
+						# Explicitly wrong restaurant — reject, do NOT fall through
+						return None
 					table_number = cint(table_num_str)
-					if table_number and table_number > 0:
+					if table_number > 0:
 						return table_number
-		
-		# If format doesn't match, try to parse as direct table number
+					return None
+
+		# If format is a plain number (no slashes or unrecognised URL), parse directly
 		table_number = cint(qr_data)
-		if table_number and table_number > 0:
+		if table_number > 0:
 			return table_number
-		
+
 		return None
 	except Exception as e:
 		frappe.log_error("QR Table Number Parse Error", str(e))
@@ -578,6 +592,16 @@ def parse_qr_code(qr_data):
 				}
 			}
 		
+		# Validate table number: must be a positive integer
+		if table_number <= 0:
+			return {
+				"success": False,
+				"error": {
+					"code": "INVALID_TABLE_NUMBER",
+					"message": f"Table number must be a positive integer (got {table_number})"
+				}
+			}
+
 		# Validate restaurant exists
 		if not frappe.db.exists("Restaurant", {"restaurant_id": restaurant_id}):
 			return {
@@ -587,15 +611,15 @@ def parse_qr_code(qr_data):
 					"message": f"Restaurant {restaurant_id} not found"
 				}
 			}
-		
-		# Validate table number
+
+		# Validate table number is within restaurant's range
 		restaurant = frappe.get_doc("Restaurant", {"restaurant_id": restaurant_id})
 		if not restaurant.tables or table_number > restaurant.tables:
 			return {
 				"success": False,
 				"error": {
 					"code": "INVALID_TABLE_NUMBER",
-					"message": f"Table number {table_number} is invalid for this restaurant"
+					"message": f"Table number {table_number} is invalid for this restaurant (max: {restaurant.tables or 0})"
 				}
 			}
 		

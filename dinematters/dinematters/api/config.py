@@ -238,6 +238,7 @@ def get_restaurant_config(restaurant_id):
 					"enable_delivery": bool(restaurant_doc.get("enable_delivery", 0)),
 					"enable_dine_in": bool(restaurant_doc.get("enable_dine_in", 1)),
 					"no_ordering": bool(restaurant_doc.get("no_ordering", 0)),
+					"packaging_fee_type": restaurant_doc.get("packaging_fee_type") or "Fixed",
 					"default_packaging_fee": flt(restaurant_doc.get("default_packaging_fee", 0)),
 					"minimum_order_value": flt(restaurant_doc.get("minimum_order_value", 0)),
 					"estimated_prep_time": cint(restaurant_doc.get("estimated_prep_time", 30) or 30)
@@ -391,6 +392,21 @@ def get_home_features(restaurant_id):
 		feature_names = [f.get("name") for f in features if f.get("name")]
 		media_batch = get_media_assets_batch("Home Feature", feature_names, ["home_feature_image"])
 		
+		# Get global toggles from Restaurant Config
+		global_config = frappe.db.get_value(
+			"Restaurant Config",
+			{"restaurant": restaurant},
+			["enable_table_booking", "enable_banquet_booking", "enable_events", "enable_offers", "enable_experience_lounge"],
+			as_dict=True
+		) or {}
+		
+		# Fallback to 1 (enabled) if config not yet created, matching get_restaurant_config fallback behavior
+		enable_table_booking = bool(global_config.get("enable_table_booking", 1))
+		enable_banquet_booking = bool(global_config.get("enable_banquet_booking", 1))
+		enable_events = bool(global_config.get("enable_events", 1))
+		enable_offers = bool(global_config.get("enable_offers", 1))
+		enable_experience_lounge = bool(global_config.get("enable_experience_lounge", 1))
+
 		formatted_features = []
 		for feature in features:
 			feature_name = feature.get("name")
@@ -407,6 +423,17 @@ def get_home_features(restaurant_id):
 				"isMandatory": bool(feature.get("is_mandatory", 0)),
 				"displayOrder": feature.get("display_order", 0)
 			}
+			
+			# Apply global toggle overrides (Multi-feature cards depend on at least one toggle being on)
+			if feature_data["id"] == "book-table":
+				if not (enable_table_booking or enable_banquet_booking):
+					feature_data["isEnabled"] = False
+			elif feature_data["id"] == "offers-events":
+				if not (enable_events or enable_offers):
+					feature_data["isEnabled"] = False
+			elif feature_data["id"] == "dine-play":
+				if not enable_experience_lounge:
+					feature_data["isEnabled"] = False
 			
 			# Check if we have batched media data
 			media_data = media_batch.get((feature_name, "home_feature_image"))
@@ -668,6 +695,7 @@ def update_order_settings(restaurant_id, settings):
 			"enable_delivery", 
 			"enable_dine_in",
 			"no_ordering",
+			"packaging_fee_type",
 			"default_packaging_fee", 
 			"minimum_order_value", 
 			"estimated_prep_time", 
@@ -748,6 +776,7 @@ def update_logistics_settings(restaurant_id, settings):
 			"preferred_logistics_provider",
 			"delivery_markup_type",
 			"delivery_markup_value",
+			"packaging_fee_type",
 			"default_packaging_fee" # Rebranded as Packaging + Operation Overhead
 		]
 		

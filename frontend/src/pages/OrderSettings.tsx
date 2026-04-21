@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { Truck, ShoppingBag, Clock, DollarSign, Settings, Percent, FileText } from 'lucide-react'
 
@@ -17,6 +18,7 @@ export default function OrderSettings() {
     enable_delivery: 0,
     enable_dine_in: 1,
     default_packaging_fee: 0,
+    packaging_fee_type: 'Fixed' as 'Fixed' | 'Percentage',
     minimum_order_value: 0,
     estimated_prep_time: 30,
     default_delivery_fee: 0,
@@ -38,6 +40,7 @@ export default function OrderSettings() {
         enable_delivery: restaurantDoc.enable_delivery ?? 0,
         enable_dine_in: restaurantDoc.enable_dine_in ?? 1,
         default_packaging_fee: restaurantDoc.default_packaging_fee ?? 0,
+        packaging_fee_type: (restaurantDoc.packaging_fee_type as any) || 'Fixed',
         minimum_order_value: restaurantDoc.minimum_order_value ?? 0,
         estimated_prep_time: restaurantDoc.estimated_prep_time ?? 30,
         default_delivery_fee: restaurantDoc.default_delivery_fee ?? 0,
@@ -61,6 +64,7 @@ export default function OrderSettings() {
           enable_takeaway: settings.enable_takeaway,
           enable_delivery: settings.enable_delivery,
           enable_dine_in: settings.enable_dine_in,
+          packaging_fee_type: settings.packaging_fee_type,
           default_packaging_fee: settings.default_packaging_fee,
           minimum_order_value: settings.minimum_order_value,
           estimated_prep_time: settings.estimated_prep_time,
@@ -306,23 +310,44 @@ export default function OrderSettings() {
                 <p className="text-xs text-muted-foreground">Default estimated time shown to customers</p>
               </div>
 
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <DollarSign className="w-4 h-4" />
-                  Packaging Fee
-                </Label>
-                <div className="flex items-center rounded-md border border-input bg-background overflow-hidden">
-                  <span className="flex h-8 items-center border-r border-input px-3 text-sm leading-none text-muted-foreground font-medium">
-                    ₹
-                  </span>
-                  <Input
-                    type="number"
-                    className="h-8 border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:border-0"
-                    value={settings.default_packaging_fee || ''}
-                    onChange={(e) => handleNumberChange('default_packaging_fee', e.target.value)}
-                  />
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4" />
+                    Packaging Fee Type
+                  </Label>
+                  <Select
+                    value={settings.packaging_fee_type}
+                    onValueChange={(val: any) => setSettings(prev => ({ ...prev, packaging_fee_type: val }))}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Fixed">Fixed Amount (₹)</SelectItem>
+                      <SelectItem value="Percentage">Percentage of Order (%)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <p className="text-xs text-muted-foreground">Additional fee applied to takeaway and delivery orders</p>
+
+                <div className="space-y-2">
+                  <Label>Packaging Fee Value</Label>
+                  <div className="flex items-center rounded-md border border-input bg-background overflow-hidden px-3 h-10">
+                    {settings.packaging_fee_type === 'Fixed' && <span className="mr-2 text-sm text-muted-foreground font-medium">₹</span>}
+                    <Input
+                      type="number"
+                      className="h-8 border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:border-0 p-0"
+                      value={settings.default_packaging_fee || ''}
+                      onChange={(e) => handleNumberChange('default_packaging_fee', e.target.value)}
+                    />
+                    {settings.packaging_fee_type === 'Percentage' && <span className="ml-2 text-sm text-muted-foreground font-medium">%</span>}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {settings.packaging_fee_type === 'Percentage' 
+                      ? `${settings.default_packaging_fee}% of order total applied as packaging fee.`
+                      : `Flat ₹${settings.default_packaging_fee} applied to takeaway and delivery orders.`}
+                  </p>
+                </div>
               </div>
 
               <div className="space-y-2">

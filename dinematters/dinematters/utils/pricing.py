@@ -112,9 +112,17 @@ def calculate_cart_totals(restaurant, items, coupon_code=None, loyalty_coins=0, 
 			# No location provided or not serviceable, use static default if serviceable, else 0
 			delivery_fee = flt(restaurant_doc.default_delivery_fee or 0) if serviceable else 0
 			
-		packaging_fee = flt(restaurant_doc.default_packaging_fee or 0)
+		packaging_fee_val = flt(restaurant_doc.default_packaging_fee or 0)
+		if restaurant_doc.packaging_fee_type == "Percentage":
+			packaging_fee = round(subtotal * (packaging_fee_val / 100.0), 2)
+		else:
+			packaging_fee = packaging_fee_val
 	elif delivery_type == "Takeaway":
-		packaging_fee = flt(restaurant_doc.default_packaging_fee or 0)
+		packaging_fee_val = flt(restaurant_doc.default_packaging_fee or 0)
+		if restaurant_doc.packaging_fee_type == "Percentage":
+			packaging_fee = round(subtotal * (packaging_fee_val / 100.0), 2)
+		else:
+			packaging_fee = packaging_fee_val
 
 	# 6. Final Total
 	# Total = (Subtotal - Discount) + Tax + Fees - Loyalty
