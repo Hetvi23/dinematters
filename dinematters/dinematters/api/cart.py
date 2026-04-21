@@ -14,39 +14,15 @@ from dinematters.dinematters.utils.api_helpers import (
 	validate_product_belongs_to_restaurant,
 	get_product_from_id
 )
+from dinematters.dinematters.utils.customization_helpers import load_product_customizations, validate_customizations
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 import json
 import random
 import string
 from datetime import datetime
+from collections import defaultdict
 
-def load_customization_options(product_doc):
-	"""
-	Load customization options for a product
-	Frappe doesn't automatically load nested child tables, so we need to manually load options
-	"""
-	if not product_doc.customization_questions:
-		return
-	
-	for question in product_doc.customization_questions:
-		# Load options for this question
-		options_list = frappe.get_all(
-			"Customization Option",
-			filters={
-				"parent": question.name,
-				"parenttype": "Customization Question",
-				"parentfield": "options"
-			},
-			fields=["option_id", "label", "price", "is_vegetarian", "is_default", "display_order"],
-			order_by="display_order asc"
-		)
-		
-		# Convert to objects and attach to question
-		question.options = []
-		for opt in options_list:
-			# Create a simple object with the option data
-			option_obj = frappe._dict(opt)
-			question.options.append(option_obj)
+# Handled by customization_helpers
 
 
 @frappe.whitelist(allow_guest=True)
@@ -83,7 +59,7 @@ def add_to_cart(restaurant_id, dish_id, quantity=1, customizations=None, session
 		product = frappe.get_doc("Menu Product", dish_id)
 		
 		# Load customization options (nested child table)
-		load_customization_options(product)
+		load_product_customizations(product)
 		
 		# Validate product belongs to restaurant
 		if product.restaurant != restaurant:
@@ -104,10 +80,13 @@ def add_to_cart(restaurant_id, dish_id, quantity=1, customizations=None, session
 				}
 			}
 		
-		# Parse customizations
+		# Parse and Validate customizations
 		if isinstance(customizations, str):
 			customizations = json.loads(customizations) if customizations else {}
 		customizations = customizations or {}
+		
+		# Validate required customizations
+		validate_customizations(product, customizations)
 		
 		# Calculate unit price (base + customizations)
 		unit_price = flt(product.price)
@@ -194,8 +173,16 @@ def add_to_cart(restaurant_id, dish_id, quantity=1, customizations=None, session
 				"cart": cart_summary
 			}
 		}
+	except (frappe.DoesNotExistError, frappe.ValidationError) as e:
+		return {
+			"success": False,
+			"error": {
+				"code": "RESTAURANT_NOT_FOUND" if isinstance(e, frappe.DoesNotExistError) else "VALIDATION_ERROR",
+				"message": str(e)
+			}
+		}
 	except Exception as e:
-		frappe.log_error(f"Error in add_to_cart: {str(e)}")
+		frappe.log_error("Error in add_to_cart", str(e))
 		return {
 			"success": False,
 			"error": {
@@ -421,6 +408,9 @@ def clear_cart(restaurant_id, session_id=None):
 
 
 # Helper functions
+
+# Handled by customization_helpers
+
 
 def find_existing_cart_entry(user, session_id, restaurant, dish_id, customizations):
 	"""Find existing cart entry with same product, restaurant, and customizations"""

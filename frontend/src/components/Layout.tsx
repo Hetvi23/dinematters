@@ -110,8 +110,8 @@ type NavGroup = {
 }
 type NavItem = NavLink | NavGroup
 
-const DIAMOND_ONLY_FEATURES = ['loyalty', 'coupons', 'pos_integration', 'customer', 'customer_pay_and_usage', 'marketing_studio', 'google_growth_sync', 'google_growth_ai']
-const GOLD_FEATURES = ['ordering', 'order_settings', 'analytics', 'ai_recommendations', 'custom_branding', 'table_booking', 'games', 'events', 'offers', 'experience_lounge', 'video_upload', 'branding', 'whatsapp_orders', 'google_growth']
+const DIAMOND_ONLY_FEATURES = ['ordering', 'order_settings', 'loyalty', 'coupons', 'pos_integration', 'customer', 'customer_pay_and_usage', 'marketing_studio', 'google_growth_sync', 'google_growth_ai']
+const GOLD_FEATURES = ['analytics', 'ai_recommendations', 'custom_branding', 'table_booking', 'games', 'events', 'offers', 'experience_lounge', 'video_upload', 'branding', 'whatsapp_orders', 'google_growth']
 
 const navigation: NavItem[] = [
   { type: 'link', name: 'Dashboard', href: '/dashboard', icon: Home },

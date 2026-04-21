@@ -14,6 +14,7 @@ from dinematters.dinematters.utils.api_helpers import (
 	validate_product_belongs_to_restaurant,
 	get_product_from_id
 )
+from dinematters.dinematters.utils.customization_helpers import load_product_customizations, validate_customizations
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 from dinematters.dinematters.utils.feature_gate import require_plan
 from dinematters.dinematters.utils.customer_helpers import (
@@ -30,33 +31,7 @@ import random
 import string
 from datetime import datetime
 
-def load_customization_options(product_doc):
-	"""
-	Load customization options for a product
-	Frappe doesn't automatically load nested child tables, so we need to manually load options
-	"""
-	if not product_doc.customization_questions:
-		return
-	
-	for question in product_doc.customization_questions:
-		# Load options for this question
-		options_list = frappe.get_all(
-			"Customization Option",
-			filters={
-				"parent": question.name,
-				"parenttype": "Customization Question",
-				"parentfield": "options"
-			},
-			fields=["option_id", "label", "price", "is_vegetarian", "is_default", "display_order"],
-			order_by="display_order asc"
-		)
-		
-		# Convert to objects and attach to question
-		question.options = []
-		for opt in options_list:
-			# Create a simple object with the option data
-			option_obj = frappe._dict(opt)
-			question.options.append(option_obj)
+# Handled by customization_helpers
 
 @frappe.whitelist(allow_guest=True)
 @require_plan('GOLD', 'DIAMOND')
@@ -188,7 +163,10 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 			# Use actual document name for operations
 			dish_id = actual_dish_id
 			product = frappe.get_doc("Menu Product", dish_id)
-			load_customization_options(product)
+			load_product_customizations(product)
+			
+			# Validate customizations
+			validate_customizations(product, customizations)
 			
 			if product.restaurant != restaurant:
 				return {"success": False, "error": {"code": "PRODUCT_NOT_FOUND", "message": f"Product {dish_id} invalid for restaurant"}}
@@ -469,6 +447,7 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 
 
 @frappe.whitelist(allow_guest=True)
+@require_plan('DIAMOND')
 def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None, admin_mode=False, date_from=None, date_to=None, search_query=None, recent_only=False, phone=None):
 	"""
 	GET /api/v1/orders
@@ -896,6 +875,7 @@ def get_order(restaurant_id, order_id):
 
 
 @frappe.whitelist()
+@require_plan('DIAMOND')
 def update_order_items(order_id, items, restaurant_id):
 	"""
 	PATCH /api/v1/orders/:orderId/items
@@ -969,7 +949,10 @@ def update_order_items(order_id, items, restaurant_id):
 			dish_id = actual_dish_id
 			
 			product = frappe.get_doc("Menu Product", dish_id)
-			load_customization_options(product)
+			load_product_customizations(product)
+			
+			# Validate customizations (ensures dashboard edits follow business rules)
+			validate_customizations(product, customizations)
 			
 			if product.restaurant != restaurant:
 				return {"success": False, "error": {"code": "PRODUCT_NOT_FOUND", "message": f"Product {dish_id} invalid for restaurant"}}
@@ -1026,6 +1009,9 @@ def update_order_items(order_id, items, restaurant_id):
 		}
 
 
+@frappe.whitelist()
+@require_plan('DIAMOND')
+def update_order_status(order_id, status):
 	"""
 	PATCH /api/v1/orders/:orderId/status
 	Update order status (admin/backend only)
@@ -1086,7 +1072,7 @@ def format_order(order_doc):
 	
 	for item in order_doc.order_items:
 		product = frappe.get_doc("Menu Product", item.product)
-		load_customization_options(product)
+		load_product_customizations(product)
 		customizations = json.loads(item.customizations) if item.customizations else {}
 		
 		# Recalculate unit price with customizations (fixes old orders with incorrect pricing)

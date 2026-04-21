@@ -15,6 +15,7 @@ from dinematters.dinematters.utils.api_helpers import (
 )
 from dinematters.dinematters.media.utils import get_media_asset_data
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
+from dinematters.dinematters.utils.customization_helpers import get_customization_options_map, load_product_customizations
 import json
 from collections import defaultdict
 
@@ -335,26 +336,7 @@ def get_customization_questions_map(product_names):
 	return questions_by_product, question_names
 
 
-def get_customization_options_map(question_names):
-	options_by_question = defaultdict(list)
-	if not question_names:
-		return options_by_question
-
-	option_rows = frappe.get_all(
-		"Customization Option",
-		filters={
-			"parent": ["in", question_names],
-			"parenttype": "Customization Question",
-			"parentfield": "options"
-		},
-		fields=["parent", "option_id", "label", "price", "is_vegetarian", "is_default"],
-		order_by="parent asc, display_order asc, idx asc"
-	)
-
-	for option_row in option_rows:
-		options_by_question[option_row["parent"]].append(option_row)
-
-	return options_by_question
+# Handled by customization_helpers
 
 
 
@@ -388,7 +370,8 @@ def format_product_from_row(product_row, media_rows, customization_questions, op
 				opt_data = {
 					"id": opt.get("option_id"),
 					"label": opt.get("label"),
-					"price": flt(opt.get("price")) or 0
+					"price": flt(opt.get("price")) or 0,
+					"displayOrder": cint(opt.get("display_order"))
 				}
 				if opt.get("is_vegetarian") is not None:
 					opt_data["isVegetarian"] = bool(opt.get("is_vegetarian"))
@@ -631,50 +614,42 @@ def format_product(product_doc):
 	elif product_doc.has_no_media:
 		product["hasNoMedia"] = True
 	
-	# Customization Questions
+	# Customization Questions - Optimized bulk loading
 	if product_doc.customization_questions:
+		# Attach options to questions
+		load_product_customizations(product_doc)
+		
 		customization_questions = []
 		for question in product_doc.customization_questions:
 			question_data = {
 				"id": question.question_id,
 				"title": question.title,
 				"type": question.question_type,
-				"required": bool(question.is_required)
+				"required": bool(question.is_required),
+				"displayOrder": cint(question.display_order)
 			}
 			
 			if question.subtitle:
 				question_data["subtitle"] = question.subtitle
 			
-			# Get options - need to manually load nested child table
-			# Customization Option is a child table of Customization Question
-			options_list = frappe.get_all(
-				"Customization Option",
-				filters={
-					"parent": question.name,
-					"parenttype": "Customization Question",
-					"parentfield": "options"
-				},
-				fields=["option_id", "label", "price", "is_vegetarian", "is_default"],
-				order_by="display_order asc"
-			)
-			
-			if options_list:
-				options = []
-				for opt in options_list:
-					option_data = {
-						"id": opt.option_id,
-						"label": opt.label,
-						"price": flt(opt.price) or 0
-					}
-					
-					if opt.is_vegetarian is not None:
-						option_data["isVegetarian"] = bool(opt.is_vegetarian)
-					
-					if opt.is_default:
-						option_data["isDefault"] = True
-					
-					options.append(option_data)
+			options = []
+			for opt in question.get("options", []):
+				option_data = {
+					"id": opt.option_id,
+					"label": opt.label,
+					"price": flt(opt.price) or 0,
+					"displayOrder": cint(opt.display_order)
+				}
 				
+				if opt.is_vegetarian is not None:
+					option_data["isVegetarian"] = bool(opt.is_vegetarian)
+				
+				if opt.is_default:
+					option_data["isDefault"] = True
+				
+				options.append(option_data)
+			
+			if options:
 				question_data["options"] = options
 			
 			customization_questions.append(question_data)

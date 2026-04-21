@@ -20,13 +20,13 @@ import inspect
 # Features listed here require specific plan types
 FEATURE_PLAN_MAP = {
     # DIAMOND Only features (Transactional/Full Automation)
-    'ordering': ['GOLD', 'DIAMOND'],
+    'ordering': ['DIAMOND'],
     'loyalty': ['DIAMOND'],
     'pos_integration': ['DIAMOND'],
     'coupons': ['DIAMOND'],
     'data_export': ['DIAMOND'],
     'customer': ['DIAMOND'],
-    'order_settings': ['GOLD', 'DIAMOND'],
+    'order_settings': ['DIAMOND'],
     'customer_pay_and_usage': ['DIAMOND'],
     
     # Marketing Studio (Campaigns, Automation, Segments) - DIAMOND only
