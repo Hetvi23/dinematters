@@ -8,6 +8,7 @@ Fast2SMS & Evolution API OTP service.
 import re
 import requests
 import frappe
+from dinematters.dinematters.utils.customer_helpers import normalize_phone
 
 FAST2SMS_SMS_URL = "https://www.fast2sms.com/dev/bulkV2"
 OTP_LENGTH = 6
@@ -62,7 +63,7 @@ def send_otp_via_whatsapp(api_key: str, phone: str, otp: str) -> bool:
 		if not phone_id or not template:
 			return False
 
-		to = re.sub(r"\D", "", str(phone))
+		to = normalize_phone(phone)
 		if len(to) == 10 and not to.startswith("91"):
 			to = "91" + to
 
@@ -96,7 +97,7 @@ def send_otp_via_msg91_whatsapp(auth_key: str, mobile: str, otp: str, template: 
 		if not auth_key or not template:
 			return False
 
-		to = re.sub(r"\D", "", str(mobile))
+		to = normalize_phone(mobile)
 		if len(to) == 10:
 			to = "91" + to
 
@@ -177,7 +178,7 @@ def send_otp_via_evolution_api(url: str, api_key: str, instance: str, phone: str
 		if not url or not api_key or not instance:
 			return False
 
-		to = re.sub(r"\D", "", str(phone))
+		to = normalize_phone(phone)
 		if len(to) == 10 and not to.startswith("91"):
 			to = "91" + to
 

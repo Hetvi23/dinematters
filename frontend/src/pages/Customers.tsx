@@ -136,7 +136,7 @@ export default function Customers() {
     setProfileLoading(true)
     setProfileData(null)
     try {
-      const res = await getCustomerProfile({ customer_id: customerId })
+      const res = await getCustomerProfile({ customer_id: customerId, restaurant_id: selectedRestaurant })
       const body = (res as { message?: CustomerProfileData })?.message ?? (res as CustomerProfileData)
       setProfileData(body)
     } catch {
@@ -361,17 +361,39 @@ export default function Customers() {
       <Dialog open={!!profileCustomerId} onOpenChange={(open) => !open && setProfileCustomerId(null)}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border-none shadow-2xl p-0">
           <div className="bg-muted/30 p-6 rounded-t-2xl border-b border-border/50">
-            <DialogHeader>
-              <div className="h-10 w-10 bg-primary/10 rounded-xl flex items-center justify-center mb-2">
-                 <Users className="h-5 w-5 text-primary" />
+            <DialogHeader className="flex flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
+                   <Users className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <DialogTitle className="text-xl font-bold tracking-tight">
+                      {profileData?.data?.customer?.customerName || "Customer Profile"}
+                    </DialogTitle>
+                    {profileData?.data?.customer?.verifiedAt && (
+                      <Badge variant="secondary" className="gap-1 bg-emerald-500/10 text-emerald-600 border-none shadow-none px-2 py-0 h-5 text-[10px]">
+                        <CheckCircle className="h-3 w-3" />
+                        Verified
+                      </Badge>
+                    )}
+                  </div>
+                  {profileData?.data?.customer ? (
+                    <DialogDescription className="text-sm font-medium mt-1 text-muted-foreground flex items-center gap-2">
+                      <span>{profileData.data.customer.phone}</span>
+                      {profileData.data.customer.email && <span>•</span>}
+                      {profileData.data.customer.email && <span>{profileData.data.customer.email}</span>}
+                    </DialogDescription>
+                  ) : (
+                    <DialogDescription className="text-xs">
+                      Insights and order history for this customer
+                    </DialogDescription>
+                  )}
+                </div>
               </div>
-              <DialogTitle className="text-xl font-bold tracking-tight">Global customer profile</DialogTitle>
-              <DialogDescription className="text-xs">
-                Insights across all restaurant networks for this user
-              </DialogDescription>
             </DialogHeader>
           </div>
-          <div className="p-6">
+          <div className="p-6 pt-4">
             {profileLoading ? (
               <div className="flex flex-col items-center justify-center py-20 space-y-4">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -379,56 +401,55 @@ export default function Customers() {
               </div>
             ) : profileData?.data ? (
               <div className="space-y-6">
-                <div className="rounded-2xl bg-primary/5 p-5 border border-primary/10">
-                  <h4 className="font-bold text-sm uppercase tracking-wider mb-3 text-primary/80">Identity</h4>
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-lg font-bold">{profileData.data.customer.customerName}</p>
-                    <div className="flex items-center gap-3">
-                      <p className="text-sm font-medium text-muted-foreground">{profileData.data.customer.phone}</p>
-                      {profileData.data.customer.email && <span className="text-muted-foreground">•</span>}
-                      {profileData.data.customer.email && <p className="text-sm font-medium text-muted-foreground">{profileData.data.customer.email}</p>}
-                    </div>
-                  </div>
-                  {profileData.data.customer.verifiedAt && (
-                    <Badge variant="secondary" className="mt-4 gap-1.5 bg-emerald-500/10 text-emerald-600 border-none shadow-none px-3">
-                      <CheckCircle className="h-3.5 w-3.5" />
-                      Verified Identity
-                    </Badge>
-                  )}
-                </div>
-                
-                <div className="space-y-4">
-                   <h4 className="font-bold text-sm uppercase tracking-wider pl-1">Network Activity</h4>
+                <div>
                    {profileData.data.restaurants.map((rest) => (
-                    <Card key={rest.restaurant_id} className="border-none shadow-sm ring-1 ring-border rounded-xl">
-                      <CardHeader className="py-3 px-4 bg-muted/20 border-b border-border/50">
-                         <h4 className="font-bold text-sm">{rest.restaurant_name}</h4>
-                      </CardHeader>
-                      <CardContent className="p-4 space-y-3">
+                    <div key={rest.restaurant_id} className="space-y-4">
                         {rest.orders && rest.orders.length > 0 && (
                           <div className="text-sm">
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Orders List</p>
-                            <ul className="space-y-2">
-                              {rest.orders.map((o: OrderItem) => (
-                                <li key={o.name} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 border border-transparent hover:border-border transition-all">
-                                  <div className="flex flex-col">
-                                    <Link to={`/orders/${o.name}`} className="text-primary font-bold text-xs hover:underline">
-                                      {o.order_number}
-                                    </Link>
-                                    <span className="text-[10px] text-muted-foreground font-medium pt-0.5">{formatDate(o.creation)}</span>
-                                  </div>
-                                  <div className="flex items-center gap-4">
-                                     <span className="text-xs font-bold">{formatAmountNoDecimals(o.total ?? 0)}</span>
-                                     {(o.food_rating ?? o.customer_rating) != null && (
-                                      <Badge variant="outline" className="border-amber-200 text-amber-600 bg-amber-50 h-5 px-1.5 py-0 text-[10px] font-bold">
-                                        <Star className="h-2.5 w-2.5 fill-amber-500 mr-1" />
-                                        {o.food_rating ?? o.customer_rating}.0
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </li>
-                              ))}
-                            </ul>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Order History</p>
+                            <div className="rounded-md border bg-card/50">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="pl-4 h-9 text-xs">Order #</TableHead>
+                                    <TableHead className="h-9 text-xs">Date</TableHead>
+                                    <TableHead className="h-9 text-xs">Amount</TableHead>
+                                    <TableHead className="text-center h-9 text-xs">Status</TableHead>
+                                    <TableHead className="h-9 text-xs">Rating</TableHead>
+                                    <TableHead className="text-right pr-4 h-9 text-xs">Actions</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {rest.orders.map((o: OrderItem) => (
+                                    <TableRow key={o.name} className="hover:bg-muted/50 border-border/50">
+                                      <TableCell className="pl-4 font-bold text-primary py-2 text-xs">
+                                        <Link to={`/orders/${o.name}`} className="hover:underline">
+                                          {o.order_number}
+                                        </Link>
+                                      </TableCell>
+                                      <TableCell className="text-muted-foreground py-2 text-xs">{formatDate(o.creation)}</TableCell>
+                                      <TableCell className="font-bold py-2 text-xs">{formatAmountNoDecimals(o.total ?? 0)}</TableCell>
+                                      <TableCell className="text-center py-2 text-xs">
+                                        <Badge variant="outline" className="capitalize text-[10px] h-5 py-0 px-1.5">{o.status}</Badge>
+                                      </TableCell>
+                                      <TableCell className="py-2 text-xs">
+                                        {(o.food_rating ?? o.customer_rating) != null ? (
+                                          <Badge variant="outline" className="border-amber-200 text-amber-600 bg-amber-50 h-5 px-1.5 py-0 text-[10px] font-bold">
+                                            <Star className="h-2.5 w-2.5 fill-amber-500 mr-1" />
+                                            {o.food_rating ?? o.customer_rating}.0
+                                          </Badge>
+                                        ) : <span className="text-muted-foreground/50">—</span>}
+                                      </TableCell>
+                                      <TableCell className="text-right pr-4 py-2">
+                                        <Link to={`/orders/${o.name}`}>
+                                          <Button variant="ghost" size="sm" className="h-6 text-[10px] font-semibold px-2">View</Button>
+                                        </Link>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
                           </div>
                         )}
                         <div className="flex gap-4">
@@ -446,17 +467,18 @@ export default function Customers() {
                         {(!rest.orders || rest.orders.length === 0) &&
                           (!rest.tableBookings || rest.tableBookings.length === 0) &&
                           (!rest.banquetBookings || rest.banquetBookings.length === 0) && (
-                            <p className="text-xs text-muted-foreground italic py-2">No transaction history detected here.</p>
+                            <div className="py-12 flex flex-col items-center justify-center border rounded-md border-dashed border-border/60 bg-muted/10">
+                               <p className="text-sm font-medium text-muted-foreground">No transaction history found</p>
+                            </div>
                           )}
-                      </CardContent>
-                    </Card>
+                    </div>
                   ))}
                 </div>
               </div>
             ) : profileData && !profileData.data && (
               <div className="py-20 text-center">
                  <p className="text-muted-foreground text-sm font-medium">
-                  {profileData.error || 'Identity retrieval failed. Please try again.'}
+                  {profileData.error || 'Profile retrieval failed. Please try again.'}
                 </p>
               </div>
             )}

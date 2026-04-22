@@ -5,9 +5,11 @@
 const VERIFIED_PHONE_KEY = 'dinematters_verified_phone'
 const VERIFIED_AT_KEY = 'dinematters_verified_at'
 
-/** Normalize phone to 10 digits for comparison */
+/** Normalize phone by stripping non-numeric chars and extracting base 10 digits */
 export function normalizePhone(phone: string): string {
   const digits = (phone || '').replace(/\D/g, '')
+  // If it's longer than 10 digits (e.g. 918850603518), take the last 10
+  // This is a simple frontend normalization; the backend will do strict E.164 parsing
   return digits.length >= 10 ? digits.slice(-10) : digits
 }
 

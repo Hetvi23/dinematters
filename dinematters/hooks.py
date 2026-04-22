@@ -358,3 +358,4 @@ website_route_rules = [
 # (ProtectedRoute then redirects to /dinematters/login)
 website_redirects = [{"source": "/", "target": "/dinematters"}]
 
+fixtures = [{"dt": "Custom Field", "filters": [["module", "=", "Dinematters"]]}]

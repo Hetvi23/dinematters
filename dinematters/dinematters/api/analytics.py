@@ -538,6 +538,95 @@ def get_dashboard_summary(restaurant_id):
 				scan_efficiency = "Low"
 			summary["enhanced"]["scanEfficiency"] = scan_efficiency
 
+			# ── 2.5 Menu Heatmap (Views vs Orders) ───────────────────────────
+			heatmap_raw = frappe.db.sql("""
+				SELECT 
+					v.item_name,
+					v.views,
+					COALESCE(o.orders, 0) as orders
+				FROM (
+					SELECT event_value as item_name, COUNT(*) as views
+					FROM `tabAnalytics Event`
+					WHERE restaurant = %s AND event_type = 'item_view'
+					AND creation BETWEEN %s AND %s
+					GROUP BY event_value
+				) v
+				LEFT JOIN (
+					SELECT oi.product_name as item_name, COUNT(*) as orders
+					FROM `tabOrder Item` oi
+					INNER JOIN `tabOrder` ord ON ord.name = oi.parent
+					WHERE ord.restaurant = %s
+					AND ord.creation BETWEEN %s AND %s
+					AND ord.status NOT IN ('cancelled', 'pending_verification')
+					GROUP BY oi.product_name
+				) o ON v.item_name = o.item_name
+				ORDER BY v.views DESC
+				LIMIT 10
+			""", (restaurant_id, start_date_7d, end_date, restaurant_id, start_date_7d, end_date), as_dict=True)
+
+			summary["menuHeatmap"] = []
+			for row in heatmap_raw:
+				views = row.views or 0
+				orders = row.orders or 0
+				item_conv = round((orders / views * 100), 1) if views > 0 else 0
+				
+				status = "Optimal"
+				if views > 10 and item_conv < 5:
+					status = "Check Price"
+				elif views > 5 and item_conv == 0:
+					status = "High Friction"
+
+				summary["menuHeatmap"].append({
+					"item_name": row.item_name,
+					"views": views,
+					"orders": orders,
+					"conversion": item_conv,
+					"status": status
+				})
+
+			# ── 2.6 QR ROAS (Revenue per Source) ─────────────────────────────
+			qr_revenue_raw = frappe.db.sql("""
+				SELECT 
+					CASE 
+						WHEN table_number IS NOT NULL AND table_number > 0 THEN 'Table QR'
+						WHEN order_type = 'takeaway' THEN 'Takeaway QR'
+						WHEN order_type = 'delivery' THEN 'Delivery QR'
+						ELSE 'Entrance/General'
+					END as source,
+					SUM(total) as revenue,
+					COUNT(*) as order_count
+				FROM `tabOrder`
+				WHERE restaurant = %s
+				AND creation BETWEEN %s AND %s
+				AND status NOT IN ('cancelled', 'pending_verification')
+				GROUP BY source
+			""", (restaurant_id, start_date_7d, end_date), as_dict=True)
+			
+			social_revenue_raw = frappe.db.sql("""
+				SELECT SUM(total) as revenue, COUNT(*) as orders
+				FROM `tabOrder`
+				WHERE restaurant = %s
+				AND referral_link IS NOT NULL AND referral_link != ''
+				AND creation BETWEEN %s AND %s
+				AND status NOT IN ('cancelled', 'pending_verification')
+			""", (restaurant_id, start_date_7d, end_date), as_dict=True)[0]
+			
+			summary["qrRoas"] = [
+				{
+					"source": r.source,
+					"revenue": flt(r.revenue),
+					"orders": r.order_count
+				}
+				for r in qr_revenue_raw
+			]
+			
+			if social_revenue_raw.revenue:
+				summary["qrRoas"].append({
+					"source": "Social Media",
+					"revenue": flt(social_revenue_raw.revenue),
+					"orders": social_revenue_raw.orders
+				})
+
 		return summary
 	except Exception as e:
 		frappe.log_error(f"Error in get_dashboard_summary: {str(e)}")

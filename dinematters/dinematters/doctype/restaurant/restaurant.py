@@ -106,9 +106,6 @@ class Restaurant(Document):
 		
 		# Prevent non-admin reactivation if suspended for billing
 		self.validate_billing_reactivation()
-		
-		# Note: QR codes are no longer auto-generated on table update
-		# They must be explicitly generated via the generate_qr_codes_pdf method
 	
 	def validate_plan_change(self):
 		"""Validate subscription plan changes - admin only"""
@@ -768,8 +765,8 @@ def record_qr_scan(restaurant_id, table_number=None, order_type=None):
 		# Log as analytics event
 		session_id = frappe.local.request.headers.get("X-Session-Id", "anonymous") if frappe.local.request else "anonymous"
 		
-		# Event value format: "T{num}" for table, or "{order_type}" for special QRs
-		event_value = f"T{table_val}" if table_val else (order_type or "unknown")
+		# Event value format: "T{num}" for table, or "{order_type}" for special QRs, or "entrance"
+		event_value = f"T{table_val}" if table_val else (order_type or "entrance")
 		
 		doc = frappe.get_doc({
 			"doctype": "Analytics Event",

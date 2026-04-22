@@ -4,6 +4,7 @@
 import frappe
 import requests
 import re
+from dinematters.dinematters.utils.customer_helpers import normalize_phone
 
 def send_whatsapp_message(phone, message, settings=None):
     """
@@ -23,7 +24,7 @@ def send_whatsapp_message(phone, message, settings=None):
         return False, "Evolution API not configured in Dinematters Settings"
 
     # Clean phone number (Evolution API expects digits only)
-    phone_clean = re.sub(r"\D", "", str(phone))
+    phone_clean = normalize_phone(phone)
     if len(phone_clean) == 10 and not phone_clean.startswith("91"):
         phone_clean = "91" + phone_clean
 

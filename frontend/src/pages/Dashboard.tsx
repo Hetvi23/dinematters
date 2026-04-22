@@ -27,6 +27,17 @@ import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { useCurrency } from '@/hooks/useCurrency'
 import { cn, copyToClipboard } from '@/lib/utils'
+import { 
+  PieChart, 
+  Pie, 
+  Cell, 
+  ResponsiveContainer, 
+  Tooltip as RechartsTooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis
+} from 'recharts'
 
 // Enhanced Stat Card with Trends
 function StatCard({ 
@@ -146,6 +157,123 @@ function TopProductsChart({ products }: { products: { name: string, count: numbe
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+// Menu Heatmap Table (Views vs Orders Gap)
+function MenuHeatmapTable({ heatmap }: { heatmap: any[] }) {
+  if (!heatmap || heatmap.length === 0) return null
+  
+  return (
+    <div className="space-y-6 mt-4">
+      {/* Visual Bar Chart for Top Gap Items */}
+      <div className="h-[200px] w-full bg-muted/5 rounded-2xl p-4 border border-border/20">
+        <p className="text-[10px] uppercase font-bold text-muted-foreground mb-4 tracking-widest text-center">Engagement vs Conversion</p>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={heatmap.slice(0, 5)} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+            <XAxis dataKey="item_name" hide />
+            <YAxis hide />
+            <RechartsTooltip 
+               cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+               contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+            />
+            <Bar dataKey="views" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={20} name="Views (Interest)" />
+            <Bar dataKey="orders" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} name="Orders (Sales)" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="grid grid-cols-4 text-[10px] uppercase font-bold text-muted-foreground px-2">
+        <span className="col-span-2">Dish Name</span>
+        <span className="text-center">Views</span>
+        <span className="text-right">Conv.</span>
+      </div>
+      <div className="space-y-1">
+        {heatmap.map((item, i) => (
+          <div key={i} className="group grid grid-cols-4 items-center p-2 rounded-xl bg-muted/20 hover:bg-muted/40 transition-all border border-transparent hover:border-border/40">
+            <div className="col-span-2 flex flex-col">
+              <span className="text-xs font-bold truncate">{item.item_name}</span>
+              <span className={cn(
+                "text-[9px] font-medium",
+                item.status === 'Optimal' ? "text-emerald-500" : "text-amber-500"
+              )}>
+                {item.status}
+              </span>
+            </div>
+            <div className="text-center">
+              <span className="text-xs font-mono">{item.views}</span>
+            </div>
+            <div className="text-right flex flex-col items-end">
+              <span className={cn(
+                "text-xs font-bold",
+                item.conversion > 10 ? "text-emerald-500" : item.conversion > 5 ? "text-amber-500" : "text-rose-500"
+              )}>
+                {item.conversion}%
+              </span>
+              <div className="h-1 w-10 bg-muted rounded-full mt-1 overflow-hidden">
+                <div 
+                  className={cn(
+                    "h-full rounded-full transition-all duration-700",
+                    item.conversion > 10 ? "bg-emerald-500" : item.conversion > 5 ? "bg-amber-500" : "bg-rose-500"
+                  )}
+                  style={{ width: `${Math.min(item.conversion * 2, 100)}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// QR ROAS Breakdown with Donut Chart
+function QRRoasSection({ roas }: { roas: any[] }) {
+  if (!roas || roas.length === 0) return null
+  const { formatAmountNoDecimals } = useCurrency()
+  
+  const COLORS = ['#6366f1', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b']
+
+  return (
+    <div className="space-y-6 mt-4">
+      <div className="h-[180px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={roas}
+              cx="50%"
+              cy="50%"
+              innerRadius={60}
+              outerRadius={80}
+              paddingAngle={5}
+              dataKey="revenue"
+              nameKey="source"
+            >
+              {roas.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              ))}
+            </Pie>
+            <RechartsTooltip 
+              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+              formatter={(value: any) => [formatAmountNoDecimals(value), 'Revenue']}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {roas.map((item, i) => (
+          <div key={i} className="p-3 rounded-xl bg-muted/20 border border-border/40 space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+              <span className="text-[10px] font-bold uppercase tracking-tight truncate">{item.source}</span>
+            </div>
+            <p className="text-sm font-black">{formatAmountNoDecimals(item.revenue)}</p>
+            <p className="text-[9px] text-muted-foreground">{item.orders} orders</p>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -515,6 +643,84 @@ export default function Dashboard() {
             </LockedInsight>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Advanced Insights Layer: Heatmap & ROAS */}
+      <div className="grid gap-6 lg:grid-cols-7 pt-4">
+         {/* Menu Heatmap: The "Click-to-Order" Gap */}
+         <Card className="lg:col-span-4 shadow-sm border-none bg-card overflow-hidden">
+            <div className="absolute top-0 right-0 p-6 opacity-[0.02] pointer-events-none">
+              <TrendingUp className="h-32 w-32" />
+            </div>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <CardTitle className="text-lg font-bold flex items-center gap-2">
+                    Menu Heatmap
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">GAP ANALYSIS</span>
+                  </CardTitle>
+                  <CardDescription>Identifying dishes that are clicked but not ordered</CardDescription>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center">
+                  <Zap className="h-5 w-5 text-primary" />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+               <LockedInsight 
+                 isUnlocked={isAtLeastGold} 
+                 title="Heatmap Data" 
+                 description="Unlock deep-dive metrics on dish friction and pricing sensitivity."
+               >
+                 <MenuHeatmapTable heatmap={analyticsData?.menuHeatmap || []} />
+                 
+                 {analyticsData?.menuHeatmap?.some((h: any) => h.status !== 'Optimal') && (
+                   <div className="mt-6 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 flex gap-3 items-start animate-pulse">
+                     <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5" />
+                     <div className="space-y-1">
+                        <p className="text-xs font-bold text-amber-800 dark:text-amber-400">Optimization Required</p>
+                        <p className="text-[11px] text-amber-700/80 dark:text-amber-500/80 leading-relaxed">
+                          We noticed high friction on some items. High views but 0 orders usually indicates the price point is slightly higher than guest expectations.
+                        </p>
+                     </div>
+                   </div>
+                 )}
+               </LockedInsight>
+            </CardContent>
+         </Card>
+
+         {/* QR ROAS: Revenue Attribution */}
+         <Card className="lg:col-span-3 shadow-sm border-none bg-card">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                QR Revenue Attribution
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">ROAS</span>
+              </CardTitle>
+              <CardDescription>Revenue tracked back to specific scan sources</CardDescription>
+            </CardHeader>
+            <CardContent>
+               <LockedInsight 
+                 isUnlocked={isAtLeastGold} 
+                 title="ROAS Intelligence" 
+                 description="Track which physical QR stickers are generating the most money for your outlet."
+               >
+                 <QRRoasSection roas={analyticsData?.qrRoas || []} />
+                 
+                 <div className="mt-8 p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/10 border border-indigo-100/50 dark:border-indigo-900/20">
+                    <div className="flex items-center justify-between mb-2">
+                       <p className="text-[10px] uppercase font-bold text-indigo-500 tracking-wider">Top Performing Source</p>
+                       <Crown className="h-3 w-3 text-amber-500" />
+                    </div>
+                    <p className="text-sm font-bold">
+                       {analyticsData?.qrRoas?.sort((a: any, b: any) => b.revenue - a.revenue)[0]?.source || 'Scanning Data...'}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1 italic">
+                       This source contributes to {Math.round((analyticsData?.qrRoas?.sort((a: any, b: any) => b.revenue - a.revenue)[0]?.revenue / (totalRevenue || 1)) * 100) || 0}% of your total digital revenue.
+                    </p>
+                 </div>
+               </LockedInsight>
+            </CardContent>
+         </Card>
       </div>
 
       {/* Quick Actions and Activity Layer */}

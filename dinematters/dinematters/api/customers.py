@@ -154,9 +154,9 @@ def normalize_order_phone_on_save(doc, event=None):
 
 @frappe.whitelist()
 @require_plan('DIAMOND')
-def get_customer_profile(customer_id):
+def get_customer_profile(customer_id, restaurant_id=None):
 	"""
-	Admin: Get customer profile with all restaurants visited, orders, bookings.
+	Admin: Get customer profile. If restaurant_id is provided, limit to that restaurant.
 	System Manager only.
 	"""
 	if "System Manager" not in frappe.get_roles():
@@ -173,9 +173,14 @@ def get_customer_profile(customer_id):
 		order_fields = ["name", "restaurant", "order_number", "total", "status", "creation"]
 		if frappe.db.has_column("Order", "customer_rating"):
 			order_fields.extend(["customer_rating", "customer_feedback"])
+            
+		order_filters = {"platform_customer": customer_id}
+		if restaurant_id:
+			order_filters["restaurant"] = restaurant_id
+            
 		orders = frappe.get_all(
 			"Order",
-			filters={"platform_customer": customer_id},
+			filters=order_filters,
 			fields=order_fields
 		)
 		order_by_rest = {}
@@ -186,9 +191,13 @@ def get_customer_profile(customer_id):
 			order_by_rest[rest].append(o)
 
 		# Table bookings
+		tb_filters = {"platform_customer": customer_id}
+		if restaurant_id:
+			tb_filters["restaurant"] = restaurant_id
+            
 		table_bookings = frappe.get_all(
 			"Table Booking",
-			filters={"platform_customer": customer_id},
+			filters=tb_filters,
 			fields=["name", "restaurant", "booking_number", "date", "time_slot", "status", "creation"]
 		)
 		tb_by_rest = {}
@@ -199,9 +208,13 @@ def get_customer_profile(customer_id):
 			tb_by_rest[rest].append(b)
 
 		# Banquet bookings
+		bb_filters = {"platform_customer": customer_id}
+		if restaurant_id:
+			bb_filters["restaurant"] = restaurant_id
+            
 		banquet_bookings = frappe.get_all(
 			"Banquet Booking",
-			filters={"platform_customer": customer_id},
+			filters=bb_filters,
 			fields=["name", "restaurant", "booking_number", "date", "event_type", "status", "creation"]
 		)
 		bb_by_rest = {}

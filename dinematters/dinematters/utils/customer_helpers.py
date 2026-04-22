@@ -3,13 +3,27 @@
 
 import frappe
 import re
+import phonenumbers
 
 SESSION_TTL_SECONDS = 30 * 24 * 60 * 60
 _SESSION_DOCTYPE = "Customer Session"
 
 
 def normalize_phone(phone: str) -> str:
-	digits = re.sub(r"\D", "", str(phone or ""))
+	if not phone:
+		return ""
+	try:
+		parsed = phonenumbers.parse(str(phone), "IN")
+		if phonenumbers.is_valid_number(parsed):
+			# Extract the national number, which is 10 digits for India
+			national_num = str(parsed.national_number)
+			if len(national_num) == 10:
+				return national_num
+	except phonenumbers.NumberParseException:
+		pass
+	
+	# Fallback: strip non-numeric and take last 10
+	digits = re.sub(r"\D", "", str(phone))
 	return digits[-10:] if len(digits) >= 10 else digits
 
 

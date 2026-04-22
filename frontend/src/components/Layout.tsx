@@ -24,6 +24,7 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { SuspendedOverlay } from './SuspendedOverlay'
+import { normalizePhone } from '@/utils/otpStorage'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -438,7 +439,7 @@ export default function Layout({ children }: LayoutProps) {
 
             if (plinkRes?.message?.success) {
               const { payment_link_url, amount, owner_phone, whatsapp_sent, whatsapp_error } = plinkRes.message
-              const phone = (owner_phone || newRestaurantData.owner_phone || '').replace(/\D/g, '')
+              const phone = normalizePhone(owner_phone || newRestaurantData.owner_phone || '')
 
               const waText = encodeURIComponent(
                 `Hi! 👋 Welcome to DineMatters.\n\n` +

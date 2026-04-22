@@ -37,6 +37,7 @@ import {
   SelectValue 
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { normalizePhone } from '@/utils/otpStorage'
 
 export default function WhatsAppOrders() {
   const { selectedRestaurant } = useRestaurant()
@@ -98,7 +99,7 @@ export default function WhatsAppOrders() {
   })
 
   const handleOpenWhatsApp = (phone: string, orderNumber: string) => {
-    const cleanPhone = phone.replace(/\D/g, '')
+    const cleanPhone = normalizePhone(phone)
     const finalPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone
     const message = encodeURIComponent(`Hi! Reaching out regarding your order ${orderNumber}. How can we help you?`)
     window.open(`https://wa.me/${finalPhone}?text=${message}`, '_blank')
