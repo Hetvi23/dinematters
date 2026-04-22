@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useFrappeGetDocList, useFrappePostCall, useFrappeUpdateDoc, useFrappeDeleteDoc } from '@/lib/frappe'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -18,15 +17,29 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Plus, Edit, Trash2, Tag, Search, Gift, Zap, AlertCircle, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Plus, Edit, Trash2, Tag, Percent, DollarSign, Gift, Calendar, Users, TrendingUp, AlertCircle, Zap } from 'lucide-react'
+import { EmptyState } from '@/components/EmptyState'
 import { LockedFeature } from '@/components/FeatureGate/LockedFeature'
+import { DatePicker } from '@/components/ui/date-picker'
+import { TimePicker } from '@/components/ui/time-picker'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { useCurrency } from '@/hooks/useCurrency'
 import { toast } from 'sonner'
 import { getFrappeError } from '@/lib/utils'
 import { useDataTable } from '@/hooks/useDataTable'
 import { DataPagination } from '@/components/ui/DataPagination'
+import { X } from 'lucide-react'
+
+const DAYS_OF_WEEK = [
+  { label: 'Mon', value: 'monday' },
+  { label: 'Tue', value: 'tuesday' },
+  { label: 'Wed', value: 'wednesday' },
+  { label: 'Thu', value: 'thursday' },
+  { label: 'Fri', value: 'friday' },
+  { label: 'Sat', value: 'saturday' },
+  { label: 'Sun', value: 'sunday' },
+]
 
 export default function Coupons() {
   const { selectedRestaurant, isDiamond } = useRestaurant()
@@ -65,11 +78,10 @@ export default function Coupons() {
     setSearchQuery
   } = useDataTable({
     doctype: 'Coupon',
-    fields: ['name', 'code', 'description', 'discount_type', 'discount_value', 'min_order_amount', 'is_active', 'valid_from', 'valid_until', 'max_uses', 'usage_count', 'offer_type', 'max_discount_cap', 'priority', 'restaurant'],
+    fields: ['name', 'code', 'description', 'discount_type', 'discount_value', 'min_order_amount', 'is_active', 'valid_from', 'valid_until', 'max_uses', 'usage_count', 'offer_type', 'max_discount_cap', 'priority', 'restaurant', 'valid_days_of_week', 'valid_time_start', 'valid_time_end', 'can_stack', 'free_item', 'required_items', 'combo_price', 'category'],
     initialFilters,
     orderBy: { field: 'creation', order: 'desc' },
     initialPageSize: 12,
-    debugId: `coupons-${selectedRestaurant}-${filterType}`
   })
 
   const { call: createCoupon } = useFrappePostCall('frappe.client.insert')
@@ -117,20 +129,27 @@ export default function Coupons() {
     }
   }
 
-  const openDeleteDialog = (name: string, code: string, e: React.MouseEvent) => {
-    e.stopPropagation()
+  const openDeleteDialog = (name: string, code: string) => {
     setCouponToDelete({ name, code })
     setDeleteDialogOpen(true)
   }
 
+  const getOfferTypeIcon = (type: string) => {
+    switch (type) {
+      case 'combo': return <Gift className="h-4 w-4" />
+      case 'auto': return <TrendingUp className="h-4 w-4" />
+      default: return <Tag className="h-4 w-4" />
+    }
+  }
+
   if (!selectedRestaurant) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8">
-        <div className="h-20 w-20 bg-muted rounded-full flex items-center justify-center mb-4">
-           <Tag className="h-10 w-10 text-muted-foreground/30" />
-        </div>
-        <h3 className="text-xl font-semibold mb-2">Select a Restaurant</h3>
-        <p className="text-muted-foreground max-w-sm">Pick a restaurant to manage your marketing campaigns and offers.</p>
+      <div className="p-6">
+        <EmptyState
+          icon={AlertCircle}
+          title="Select a Restaurant"
+          description="Please select a restaurant from the sidebar to manage offers and coupons."
+        />
       </div>
     )
   }
@@ -140,51 +159,106 @@ export default function Coupons() {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-        <div className="space-y-1">
-          <h2 className="text-2xl font-bold tracking-tight">Campaign Center</h2>
-          <p className="text-muted-foreground text-sm flex items-center gap-2">
-            <Zap className="h-3.5 w-3.5" />
-            Launch and monitor high-conversion restaurant offers
-          </p>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Manage Offers & Coupons</h1>
+          <p className="text-muted-foreground mt-1">Create and manage discount coupons, auto-offers, and combo deals</p>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)} className="rounded-xl h-11 px-6 shadow-lg shadow-primary/20">
+        <Button onClick={() => setIsCreateDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
-          Create New Offer
+          Create Coupon
         </Button>
       </div>
 
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Coupons</p>
+                <p className="text-2xl font-bold">{totalCount || 0}</p>
+              </div>
+              <Tag className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Active</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {coupons?.filter((c: any) => c.is_active).length || 0}
+                </p>
+              </div>
+              <TrendingUp className="h-8 w-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Usage</p>
+                <p className="text-2xl font-bold">
+                  {coupons?.reduce((sum: number, c: any) => sum + (c.usage_count || 0), 0) || 0}
+                </p>
+              </div>
+              <Users className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Combo Offers</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {coupons?.filter((c: any) => c.offer_type === 'combo').length || 0}
+                </p>
+              </div>
+              <Gift className="h-8 w-8 text-purple-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters */}
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
-              <CardTitle>Coupons</CardTitle>
+              <CardTitle>All Coupons</CardTitle>
               <CardDescription>
-                Manage your marketing campaigns and offers
+                Manage your discount coupons and offers
+                {totalCount > 0 && (
+                  <span className="ml-2">
+                    (Showing {coupons.length} of {totalCount})
+                  </span>
+                )}
               </CardDescription>
             </div>
-            <div className="flex flex-col sm:flex-row items-center gap-3">
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search coupons..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 h-9"
-                />
-              </div>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <Input
+                placeholder="Search coupons..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full sm:w-[200px]"
+              />
               <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="h-9 w-[120px]">
-                  <SelectValue placeholder="All" />
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="Filter by type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="coupon">Coupon</SelectItem>
-                  <SelectItem value="auto">Auto</SelectItem>
-                  <SelectItem value="combo">Combo</SelectItem>
+                  <SelectItem value="all">All Coupons</SelectItem>
+                  <SelectItem value="active">Active Only</SelectItem>
+                  <SelectItem value="inactive">Inactive Only</SelectItem>
+                  <SelectItem value="coupon">Coupon Codes</SelectItem>
+                  <SelectItem value="auto">Auto Offers</SelectItem>
+                  <SelectItem value="combo">Combo Deals</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -192,69 +266,113 @@ export default function Coupons() {
         </CardHeader>
         <CardContent>
           {isLoading && !coupons.length ? (
-            <div className="py-20 flex justify-center">
-              <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
-            </div>
+            <div className="text-center py-12 text-muted-foreground">Loading coupons...</div>
           ) : !coupons || coupons.length === 0 ? (
-            <div className="py-20 text-center text-muted-foreground">No coupons found</div>
+            <EmptyState
+              icon={Tag}
+              title="No Coupons Found"
+              description={searchQuery || filterType !== 'all' 
+                ? "No coupons match your search or filter criteria. Try adjusting your filters."
+                : "Create your first coupon to start offering discounts to your customers."}
+              action={{
+                label: "Create Coupon",
+                onClick: () => setIsCreateDialogOpen(true)
+              }}
+            />
           ) : (
-            <>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Code</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Discount</TableHead>
-                      <TableHead>Usage</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {coupons.map((coupon: any) => (
-                      <TableRow key={coupon.name}>
-                        <TableCell className="font-bold">{coupon.code}</TableCell>
-                        <TableCell className="capitalize">{coupon.offer_type || 'Coupon'}</TableCell>
-                        <TableCell>
-                          {coupon.discount_type === 'percent' 
-                            ? `${coupon.discount_value}%` 
-                            : formatAmountNoDecimals(coupon.discount_value)}
-                        </TableCell>
-                        <TableCell>
-                          {coupon.usage_count || 0} / {coupon.max_uses > 0 ? coupon.max_uses : '∞'}
-                        </TableCell>
-                        <TableCell>
-                          {coupon.is_active ? (
-                            <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">Active</Badge>
-                          ) : (
-                            <Badge variant="secondary">Inactive</Badge>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {coupons.map((coupon: any) => (
+                  <Card key={coupon.name} className={!coupon.is_active ? 'opacity-60' : ''}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          {getOfferTypeIcon(coupon.offer_type || 'coupon')}
+                          <CardTitle className="text-lg">{coupon.code}</CardTitle>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={coupon.is_active ? 'default' : 'secondary'}>
+                            {coupon.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <p className="text-sm text-muted-foreground line-clamp-2 min-h-[40px]">
+                        {coupon.description || 'No description'}
+                      </p>
+                      
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        {coupon.discount_type === 'percent' ? (
+                          <>
+                            <Percent className="h-4 w-4 text-green-600" />
+                            <span className="font-semibold text-green-600">{coupon.discount_value}% OFF</span>
+                          </>
+                        ) : coupon.discount_type === 'delivery' ? (
+                          <>
+                            <Zap className="h-4 w-4 text-blue-600" />
+                            <span className="font-semibold text-blue-600">FREE DELIVERY</span>
+                          </>
+                        ) : (
+                          <>
+                            <DollarSign className="h-4 w-4 text-green-600" />
+                            <span className="font-semibold text-green-600">{formatAmountNoDecimals(coupon.discount_value)} OFF</span>
+                          </>
+                        )}
+                        {coupon.max_discount_cap > 0 && coupon.discount_type !== 'delivery' && (
+                          <span className="text-xs text-muted-foreground">(Max: {formatAmountNoDecimals(coupon.max_discount_cap)})</span>
+                        )}
+                        {coupon.category === 'delivery' && (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] py-0 h-4">
+                            Delivery Only
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                        <div className="flex flex-col gap-1">
+                          {coupon.min_order_amount > 0 && (
+                            <span>Min order: {formatAmountNoDecimals(coupon.min_order_amount)}</span>
                           )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => setEditingCoupon(coupon)}
-                              className="h-8 w-8"
-                            >
-                               <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-destructive"
-                              onClick={(e) => openDeleteDialog(coupon.name, coupon.code, e)}
-                            >
-                               <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                          <span>Usage: {coupon.usage_count || 0}/{coupon.max_uses || '∞'}</span>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          {coupon.valid_until && (
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              Until {new Date(coupon.valid_until).toLocaleDateString()}
+                            </span>
+                          )}
+                          {coupon.can_stack && (
+                            <span className="flex items-center gap-1 text-blue-600 font-medium">
+                               <Zap className="h-3 w-3 fill-current" />
+                               Stackable
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => setEditingCoupon(coupon)}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openDeleteDialog(coupon.name, coupon.code)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
 
               <DataPagination
@@ -265,7 +383,7 @@ export default function Coupons() {
                 onPageSizeChange={setPageSize}
                 isLoading={isLoading}
               />
-            </>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -289,26 +407,21 @@ export default function Coupons() {
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent className="rounded-3xl border-none shadow-2xl p-0 overflow-hidden">
-          <div className="p-8 pb-0">
-             <AlertDialogHeader className="space-y-3">
-               <div className="h-14 w-14 bg-red-100 rounded-2xl flex items-center justify-center mb-2">
-                 <AlertCircle className="h-8 w-8 text-red-600" />
-               </div>
-               <AlertDialogTitle className="text-2xl font-black tracking-tight">Deactivate Campaign?</AlertDialogTitle>
-               <AlertDialogDescription className="text-base font-medium leading-relaxed">
-                 You are about to permanently delete <strong>{couponToDelete?.code}</strong>. 
-                 This will disable the offer in the menu immediately and purge all usage metrics.
-               </AlertDialogDescription>
-             </AlertDialogHeader>
-          </div>
-          <AlertDialogFooter className="p-6 bg-muted/20 mt-4 flex justify-between sm:justify-start gap-4">
-            <AlertDialogCancel onClick={() => setCouponToDelete(null)} className="flex-1 rounded-xl h-11 font-bold uppercase text-xs border-none shadow-none bg-card">Stay Live</AlertDialogCancel>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Coupon?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the coupon <strong>"{couponToDelete?.code}"</strong>? 
+              This action cannot be undone and all usage history will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setCouponToDelete(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteCoupon}
-              className="flex-1 rounded-xl h-11 font-bold uppercase text-xs bg-red-600 text-white hover:bg-red-700 shadow-lg shadow-red-200"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete Offer
+              Delete Coupon
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -321,7 +434,6 @@ function CouponDialog({ open, onClose, coupon, onSave }: any) {
   const { formatAmountNoDecimals } = useCurrency()
   const { selectedRestaurant } = useRestaurant()
   const [selectedProducts, setSelectedProducts] = useState<string[]>([])
-  const [activeTab, setActiveTab] = useState<'basic' | 'config' | 'combo'>('basic')
   
   // Fetch products for combo selection
   const { data: productsData } = useFrappeGetDocList('Menu Product', {
@@ -329,15 +441,16 @@ function CouponDialog({ open, onClose, coupon, onSave }: any) {
     filters: selectedRestaurant ? ({ restaurant: selectedRestaurant, is_active: 1 } as any) : undefined,
     limit: 500,
     orderBy: { field: 'product_name', order: 'asc' } as any
-  }, `combo-products-list-${selectedRestaurant}`)
+  })
 
   const products: { product_id: string; product_name: string; category_name?: string; main_category?: string }[] =
     (productsData as any) || []
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<any>({
     code: '',
     description: '',
     discount_type: 'percent',
+    category: 'best',
     discount_value: 0,
     min_order_amount: 0,
     max_discount_cap: 0,
@@ -350,6 +463,11 @@ function CouponDialog({ open, onClose, coupon, onSave }: any) {
     valid_until: '',
     combo_price: 0,
     required_items: '',
+    valid_days_of_week: '',
+    valid_time_start: '',
+    valid_time_end: '',
+    can_stack: false,
+    free_item: '',
   })
 
   useEffect(() => {
@@ -370,13 +488,20 @@ function CouponDialog({ open, onClose, coupon, onSave }: any) {
         valid_until: coupon.valid_until || '',
         combo_price: coupon.combo_price || 0,
         required_items: coupon.required_items || '',
+        valid_days_of_week: coupon.valid_days_of_week || '',
+        valid_time_start: coupon.valid_time_start || '',
+        valid_time_end: coupon.valid_time_end || '',
+        can_stack: !!coupon.can_stack,
+        free_item: coupon.free_item || '',
       })
       if (coupon.required_items) {
-        setSelectedProducts(coupon.required_items.split(',').map((s: string) => s.trim()).filter(Boolean))
+        try {
+           const parsed = typeof coupon.required_items === 'string' ? JSON.parse(coupon.required_items) : coupon.required_items;
+           setSelectedProducts(Array.isArray(parsed) ? parsed : []);
+        } catch { setSelectedProducts([]); }
       } else {
         setSelectedProducts([])
       }
-      setActiveTab(coupon.offer_type === 'combo' ? 'combo' : 'basic')
     } else {
       setFormData({
         code: '',
@@ -394,17 +519,42 @@ function CouponDialog({ open, onClose, coupon, onSave }: any) {
         valid_until: '',
         combo_price: 0,
         required_items: '',
+        valid_days_of_week: '',
+        valid_time_start: '',
+        valid_time_end: '',
+        can_stack: false,
+        free_item: '',
       })
       setSelectedProducts([])
-      setActiveTab('basic')
     }
   }, [coupon, open])
 
+  const toggleDay = (dayValue: string) => {
+    let currentDays: string[] = []
+    try {
+      currentDays = formData.valid_days_of_week ? JSON.parse(formData.valid_days_of_week) : []
+    } catch { currentDays = [] }
+
+    if (currentDays.includes(dayValue)) {
+      currentDays = currentDays.filter(d => d !== dayValue)
+    } else {
+      currentDays.push(dayValue)
+    }
+    setFormData({ ...formData, valid_days_of_week: currentDays.length ? JSON.stringify(currentDays) : '' })
+  }
+
+  const isDaySelected = (dayValue: string) => {
+    try {
+      const currentDays = formData.valid_days_of_week ? JSON.parse(formData.valid_days_of_week) : []
+      return currentDays.includes(dayValue)
+    } catch { return false }
+  }
+
   useEffect(() => {
     if (formData.offer_type === 'combo') {
-      setFormData(prev => ({
+      setFormData((prev: any) => ({
         ...prev,
-        required_items: selectedProducts.join(', ')
+        required_items: JSON.stringify(selectedProducts)
       }))
     }
   }, [selectedProducts, formData.offer_type])
@@ -416,299 +566,209 @@ function CouponDialog({ open, onClose, coupon, onSave }: any) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-xl p-0 overflow-hidden border-none shadow-3xl box-shadow-xl rounded-3xl">
-        <div className="bg-primary/5 p-8 pb-6 border-b border-primary/10">
-           <DialogHeader>
-              <DialogTitle className="text-2xl font-black tracking-tight">{coupon ? 'Configure Offer' : 'Launch Campaign'}</DialogTitle>
-              <DialogDescription className="text-sm font-medium">
-                {coupon ? `Updating mechanics for ${coupon.code}` : 'Design a reward system to boost your restaurant sales'}
-              </DialogDescription>
-           </DialogHeader>
-           
-           <div className="flex bg-muted/50 p-1 rounded-xl mt-6">
-              <button 
-                type="button"
-                onClick={() => setActiveTab('basic')}
-                className={cn("flex-1 h-9 rounded-lg text-xs font-bold uppercase transition-all", activeTab === 'basic' ? "bg-card shadow-sm shadow-primary/5" : "text-muted-foreground")}
-              >
-                Core Details
-              </button>
-              <button 
-                 type="button"
-                 onClick={() => setActiveTab('config')}
-                 className={cn("flex-1 h-9 rounded-lg text-xs font-bold uppercase transition-all", activeTab === 'config' ? "bg-card shadow-sm shadow-primary/5" : "text-muted-foreground")}
-              >
-                 Mechanics
-              </button>
-              {formData.offer_type === 'combo' && (
-                 <button 
-                  type="button"
-                  onClick={() => setActiveTab('combo')}
-                  className={cn("flex-1 h-9 rounded-lg text-xs font-bold uppercase transition-all", activeTab === 'combo' ? "bg-card shadow-sm shadow-primary/5" : "text-muted-foreground")}
-                 >
-                   Combo Items
-                 </button>
-              )}
-           </div>
-        </div>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{coupon ? 'Edit Coupon' : 'Create New Coupon'}</DialogTitle>
+          <DialogDescription>
+            {coupon ? 'Update coupon details' : 'Create a new discount coupon, auto-offer, or combo deal'}
+          </DialogDescription>
+        </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
-          <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
-            {activeTab === 'basic' && (
-               <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
-                  <div className="grid grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <Label htmlFor="code" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Unique Reward Code *</Label>
-                      <Input
-                        id="code"
-                        value={formData.code}
-                        onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                        placeholder="e.g. SUMMER50"
-                        className="h-11 rounded-2xl bg-muted/20 border-none font-bold placeholder:font-normal"
-                        required
-                      />
-                    </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="code">Coupon Code *</Label>
+              <Input
+                id="code"
+                value={formData.code}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                placeholder="SAVE20"
+                required
+              />
+            </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="offer_type" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Offer Strategy</Label>
-                      <Select value={formData.offer_type} onValueChange={(v) => {
-                        setFormData({ ...formData, offer_type: v })
-                        if (v === 'combo') setActiveTab('combo')
-                      }}>
-                        <SelectTrigger className="h-11 rounded-2xl bg-muted/20 border-none">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-2xl border-none shadow-2xl">
-                          <SelectItem value="coupon" className="font-semibold">Coupon Code</SelectItem>
-                          <SelectItem value="auto" className="font-semibold">Auto-Applied</SelectItem>
-                          <SelectItem value="combo" className="font-semibold">Combo Deal</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="description" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Internal Description</Label>
-                    <Input
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="e.g. Free delivery on orders above ₹1000"
-                      className="h-11 rounded-2xl bg-muted/20 border-none"
-                    />
-                  </div>
-
-                  {formData.offer_type === 'combo' ? (
-                     <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10">
-                        <Label htmlFor="combo_price" className="text-[10px] font-bold uppercase tracking-widest text-primary mb-2 block">Bundle Price ({formatAmountNoDecimals(0).replace('0', '')}) *</Label>
-                        <Input
-                          id="combo_price"
-                          type="number"
-                          value={formData.combo_price}
-                          onChange={(e) => setFormData({ ...formData, combo_price: parseFloat(e.target.value) })}
-                          required
-                          className="h-11 rounded-xl border-dashed border-primary/20 bg-background text-lg font-black"
-                          placeholder="299"
-                        />
-                     </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-5">
-                      <div className="space-y-2">
-                        <Label htmlFor="discount_type" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Value Type</Label>
-                        <Select value={formData.discount_type} onValueChange={(v) => setFormData({ ...formData, discount_type: v })}>
-                          <SelectTrigger className="h-11 rounded-2xl bg-muted/20 border-none">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-2xl">
-                            <SelectItem value="percent" className="font-semibold">Percentage</SelectItem>
-                            <SelectItem value="flat" className="font-semibold">Flat Amount</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="discount_value" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Magnitude *</Label>
-                        <Input
-                          id="discount_value"
-                          type="number"
-                          value={formData.discount_value}
-                          onChange={(e) => setFormData({ ...formData, discount_value: parseFloat(e.target.value) })}
-                          className="h-11 rounded-2xl bg-muted/20 border-none font-bold"
-                          required
-                        />
-                      </div>
-                    </div>
-                  )}
-               </div>
-            )}
-
-            {activeTab === 'config' && (
-               <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
-                  <div className="grid grid-cols-2 gap-5">
-                     <div className="space-y-2">
-                        <Label htmlFor="min_order_amount" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Min Purchase Required</Label>
-                        <Input
-                          id="min_order_amount"
-                          type="number"
-                          value={formData.min_order_amount}
-                          onChange={(e) => setFormData({ ...formData, min_order_amount: parseFloat(e.target.value) })}
-                          className="h-11 rounded-2xl bg-muted/20 border-none font-bold"
-                        />
-                     </div>
-                     <div className="space-y-2">
-                        <Label htmlFor="max_discount_cap" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Reward Cap (Max ₹)</Label>
-                        <Input
-                          id="max_discount_cap"
-                          type="number"
-                          value={formData.max_discount_cap}
-                          onChange={(e) => setFormData({ ...formData, max_discount_cap: parseFloat(e.target.value) })}
-                          className="h-11 rounded-2xl bg-muted/20 border-none font-bold"
-                          placeholder="No upper limit"
-                        />
-                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-5">
-                     <div className="space-y-2">
-                        <Label htmlFor="max_uses" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Campaign Budget (Total Uses)</Label>
-                        <Input
-                          id="max_uses"
-                          type="number"
-                          value={formData.max_uses}
-                          onChange={(e) => setFormData({ ...formData, max_uses: parseInt(e.target.value) })}
-                          className="h-11 rounded-2xl bg-muted/20 border-none font-bold"
-                          placeholder="0 = Unlimited"
-                        />
-                     </div>
-                     <div className="space-y-2">
-                        <Label htmlFor="max_uses_per_user" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Usage Per Customer</Label>
-                        <Input
-                          id="max_uses_per_user"
-                          type="number"
-                          value={formData.max_uses_per_user}
-                          onChange={(e) => setFormData({ ...formData, max_uses_per_user: parseInt(e.target.value) })}
-                          className="h-11 rounded-2xl bg-muted/20 border-none font-bold"
-                          placeholder="0 = Unlimited"
-                        />
-                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-5">
-                     <div className="space-y-2">
-                        <Label htmlFor="valid_from" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Activation Date</Label>
-                        <Input
-                          id="valid_from"
-                          type="date"
-                          value={formData.valid_from}
-                          onChange={(e) => setFormData({ ...formData, valid_from: e.target.value })}
-                          className="h-11 rounded-2xl bg-muted/20 border-none font-bold"
-                        />
-                     </div>
-                     <div className="space-y-2">
-                        <Label htmlFor="valid_until" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Expiry Date</Label>
-                        <Input
-                          id="valid_until"
-                          type="date"
-                          value={formData.valid_until}
-                          onChange={(e) => setFormData({ ...formData, valid_until: e.target.value })}
-                          className="h-11 rounded-2xl bg-muted/20 border-none font-bold"
-                        />
-                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-xl border border-primary/10">
-                     <input
-                        type="checkbox"
-                        id="is_active_check"
-                        checked={formData.is_active}
-                        onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                        className="h-4 w-4 rounded-full accent-primary"
-                      />
-                      <Label htmlFor="is_active_check" className="text-xs font-bold uppercase tracking-widest text-primary">Immediately Live and Active</Label>
-                  </div>
-               </div>
-            )}
-
-            {activeTab === 'combo' && formData.offer_type === 'combo' && (
-               <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
-                   <div className="space-y-3">
-                      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                        <Gift className="h-3 w-3" /> Bundle Components
-                      </Label>
-                      
-                      <div className="flex flex-wrap gap-2 min-h-[50px] p-3 bg-muted/20 rounded-2xl border border-dashed border-border">
-                        {selectedProducts.length > 0 ? (
-                          selectedProducts.map((productName) => (
-                            <Badge
-                              key={productName}
-                              variant="secondary"
-                              className="pl-3 pr-1 py-1.5 h-8 rounded-lg shadow-sm font-semibold text-xs border bg-card"
-                            >
-                              {productName}
-                              <button
-                                type="button"
-                                onClick={() => setSelectedProducts(prev => prev.filter(p => p !== productName))}
-                                className="ml-2 h-5 w-5 rounded-md hover:bg-muted hover:text-red-500 transition-colors flex items-center justify-center"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </Badge>
-                          ))
-                        ) : (
-                          <div className="flex items-center justify-center w-full py-2">
-                             <p className="text-[10px] font-bold uppercase tracking-tighter text-muted-foreground/40">No items added to bundle</p>
-                          </div>
-                        )}
-                      </div>
-
-                      <Select
-                        value=""
-                        onValueChange={(productName) => {
-                          if (productName && !selectedProducts.includes(productName)) {
-                            setSelectedProducts(prev => [...prev, productName])
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="h-12 rounded-2xl border-none bg-muted/20 pl-4 font-semibold text-sm">
-                          <SelectValue placeholder="Add menu item to bundle..." />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-2xl shadow-3xl border-none">
-                          {products.filter(p => !selectedProducts.includes(p.product_name)).map((product) => (
-                            <SelectItem key={product.product_id} value={product.product_name} className="py-2.5">
-                                <div className="flex flex-col">
-                                   <span className="font-bold text-sm tracking-tight">{product.product_name}</span>
-                                   <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">{product.category_name}</span>
-                                </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-[10px] font-medium text-muted-foreground/60 px-1 italic">* Customers must have all these items in cart for the special price to trigger.</p>
-                   </div>
-                   
-                   <div className="space-y-2">
-                      <Label htmlFor="priority_combo" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Conflict Resolution (Priority)</Label>
-                      <Input
-                        id="priority_combo"
-                        type="number"
-                        value={formData.priority}
-                        onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) })}
-                        className="h-11 rounded-2xl bg-muted/20 border-none"
-                      />
-                   </div>
-               </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="offer_type">Offer Type</Label>
+              <Select value={formData.offer_type} onValueChange={(v) => {
+                const updates: any = { offer_type: v }
+                if (v === 'delivery') {
+                  updates.category = 'delivery'
+                  updates.discount_type = 'delivery'
+                } else if (v === 'combo') {
+                  updates.category = 'best'
+                  updates.discount_type = 'flat'
+                } else {
+                  updates.category = 'best'
+                }
+                setFormData({ ...formData, ...updates })
+              }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="coupon">Coupon Code</SelectItem>
+                  <SelectItem value="auto">Auto-Applied</SelectItem>
+                  <SelectItem value="combo">Combo Deal</SelectItem>
+                  <SelectItem value="delivery">Delivery Offer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <DialogFooter className="p-8 bg-muted/10 border-t border-border/40">
-            <div className="flex justify-between w-full items-center">
-               <Button type="button" variant="ghost" onClick={onClose} className="rounded-xl h-12 font-bold uppercase text-xs">
-                 Discard Changes
-               </Button>
-               <Button type="submit" className="rounded-xl h-12 px-8 font-bold uppercase text-xs shadow-xl shadow-primary/20">
-                 {coupon ? 'Save Configuration' : 'Launch Campaign'}
-               </Button>
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Input
+              id="description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder={formData.offer_type === 'combo' ? 'Get 2 Pizzas + 1 Drink for special price' : formData.offer_type === 'delivery' ? 'Free delivery on orders above ₹500' : 'Get 20% off on orders above ₹500'}
+            />
+          </div>
+
+          {formData.offer_type === 'combo' ? (
+            <>
+              <div className="space-y-2">
+                <Label>Required Products *</Label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {selectedProducts.map((productId) => {
+                    const prod = products.find(p => p.product_id === productId)
+                    return (
+                      <Badge key={productId} variant="secondary" className="gap-1">
+                        {prod?.product_name || productId}
+                        <button type="button" onClick={() => setSelectedProducts(prev => prev.filter(p => p !== productId))}>
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    )
+                  })}
+                </div>
+                <Select value="" onValueChange={(pid) => pid && !selectedProducts.includes(pid) && setSelectedProducts(prev => [...prev, pid])}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Add product to combo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products.filter(p => !selectedProducts.includes(p.product_id)).map((p) => (
+                      <SelectItem key={p.product_id} value={p.product_id}>{p.product_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="combo_price">Combo Price ({formatAmountNoDecimals(0).replace('0', '')})*</Label>
+                  <Input id="combo_price" type="number" value={formData.combo_price} onChange={(e) => setFormData({ ...formData, combo_price: parseFloat(e.target.value) })} required min="0" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="free_item">Gift Item (BOGO)</Label>
+                  <Select value={formData.free_item} onValueChange={(v) => setFormData({ ...formData, free_item: v })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="null_item">None</SelectItem>
+                      {products.map((p) => <SelectItem key={p.product_id} value={p.product_id}>{p.product_name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </>
+          ) : formData.offer_type === 'delivery' ? (
+            <div className="p-4 rounded-lg border-2 border-orange-500/20 space-y-4">
+              <div className="flex items-center gap-2 text-orange-600 font-medium">
+                <Zap className="h-4 w-4" />
+                Delivery Discount Settings
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="discount_type">Delivery Benefit</Label>
+                  <Select value={formData.discount_type} onValueChange={(v) => setFormData({ ...formData, discount_type: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="delivery">Free Delivery</SelectItem>
+                      <SelectItem value="flat">Flat Discount on Fee</SelectItem>
+                      <SelectItem value="percent">Percentage off Fee</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {formData.discount_type !== 'delivery' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="discount_value">Discount Value *</Label>
+                    <Input id="discount_value" type="number" value={formData.discount_value} onChange={(e) => setFormData({ ...formData, discount_value: parseFloat(e.target.value) })} required min="0" />
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-orange-600/70 italic">
+                Note: This discount will be applied directly to the delivery fee calculated at checkout.
+              </p>
             </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="discount_type">Discount Type</Label>
+                <Select value={formData.discount_type} onValueChange={(v) => setFormData({ ...formData, discount_type: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percent">Percentage</SelectItem>
+                    <SelectItem value="flat">Flat Amount</SelectItem>
+                    <SelectItem value="delivery">Free Delivery</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="discount_value">Discount Value *</Label>
+                <Input id="discount_value" type="number" value={formData.discount_value} onChange={(e) => setFormData({ ...formData, discount_value: parseFloat(e.target.value) })} required min="0" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="max_discount_cap">Max Cap ({formatAmountNoDecimals(0).replace('0', '')})</Label>
+                <Input id="max_discount_cap" type="number" value={formData.max_discount_cap} onChange={(e) => setFormData({ ...formData, max_discount_cap: parseFloat(e.target.value) })} min="0" />
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="min_order_amount">Min Order Amount ({formatAmountNoDecimals(0).replace('0', '')})</Label>
+              <Input id="min_order_amount" type="number" value={formData.min_order_amount} onChange={(e) => setFormData({ ...formData, min_order_amount: parseFloat(e.target.value) })} min="0" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="priority">Priority</Label>
+              <Input id="priority" type="number" value={formData.priority} onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) })} min="1" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <DatePicker label="Valid From" value={formData.valid_from} onChange={(v) => setFormData({ ...formData, valid_from: v })} />
+            <DatePicker label="Valid Until" value={formData.valid_until} onChange={(v) => setFormData({ ...formData, valid_until: v })} />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">Active Days</Label>
+            <div className="flex flex-wrap gap-2">
+              {DAYS_OF_WEEK.map((day) => (
+                <Badge key={day.value} variant={isDaySelected(day.value) ? 'default' : 'outline'} className="cursor-pointer" onClick={() => toggleDay(day.value)}>
+                  {day.label}
+                </Badge>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <TimePicker label="Time Start" value={formData.valid_time_start} onChange={(e) => setFormData({ ...formData, valid_time_start: e.target.value })} />
+            <TimePicker label="Time End" value={formData.valid_time_end} onChange={(e) => setFormData({ ...formData, valid_time_end: e.target.value })} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox id="is_active" checked={formData.is_active} onCheckedChange={(c) => setFormData({ ...formData, is_active: !!c })} />
+              <Label htmlFor="is_active">Active</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox id="can_stack" checked={formData.can_stack} onCheckedChange={(c) => setFormData({ ...formData, can_stack: !!c })} />
+              <Label htmlFor="can_stack">Stackable</Label>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit">{coupon ? 'Update' : 'Create'} Coupon</Button>
           </DialogFooter>
         </form>
       </DialogContent>

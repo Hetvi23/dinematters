@@ -261,7 +261,7 @@ def validate_coupon(restaurant_id, coupon_code, cart_total=0, customer_id=None, 
 
 
 @frappe.whitelist(allow_guest=True)
-def get_applicable_offers(restaurant_id, cart_items, cart_total, customer_id=None):
+def get_applicable_offers(restaurant_id, cart_items, cart_total, customer_id=None, order_type=None):
 	"""
 	POST /api/method/dinematters.dinematters.api.coupons.get_applicable_offers
 	Get ALL offers (both eligible and ineligible) with detailed reasons
@@ -321,7 +321,17 @@ def get_applicable_offers(restaurant_id, cart_items, cart_total, customer_id=Non
 		for offer in offers:
 			is_eligible = True
 			ineligibility_reasons = []
-			
+
+			# Check delivery specific logic
+			is_delivery_offer = (offer.discount_type == 'delivery' or offer.category == 'delivery' or offer.offer_type == 'delivery')
+			if is_delivery_offer and order_type != "delivery":
+				is_eligible = False
+				ineligibility_reasons.append({
+					"code": "INVALID_MODE",
+					"message": "Only available for delivery orders",
+					"type": "schedule"
+				})
+
 			# Skip if not within validity dates
 			if offer.valid_from and getdate(offer.valid_from) > getdate(today_date):
 				continue # Not valid yet
@@ -448,6 +458,13 @@ def get_applicable_offers(restaurant_id, cart_items, cart_total, customer_id=Non
 				discount_amount = (calc_total * flt(offer.discount_value)) / 100
 				if offer.max_discount_cap and discount_amount > flt(offer.max_discount_cap):
 					discount_amount = flt(offer.max_discount_cap)
+			
+			if is_delivery_offer:
+				# For display, if we don't have fee, use potential full discount
+				if offer.discount_type == 'delivery':
+					# Assume delivery fee might be around 50 for display if not known
+					discount_amount = flt(offer.discount_value) or 50 
+				potential_discount = discount_amount
 				potential_discount = discount_amount
 			
 			# Build offer data

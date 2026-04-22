@@ -1,4 +1,6 @@
 import math
+import requests
+import frappe
 
 def calculate_distance(lat1, lon1, lat2, lon2):
     """
@@ -26,9 +28,27 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     
     return R * c
 
-def estimate_road_distance(straight_distance, multiplier=1.25):
+def get_osrm_road_distance(lat1, lon1, lat2, lon2):
     """
-    Apply a circuity factor to estimate actual road distance from straight-line distance.
-    1.25 is a standard multiplier for Indian urban areas.
+    Get real road distance using Open Source Routing Machine (OSRM) public API.
+    Returns distance in KM or None if fails.
+    """
+    try:
+        # Note: OSRM uses {longitude},{latitude} format
+        url = f"http://router.project-osrm.org/route/v1/driving/{lon1},{lat1};{lon2},{lat2}?overview=false"
+        response = requests.get(url, timeout=5)
+        data = response.json()
+        
+        if data.get("code") == "Ok":
+            # distance is in meters
+            return round(data["routes"][0]["distance"] / 1000.0, 2)
+    except Exception as e:
+        frappe.log_error(f"OSRM Error: {str(e)}", "GeoUtils OSRM")
+    
+    return None
+
+def estimate_road_distance(straight_distance, multiplier=1.3):
+    """
+    Fallback: Apply a circuity factor to estimate actual road distance.
     """
     return straight_distance * multiplier
