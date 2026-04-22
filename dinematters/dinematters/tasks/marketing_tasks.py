@@ -185,6 +185,22 @@ def dispatch_campaign_task(campaign_id):
                         coupon_code=campaign.coupon_code or ""
                     )
 
+                    # ✅ NEW: Frequency Capping (Fatigue Rule)
+                    if _is_customer_fatigued(customer.get("customer"), settings):
+                        frappe.get_doc({
+                            "doctype": "Marketing Event",
+                            "campaign": campaign_id,
+                            "restaurant": campaign.restaurant,
+                            "customer": customer.get("customer"),
+                            "channel": campaign.channel,
+                            "phone": customer.get("phone"),
+                            "status": "FatigueSkipped",
+                            "sent_at": now_datetime(),
+                            "coins_charged": 0,
+                            "error_message": "Global Fatigue Rule: Customer reached message limit for this window."
+                        }).insert(ignore_permissions=True)
+                        continue
+
                     success, error = _send_message(
                         channel=campaign.channel,
                         phone=customer.get("phone", ""),
@@ -457,6 +473,22 @@ def _fire_single_trigger(trigger, customer, settings, restaurant_name_cache):
         coupon_code=trigger.coupon_code or ""
     )
 
+    # ✅ NEW: Frequency Capping (Fatigue Rule)
+    if _is_customer_fatigued(customer.get("customer"), settings):
+        frappe.get_doc({
+            "doctype": "Marketing Event",
+            "trigger": trigger.name,
+            "restaurant": trigger.restaurant,
+            "customer": customer.get("customer"),
+            "channel": trigger.channel,
+            "phone": customer.get("phone"),
+            "status": "FatigueSkipped",
+            "sent_at": now_datetime(),
+            "coins_charged": 0,
+            "error_message": "Global Fatigue Rule: Customer reached message limit for this window."
+        }).insert(ignore_permissions=True)
+        return
+
     success, error = _send_message(
         channel=trigger.channel,
         phone=customer.get("phone", ""),
@@ -501,6 +533,25 @@ def _get_opted_out_phones(restaurant):
         WHERE o.restaurant = %s AND c.opted_out_of_marketing = 1 AND c.phone IS NOT NULL
     """, (restaurant,))
     return {r[0] for r in rows}
+
+
+def _is_customer_fatigued(customer_id, settings):
+    """
+    Checks if a customer has reached the global marketing fatigue limit.
+    Returns True if limit reached, False otherwise.
+    """
+    max_msgs = int(getattr(settings, "marketing_max_msgs_per_window", 2) or 2)
+    window_days = int(getattr(settings, "marketing_fatigue_window_days", 7) or 7)
+
+    # Count 'Sent' marketing events in the window
+    # Note: we ignore 'Failed' or 'OptedOut' as they didn't consume customer attention/balance
+    count = frappe.db.count("Marketing Event", {
+        "customer": customer_id,
+        "status": "Sent",
+        "sent_at": [">=", add_days(now_datetime(), -window_days)]
+    })
+
+    return count >= max_msgs
 
 
 def _safe_deduct_coins(restaurant, amount, description, ref_doctype, ref_name):

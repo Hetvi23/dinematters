@@ -43,6 +43,9 @@
   "marketing_resend_api_key",
   "marketing_from_email",
   "marketing_wa_template_name",
+  "column_break_fatigue",
+  "marketing_max_msgs_per_window",
+  "marketing_fatigue_window_days",
   "section_flash",
   "flash_access_token",
   "flash_store_id",
@@ -279,6 +282,24 @@
    "fieldname": "marketing_wa_template_name",
    "fieldtype": "Data",
    "label": "WhatsApp Campaign Template Name (Meta BSP)"
+  },
+  {
+   "fieldname": "column_break_fatigue",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "2",
+   "description": "Maximum marketing messages a customer can receive within the fatigue window.",
+   "fieldname": "marketing_max_msgs_per_window",
+   "fieldtype": "Int",
+   "label": "Max Messages per Window"
+  },
+  {
+   "default": "7",
+   "description": "Number of days for the frequency capping window.",
+   "fieldname": "marketing_fatigue_window_days",
+   "fieldtype": "Int",
+   "label": "Fatigue Window (Days)"
   },
   {
    "fieldname": "section_flash",

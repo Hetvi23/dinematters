@@ -53,6 +53,8 @@ class MarketingSegment(Document):
                 return self._query_high_spenders(restaurant, self.min_total_spent or 1000)
             elif criteria == "Birthday This Month":
                 return self._query_birthday_this_month(restaurant)
+            elif criteria == "Advanced Filter":
+                return self._query_advanced_filter(restaurant)
             elif criteria == "Manual":
                 return len(self._parse_manual_phones())
             elif criteria == "Custom SQL":
@@ -86,6 +88,8 @@ class MarketingSegment(Document):
                 phones = self._fetch_high_spenders(restaurant, self.min_total_spent or 1000)
             elif criteria == "Birthday This Month":
                 phones = self._fetch_birthday_this_month(restaurant)
+            elif criteria == "Advanced Filter":
+                phones = self._fetch_advanced_filter(restaurant)
             elif criteria == "Manual":
                 phones = self._fetch_manual(restaurant)
             elif criteria == "Custom SQL":
@@ -270,3 +274,57 @@ class MarketingSegment(Document):
               AND phone IS NOT NULL
               AND (opted_out_of_marketing IS NULL OR opted_out_of_marketing = 0)
         """, {"phones": phones}, as_dict=True)
+
+    # ── ADVANCED FILTER ─────────────────────────────────────────────────────────
+
+    def _query_advanced_filter(self, restaurant):
+        """Build and execute a combined query based on multiple checks."""
+        sql, params = self._build_advanced_query(restaurant, count_only=True)
+        result = frappe.db.sql(sql, params)
+        return (result[0][0] or 0) if result else 0
+
+    def _fetch_advanced_filter(self, restaurant):
+        """Fetch full list of customers matching all enabled filters."""
+        sql, params = self._build_advanced_query(restaurant, count_only=False)
+        return frappe.db.sql(sql, params, as_dict=True)
+
+    def _build_advanced_query(self, restaurant, count_only=True):
+        """
+        Constructs the complex JOIN/WHERE query for multi-condition segments.
+        Start with customers who have ordered at least once at this restaurant.
+        """
+        select_clause = "SELECT COUNT(DISTINCT c.name)" if count_only else "SELECT DISTINCT c.name as customer, c.phone, c.customer_name"
+        
+        # Base query: Customers who have ordered at this restaurant
+        query = f"""
+            {select_clause}
+            FROM `tabCustomer` c
+            JOIN `tabOrder` o ON o.platform_customer = c.name
+            WHERE o.restaurant = %(restaurant)s
+              AND (c.opted_out_of_marketing IS NULL OR c.opted_out_of_marketing = 0)
+        """
+        params = {"restaurant": restaurant}
+
+        # 1. Filter by Last Visit
+        if self.filter_by_last_visit:
+            days = self.days_since_last_visit or 30
+            query += f" AND c.name IN (SELECT platform_customer FROM `tabOrder` WHERE restaurant = %(restaurant)s GROUP BY platform_customer HAVING MAX(creation) < DATE_SUB(NOW(), INTERVAL %(days)s DAY))"
+            params["days"] = days
+
+        # 2. Filter by Visit Count
+        if self.filter_by_visit_count:
+            min_visits = self.min_visit_count or 5
+            query += f" AND c.name IN (SELECT platform_customer FROM `tabOrder` WHERE restaurant = %(restaurant)s GROUP BY platform_customer HAVING COUNT(name) >= %(min_visits)s)"
+            params["min_visits"] = min_visits
+
+        # 3. Filter by Total Spent
+        if self.filter_by_total_spent:
+            min_spend = self.min_total_spent or 1000
+            query += f" AND c.name IN (SELECT platform_customer FROM `tabOrder` WHERE restaurant = %(restaurant)s GROUP BY platform_customer HAVING SUM(total) >= %(min_spend)s)"
+            params["min_spend"] = min_spend
+
+        # 4. Filter by Birthday
+        if self.filter_by_birthday:
+            query += " AND c.date_of_birth IS NOT NULL AND MONTH(c.date_of_birth) = MONTH(CURDATE())"
+
+        return query, params
