@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from frappe.utils import flt, cint, today
+from frappe.utils import flt, cint, today, add_months
 
 def is_loyalty_enabled(restaurant):
 	"""Check if loyalty is enabled for a restaurant."""
@@ -8,16 +8,24 @@ def is_loyalty_enabled(restaurant):
 		return False
 	return frappe.db.get_value("Restaurant", restaurant, "enable_loyalty")
 
-def get_loyalty_balance(customer, restaurant):
+def get_loyalty_balance(customer, restaurant, include_pending=False):
 	"""
 	Calculate current loyalty coin balance for a customer at a restaurant.
+	Filters by is_settled=1 and expiry_date >= today by default.
 	"""
 	if not customer or not restaurant:
 		return 0
 		
+	filters = {"customer": customer, "restaurant": restaurant}
+	if not include_pending:
+		filters["is_settled"] = 1
+	
+	# Only include non-expired entries
+	filters["expiry_date"] = [">=", today()]
+	
 	entries = frappe.get_all(
 		"Restaurant Loyalty Entry",
-		filters={"customer": customer, "restaurant": restaurant},
+		filters=filters,
 		fields=["transaction_type", "coins"]
 	)
 	
@@ -41,7 +49,10 @@ def redeem_loyalty_coins(customer, restaurant, coins, reason="Redemption", ref_d
 	if not is_loyalty_enabled(restaurant):
 		return None
 		
-	balance = get_loyalty_balance(customer, restaurant)
+	# For reverts, we allow redeeming from pending points
+	include_pending = reason == "Cancellation Revert"
+	balance = get_loyalty_balance(customer, restaurant, include_pending=include_pending)
+	
 	if coins > balance:
 		coins = balance
 		
@@ -65,8 +76,8 @@ def redeem_loyalty_coins(customer, restaurant, coins, reason="Redemption", ref_d
 
 def earn_loyalty_coins(customer, restaurant, amount_paid, reason="Order", ref_doctype=None, ref_name=None):
 	"""
-	Calculate and credit 10% loyalty coins based on the final paid price.
-	Returns the number of coins earned.
+	Calculate and credit loyalty coins based on restaurant config.
+	Sets is_settled=0 initially if reference is an Order.
 	"""
 	if not customer or not restaurant or not amount_paid or amount_paid <= 0:
 		return 0
@@ -74,12 +85,19 @@ def earn_loyalty_coins(customer, restaurant, amount_paid, reason="Order", ref_do
 	if not is_loyalty_enabled(restaurant):
 		return 0
 	
-	# User requirement: 10% coins based on final paid price
-	coins_earned = int(flt(amount_paid) * 0.1)
+	# Get loyalty config
+	config = frappe.db.get_value("Restaurant Loyalty Config", {"restaurant": restaurant, "is_active": 1}, ["points_per_inr", "loyalty_expiry_months"], as_dict=True)
+	
+	points_per_inr = flt(config.points_per_inr) if config else 0.1
+	expiry_months = cint(config.loyalty_expiry_months) if config else 12
+	
+	coins_earned = int(flt(amount_paid) * points_per_inr)
 	
 	if coins_earned <= 0:
 		return 0
 		
+	expiry_date = add_months(today(), expiry_months)
+	
 	entry = frappe.get_doc({
 		"doctype": "Restaurant Loyalty Entry",
 		"customer": customer,
@@ -89,10 +107,11 @@ def earn_loyalty_coins(customer, restaurant, amount_paid, reason="Order", ref_do
 		"reason": reason,
 		"reference_doctype": ref_doctype,
 		"reference_name": ref_name,
-		"posting_date": today()
+		"posting_date": today(),
+		"expiry_date": expiry_date,
+		"is_settled": 0 if ref_doctype == "Order" else 1
 	})
 	entry.insert(ignore_permissions=True)
-	# We don't commit here to allow the caller to manage the transaction
 	
 	# Update Order doc if reference is an Order
 	if ref_doctype == "Order" and ref_name:
@@ -109,6 +128,10 @@ def add_loyalty_coins(customer, restaurant, coins, reason, ref_doctype=None, ref
 		
 	if not is_loyalty_enabled(restaurant):
 		return 0
+	
+	config = frappe.db.get_value("Restaurant Loyalty Config", {"restaurant": restaurant, "is_active": 1}, "loyalty_expiry_months")
+	expiry_months = cint(config) if config else 12
+	expiry_date = add_months(today(), expiry_months)
 		
 	entry = frappe.get_doc({
 		"doctype": "Restaurant Loyalty Entry",
@@ -119,7 +142,9 @@ def add_loyalty_coins(customer, restaurant, coins, reason, ref_doctype=None, ref
 		"reason": reason,
 		"reference_doctype": ref_doctype,
 		"reference_name": ref_name,
-		"posting_date": today()
+		"posting_date": today(),
+		"expiry_date": expiry_date,
+		"is_settled": 0 if ref_doctype == "Order" else 1
 	})
 	entry.insert(ignore_permissions=True)
 	
@@ -129,6 +154,23 @@ def add_loyalty_coins(customer, restaurant, coins, reason, ref_doctype=None, ref
 		frappe.db.set_value("Order", ref_name, "coins_earned", current_coins + int(coins))
 		
 	return int(coins)
+
+def settle_loyalty_points(order_name):
+	"""
+	Marks all loyalty entries for a specific order as is_settled=1.
+	Called when order is completed or billed.
+	"""
+	try:
+		frappe.db.sql("""
+			UPDATE `tabRestaurant Loyalty Entry`
+			SET is_settled = 1
+			WHERE reference_doctype = 'Order' AND reference_name = %s
+		""", (order_name,))
+		frappe.db.commit()
+		return True
+	except Exception as e:
+		frappe.log_error(f"Error in settle_loyalty_points: {str(e)}")
+		return False
 
 
 def handle_order_cancellation(doc, method=None):
@@ -196,4 +238,25 @@ def handle_order_cancellation(doc, method=None):
 	# Final cleanup of the order doc fields via DB
 	if doc.coins_earned > 0:
 		frappe.db.set_value("Order", doc.name, "coins_earned", 0)
+
+def handle_loyalty_settlement(doc, method=None):
+	"""
+	Hook function for Order on_update.
+	Settles loyalty points when order reaches the configured status.
+	"""
+	if doc.status not in ["confirmed", "completed", "billed"] and doc.payment_status != "completed":
+		return
+	
+	if not doc.restaurant:
+		return
+
+	# Get settlement status from config
+	config = frappe.db.get_value("Restaurant Loyalty Config", {"restaurant": doc.restaurant, "is_active": 1}, "earn_on_status")
+	settle_on = (config or "Completed").lower()
+	
+	current_status = str(doc.status).lower()
+	
+	# If payment is completed, we always settle regardless of order status
+	if doc.payment_status == "completed" or current_status == settle_on or (settle_on == "confirmed" and current_status in ["confirmed", "completed", "billed"]):
+		settle_loyalty_points(doc.name)
 

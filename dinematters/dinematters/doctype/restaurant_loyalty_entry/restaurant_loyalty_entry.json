@@ -9,6 +9,8 @@
   "customer",
   "restaurant",
   "posting_date",
+  "expiry_date",
+  "is_settled",
   "column_break_1",
   "transaction_type",
   "coins",
@@ -38,6 +40,17 @@
    "fieldname": "posting_date",
    "fieldtype": "Date",
    "label": "Posting Date"
+  },
+  {
+   "fieldname": "expiry_date",
+   "fieldtype": "Date",
+   "label": "Expiry Date"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_settled",
+   "fieldtype": "Check",
+   "label": "Is Settled"
   },
   {
    "fieldname": "column_break_1",

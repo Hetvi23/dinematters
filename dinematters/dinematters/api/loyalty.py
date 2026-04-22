@@ -30,17 +30,32 @@ def get_loyalty_summary(restaurant_id, phone):
 		entries = frappe.get_all(
 			"Restaurant Loyalty Entry",
 			filters={"customer": customer.name, "restaurant": restaurant},
-			fields=["transaction_type", "coins", "reason", "posting_date", "reference_doctype", "reference_name", "creation"],
+			fields=["transaction_type", "coins", "reason", "posting_date", "reference_doctype", "reference_name", "creation", "is_settled"],
 			order_by="creation desc"
 		)
 		
 		from dinematters.dinematters.utils.loyalty import get_loyalty_balance
 		balance = get_loyalty_balance(customer.name, restaurant)
+		pending_balance = get_loyalty_balance(customer.name, restaurant, include_pending=True) - balance
+		
+		# Expiring soon (within 30 days)
+		from frappe.utils import add_days, today
+		expiring_soon_filters = {
+			"customer": customer.name, 
+			"restaurant": restaurant,
+			"is_settled": 1,
+			"transaction_type": "Earn",
+			"expiry_date": ["between", [today(), add_days(today(), 30)]]
+		}
+		expiring_soon_entries = frappe.get_all("Restaurant Loyalty Entry", filters=expiring_soon_filters, fields=["coins"])
+		expiring_soon_balance = sum(e.coins for e in expiring_soon_entries)
 		
 		return {
 			"success": True,
 			"data": {
 				"balance": balance,
+				"pending_balance": pending_balance,
+				"expiring_soon_balance": expiring_soon_balance,
 				"transactions": entries
 			}
 		}

@@ -212,6 +212,7 @@ doc_events = {
 		"on_update": [
 			"dinematters.dinematters.api.realtime.notify_order_update",
 			"dinematters.dinematters.utils.loyalty.handle_order_cancellation",
+			"dinematters.dinematters.utils.loyalty.handle_loyalty_settlement",
 			"dinematters.dinematters.pos.utils.handle_order_update"
 		],
 	},
