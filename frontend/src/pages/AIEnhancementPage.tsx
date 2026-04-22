@@ -64,8 +64,8 @@ export default function AIEnhancementPage() {
   const [activeSlide, setActiveSlide] = useState(0)
   const [isPolling, setIsPolling] = useState(false)
 
-  const BASE_COINS = aiMode === 'generate' ? 16 : 10
-  const COINS_PER_VARIANT = BASE_COINS + (includeBranding ? 4 : 0)
+  const BASE_COINS = aiMode === 'generate' ? 10 : 5
+  const COINS_PER_VARIANT = BASE_COINS
   const numVariants = parseInt(variantCount, 10)
   const [isApplying, setIsApplying] = useState(false)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
@@ -414,13 +414,13 @@ export default function AIEnhancementPage() {
                   <SelectItem value="enhance">
                     <div className="flex items-center gap-2">
                        <Sparkles className="h-4 w-4 text-primary" />
-                       Enhance my Photo <span className="text-muted-foreground text-xs ml-1">(10 coins)</span>
+                       Enhance my Photo <span className="text-muted-foreground text-xs ml-1">(5 coins)</span>
                      </div>
                    </SelectItem>
                    <SelectItem value="generate">
                      <div className="flex items-center gap-2">
                        <Camera className="h-4 w-4 text-primary" />
-                       Generate Photo for my Food <span className="text-muted-foreground text-xs ml-1">(16 coins)</span>
+                       Generate Photo for my Food <span className="text-muted-foreground text-xs ml-1">(10 coins)</span>
                      </div>
                    </SelectItem>
                 </SelectContent>
@@ -470,7 +470,7 @@ export default function AIEnhancementPage() {
                   Include {restaurants.find(r => r.restaurant_id === selectedRestaurant)?.restaurant_name || 'Restaurant'} branding
                 </label>
                 <p className="text-[10px] text-muted-foreground">
-                  Adds 4 coins per variant.
+                   Included free.
                 </p>
               </div>
             </div>

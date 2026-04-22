@@ -12,8 +12,8 @@ from dinematters.dinematters.utils.razorpay_utils import get_razorpay_client, ge
 
 # ─── Constants ───────────────────────────────────────────────────────────────
 INR_PER_WALLET_UNIT = 1
-COINS_PER_ENHANCEMENT = 10  # ₹10
-COINS_PER_GENERATION = 16   # ₹16
+COINS_PER_ENHANCEMENT = 5   # ₹5
+COINS_PER_GENERATION = 10   # ₹10
 AUTO_RECHARGE_DAILY_LIMIT = 5000.0  # Safety cap per day
 AUTO_RECHARGE_HARD_CAP = 15000.0   # RBI AFA Limit for single transaction
 

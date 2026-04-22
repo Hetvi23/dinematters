@@ -16,6 +16,7 @@ def calculate_cart_totals(restaurant, items, coupon_code=None, loyalty_coins=0, 
 	latitude: Latitude of delivery location
 	longitude: Longitude of delivery location
 	"""
+	frappe.log_error(f"DEBUG: calculate_cart_totals - type: {delivery_type}, lat: {latitude}, lng: {longitude}", "Pricing Debug")
     
 	# 0. Global Context
 	restaurant_doc = frappe.get_doc("Restaurant", restaurant)
@@ -104,9 +105,15 @@ def calculate_cart_totals(restaurant, items, coupon_code=None, loyalty_coins=0, 
 					delivery_fee = flt(quote_res.get("delivery_fee"))
 					delivery_details = quote_res
 				else:
-					# Fallback to default
-					delivery_fee = flt(restaurant_doc.default_delivery_fee or 0)
-			except Exception:
+					# If provider specifically says not serviceable, respect it
+					if quote_res.get("locationServiceAble") == False or quote_res.get("riderServiceAble") == False:
+						serviceable = False
+						distance_error = quote_res.get("error") or "Location not serviceable by delivery partner."
+						delivery_fee = 0
+					else:
+						# Fallback to default for other errors (API timeouts etc)
+						delivery_fee = flt(restaurant_doc.default_delivery_fee or 0)
+			except Exception as e:
 				delivery_fee = flt(restaurant_doc.default_delivery_fee or 0)
 		else:
 			# No location provided or not serviceable, use static default if serviceable, else 0
@@ -146,7 +153,7 @@ def calculate_cart_totals(restaurant, items, coupon_code=None, loyalty_coins=0, 
 	if packaging_fee > 0:
 		# User Request: Rename to "Packaging and Extra Charges"
 		bill_details.append({"label": "Packaging and Extra Charges", "value": packaging_fee, "type": "fee"})
-	if delivery_fee > 0:
+	if delivery_type == "Delivery" and serviceable:
 		bill_details.append({"label": "Delivery Fee", "value": delivery_fee, "type": "fee"})
 	
 	bill_details.append({"label": "Total Payable", "value": max(0, total), "type": "total"})

@@ -213,13 +213,13 @@ def upload_base64_image(filename, filedata):
 def enqueue_enhancement(restaurant, owner_doctype, owner_name, original_image_url=None, mode="enhance", include_branding=False):
     """
     Creates an AI Image Generation record and enqueues a job.
-    mode="enhance" costs 10 coins and requires original_image_url.
-    mode="generate" costs 16 coins and uses only product info + reference image.
+    mode="enhance" costs 5 coins and requires original_image_url.
+    mode="generate" costs 10 coins and uses only product info + reference image.
     """
     from dinematters.dinematters.api.coin_billing import deduct_coins
 
-    BASE_COST = 16 if mode == "generate" else 10
-    BRANDING_COST = 4 if include_branding else 0
+    BASE_COST = 10 if mode == "generate" else 5
+    BRANDING_COST = 0 # Branding is now free to encourage adoption
     COIN_COST = BASE_COST + BRANDING_COST
 
     # Step 1: Verify coin balance before even creating the doc

@@ -844,8 +844,8 @@ function AdminRestaurantDetailsPage() {
                    <div className="space-y-4">
                       <h4 className="text-sm font-bold">Coin Utility Policy</h4>
                       <ul className="text-xs space-y-2 text-muted-foreground list-disc pl-4">
-                        <li>AI Product Photo Enhancement: 10-14 Coins</li>
-                        <li>AI Image Generation: 16-20 Coins</li>
+                        <li>AI Product Photo Enhancement: 5 Coins</li>
+                        <li>AI Image Generation: 10 Coins</li>
                         <li>SMS/WhatsApp Automation: ~1 Coin/unit</li>
                         <li>Digital Menu Customizations (Premium Themes)</li>
                       </ul>
