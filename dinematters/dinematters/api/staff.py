@@ -17,7 +17,7 @@ from dinematters.dinematters.doctype.restaurant_user.restaurant_user import get_
 def _assert_admin(restaurant_id):
 	"""Throw if the current user is NOT a Restaurant Admin for this restaurant."""
 	user = frappe.session.user
-	if user == "Administrator" or "System Manager" in frappe.get_roles(user):
+	if user == "Administrator" or "System Manager" in frappe.get_roles(user) or "Restaurant Admin" in frappe.get_roles(user):
 		return
 
 	role = frappe.db.get_value(
@@ -82,13 +82,22 @@ def get_staff_members(restaurant_id):
 			user_info = frappe.db.get_value(
 				"User", m.user, ["full_name", "email", "user_image"], as_dict=True
 			) or {}
+			
+			# Role priority: if they have Restaurant Admin or System Manager role in Frappe, they are an Admin
+			actual_role = m.role
+			if "Restaurant Admin" in frappe.get_roles(m.user) or "System Manager" in frappe.get_roles(m.user):
+				actual_role = "Restaurant Admin"
+				# Auto-sync to database if there's a mismatch (perfect fix)
+				if m.role != "Restaurant Admin":
+					frappe.db.set_value("Restaurant User", m.name, "role", "Restaurant Admin")
+			
 			members.append({
 				"name": m.name,
 				"user": m.user,
 				"full_name": user_info.get("full_name") or m.user,
 				"email": user_info.get("email") or m.user,
 				"user_image": user_info.get("user_image"),
-				"role": m.role,
+				"role": actual_role,
 				"is_active": bool(m.is_active),
 				"is_default": bool(m.is_default),
 				"creation": str(m.creation),
@@ -238,9 +247,9 @@ def remove_staff_member(restaurant_id, restaurant_user_name):
 
 
 @frappe.whitelist()
-def update_staff_member(restaurant_id, restaurant_user_name, is_active):
+def update_staff_member(restaurant_id, restaurant_user_name, is_active=None, role=None):
 	"""
-	PATCH – activate or deactivate a staff member.
+	PATCH – update staff member status or role.
 	"""
 	try:
 		restaurant = _resolve_restaurant(restaurant_id)
@@ -250,11 +259,19 @@ def update_staff_member(restaurant_id, restaurant_user_name, is_active):
 		if ru.restaurant != restaurant:
 			frappe.throw(_("This staff record does not belong to this restaurant."), frappe.PermissionError)
 
-		# Cannot deactivate yourself
-		if ru.user == frappe.session.user and not is_active:
-			frappe.throw(_("You cannot deactivate your own account."))
+		# Update active status if provided
+		if is_active is not None:
+			# Cannot deactivate yourself
+			if ru.user == frappe.session.user and not is_active:
+				frappe.throw(_("You cannot deactivate your own account."))
+			ru.is_active = 1 if is_active else 0
 
-		ru.is_active = 1 if is_active else 0
+		# Update role if provided
+		if role:
+			if role not in ("Restaurant Admin", "Restaurant Staff"):
+				frappe.throw(_("Invalid role: {0}").format(role))
+			ru.role = role
+
 		ru.save(ignore_permissions=True)
 
 		# Bust Redis cache

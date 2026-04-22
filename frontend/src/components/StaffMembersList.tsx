@@ -160,6 +160,25 @@ export default function StaffMembersList({ restaurantId, onAdd }: StaffMembersLi
     }
   }, [removeTarget, restaurantId, callRemove, mutate])
 
+  const handleUpdateRole = useCallback(async (member: StaffMember, newRole: 'Restaurant Admin' | 'Restaurant Staff') => {
+    try {
+      const res = await callUpdate({
+        restaurant_id: restaurantId,
+        restaurant_user_name: member.name,
+        role: newRole,
+      }) as any
+      const payload = res?.message ?? res
+      if (payload?.success) {
+        toast.success(`Role updated to ${newRole === 'Restaurant Admin' ? 'Admin' : 'Staff'}`)
+        mutate()
+      } else {
+        toast.error(payload?.error || 'Failed to update role')
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Something went wrong')
+    }
+  }, [restaurantId, callUpdate, mutate])
+
   const handleToggleActive = useCallback(async (member: StaffMember) => {
     try {
       const res = await callUpdate({
@@ -284,20 +303,60 @@ export default function StaffMembersList({ restaurantId, onAdd }: StaffMembersLi
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-medium truncate">{member.full_name || member.user}</span>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-xs rounded-full gap-1 border-none",
-                          member.role === 'Restaurant Admin'
-                            ? 'bg-primary/10 text-primary'
-                            : 'bg-muted/60 text-muted-foreground'
-                        )}
-                      >
-                        {member.role === 'Restaurant Admin'
-                          ? <Shield className="w-3 h-3" />
-                          : <User className="w-3 h-3" />}
-                        {member.role === 'Restaurant Admin' ? 'Admin' : 'Staff'}
-                      </Badge>
+                      
+                      {isAdmin ? (
+                        <Select
+                          value={member.role}
+                          onValueChange={(val) => handleUpdateRole(member, val as any)}
+                        >
+                          <SelectTrigger className="h-6 w-auto border-none bg-transparent hover:bg-muted/50 px-2 rounded-full gap-1 shadow-none transition-colors">
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-xs rounded-full gap-1 border-none pointer-events-none",
+                                member.role === 'Restaurant Admin'
+                                  ? 'bg-primary/10 text-primary'
+                                  : 'bg-muted/60 text-muted-foreground'
+                              )}
+                            >
+                              {member.role === 'Restaurant Admin'
+                                ? <Shield className="w-3 h-3" />
+                                : <User className="w-3 h-3" />}
+                              {member.role === 'Restaurant Admin' ? 'Admin' : 'Staff'}
+                            </Badge>
+                          </SelectTrigger>
+                          <SelectContent align="start" className="rounded-xl shadow-xl">
+                            <SelectItem value="Restaurant Staff" className="rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <User className="w-3.5 h-3.5" />
+                                <span>Staff</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="Restaurant Admin" className="rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <Shield className="w-3.5 h-3.5" />
+                                <span>Admin</span>
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-xs rounded-full gap-1 border-none",
+                            member.role === 'Restaurant Admin'
+                              ? 'bg-primary/10 text-primary'
+                              : 'bg-muted/60 text-muted-foreground'
+                          )}
+                        >
+                          {member.role === 'Restaurant Admin'
+                            ? <Shield className="w-3 h-3" />
+                            : <User className="w-3 h-3" />}
+                          {member.role === 'Restaurant Admin' ? 'Admin' : 'Staff'}
+                        </Badge>
+                      )}
+
                       {!member.is_active && (
                         <Badge variant="outline" className="text-xs rounded-full bg-red-50 text-red-500 border-red-200 dark:bg-red-950/30 dark:text-red-400">
                           Inactive
@@ -307,8 +366,8 @@ export default function StaffMembersList({ restaurantId, onAdd }: StaffMembersLi
                     <p className="text-xs text-muted-foreground truncate mt-0.5">{member.email}</p>
                   </div>
 
-                  {/* Admin actions — not on admins, not on self */}
-                  {isAdmin && member.role !== 'Restaurant Admin' && (
+                  {/* Admin actions — not on self */}
+                  {isAdmin && member.user !== (window as any).frappe?.session?.user && (
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <Button
                         variant="ghost"

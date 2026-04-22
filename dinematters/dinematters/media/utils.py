@@ -18,6 +18,49 @@ def normalize_variant_name(variant_name):
 	return variant_map.get(variant_name, variant_name)
 
 
+def get_allowed_roles():
+	"""Centralized mapping of owner doctypes to their allowed media roles"""
+	return {
+		"Menu Product": ["product_image", "product_video", "product_video_poster"],
+		"Menu Category": ["category_image"],
+		"Home Feature": ["home_feature_image"],
+		"Restaurant": ["restaurant_logo", "restaurant_hero_video", "restaurant_banner", "restaurant_gallery_image"],
+		"Restaurant Config": ["restaurant_config_logo", "restaurant_config_hero_video", "apple_touch_icon"],
+		"Menu Image Extractor": ["category_image"],
+		"Event": ["event_image"],
+		"Offer": ["offer_image"],
+		"Legacy Content": ["legacy_hero_media", "legacy_hero_fallback", "legacy_footer_media"],
+		"Legacy Member": ["legacy_member_image"],
+		"Legacy Testimonial": ["legacy_testimonial_avatar", "legacy_testimonial_dish_image"],
+		"Legacy Gallery Image": ["legacy_gallery_image"],
+		"Legacy Testimonial Image": ["legacy_testimonial_dish_image"]
+	}
+
+
+def get_actual_media_role(owner_doctype, media_role):
+	"""
+	Map prefixed media roles (e.g. "menu_category_category_image") 
+	to base roles (e.g. "category_image").
+	"""
+	if not owner_doctype or not media_role:
+		return media_role
+		
+	# Check if it's already a base role
+	allowed_roles = get_allowed_roles()
+	if owner_doctype in allowed_roles and media_role in allowed_roles[owner_doctype]:
+		return media_role
+		
+	# Check if it has a doctype prefix
+	prefix = owner_doctype.lower().replace(' ', '_') + "_"
+	if media_role.startswith(prefix):
+		actual_role = media_role[len(prefix):]
+		# Only return the stripped version if it's actually allowed for this doctype
+		if owner_doctype in allowed_roles and actual_role in allowed_roles[owner_doctype]:
+			return actual_role
+			
+	return media_role
+
+
 def get_media_asset_data(owner_doctype, owner_name, media_role, fallback_url=None):
 	"""
 	Centralized function to get Media Asset data for any DocType field
@@ -51,6 +94,9 @@ def get_media_asset_data(owner_doctype, owner_name, media_role, fallback_url=Non
 			"srcset": None
 		}
 	
+	# Normalize role (strip doctype prefix if present)
+	actual_role = get_actual_media_role(owner_doctype, media_role)
+	
 	# Try to get Media Asset (accept both 'uploaded' and 'ready' so a freshly-uploaded
 	# asset is surfaced immediately while the processing job is still running)
 	media_asset = frappe.db.get_value(
@@ -58,7 +104,7 @@ def get_media_asset_data(owner_doctype, owner_name, media_role, fallback_url=Non
 		{
 			"owner_doctype": owner_doctype,
 			"owner_name": owner_name,
-			"media_role": media_role,
+			"media_role": actual_role,
 			"status": ["in", ["uploaded", "ready"]]
 		},
 		["name", "primary_url", "blur_placeholder", "media_kind"],
@@ -187,6 +233,9 @@ def get_media_assets_batch(owner_doctype, owner_names, media_roles):
 	if not owner_names or not media_roles:
 		return {}
 	
+	# Normalize roles
+	actual_roles = [get_actual_media_role(owner_doctype, r) for r in media_roles]
+	
 	# 1. Fetch all matching Media Assets in one query
 	# Accept both 'uploaded' (processing in queue) and 'ready' so freshly-uploaded
 	# assets are returned immediately rather than waiting for the worker to finish.
@@ -195,7 +244,7 @@ def get_media_assets_batch(owner_doctype, owner_names, media_roles):
 		filters={
 			"owner_doctype": owner_doctype,
 			"owner_name": ["in", owner_names],
-			"media_role": ["in", media_roles],
+			"media_role": ["in", actual_roles],
 			"status": ["in", ["uploaded", "ready"]]
 		},
 		fields=["name", "owner_name", "media_role", "primary_url", "blur_placeholder", "media_kind"]
@@ -226,7 +275,9 @@ def get_media_assets_batch(owner_doctype, owner_names, media_roles):
 	results = {}
 	for asset in assets:
 		asset_name = asset["name"]
-		key = (asset["owner_name"], asset["media_role"])
+		# Map back to the original role requested by the caller
+		original_role = next((r for r in media_roles if get_actual_media_role(owner_doctype, r) == asset["media_role"]), asset["media_role"])
+		key = (asset["owner_name"], original_role)
 		
 		media_data = {
 			"url": asset["primary_url"],

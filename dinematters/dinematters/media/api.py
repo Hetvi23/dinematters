@@ -9,6 +9,7 @@ import frappe
 from frappe import _
 from .config import get_allowed_mime_types, get_max_upload_size
 from .storage import generate_object_key, generate_signed_upload_url, verify_object_exists
+from .utils import get_allowed_roles, get_actual_media_role
 import os
 
 
@@ -61,12 +62,15 @@ def request_upload_session(owner_doctype, owner_name, media_role, filename, cont
 	# Sanitize filename
 	safe_filename = sanitize_filename(filename)
 	
+	# Normalize role for storage and session record
+	actual_role = get_actual_media_role(owner_doctype, media_role)
+	
 	# Generate object key
 	object_key = generate_object_key(
 		restaurant_id=restaurant,
 		owner_doctype=owner_doctype,
 		owner_name=owner_name,
-		media_role=media_role,
+		media_role=actual_role,
 		media_id=media_id,
 		filename=safe_filename
 	)
@@ -81,7 +85,7 @@ def request_upload_session(owner_doctype, owner_name, media_role, filename, cont
 		"restaurant": restaurant,
 		"owner_doctype": owner_doctype,
 		"owner_name": owner_name,
-		"media_role": media_role,
+		"media_role": actual_role,
 		"media_kind": media_kind,
 		"object_key": object_key,
 		"filename": safe_filename,
@@ -178,6 +182,9 @@ def confirm_upload(upload_id, owner_doctype, owner_name, media_role, alt_text=No
 	from dinematters.dinematters.media.storage import get_cdn_url
 	cdn_url = get_cdn_url(upload_session.object_key)
 
+	# Normalize role (ensure we save the canonical role to the Media Asset record)
+	actual_role = get_actual_media_role(owner_doctype, media_role)
+	
 	# Create Media Asset with primary_url set from the start so that
 	# get_media_assets_batch / get_media_asset_data can surface it immediately.
 	media_asset = frappe.get_doc({
@@ -186,7 +193,7 @@ def confirm_upload(upload_id, owner_doctype, owner_name, media_role, alt_text=No
 		"restaurant": restaurant,
 		"owner_doctype": owner_doctype,
 		"owner_name": owner_name,
-		"media_role": media_role,
+		"media_role": actual_role,
 		"media_kind": upload_session.media_kind,
 		"source_filename": upload_session.filename,
 		"source_extension": file_extension,
@@ -359,39 +366,17 @@ def validate_restaurant_access(restaurant):
 
 def validate_media_role_for_doctype(owner_doctype, media_role):
 	"""Validate media role is allowed for owner doctype"""
-	allowed_roles = {
-		"Menu Product": ["product_image", "product_video", "product_video_poster"],
-		"Menu Category": ["category_image"],
-		"Home Feature": ["home_feature_image"],
-		"Restaurant": ["restaurant_logo", "restaurant_hero_video", "restaurant_banner", "restaurant_gallery_image"],
-		"Restaurant Config": ["restaurant_config_logo", "restaurant_config_hero_video", "apple_touch_icon"],
-		"Menu Image Extractor": ["category_image"],
-		"Event": ["event_image"],
-		"Offer": ["offer_image"],
-		"Legacy Content": ["legacy_hero_media", "legacy_hero_fallback", "legacy_footer_media"],
-		"Legacy Member": ["legacy_member_image"],
-		"Legacy Testimonial": ["legacy_testimonial_avatar", "legacy_testimonial_dish_image"],
-		"Legacy Gallery Image": ["legacy_gallery_image"],
-		"Legacy Testimonial Image": ["legacy_testimonial_dish_image"]
-	}
+	allowed_roles = get_allowed_roles()
 	
 	if owner_doctype not in allowed_roles:
 		frappe.throw(_(f"Media upload not supported for {owner_doctype}"))
 	
-	# Check if exact role is allowed
-	if media_role in allowed_roles[owner_doctype]:
-		return
+	actual_role = get_actual_media_role(owner_doctype, media_role)
 	
-	# Check if role with doctype prefix is allowed (e.g. "menu_category_category_image")
-	prefix = owner_doctype.lower().replace(' ', '_') + "_"
-	if media_role.startswith(prefix):
-		actual_role = media_role[len(prefix):]
-		if actual_role in allowed_roles[owner_doctype]:
-			return
-
-	frappe.throw(
-		_(f"Media role '{media_role}' not allowed for {owner_doctype}. Allowed: {', '.join(allowed_roles[owner_doctype])}")
-	)
+	if actual_role not in allowed_roles[owner_doctype]:
+		frappe.throw(
+			_(f"Media role '{media_role}' not allowed for {owner_doctype}. Allowed: {', '.join(allowed_roles[owner_doctype])}")
+		)
 
 
 def get_media_kind_from_mime(content_type):
