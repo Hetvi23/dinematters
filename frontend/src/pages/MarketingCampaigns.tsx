@@ -115,7 +115,7 @@ export default function MarketingCampaigns() {
   }, [selectedRestaurant, fetchSegments])
 
   const selectedSegment = segments.find(s => s.name === form.target_segment)
-  const estimatedCoinCost = (selectedSegment?.estimated_reach ?? 0) * (form.channel === 'WhatsApp' ? 1.0 : form.channel === 'SMS' ? 0.25 : 0.05)
+  const estimatedCoinCost = (selectedSegment?.estimated_reach ?? 0) * (form.channel === 'WhatsApp' ? 1.2 : form.channel === 'SMS' ? 0.25 : 0.05)
 
   const handleTemplateChange = (key: string) => {
     setForm(f => ({ ...f, template_key: key, message_template: TEMPLATES[key as keyof typeof TEMPLATES] ?? '' }))
@@ -246,7 +246,7 @@ export default function MarketingCampaigns() {
                   <Select value={form.channel} onValueChange={v => setForm(f => ({ ...f, channel: v }))}>
                     <SelectTrigger className="bg-muted/30"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="WhatsApp">💬 WhatsApp (₹1.00/msg)</SelectItem>
+                      <SelectItem value="WhatsApp">💬 WhatsApp (₹1.20/msg)</SelectItem>
                       <SelectItem value="SMS">📱 SMS (₹0.25/msg)</SelectItem>
                       <SelectItem value="Email">📧 Email (₹0.05/msg)</SelectItem>
                     </SelectContent>

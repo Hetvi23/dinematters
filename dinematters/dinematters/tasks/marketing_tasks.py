@@ -206,7 +206,8 @@ def dispatch_campaign_task(campaign_id):
                         phone=customer.get("phone", ""),
                         message=message,
                         settings=settings,
-                        subject=getattr(campaign, "email_subject", None)
+                        subject=getattr(campaign, "email_subject", None),
+                        template_name=getattr(campaign, "whatsapp_template_name", None)
                     )
 
                     event_doc = frappe.get_doc({
@@ -494,7 +495,8 @@ def _fire_single_trigger(trigger, customer, settings, restaurant_name_cache):
         phone=customer.get("phone", ""),
         message=message,
         settings=settings,
-        subject=getattr(trigger, "email_subject", None)
+        subject=getattr(trigger, "email_subject", None),
+        template_name=getattr(trigger, "whatsapp_template_name", None)
     )
 
     frappe.get_doc({
@@ -571,8 +573,8 @@ def _safe_deduct_coins(restaurant, amount, description, ref_doctype, ref_name):
 
 
 def _get_coins_per_msg(settings, channel):
-    if channel == "WhatsApp":
-        return float(getattr(settings, "marketing_whatsapp_coins_per_msg", None) or 1.00)
+    if channel in ("WhatsApp", "WhatsApp Cloud API"):
+        return float(getattr(settings, "marketing_whatsapp_coins_per_msg", None) or 1.20)
     elif channel == "SMS":
         return float(getattr(settings, "marketing_sms_coins_per_msg", None) or 0.25)
     elif channel == "Email":
@@ -598,7 +600,7 @@ def _get_loyalty_balance(customer_id, restaurant):
         return 0
 
 
-def _send_message(channel, phone, message, settings, subject=None):
+def _send_message(channel, phone, message, settings, subject=None, template_name=None):
     """Route message to correct channel. Returns (success, error_or_None)."""
     if not phone:
         return False, "No phone number"
@@ -607,6 +609,8 @@ def _send_message(channel, phone, message, settings, subject=None):
             return _send_sms(phone, message, settings)
         elif channel == "WhatsApp":
             return _send_whatsapp(phone, message, settings)
+        elif channel == "WhatsApp Cloud API":
+            return _send_whatsapp_cloud_api(phone, message, settings, template_name=template_name)
         elif channel == "Email":
             return _send_email(phone, message, settings, subject=subject)
         return False, f"Unknown channel: {channel}"
@@ -666,6 +670,82 @@ def _send_whatsapp(phone, message, settings):
     """
     from dinematters.dinematters.utils.whatsapp_utils import send_whatsapp_message
     return send_whatsapp_message(phone, message, settings=settings)
+
+
+def _send_whatsapp_cloud_api(phone, message, settings, template_name=None):
+    """
+    Send via Meta WhatsApp Cloud API (Official).
+    Requires a pre-approved template if sending marketing messages.
+    """
+    access_token = settings.get_password("whatsapp_cloud_api_token")
+    phone_id = getattr(settings, "whatsapp_cloud_api_phone_id", None)
+    
+    # Use per-campaign/trigger template if provided, else fallback to global settings
+    if not template_name:
+        template_name = getattr(settings, "marketing_wa_template_name", None)
+
+    if not access_token or not phone_id:
+        return False, "WhatsApp Cloud API credentials not configured"
+
+    import requests
+    import json
+
+    # Normalize phone number to E.164 (e.g. 91xxxxxxxxxx)
+    phone_clean = phone.replace("+", "").replace(" ", "").replace("-", "").strip()
+    if len(phone_clean) == 10:
+        phone_clean = "91" + phone_clean
+
+    # Meta Cloud API uses Templates for business-initiated marketing conversations.
+    # We will assume 'message' is a simple string for now, but in production,
+    # you usually send template parameters.
+    
+    url = f"https://graph.facebook.com/v21.0/{phone_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+    
+    # If a template name is configured, we try to send a template message.
+    # Otherwise, we send a text message (which only works if the user replied in the last 24h).
+    if template_name:
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": phone_clean,
+            "type": "template",
+            "template": {
+                "name": template_name,
+                "language": {"code": "en_US"}
+            }
+        }
+        # hello_world takes 0 parameters. Real templates take the message text as a parameter.
+        if template_name != "hello_world":
+            payload["template"]["components"] = [
+                {
+                    "type": "body",
+                    "parameters": [
+                        {"type": "text", "text": message[:1000]}
+                    ]
+                }
+            ]
+    else:
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": phone_clean,
+            "type": "text",
+            "text": {"preview_url": False, "body": message}
+        }
+
+    try:
+        res = requests.post(url, headers=headers, json=payload, timeout=15)
+        data = res.json()
+        if res.status_code in [200, 201] and not data.get("error"):
+            return True, None
+        
+        error_msg = data.get("error", {}).get("message", "Unknown Meta API error")
+        return False, f"Meta Cloud API Error: {error_msg}"
+    except Exception as e:
+        return False, str(e)
 
 
 def _send_email(recipient_phone, message, settings, subject=None):

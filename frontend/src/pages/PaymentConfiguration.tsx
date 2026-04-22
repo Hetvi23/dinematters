@@ -19,7 +19,8 @@ import {
   Wallet,
   Edit2,
   X,
-  ArrowLeft
+  ArrowLeft,
+  Download
 } from 'lucide-react'
 
 interface PaymentStats {
@@ -160,6 +161,18 @@ export default function PaymentConfiguration() {
           <p className="text-muted-foreground text-sm max-w-2xl ml-12">
             Configure the Razorpay merchant credentials for this restaurant.
           </p>
+        </div>
+        <div className="flex items-center mt-4 md:mt-0">
+          <Button
+            variant="outline"
+            className="rounded-full gap-2 border-primary/20 text-primary hover:bg-primary/5"
+            onClick={() => {
+              window.open('/api/method/dinematters.dinematters.api.payments.download_guide?guide_name=DineMatters_Razorpay_Guide', '_blank')
+            }}
+          >
+            <Download className="h-4 w-4" />
+            Help? Download Guide
+          </Button>
         </div>
       </div>
 

@@ -20,6 +20,7 @@
   "column_break_event_params_2",
   "section_break_message",
   "message_template",
+  "whatsapp_template_name",
   "email_subject",
   "column_break_coupon",
   "include_coupon",
@@ -99,7 +100,7 @@
    "depends_on": "eval:doc.trigger_event == 'On Loyalty Milestone'",
    "fieldname": "loyalty_milestone_coins",
    "fieldtype": "Int",
-   "label": "Milestone (₹)"
+   "label": "Milestone (\u20b9)"
   },
   {
    "fieldname": "column_break_event_params_2",
@@ -116,6 +117,13 @@
    "label": "Message Body",
    "description": "Supports: {{customer_name}}, {{restaurant_name}}, {{loyalty_balance}}, {{coupon_code}}, {{review_link}}",
    "reqd": 1
+  },
+  {
+   "fieldname": "whatsapp_template_name",
+   "fieldtype": "Data",
+   "label": "WhatsApp Template Name",
+   "depends_on": "eval:doc.channel == \"WhatsApp Cloud API\"",
+   "description": "The approved template name from Meta (e.g. hello_world). Required for Cloud API."
   },
   {
    "fieldname": "email_subject",

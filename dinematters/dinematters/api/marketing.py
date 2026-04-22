@@ -440,7 +440,7 @@ def get_optout_stats(restaurant_id):
 
 def _get_coins_per_msg(settings, channel):
     if channel == "WhatsApp":
-        return float(getattr(settings, "marketing_whatsapp_coins_per_msg", None) or 1.00)
+        return float(getattr(settings, "marketing_whatsapp_coins_per_msg", None) or 1.20)
     elif channel == "SMS":
         return float(getattr(settings, "marketing_sms_coins_per_msg", None) or 0.25)
     elif channel == "Email":

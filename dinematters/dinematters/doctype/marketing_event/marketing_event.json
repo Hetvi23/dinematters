@@ -58,7 +58,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Channel",
-   "options": "SMS\nWhatsApp\nEmail"
+   "options": "SMS\nWhatsApp\nWhatsApp Cloud API\nEmail"
   },
   {
    "fieldname": "phone",

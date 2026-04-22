@@ -803,6 +803,52 @@ def confirm_mandate_setup(restaurant_id, razorpay_payment_id, razorpay_order_id,
 		frappe.log_error(f"confirm_mandate_setup failed for {restaurant_id}: {str(e)}", "razorpay.confirm_mandate")
 		return {"success": False, "error": str(e)}
 
+@frappe.whitelist(allow_guest=True)
+def download_guide(guide_name):
+	import os
+	try:
+		from markdown_pdf import MarkdownPdf, Section
+	except ImportError:
+		frappe.throw("markdown-pdf library is required. Please install it.")
+		
+	# Validate guide_name to prevent directory traversal
+	if not guide_name or not guide_name.replace('_', '').replace('-', '').isalnum():
+		frappe.throw("Invalid guide name")
+		
+	# Use deterministic path relative to this script
+	base_dir = os.path.join(os.path.dirname(__file__), '..', 'customer-readme-notes')
+	file_path = os.path.abspath(os.path.join(base_dir, f"{guide_name}.md"))
+	
+	# Ensure the resolved path is actually inside the expected directory
+	if not file_path.startswith(os.path.abspath(base_dir)):
+		frappe.throw("Invalid path")
+		
+	if not os.path.exists(file_path):
+		frappe.throw(f"Guide not found: {guide_name}")
+		
+	with open(file_path, "r") as f:
+		md_content = f.read()
+		
+	pdf = MarkdownPdf(toc_level=0)
+	pdf.add_section(Section(md_content))
+	
+	import tempfile
+	with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+		tmp_path = tmp.name
+	
+	try:
+		pdf.save(tmp_path)
+		with open(tmp_path, "rb") as f:
+			pdf_data = f.read()
+	finally:
+		if os.path.exists(tmp_path):
+			os.remove(tmp_path)
+	
+	frappe.local.response.filename = f"{guide_name}.pdf"
+	frappe.local.response.filecontent = pdf_data
+	frappe.local.response.type = "download"
+
+
 
 @frappe.whitelist()
 def schedule_monthly_billing():

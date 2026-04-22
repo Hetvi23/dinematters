@@ -16,6 +16,7 @@
   "sent_at",
   "section_break_message",
   "message_template",
+   "whatsapp_template_name",
   "email_subject",
   "column_break_coupon",
   "include_coupon",
@@ -53,7 +54,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Channel",
-   "options": "SMS\nWhatsApp\nEmail"
+   "options": "SMS\nWhatsApp\nWhatsApp Cloud API\nEmail"
   },
   {
    "default": "Draft",

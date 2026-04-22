@@ -23,6 +23,7 @@ import {
   ShieldAlert,
   Crown,
   Smartphone,
+  Download,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { AiRechargeModal } from '@/components/AiRechargeModal'
@@ -288,6 +289,17 @@ export default function AutopaySetupPage() {
           <p className="text-sm text-muted-foreground">Manage your DineMatters tier, wallet balance and automatic top-ups.</p>
         </div>
         <div className="flex items-center gap-3">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-2 border-primary/20 text-primary hover:bg-primary/5" 
+            onClick={() => {
+              window.open('/api/method/dinematters.dinematters.api.payments.download_guide?guide_name=Dinematters_Charges', '_blank')
+            }}
+          >
+             <Download className="h-4 w-4" />
+             Help? Download Guide
+          </Button>
           <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate('/ledger')}>
              <History className="h-4 w-4" />
              Ledger
