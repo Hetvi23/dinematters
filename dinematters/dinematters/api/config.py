@@ -19,7 +19,7 @@ def _get_user_role_for_restaurant(user, restaurant):
 	"""Return 'Restaurant Admin' or 'Restaurant Staff' for the current user, or None for guests."""
 	if not user or user == "Guest":
 		return None
-	if user == "Administrator":
+	if user == "Administrator" or "System Manager" in frappe.get_roles(user):
 		return "Restaurant Admin"
 	role = frappe.db.get_value(
 		"Restaurant User",

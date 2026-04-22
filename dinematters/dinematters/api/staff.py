@@ -17,7 +17,7 @@ from dinematters.dinematters.doctype.restaurant_user.restaurant_user import get_
 def _assert_admin(restaurant_id):
 	"""Throw if the current user is NOT a Restaurant Admin for this restaurant."""
 	user = frappe.session.user
-	if user == "Administrator":
+	if user == "Administrator" or "System Manager" in frappe.get_roles(user):
 		return
 
 	role = frappe.db.get_value(

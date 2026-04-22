@@ -55,12 +55,23 @@ interface StaffMembersListProps {
 // ---------- Inline Avatar ----------
 
 function StaffAvatar({ src, initials }: { src?: string; initials: string }) {
+  const gradients = [
+    'from-blue-500 to-indigo-600',
+    'from-emerald-500 to-teal-600',
+    'from-orange-500 to-rose-600',
+    'from-purple-500 to-fuchsia-600',
+  ]
+  const gradient = gradients[initials.charCodeAt(0) % gradients.length]
+
   return (
-    <div className="w-9 h-9 rounded-full bg-primary/10 flex-shrink-0 overflow-hidden flex items-center justify-center border border-border/30">
+    <div className={cn(
+      "w-10 h-10 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center border-2 border-background shadow-sm ring-1 ring-border/30",
+      !src && `bg-gradient-to-br ${gradient}`
+    )}>
       {src ? (
         <img src={src} alt={initials} className="w-full h-full object-cover" />
       ) : (
-        <span className="text-xs font-semibold text-primary">{initials}</span>
+        <span className="text-[13px] font-bold text-white tracking-tighter">{initials}</span>
       )}
     </div>
   )

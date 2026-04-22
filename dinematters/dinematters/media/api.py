@@ -378,10 +378,20 @@ def validate_media_role_for_doctype(owner_doctype, media_role):
 	if owner_doctype not in allowed_roles:
 		frappe.throw(_(f"Media upload not supported for {owner_doctype}"))
 	
-	if media_role not in allowed_roles[owner_doctype]:
-		frappe.throw(
-			_(f"Media role '{media_role}' not allowed for {owner_doctype}. Allowed: {', '.join(allowed_roles[owner_doctype])}")
-		)
+	# Check if exact role is allowed
+	if media_role in allowed_roles[owner_doctype]:
+		return
+	
+	# Check if role with doctype prefix is allowed (e.g. "menu_category_category_image")
+	prefix = owner_doctype.lower().replace(' ', '_') + "_"
+	if media_role.startswith(prefix):
+		actual_role = media_role[len(prefix):]
+		if actual_role in allowed_roles[owner_doctype]:
+			return
+
+	frappe.throw(
+		_(f"Media role '{media_role}' not allowed for {owner_doctype}. Allowed: {', '.join(allowed_roles[owner_doctype])}")
+	)
 
 
 def get_media_kind_from_mime(content_type):
