@@ -48,7 +48,25 @@ const RestaurantContext = createContext<RestaurantContextType | undefined>(undef
 const STORAGE_KEY = 'dinematters-selected-restaurant'
 
 export function RestaurantProvider({ children }: { children: ReactNode }) {
-  const [selectedRestaurant, setSelectedRestaurantState] = useState<string | null>(null)
+  // Helper to validate restaurant IDs
+  const isValidRestaurantId = (id: string | null) => {
+    if (!id) return false
+    // Reject 3-letter currency codes (e.g., INR, USD)
+    if (/^[A-Z]{3}$/.test(id)) return false
+    return true
+  }
+
+  const [selectedRestaurant, setSelectedRestaurantState] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    const saved = localStorage.getItem(STORAGE_KEY)
+    // Only initialize with saved value if it doesn't look like a currency code
+    if (saved && /^[A-Z]{3}$/.test(saved)) {
+      localStorage.removeItem(STORAGE_KEY)
+      return null
+    }
+    return saved
+  })
+
   const [restaurants, setRestaurants] = useState<Restaurant[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [restaurantConfig, setRestaurantConfig] = useState<any | null>(null)
@@ -101,9 +119,11 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
     else if (saved && data.find(r => r.name === saved || r.restaurant_id === saved)) {
       newSelectedRestaurant = saved
     } 
-    // Priority 3: Default to first restaurant
+    // Priority 3: Default to first valid restaurant
     else if (data.length > 0) {
-      newSelectedRestaurant = data[0].name
+      // Skip any that look like currency codes for default selection
+      const firstNonCurrency = data.find(r => isValidRestaurantId(r.name))
+      newSelectedRestaurant = firstNonCurrency ? firstNonCurrency.name : data[0].name
       localStorage.setItem(STORAGE_KEY, newSelectedRestaurant)
     }
 
@@ -117,6 +137,12 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
   }
 
   const setSelectedRestaurant = (restaurantId: string | null) => {
+    // Defense: ignore values that look like currency codes (e.g., "INR", "USD")
+    if (restaurantId && !isValidRestaurantId(restaurantId)) {
+      console.warn(`[RestaurantContext] Ignored setting selectedRestaurant to currency-like value: ${restaurantId}`)
+      return
+    }
+
     setSelectedRestaurantState(restaurantId)
     if (restaurantId) {
       try {
@@ -180,7 +206,7 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
     const handleStorageChange = () => {
       try {
         const saved = localStorage.getItem(STORAGE_KEY)
-        if (saved !== selectedRestaurant) {
+        if (saved !== selectedRestaurant && isValidRestaurantId(saved)) {
           setSelectedRestaurantState(saved)
         }
       } catch {

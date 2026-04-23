@@ -283,3 +283,42 @@ def delete_doc(doctype, name):
 		frappe.throw(_("Failed to delete document: {0}").format(str(e)))
 
 
+@frappe.whitelist()
+def delete_multiple_docs(doctype, names, force=False):
+	"""
+	Delete multiple documents with proper error handling
+	"""
+	try:
+		# Parse names if it's a string
+		if isinstance(names, str):
+			names = json.loads(names)
+		
+		# Ensure force is a boolean
+		force = frappe.parse_json(force)
+		
+		deleted_count = 0
+		errors = []
+		
+		for name in names:
+			try:
+				if frappe.db.exists(doctype, name):
+					frappe.delete_doc(doctype, name, force=force)
+					deleted_count += 1
+			except Exception as e:
+				error_msg = str(e)
+				frappe.log_error(f"Bulk Delete Item Error: {doctype} {name}", error_msg)
+				errors.append(f"Failed to delete {name}: {error_msg}")
+		
+		return {
+			'success': True,
+			'deleted_count': deleted_count,
+			'errors': errors
+		}
+	except Exception as e:
+		frappe.log_error(f"Bulk Delete Error: {doctype}", str(e))
+		return {
+			'success': False,
+			'error': str(e)
+		}
+
+

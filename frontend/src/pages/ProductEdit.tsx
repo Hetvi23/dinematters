@@ -5,7 +5,7 @@ import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import DynamicForm from '@/components/DynamicForm'
 
-const PRODUCT_HIDE_FIELDS = ['restaurant_id', 'company', 'subdomain']
+const PRODUCT_HIDE_FIELDS = ['restaurant_id', 'company', 'subdomain', 'category_name', 'main_category']
 const PRODUCT_READ_ONLY_FIELDS = ['restaurant']
 
 export default function ProductEdit() {

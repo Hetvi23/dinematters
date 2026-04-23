@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
-import { useFrappeDeleteDoc } from '@/lib/frappe'
+import { useFrappePostCall } from '@/lib/frappe'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Eye, Pencil, Trash2, Plus, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/hooks/useConfirm'
@@ -23,6 +24,8 @@ export default function Categories() {
   
   const [sortField, setSortField] = useState<SortField>('display_order')
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
+  const [selectedNames, setSelectedNames] = useState<string[]>([])
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const {
     data: categories,
@@ -45,7 +48,7 @@ export default function Categories() {
     debugId: `categories-${selectedRestaurant}`
   })
 
-  const { deleteDoc } = useFrappeDeleteDoc()
+  const { call: bulkDelete } = useFrappePostCall('dinematters.dinematters.api.documents.delete_multiple_docs')
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -78,23 +81,94 @@ export default function Categories() {
 
   const handleDelete = async (categoryId: string, categoryName: string) => {
     const confirmed = await confirm({
-      title: 'Delete Category',
-      description: `Are you sure you want to delete "${categoryName}"? This action cannot be undone.`,
+      title: 'Force Delete Category',
+      description: `Are you sure you want to delete "${categoryName}"? This category may be linked to products; force deleting will remove it regardless.`,
       variant: 'destructive',
-      confirmText: 'Delete',
+      confirmText: 'Force Delete',
       cancelText: 'Cancel'
     })
 
     if (!confirmed) return
 
     try {
-      await deleteDoc('Menu Category', categoryId)
-      toast.success('Category deleted successfully')
-      mutate()
+      const result = await bulkDelete({
+        doctype: 'Menu Category',
+        names: [categoryId],
+        force: true
+      })
+
+      if (result.success && result.deleted_count > 0) {
+        toast.success('Category deleted successfully')
+        setSelectedNames(prev => prev.filter(name => name !== categoryId))
+        mutate()
+      } else if (result.errors && result.errors.length > 0) {
+        toast.error('Failed to delete category', { description: result.errors[0] })
+      } else {
+        throw new Error(result.error || 'Delete failed')
+      }
     } catch (error: any) {
       console.error('Failed to delete category:', error)
       toast.error('Failed to delete category', { description: getFrappeError(error) })
     }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedNames.length === 0) return
+
+    const confirmed = await confirm({
+      title: 'Force Delete Multiple Categories',
+      description: `Are you sure you want to delete ${selectedNames.length} selected categories? This will bypass constraints and delete items even if they are linked to products. This action cannot be undone.`,
+      variant: 'destructive',
+      confirmText: `Force Delete ${selectedNames.length} Items`,
+      cancelText: 'Cancel'
+    })
+
+    if (!confirmed) return
+
+    setIsDeleting(true)
+    try {
+      const result = await bulkDelete({
+        doctype: 'Menu Category',
+        names: selectedNames,
+        force: true
+      })
+
+      if (result.success) {
+        if (result.deleted_count > 0) {
+          toast.success(`Successfully deleted ${result.deleted_count} categories`)
+        }
+        if (result.errors && result.errors.length > 0) {
+          toast.error('Some categories could not be deleted', {
+            description: result.errors.join('\n')
+          })
+        }
+        setSelectedNames([])
+        mutate()
+      } else {
+        throw new Error(result.error || 'Bulk delete failed')
+      }
+    } catch (error: any) {
+      console.error('Failed to bulk delete categories:', error)
+      toast.error('Failed to bulk delete categories', { description: getFrappeError(error) })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedNames.length === categories?.length) {
+      setSelectedNames([])
+    } else {
+      setSelectedNames(categories?.map((c: any) => c.name) || [])
+    }
+  }
+
+  const toggleSelectRow = (name: string) => {
+    setSelectedNames(prev => 
+      prev.includes(name) 
+        ? prev.filter(n => n !== name) 
+        : [...prev, name]
+    )
   }
 
   return (
@@ -106,12 +180,25 @@ export default function Categories() {
             View and manage menu categories (filtered by your restaurant permissions)
           </p>
         </div>
-        <Button asChild className="w-full sm:w-auto shadow-sm">
-          <Link to="/categories/new">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Category
-          </Link>
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          {selectedNames.length > 0 && (
+            <Button 
+              variant="destructive" 
+              onClick={handleBulkDelete}
+              disabled={isDeleting}
+              className="w-full sm:w-auto shadow-sm"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Selected ({selectedNames.length})
+            </Button>
+          )}
+          <Button asChild className="w-full sm:w-auto shadow-sm">
+            <Link to="/categories/new">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Category
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -147,6 +234,12 @@ export default function Categories() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[50px]">
+                        <Checkbox 
+                          checked={selectedNames.length > 0 && selectedNames.length === categories?.length}
+                          onCheckedChange={toggleSelectAll}
+                        />
+                      </TableHead>
                       <TableHead className="w-[50px]">#</TableHead>
                       <SortableHeader field="category_name">Category Name</SortableHeader>
                       <TableHead>Description</TableHead>
@@ -157,7 +250,13 @@ export default function Categories() {
                   </TableHeader>
                   <TableBody>
                     {categories.map((category: any, index: number) => (
-                      <TableRow key={category.name}>
+                      <TableRow key={category.name} className={selectedNames.includes(category.name) ? 'bg-muted/50' : ''}>
+                        <TableCell>
+                          <Checkbox 
+                            checked={selectedNames.includes(category.name)}
+                            onCheckedChange={() => toggleSelectRow(category.name)}
+                          />
+                        </TableCell>
                         <TableCell className="text-muted-foreground">{(page - 1) * pageSize + index + 1}</TableCell>
                         <TableCell className="font-medium">{category.category_name || category.name}</TableCell>
                         <TableCell className="max-w-[300px] truncate">{category.description || '-'}</TableCell>

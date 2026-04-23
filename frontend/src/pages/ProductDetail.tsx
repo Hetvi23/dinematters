@@ -52,7 +52,7 @@ export default function ProductDetail() {
         doctype="Menu Product"
         docname={productId}
         mode="view"
-        hideFields={['restaurant_id', 'company', 'subdomain']}
+        hideFields={['restaurant_id', 'company', 'subdomain', 'category_name', 'main_category']}
         readOnlyFields={['restaurant']}
       />
     </div>

@@ -179,10 +179,20 @@ export default function DynamicForm({
       }
 
       // Always apply read-only field overrides (e.g. restaurant from context)
+      // BUT: avoid overwriting valid database values with currency codes (e.g. "INR")
       readOnlyFields.forEach(fieldname => {
-        const value = initialData[fieldname] || initialDataRef.current[fieldname]
-        if (value !== undefined && value !== null && value !== '') {
-          mergedData[fieldname] = value
+        const overrideValue = initialData[fieldname] || initialDataRef.current[fieldname]
+        const currentValue = mergedData[fieldname]
+        
+        const isCurrency = typeof overrideValue === 'string' && /^[A-Z]{3}$/.test(overrideValue)
+        const hasValidCurrent = currentValue && currentValue !== '' && !(/^[A-Z]{3}$/.test(String(currentValue)))
+
+        if (overrideValue !== undefined && overrideValue !== null && overrideValue !== '') {
+          // If it's a currency code and we already have a valid value, don't overwrite
+          if (isCurrency && hasValidCurrent) {
+            return
+          }
+          mergedData[fieldname] = overrideValue
         }
       })
 
@@ -1565,54 +1575,47 @@ function LinkFieldReadOnly({
   value: any
 }) {
   const linkedDoctype = field.options || ''
+  const { selectedRestaurant, restaurants, isLoading: contextLoading } = useRestaurant()
+  
+  // 1. Fetch the actual linked record (for non-restaurant links or for full resolution)
   const { data: linkedRecord } = useFrappeGetDoc(linkedDoctype, value || '', {
     enabled: !!value && !!linkedDoctype
   })
-  const { selectedRestaurant } = useRestaurant()
-  const selectedRestaurantKey = selectedRestaurant || ''
-  const { data: selectedRestaurantDoc } = useFrappeGetDoc('Restaurant', selectedRestaurantKey || '', {
-    enabled: !!selectedRestaurantKey && linkedDoctype === 'Restaurant'
-  })
 
-  const getDisplayValue = () => {
-    // If we have a valid linked record with a friendly name, use it
+  // 2. Resolve the display value
+  const displayValue = (function() {
+    // Priority 1: Use full linked record if available
     if (linkedRecord) {
       if (linkedDoctype === 'Restaurant' && linkedRecord.restaurant_name) {
         return linkedRecord.restaurant_name
       }
-      return linkedRecord.name || value || ''
+      return linkedRecord.name || String(value)
     }
 
-    // If linkedRecord not found or doesn't match value, but selectedRestaurantDoc is available,
-    // prefer showing the selected restaurant's friendly name. This avoids showing raw values
-    // like currency codes (e.g., "INR", "USD") which can appear when initialData contains a label.
-    if (linkedDoctype === 'Restaurant' && selectedRestaurantDoc) {
-      return selectedRestaurantDoc.restaurant_name || selectedRestaurantDoc.name || value || ''
+    // Priority 2: If it's a Restaurant link, try to find it in the global context list
+    if (linkedDoctype === 'Restaurant') {
+      const isCurrency = typeof value === 'string' && /^[A-Z]{3}$/.test(value)
+      
+      // If the value is a currency code (leak), or if it matches a known restaurant
+      const matchingRestaurant = restaurants.find(r => 
+        r.name === value || 
+        r.restaurant_id === value ||
+        (isCurrency && (r.name === selectedRestaurant || r.restaurant_id === selectedRestaurant))
+      )
+
+      if (matchingRestaurant) {
+        return matchingRestaurant.restaurant_name || matchingRestaurant.name
+      }
+
+      // If we are still loading context or fetching doc, show loading for currency-like values
+      if (isCurrency && (contextLoading || !selectedRestaurant)) {
+        return 'Loading...'
+      }
     }
 
+    // Fallback to raw value
     return value || ''
-  }
-  // If linkedRecord wasn't found, but we have a selectedRestaurantDoc, show its restaurant_name (render below)
-  if (!linkedRecord && selectedRestaurantDoc && linkedDoctype === 'Restaurant') {
-    const displayFromSelected = selectedRestaurantDoc.restaurant_name || selectedRestaurantDoc.name
-    return (
-      <div className="space-y-2">
-        <Label htmlFor={field.fieldname}>
-          {field.label}
-          {field.required && <span className="text-destructive">*</span>}
-        </Label>
-        <Input
-          id={field.fieldname}
-          value={displayFromSelected}
-          readOnly={true}
-          className="bg-muted cursor-not-allowed"
-        />
-        {field.description && (
-          <p className="text-xs text-muted-foreground">{field.description}</p>
-        )}
-      </div>
-    )
-  }
+  })()
 
   return (
     <div className="space-y-2">
@@ -1622,16 +1625,7 @@ function LinkFieldReadOnly({
       </Label>
       <Input
         id={field.fieldname}
-        value={(function () {
-          const raw = getDisplayValue()
-          const looksLikeCurrency = typeof raw === 'string' && /^[A-Z]{3}$/.test(raw)
-          if (linkedDoctype === 'Restaurant' && looksLikeCurrency) {
-            // Prefer selected restaurant friendly name if available, otherwise show loading placeholder
-            if (selectedRestaurantDoc) return selectedRestaurantDoc.restaurant_name || selectedRestaurantDoc.name || ''
-            return 'Loading...'
-          }
-          return raw
-        })()}
+        value={displayValue}
         readOnly={true}
         className="bg-muted cursor-not-allowed"
       />
@@ -1661,6 +1655,8 @@ function LinkField({
     switch (doctype) {
       case 'Restaurant':
         return ['name', 'restaurant_name']
+      case 'Menu Category':
+        return ['name', 'display_name', 'category_name']
       default:
         // Try to get name field and common title fields
         return ['name']
@@ -1686,6 +1682,10 @@ function LinkField({
     // For Restaurant, use restaurant_name
     if (linkedDoctype === 'Restaurant' && record.restaurant_name) {
       return record.restaurant_name
+    }
+    // For Menu Category, prefer display_name then category_name
+    if (linkedDoctype === 'Menu Category') {
+      return record.display_name || record.category_name || record.name || ''
     }
     // Fallback to name or first available field
     return record[fields[1]] || record.name || ''

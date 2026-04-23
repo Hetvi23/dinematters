@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
-import { useFrappeDeleteDoc } from '@/lib/frappe'
+import { useFrappePostCall } from '@/lib/frappe'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Eye, Pencil, Trash2, Plus, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/hooks/useConfirm'
@@ -25,6 +26,8 @@ export default function Products() {
   
   const [sortField, setSortField] = useState<SortField>('product_name')
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
+  const [selectedNames, setSelectedNames] = useState<string[]>([])
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const {
     data: products,
@@ -48,7 +51,7 @@ export default function Products() {
     debugId: `products-${selectedRestaurant}`
   })
 
-  const { deleteDoc } = useFrappeDeleteDoc()
+  const { call: bulkDelete } = useFrappePostCall('dinematters.dinematters.api.documents.delete_multiple_docs')
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -81,23 +84,94 @@ export default function Products() {
 
   const handleDelete = async (productId: string, productName: string) => {
     const confirmed = await confirm({
-      title: 'Delete Product',
-      description: `Are you sure you want to delete "${productName}"? This action cannot be undone.`,
+      title: 'Force Delete Product',
+      description: `Are you sure you want to delete "${productName}"? This product may be linked to orders; force deleting will remove it regardless.`,
       variant: 'destructive',
-      confirmText: 'Delete',
+      confirmText: 'Force Delete',
       cancelText: 'Cancel'
     })
 
     if (!confirmed) return
 
     try {
-      await deleteDoc('Menu Product', productId)
-      toast.success('Product deleted successfully')
-      mutate()
+      const result = await bulkDelete({
+        doctype: 'Menu Product',
+        names: [productId],
+        force: true
+      })
+
+      if (result.success && result.deleted_count > 0) {
+        toast.success('Product deleted successfully')
+        setSelectedNames(prev => prev.filter(name => name !== productId))
+        mutate()
+      } else if (result.errors && result.errors.length > 0) {
+        toast.error('Failed to delete product', { description: result.errors[0] })
+      } else {
+        throw new Error(result.error || 'Delete failed')
+      }
     } catch (error: any) {
       console.error('Failed to delete product:', error)
       toast.error('Failed to delete product', { description: getFrappeError(error) })
     }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedNames.length === 0) return
+
+    const confirmed = await confirm({
+      title: 'Force Delete Multiple Products',
+      description: `Are you sure you want to delete ${selectedNames.length} selected products? This will bypass constraints and delete items even if they are linked to orders. This action cannot be undone.`,
+      variant: 'destructive',
+      confirmText: `Force Delete ${selectedNames.length} Items`,
+      cancelText: 'Cancel'
+    })
+
+    if (!confirmed) return
+
+    setIsDeleting(true)
+    try {
+      const result = await bulkDelete({
+        doctype: 'Menu Product',
+        names: selectedNames,
+        force: true
+      })
+
+      if (result.success) {
+        if (result.deleted_count > 0) {
+          toast.success(`Successfully deleted ${result.deleted_count} products`)
+        }
+        if (result.errors && result.errors.length > 0) {
+          toast.error('Some products could not be deleted', {
+            description: result.errors.join('\n')
+          })
+        }
+        setSelectedNames([])
+        mutate()
+      } else {
+        throw new Error(result.error || 'Bulk delete failed')
+      }
+    } catch (error: any) {
+      console.error('Failed to bulk delete products:', error)
+      toast.error('Failed to bulk delete products', { description: getFrappeError(error) })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedNames.length === products?.length) {
+      setSelectedNames([])
+    } else {
+      setSelectedNames(products?.map((p: any) => p.name) || [])
+    }
+  }
+
+  const toggleSelectRow = (name: string) => {
+    setSelectedNames(prev => 
+      prev.includes(name) 
+        ? prev.filter(n => n !== name) 
+        : [...prev, name]
+    )
   }
 
   return (
@@ -110,6 +184,17 @@ export default function Products() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 sm:w-auto">
+          {selectedNames.length > 0 && (
+            <Button 
+              variant="destructive" 
+              onClick={handleBulkDelete}
+              disabled={isDeleting}
+              className="w-full sm:w-auto"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Selected ({selectedNames.length})
+            </Button>
+          )}
           <Button asChild className="w-full sm:w-auto shadow-sm">
             <Link to="/products/new">
               <Plus className="h-4 w-4 mr-2" />
@@ -152,7 +237,14 @@ export default function Products() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[50px]">#</TableHead>
+                      <TableHead className="w-[50px]">
+                        <Checkbox 
+                          checked={products?.length > 0 && selectedNames.length === products?.length}
+                          onCheckedChange={toggleSelectAll}
+                          aria-label="Select all"
+                        />
+                      </TableHead>
+                      <TableHead className="w-[50px] text-muted-foreground font-normal">#</TableHead>
                       <SortableHeader field="product_name">Product Name</SortableHeader>
                       <SortableHeader field="category_name">Category</SortableHeader>
                       <SortableHeader field="price">Price</SortableHeader>
@@ -163,7 +255,14 @@ export default function Products() {
                   </TableHeader>
                   <TableBody>
                     {products.map((product: any, index: number) => (
-                      <TableRow key={product.name}>
+                      <TableRow key={product.name} className={selectedNames.includes(product.name) ? 'bg-muted/50' : ''}>
+                        <TableCell>
+                          <Checkbox 
+                            checked={selectedNames.includes(product.name)}
+                            onCheckedChange={() => toggleSelectRow(product.name)}
+                            aria-label={`Select ${product.product_name}`}
+                          />
+                        </TableCell>
                         <TableCell className="text-muted-foreground">{(page - 1) * pageSize + index + 1}</TableCell>
                         <TableCell className="font-medium">{product.product_name}</TableCell>
                         <TableCell>{product.category_name || '-'}</TableCell>

@@ -46,7 +46,7 @@ class MenuImageExtractor(Document):
 					if frappe.db.exists("Media Asset", row.media_asset):
 						frappe.delete_doc("Media Asset", row.media_asset, ignore_permissions=True)
 				except Exception as e:
-					frappe.log_error(f"Failed to cleanup image {row.media_asset}: {str(e)}", "Menu Extraction Cleanup Error")
+					frappe.log_error(title="Menu Extraction Cleanup Error", message=f"Failed to cleanup image {row.media_asset}: {str(e)}")
 		
 		# Optional: Clear the table links too if we want to be thorough, 
 		# but keeping the rows (now with empty media_asset) provides a record of what was uploaded.
@@ -175,7 +175,7 @@ def extract_menu_data(docname):
 				batch_images=image_batch,
 				batch_number=batch_idx + 1,
 				total_batches=len(image_batches),
-				queue="long",
+				queue="short",
 				timeout=7200,  # 2 hours per batch (very generous)
 				job_id=f"menu_extraction_{docname}_batch_{batch_idx + 1}",
 				is_async=True,
@@ -196,7 +196,7 @@ def extract_menu_data(docname):
 	except frappe.exceptions.ValidationError:
 		raise
 	except Exception as e:
-		frappe.log_error(frappe.get_traceback(), "Menu Extraction - Enqueue Error")
+		frappe.log_error(title="Menu Extraction - Enqueue Error", message=frappe.get_traceback())
 		frappe.throw(_("Error starting extraction: {0}").format(str(e)))
 
 
@@ -257,10 +257,12 @@ def _extract_batch_internal(docname, batch_images, batch_number, total_batches):
 	try:
 		# Log that batch processing started
 		frappe.log_error(
-			f"Batch {batch_number}/{total_batches} started processing\n"
-			f"Document: {docname}\n"
-			f"Images in batch: {len(batch_images)}",
-			"Menu Extraction - Batch Start"
+			title="Menu Extraction - Batch Start",
+			message=(
+				f"Batch {batch_number}/{total_batches} started processing\n"
+				f"Document: {docname}\n"
+				f"Images in batch: {len(batch_images)}"
+			)
 		)
 		
 		doc = frappe.get_doc("Menu Image Extractor", docname)
@@ -268,8 +270,8 @@ def _extract_batch_internal(docname, batch_images, batch_number, total_batches):
 		# Check if document still exists and is in Processing status
 		if doc.extraction_status != "Processing":
 			frappe.log_error(
-				f"Batch {batch_number} skipped: Document status is {doc.extraction_status}, not Processing",
-				"Menu Extraction - Batch Skip"
+				title="Menu Extraction - Batch Skip",
+				message=f"Batch {batch_number} skipped: Document status is {doc.extraction_status}, not Processing"
 			)
 			return
 		
@@ -287,12 +289,12 @@ def _extract_batch_internal(docname, batch_images, batch_number, total_batches):
 					if is_temp:
 						temp_files.append(local_path)
 				else:
-					frappe.log_error(f"Batch {batch_number}: Could not resolve image path for {image_url}", "Menu Extraction - Path Error")
+					frappe.log_error(title="Menu Extraction - Path Error", message=f"Batch {batch_number}: Could not resolve image path for {image_url}")
 			except Exception as e:
-				frappe.log_error(f"Batch {batch_number}: Error resolving image {image_url}\n{str(e)}", "Menu Extraction - Resolution Error")
+				frappe.log_error(title="Menu Extraction - Resolution Error", message=f"Batch {batch_number}: Error resolving image {image_url}\n{str(e)}")
 
 		if not image_paths:
-			frappe.log_error(f"Batch {batch_number}: No valid image files found", "Menu Extraction - Batch Empty")
+			frappe.log_error(title="Menu Extraction - Batch Empty", message=f"Batch {batch_number}: No valid image files found")
 			_update_batch_completion(docname, batch_number, total_batches, None, None)
 			return
 
@@ -309,11 +311,13 @@ def _extract_batch_internal(docname, batch_images, batch_number, total_batches):
 		
 		# Log successful result
 		frappe.log_error(
-			f"Batch {batch_number}: Extraction Success\n"
-			f"Success: {result.get('success')}\n"
-			f"Categories: {len(result.get('data', {}).get('categories', []))}\n"
-			f"Dishes: {len(result.get('data', {}).get('dishes', []))}",
-			"Menu Extraction - Internal Success"
+			title="Menu Extraction - Internal Success",
+			message=(
+				f"Batch {batch_number}: Extraction Success\n"
+				f"Success: {result.get('success')}\n"
+				f"Categories: {len(result.get('data', {}).get('categories', []))}\n"
+				f"Dishes: {len(result.get('data', {}).get('dishes', []))}"
+			)
 		)
 		
 		processing_time = time.time() - start_time
@@ -325,13 +329,13 @@ def _extract_batch_internal(docname, batch_images, batch_number, total_batches):
 			_store_batch_results(docname, batch_number, data, processing_time)
 		else:
 			frappe.log_error(
-				f"Batch {batch_number} extraction returned success=False: {result.get('error', 'Unknown error')}",
-				"Menu Extraction - Batch Service Error"
+				title="Menu Extraction - Batch Service Error",
+				message=f"Batch {batch_number} extraction returned success=False: {result.get('error', 'Unknown error')}"
 			)
 			_update_batch_completion(docname, batch_number, total_batches, None, None)
 	
 	except Exception as e:
-		frappe.log_error(f"Batch {batch_number} failed: {str(e)}\n{frappe.get_traceback()}", "Menu Extraction - Batch Error")
+		frappe.log_error(title="Menu Extraction - Batch Error", message=f"Batch {batch_number} failed: {str(e)}\n{frappe.get_traceback()}")
 		_update_batch_completion(docname, batch_number, total_batches, None, None)
 	
 	finally:
@@ -342,7 +346,7 @@ def _extract_batch_internal(docname, batch_images, batch_number, total_batches):
 					if os.path.exists(temp_file):
 						os.remove(temp_file)
 				except Exception as cleanup_err:
-					frappe.log_error(f"Failed to cleanup temp file {temp_file}: {str(cleanup_err)}", "Menu Extraction - Cleanup Error")
+					frappe.log_error(title="Menu Extraction - Cleanup Error", message=f"Failed to cleanup temp file {temp_file}: {str(cleanup_err)}")
 
 
 def _get_local_image_path(image_url):
@@ -386,7 +390,7 @@ def _get_local_image_path(image_url):
 			return temp_path, True
 			
 		except Exception as e:
-			frappe.log_error(f"Failed to download external image {image_url}: {str(e)}", "Menu Extraction - Download Error")
+			frappe.log_error(title="Menu Extraction - Download Error", message=f"Failed to download external image {image_url}: {str(e)}")
 			return None, False
 
 	# CASE 2: Local Frappe URL or Path
@@ -451,8 +455,8 @@ def _store_batch_results(docname, batch_number, data, processing_time):
 	
 	except Exception as e:
 		frappe.log_error(
-			f"Error storing batch {batch_number} results: {str(e)}\n{frappe.get_traceback()}",
-			"Menu Extraction - Store Batch Error"
+			title="Menu Extraction - Store Batch Error",
+			message=f"Error storing batch {batch_number} results: {str(e)}\n{frappe.get_traceback()}"
 		)
 
 
@@ -473,7 +477,7 @@ def _update_batch_completion(docname, batch_number, total_batches, data, process
 		
 		frappe.db.commit()
 	except Exception as e:
-		frappe.log_error(f"Error updating batch completion: {str(e)}", "Menu Extraction - Batch Update Error")
+		frappe.log_error(title="Menu Extraction - Batch Update Error", message=f"Error updating batch completion: {str(e)}")
 
 
 def _aggregate_and_process_batches(docname):
@@ -548,71 +552,17 @@ def _aggregate_and_process_batches(docname):
 		
 	except Exception as e:
 		frappe.log_error(
-			f"Error aggregating batches: {str(e)}\n{frappe.get_traceback()}",
-			"Menu Extraction - Aggregate Error"
+			title="Menu Extraction - Aggregate Error",
+			message=f"Error aggregating batches: {str(e)}\n{frappe.get_traceback()}"
 		)
 		# Fallback to reload and set failed
 		try:
 			doc = frappe.get_doc("Menu Image Extractor", docname)
-			doc.extraction_status = "Failed"
-			doc.extraction_log = f"Error aggregating batch results: {str(e)}"
-			doc.save(ignore_permissions=True)
+			doc.db_set('extraction_status', 'Failed', update_modified=False)
+			doc.db_set('extraction_log', f"Error aggregating batch results: {str(e)}", update_modified=False)
 			frappe.db.commit()
 		except:
 			pass
-
-			# Safely get sample data
-			sample_categories = []
-			sample_dishes = []
-			
-			if isinstance(categories, list) and len(categories) > 0:
-				sample_categories = [c.get('name', '') if isinstance(c, dict) else str(c) for c in categories[:5]]
-			if isinstance(dishes, list) and len(dishes) > 0:
-				sample_dishes = [d.get('name', '') if isinstance(d, dict) else str(d) for d in dishes[:10]]
-			
-			return {
-				'success': True,
-				'message': f"Successfully extracted {len(dishes)} dishes and {len(categories)} categories. Please review and approve to add them to the database.",
-				'extracted_data_preview': {
-					'categories_count': len(categories),
-					'dishes_count': len(dishes),
-					'sample_categories': sample_categories,
-					'sample_dishes': sample_dishes
-				}
-			}
-		else:
-			# Extraction failed
-			doc.extraction_status = "Failed"
-			doc.extraction_log = f"Extraction failed: {result.get('message', 'Unknown error')}"
-			doc.extraction_date = datetime.now()
-			doc.processing_time = f"{processing_time:.2f} seconds"
-			doc.raw_response = json.dumps(result, indent=2)
-			doc.save(ignore_permissions=True)
-			frappe.db.commit()
-			
-			frappe.throw(_("Extraction failed: {0}").format(result.get('message', 'Unknown error')))
-	
-	except frappe.exceptions.ValidationError:
-		# Re-raise ValidationError (from frappe.throw) without modification
-		# This preserves the specific error messages we set above
-		raise
-		
-	except Exception as e:
-		frappe.log_error(frappe.get_traceback(), "Menu Extraction Error")
-		
-		# Update status to failed in background job
-		try:
-			doc = frappe.get_doc("Menu Image Extractor", docname)
-			doc.extraction_status = "Failed"
-			doc.extraction_log = f"Extraction failed: {str(e)}\n\n{frappe.get_traceback()}"
-			doc.extraction_date = datetime.now()
-			doc.save(ignore_permissions=True)
-			frappe.db.commit()
-		except:
-			pass  # If we can't update, at least log the error
-		
-		# Re-raise to mark job as failed
-		raise
 
 
 def store_extracted_data(data, extractor_doc):
@@ -1203,40 +1153,59 @@ def process_extracted_data(data, extractor_doc):
 				media_row.display_order = idx + 1
 				media_added += 1
 		
-		# Handle customizations if present
-		if dish_data.get('customizationQuestions'):
-			product_doc.customization_questions = []
-			for custom_data in dish_data.get('customizationQuestions', []):
-				if not isinstance(custom_data, dict): continue
-				options_list = custom_data.get('options')
-				if not isinstance(options_list, list) or len(options_list) == 0: continue
-				valid_options = [opt for opt in options_list if isinstance(opt, dict) and opt.get('label')]
-				if not valid_options: continue
-				
-				custom_row = product_doc.append('customization_questions', {})
-				custom_row.question_id = custom_data.get('id', '')
-				custom_row.title = custom_data.get('title', '')
-				custom_row.subtitle = custom_data.get('subtitle', '')
-				custom_row.question_type = custom_data.get('type', 'single')
-				custom_row.is_required = 1 if custom_data.get('required') else 0
-				custom_row.display_order = custom_data.get('displayOrder', 0)
-				
-				for opt_idx, option_data in enumerate(valid_options):
-					opt_row = custom_row.append('options', {})
-					opt_row.option_id = option_data.get('id') or f"opt_{opt_idx}_{int(time.time())}"
-					opt_row.label = option_data.get('label')
-					raw_opt_price = option_data.get('price', 0)
-					if isinstance(raw_opt_price, str):
-						raw_opt_price = re.sub(r'[^\d.]', '', raw_opt_price)
-						opt_row.price = float(raw_opt_price) if raw_opt_price else 0
-					else:
-						opt_row.price = raw_opt_price
-					opt_row.is_default = 1 if option_data.get('isDefault') else 0
-					opt_row.is_vegetarian = 1 if option_data.get('isVegetarian') else 0
-					opt_row.display_order = option_data.get('displayOrder', opt_idx)
-		
 		try:
+			# Clear customizations from the object before saving to avoid validation errors
+			# (We will handle them manually after the product is saved)
+			product_doc.set('customization_questions', [])
 			product_doc.save(ignore_permissions=True)
+			
+			# Explicitly handle nested customizations (Questions -> Options)
+			# Standard product_doc.save() often fails to recurse into nested child tables
+			if dish_data.get('customizationQuestions'):
+				# Clear existing customizations for this product to prevent duplicates
+				existing_questions = frappe.get_all("Customization Question", filters={"parent": product_doc.name}, fields=["name"])
+				for eq in existing_questions:
+					frappe.db.delete("Customization Option", {"parent": eq.name, "parenttype": "Customization Question"})
+					frappe.db.delete("Customization Question", {"name": eq.name})
+				
+				# Re-insert questions and options manually
+				for q_idx, custom_data in enumerate(dish_data.get('customizationQuestions', [])):
+					if not isinstance(custom_data, dict): continue
+					options_list = custom_data.get('options')
+					if not isinstance(options_list, list) or len(options_list) == 0: continue
+					valid_options = [opt for opt in options_list if isinstance(opt, dict) and opt.get('label')]
+					if not valid_options: continue
+					
+					cq = frappe.new_doc("Customization Question")
+					cq.parent = product_doc.name
+					cq.parenttype = "Menu Product"
+					cq.parentfield = "customization_questions"
+					cq.question_id = custom_data.get('id', '')
+					cq.title = custom_data.get('title', '')
+					cq.subtitle = custom_data.get('subtitle', '')
+					cq.question_type = custom_data.get('type', 'single')
+					cq.is_required = 1 if custom_data.get('required') else 0
+					cq.display_order = custom_data.get('displayOrder', q_idx)
+					
+					for opt_idx, option_data in enumerate(valid_options):
+						raw_opt_price = option_data.get('price', 0)
+						if isinstance(raw_opt_price, str):
+							raw_opt_price = re.sub(r'[^\d.]', '', raw_opt_price)
+							price = float(raw_opt_price) if raw_opt_price else 0
+						else:
+							price = raw_opt_price
+							
+						cq.append('options', {
+							'option_id': option_data.get('id') or f"opt_{opt_idx}_{int(time.time())}",
+							'label': option_data.get('label'),
+							'price': price,
+							'is_default': 1 if option_data.get('isDefault') else 0,
+							'is_vegetarian': 1 if option_data.get('isVegetarian') else 0,
+							'display_order': option_data.get('displayOrder', opt_idx)
+						})
+					
+					cq.insert(ignore_permissions=True)
+
 		except Exception as e:
 			raw_err = str(e)
 			display_name = product_name[:30] + "..." if len(product_name) > 30 else product_name

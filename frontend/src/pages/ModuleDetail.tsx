@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { useFrappeGetDoc, useFrappePostCall, useFrappeGetCall } from '@/lib/frappe'
+import { useFrappeGetDoc, useFrappePostCall } from '@/lib/frappe'
 import { usePermissions } from '@/lib/permissions'
 import DynamicForm from '@/components/DynamicForm'
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,6 @@ export default function ModuleDetail() {
   const { permissions } = usePermissions(doctype || '')
   const { data: doc, isLoading } = useFrappeGetDoc(doctype || '', docname || '')
   const [mode, setMode] = useState<'view' | 'edit'>('view')
-  const { call: deleteDoc } = useFrappePostCall('frappe.client.delete')
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
   const { selectedRestaurant } = useRestaurant()
   const { call: getQrCodeUrl } = useFrappePostCall('dinematters.dinematters.doctype.restaurant.restaurant.get_qr_codes_pdf_url')
@@ -39,24 +38,34 @@ export default function ModuleDetail() {
     }
   }, [doctype, docname, doc?.tables])
 
+  const { call: deleteDocApi } = useFrappePostCall('dinematters.dinematters.api.documents.delete_multiple_docs')
+
   const handleDelete = async () => {
     const confirmed = await confirm({
-      title: 'Delete Record',
-      description: `Are you sure you want to delete this ${doctype}? This action cannot be undone.`,
+      title: `Force Delete ${doctype}`,
+      description: `Are you sure you want to delete this ${doctype}? If it is linked to other records, force deleting will remove it regardless. This action cannot be undone.`,
       variant: 'destructive',
-      confirmText: 'Delete',
+      confirmText: 'Force Delete',
       cancelText: 'Cancel'
     })
 
     if (!confirmed) return
 
     try {
-      await deleteDoc({
+      const result = await deleteDocApi({
         doctype: doctype || '',
-        name: docname
+        names: [docname],
+        force: true
       })
-      toast.success(`${doctype} deleted successfully`)
-      navigate(`/${doctype}`)
+
+      if (result.success && result.deleted_count > 0) {
+        toast.success(`${doctype} deleted successfully`)
+        navigate(`/${doctype}`)
+      } else if (result.errors && result.errors.length > 0) {
+        toast.error(`Failed to delete ${doctype}`, { description: result.errors[0] })
+      } else {
+        throw new Error(result.error || 'Delete failed')
+      }
     } catch (error: any) {
       toast.error(error?.message || `Failed to delete ${doctype}`)
     }
@@ -180,7 +189,7 @@ export default function ModuleDetail() {
         mode={mode}
         initialData={selectedRestaurant ? { restaurant: selectedRestaurant } : {}}
         readOnlyFields={['restaurant']}
-        onSave={(data) => {
+        onSave={() => {
           setMode('view')
           toast.success(`${doctype} updated successfully`)
         }}

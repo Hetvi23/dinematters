@@ -95,14 +95,13 @@ def generate_signed_upload_url(object_key, content_type, expiration=600):
 		client = get_r2_client()
 		config = get_r2_config()
 		
-		# Generate presigned URL with CORS headers
+		# Generate presigned URL
 		url = client.generate_presigned_url(
 			'put_object',
 			Params={
 				'Bucket': config["bucket_name"],
 				'Key': object_key,
-				'ContentType': content_type,
-				'ACL': 'public-read'
+				'ContentType': content_type
 			},
 			ExpiresIn=expiration,
 			HttpMethod='PUT'
@@ -111,8 +110,7 @@ def generate_signed_upload_url(object_key, content_type, expiration=600):
 		return {
 			"upload_url": url,
 			"headers": {
-				"Content-Type": content_type,
-				"x-amz-acl": "public-read"
+				"Content-Type": content_type
 			},
 			"expires_in": expiration
 		}
@@ -198,7 +196,7 @@ def upload_object(local_path, object_key, content_type=None, metadata=None):
 		return get_cdn_url(object_key)
 	except ClientError as e:
 		error_msg = f"Error uploading object: {str(e)}"
-		frappe.log_error(error_msg[:140], "R2 Object Upload")
+		frappe.log_error(title="R2 Object Upload", message=error_msg)
 		frappe.throw(error_msg)
 
 
