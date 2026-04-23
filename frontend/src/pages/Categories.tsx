@@ -127,13 +127,16 @@ export default function Categories() {
 
     setIsDeleting(true)
     try {
-      const result = await bulkDelete({
+      const response = await bulkDelete({
         doctype: 'Menu Category',
         names: selectedNames,
         force: true
       })
 
-      if (result.success) {
+      // Standard Frappe SDK returns the message content, but let's be safe
+      const result = response?.message || response
+
+      if (result && result.success) {
         if (result.deleted_count > 0) {
           toast.success(`Successfully deleted ${result.deleted_count} categories`)
         }
@@ -145,7 +148,8 @@ export default function Categories() {
         setSelectedNames([])
         mutate()
       } else {
-        throw new Error(result.error || 'Bulk delete failed')
+        console.error('Bulk delete returned unexpected result:', result)
+        throw new Error(result?.error || 'Bulk delete failed')
       }
     } catch (error: any) {
       console.error('Failed to bulk delete categories:', error)

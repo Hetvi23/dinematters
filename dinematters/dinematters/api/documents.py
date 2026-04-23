@@ -299,15 +299,20 @@ def delete_multiple_docs(doctype, names, force=False):
 		deleted_count = 0
 		errors = []
 		
+		# For bulk delete, we can optimize by checking existence once or just attempting
 		for name in names:
 			try:
-				if frappe.db.exists(doctype, name):
-					frappe.delete_doc(doctype, name, force=force)
-					deleted_count += 1
+				# Using frappe.delete_doc with force=force
+				# If force=True, it skips link validation which is much faster
+				frappe.delete_doc(doctype, name, force=force, ignore_permissions=False, ignore_missing=True)
+				deleted_count += 1
 			except Exception as e:
 				error_msg = str(e)
 				frappe.log_error(f"Bulk Delete Item Error: {doctype} {name}", error_msg)
 				errors.append(f"Failed to delete {name}: {error_msg}")
+		
+		# Commit after all deletions are done
+		frappe.db.commit()
 		
 		return {
 			'success': True,
