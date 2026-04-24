@@ -422,7 +422,8 @@ export default function DynamicForm({
 
     // Check required fields
     meta.fields.forEach(field => {
-      if (field.required && !field.hidden) {
+      // Skip validation if field is hidden in meta OR passed in hideFields prop
+      if (field.required && !field.hidden && !hideFields.includes(field.fieldname)) {
         const value = formData[field.fieldname]
 
         // Special handling for Table fields

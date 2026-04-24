@@ -203,14 +203,14 @@ export default function MenuManagement() {
           names: [category.name]
         })
         
-        if (response.success) {
+        if (response.message?.success) {
           toast.success('Category deleted')
           mutateCategories()
           if (selectedCategoryId === category.name) {
             setSelectedCategoryId(null)
           }
         } else {
-          const errorMsg = response.errors?.[0] || 'Failed to delete category'
+          const errorMsg = response.message?.errors?.[0] || 'Failed to delete category'
           toast.error(errorMsg)
         }
       } catch (error) {
@@ -234,11 +234,11 @@ export default function MenuManagement() {
         force: true
       })
 
-      if (response.success) {
+      if (response.message?.success) {
         mutateProducts()
         toast.success('Product deleted')
       } else {
-        const errorMsg = response.errors?.[0] || 'Failed to delete product'
+        const errorMsg = response.message?.errors?.[0] || 'Failed to delete product'
         toast.error(errorMsg)
       }
     } catch (error) {
