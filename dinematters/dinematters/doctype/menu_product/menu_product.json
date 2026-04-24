@@ -167,7 +167,8 @@
    "reqd": 1
   },
   {
-   "default": "0",
+   "default": "1",
+
    "fieldname": "is_vegetarian",
    "fieldtype": "Check",
    "in_list_view": 1,

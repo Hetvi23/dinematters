@@ -19,15 +19,7 @@ const ModuleDetail = lazy(() => import('./pages/ModuleDetail'))
 const Orders = lazy(() => import('./pages/Orders'))
 const AcceptOrders = lazy(() => import('./pages/AcceptOrders'))
 const PastOrders = lazy(() => import('./pages/PastOrders'))
-const Products = lazy(() => import('./pages/Products'))
-const Categories = lazy(() => import('./pages/Categories'))
 const OrderDetail = lazy(() => import('./pages/OrderDetail'))
-const ProductDetail = lazy(() => import('./pages/ProductDetail'))
-const ProductEdit = lazy(() => import('./pages/ProductEdit'))
-const ProductNew = lazy(() => import('./pages/ProductNew'))
-const CategoryDetail = lazy(() => import('./pages/CategoryDetail'))
-const CategoryEdit = lazy(() => import('./pages/CategoryEdit'))
-const CategoryNew = lazy(() => import('./pages/CategoryNew'))
 const QRCodes = lazy(() => import('./pages/QRCodes'))
 const HomeFeaturesManager = lazy(() => import('./pages/HomeFeaturesManager'))
 const LegacyContent = lazy(() => import('./pages/LegacyContent'))
@@ -63,6 +55,8 @@ const GoogleGrowth = lazy(() => import('./pages/GoogleGrowth'))
 const GoogleGrowthSync = lazy(() => import('./pages/GoogleGrowthSync'))
 const GoogleGrowthReviews = lazy(() => import('./pages/GoogleGrowthReviews'))
 const TeamManagement = lazy(() => import('./pages/TeamManagement'))
+const MenuManagement = lazy(() => import('./pages/MenuManagement'))
+
 
 function AppContent() {
 	const { theme } = useTheme()
@@ -154,16 +148,11 @@ function AppContent() {
 							<Route path="/autopay-setup" element={<Layout><AutopaySetupPage /></Layout>} />
 							<Route path="/team" element={<Layout><TeamManagement /></Layout>} />
 
-							<Route path="/products" element={<Layout><Products /></Layout>} />
-							<Route path="/products/new" element={<Layout><ProductNew /></Layout>} />
-							<Route path="/products/:productId/edit" element={<Layout><ProductEdit /></Layout>} />
-							<Route path="/products/:productId" element={<Layout><ProductDetail /></Layout>} />
-							<Route path="/categories" element={<Layout><Categories /></Layout>} />
-							<Route path="/categories/new" element={<Layout><CategoryNew /></Layout>} />
-							<Route path="/categories/:categoryId/edit" element={<Layout><CategoryEdit /></Layout>} />
-							<Route path="/categories/:categoryId" element={<Layout><CategoryDetail /></Layout>} />
+							<Route path="/menu" element={<Layout><MenuManagement /></Layout>} />
 							<Route path="/qr-codes" element={<Layout><QRCodes /></Layout>} />
+
 							<Route path="/home-features" element={<Layout><HomeFeaturesManager /></Layout>} />
+
 							<Route path="/ai-enhancements" element={<Layout><AIEnhancementPage /></Layout>} />
 							<Route path="/ai-gallery" element={<Layout><AIGalleryPage /></Layout>} />
 							<Route path="/ai-menu-theme-background" element={<Layout><AIMenuThemeBackgroundPage /></Layout>} />

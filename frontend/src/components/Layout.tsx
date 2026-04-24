@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Package, Truck, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, ShieldAlert, Wallet, Crown, CreditCard, Settings, MessageSquare, Megaphone, Send, Zap, BarChart3, Menu, Search, Globe, Mail, Smartphone, ClipboardCopy } from 'lucide-react'
+import { Home, ShoppingCart, Package, Truck, FolderTree, Grid3x3, Sparkles, Star, Store, X, Lock, LockOpen, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, AlertCircle, Activity, Moon, Sun, ExternalLink, Eye, Plus, Loader2, QrCode, Clock, User, Users, LogOut, LayoutDashboard, CheckCircle2, Calendar, Tag, Shield, ShieldAlert, Wallet, Crown, CreditCard, Settings, MessageSquare, Megaphone, Send, Zap, BarChart3, Menu, Search, Globe, Mail, Smartphone, ClipboardCopy, PartyPopper } from 'lucide-react'
 import { cn, copyToClipboard } from '@/lib/utils'
 import { useFrappeGetDocList, useFrappeGetDoc, useFrappePostCall, useFrappeAuth } from '@/lib/frappe'
 import { AiRechargeModal } from '@/components/AiRechargeModal'
@@ -148,7 +148,7 @@ const navigation: NavItem[] = [
   },
   { type: 'link', name: 'WhatsApp Orders', href: '/whatsapp-orders', icon: MessageSquare, badgeHref: '/whatsapp-orders', feature: 'whatsapp_orders' },
   { type: 'link', name: 'Table Bookings', href: '/bookings', icon: Calendar, feature: 'table_booking' },
-  { type: 'link', name: 'Events', href: '/events', icon: Calendar, feature: 'events' },
+  { type: 'link', name: 'Events', href: '/events', icon: PartyPopper, feature: 'events' },
   { type: 'link', name: 'Customers', href: '/customers', icon: Users, feature: 'customer' },
   {
     type: 'group',
@@ -167,11 +167,11 @@ const navigation: NavItem[] = [
     name: 'Manage Product',
     icon: Package,
     children: [
-      { name: 'Products', href: '/products', icon: Package },
-      { name: 'Categories', href: '/categories', icon: FolderTree },
+      { name: 'Menu Management', href: '/menu', icon: Package },
       { name: 'AI Image Gallery', href: '/ai-enhancements', icon: Sparkles },
       { name: 'Recommendations Engine', href: '/recommendations-engine', icon: FolderTree, feature: 'ai_recommendations' },
     ],
+
   },
   {
     type: 'group',
@@ -1560,7 +1560,7 @@ export default function Layout({ children }: LayoutProps) {
                </div>
             ) : (
                <>
-                 {location.pathname !== '/account' && <Breadcrumb />}
+                 {location.pathname !== '/account' && location.pathname !== '/menu' && <Breadcrumb />}
                  {children}
                </>
             )}

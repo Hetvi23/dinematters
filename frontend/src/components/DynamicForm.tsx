@@ -8,7 +8,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { ColorPaletteSelector } from '@/components/ui/color-palette-selector'
+
 const CityStateSelector = lazy(() => import('@/components/ui/CityStateSelector').then(m => ({ default: m.CityStateSelector })))
 import AddressAutocomplete from '@/components/ui/AddressAutocomplete'
 import { DatePicker } from '@/components/ui/date-picker'
@@ -21,7 +23,21 @@ import MenuImagesTable from './MenuImagesTable'
 import ExtractedDishesTable from './ExtractedDishesTable'
 import ProductMediaTable from './ProductMediaTable'
 import CustomizationQuestionsTable from './CustomizationQuestionsTable'
+import ProductRecommendationsTable from './ProductRecommendationsTable'
 import { uploadToR2 } from '@/lib/r2Upload'
+import { 
+  FileText, 
+  Tag, 
+  Image as ImageIcon, 
+  Settings, 
+  Layers, 
+  Globe, 
+  Info,
+  DollarSign
+} from 'lucide-react'
+
+
+
 
 interface DynamicFormProps {
   doctype: string
@@ -158,14 +174,35 @@ export default function DynamicForm({
     //    !formDataInitialized is the guard that prevents overwriting user edits during SWR
     //    background revalidation of the SAME document.
     if (docData && mode !== 'create' && (lastHydratedKeyRef.current !== currentDocKey || !formDataInitialized)) {
-      const cleanDocData = { ...docData }
-      delete cleanDocData.name
-      delete cleanDocData.creation
-      delete cleanDocData.modified
-      delete cleanDocData.modified_by
-      delete cleanDocData.owner
+      const mergedData = { ...docData }
+      
+      // DEEP HYDRATION: Standard Frappe get_doc (used by useFrappeGetDoc) only returns 1 level 
+      // of child tables. It DOES NOT return child-of-child tables (e.g. customizations -> options).
+      // If we have deeper data in initialData (passed from a custom API like get_products),
+      // we MUST prefer it to prevent data loss on save.
+      if (initialDataRef.current) {
+        Object.keys(initialDataRef.current).forEach(key => {
+          const initVal = initialDataRef.current[key]
+          const serverVal = mergedData[key]
+          
+          // If both are arrays (likely child tables)
+          if (Array.isArray(initVal) && Array.isArray(serverVal)) {
+            // If initialData has nested content but serverData doesn't, prefer initialData
+            const initHasNested = initVal.some(item => 
+              Object.values(item).some(val => Array.isArray(val) && val.length > 0)
+            )
+            const serverHasNested = serverVal.some(item => 
+              Object.values(item).some(val => Array.isArray(val) && val.length > 0)
+            )
+            
+            if (initHasNested && !serverHasNested) {
+              mergedData[key] = initVal
+            }
+          }
+        })
+      }
 
-      const mergedData = { ...cleanDocData }
+      const cleanDocData = { ...mergedData }
 
       // Fill in meta defaults for fields not present in the doc
       if (meta && meta.fields) {
@@ -1273,10 +1310,9 @@ export default function DynamicForm({
         if (field.fieldname === 'customization_questions' && field.options === 'Customization Question') {
           return (
             <div key={field.fieldname} className="space-y-2">
-              <CustomizationQuestionsTable
+              <CustomizationQuestionsTable 
                 value={Array.isArray(value) ? value : []}
                 onChange={(questions) => handleFieldChange(field.fieldname, questions)}
-                required={field.required}
                 disabled={isReadOnly}
               />
               {field.description && (
@@ -1306,6 +1342,48 @@ export default function DynamicForm({
             </div>
           </div>
         )
+
+      case 'JSON':
+        if (field.fieldname === 'recommendations') {
+          return (
+            <div key={field.fieldname} className="space-y-2">
+              <Label htmlFor={field.fieldname}>
+                {field.label}
+                {field.required && <span className="text-destructive">*</span>}
+              </Label>
+              <ProductRecommendationsTable
+                value={value}
+                onChange={(val) => handleFieldChange(field.fieldname, val)}
+                disabled={isReadOnly}
+              />
+              {field.description && (
+                <p className="text-xs text-muted-foreground">{field.description}</p>
+              )}
+            </div>
+          )
+        }
+        // Fallback for other JSON fields
+        return (
+          <div key={field.fieldname} className="space-y-2">
+            <Label htmlFor={field.fieldname}>
+              {field.label}
+              {field.required && <span className="text-destructive">*</span>}
+            </Label>
+            <Textarea
+              id={field.fieldname}
+              value={typeof value === 'object' ? JSON.stringify(value, null, 2) : value}
+              onChange={(e) => handleFieldChange(field.fieldname, e.target.value)}
+              readOnly={isReadOnly}
+              required={field.required}
+              rows={5}
+              className="font-mono text-xs"
+            />
+            {field.description && (
+              <p className="text-xs text-muted-foreground">{field.description}</p>
+            )}
+          </div>
+        )
+
 
       default:
         return (
@@ -1502,30 +1580,48 @@ export default function DynamicForm({
           <p className="text-xs mt-2">Total fields: {meta?.fields?.length || 0}, Hidden: {meta?.fields?.filter((f: DocTypeField) => f.hidden).length || 0}</p>
         </div>
       ) : (
-        sections.map((section, sectionIndex) => (
-          <div key={sectionIndex} className="space-y-4">
-            {section.label && (
-              <div className="border-b pb-2">
-                <h3 className="text-lg font-semibold">{section.label}</h3>
-              </div>
-            )}
-            <div className={cn(
-              "grid gap-4 sm:gap-6",
-              // For table fields (like customization_questions, product_media), use full width
-              section.fields.some(f => f.fieldtype === 'Table')
-                ? "grid-cols-1"
-                : "grid-cols-1 sm:grid-cols-2"
-            )}>
-              {section.fields.map(field => {
-                const rendered = renderField(field)
-                if (!rendered) {
-                  console.warn(`[DynamicForm] Field ${field.fieldname} (${field.fieldtype}) was not rendered`)
-                }
-                return rendered
-              })}
-            </div>
-          </div>
-        ))
+        /* Accordion Sections */
+        <Accordion type="multiple" defaultValue={sections.map((_, i) => `section-${i}`)} className="space-y-4">
+          {sections.map((section, sectionIndex) => {
+            // Determine icon based on section label
+            const label = section.label?.toLowerCase() || ''
+            let SectionIcon = Info
+            if (label.includes('pricing') || label.includes('price')) SectionIcon = DollarSign
+            if (label.includes('media') || label.includes('image')) SectionIcon = ImageIcon
+            if (label.includes('customization') || label.includes('variant')) SectionIcon = Layers
+            if (label.includes('google') || label.includes('seo') || label.includes('sync')) SectionIcon = Globe
+            if (label.includes('basic') || label.includes('detail')) SectionIcon = FileText
+            if (label.includes('advanced') || label.includes('setting')) SectionIcon = Settings
+
+            return (
+              <AccordionItem key={sectionIndex} value={`section-${sectionIndex}`} className="border-none">
+                <AccordionTrigger className="px-0 hover:no-underline transition-all py-3 border-b border-border/40">
+                  <div className="flex items-center gap-2">
+                    <SectionIcon className="h-4 w-4 text-muted-foreground/60" />
+                    <span className="text-sm font-semibold tracking-tight text-foreground/80 uppercase">{section.label || 'Details'}</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-0 pt-4 pb-8">
+                  <div className={cn(
+                    "grid gap-6 sm:gap-8",
+                    // For table fields (like customization_questions, product_media), use full width
+                    section.fields.some(f => f.fieldtype === 'Table' || f.fieldname === 'recommendations')
+                      ? "grid-cols-1"
+                      : "grid-cols-1 sm:grid-cols-2"
+                  )}>
+                    {section.fields.map(field => {
+                      const rendered = renderField(field)
+                      if (!rendered) {
+                        console.warn(`[DynamicForm] Field ${field.fieldname} (${field.fieldtype}) was not rendered`)
+                      }
+                      return rendered
+                    })}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            )
+          })}
+        </Accordion>
       )}
 
       {/* Action Buttons */}
@@ -1544,7 +1640,8 @@ export default function DynamicForm({
               sections.flatMap(s => s.fields).length === 0
             }
             size="lg"
-            className="min-w-[120px] w-full sm:w-auto shadow-lg"
+            className="min-w-[120px] w-full sm:w-auto"
+
             title={
               !allRequiredFieldsFilled
                 ? `Please fill in all ${requiredFieldsCount - filledRequiredFields} required field(s)`

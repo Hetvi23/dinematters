@@ -75,31 +75,98 @@ def update_document(doctype, name, doc_data):
 		# Get existing document
 		doc = frappe.get_doc(doctype, name)
 		
-		# Get table fields from meta
-		table_fields = [f.fieldname for f in doc.meta.get_table_fields()]
-		
+		def prepare_dict_recursive(dt, data_item, parent_field=None, parent_type=None):
+			if isinstance(data_item, list):
+				return [prepare_dict_recursive(dt, item, parent_field, parent_type) for item in data_item]
+			if isinstance(data_item, dict):
+				data_item['doctype'] = dt
+				# Remove name to treat as new row for recreation
+				data_item.pop('name', None)
+				
+				# Explicitly set parent fields for nested child table rows
+				if parent_field:
+					data_item['parentfield'] = parent_field
+				if parent_type:
+					data_item['parenttype'] = parent_type
+				
+				# Recurse into table fields
+				meta = frappe.get_meta(dt)
+				for field in meta.get_table_fields():
+					if field.fieldname in data_item and isinstance(data_item[field.fieldname], list):
+						data_item[field.fieldname] = prepare_dict_recursive(field.options, data_item[field.fieldname], field.fieldname, dt)
+				return data_item
+			return data_item
+
+		def load_deep_children(parent_doc):
+			"""Recursively load child table rows for children of children."""
+			meta = parent_doc.meta
+			for field in meta.get_table_fields():
+				children = parent_doc.get(field.fieldname)
+				if not children:
+					continue
+				for child in children:
+					if not hasattr(child, "doctype"): continue
+					child_meta = frappe.get_meta(child.doctype)
+					for subfield in child_meta.get_table_fields():
+						if not child.get(subfield.fieldname):
+							sub_children = frappe.get_all(
+								subfield.options,
+								filters={"parent": child.name, "parentfield": subfield.fieldname},
+								fields=["*"]
+							)
+							child.set(subfield.fieldname, sub_children)
+					load_deep_children(child)
+
+		# Ensure the full hierarchy is loaded into memory
+		load_deep_children(doc)
+
+		def save_deep_children(parent_doc):
+			meta = parent_doc.meta
+			for field in meta.get_table_fields():
+				children = parent_doc.get(field.fieldname)
+				if not children:
+					continue
+					
+				for child in children:
+					# Check if this child has its own table fields
+					child_meta = frappe.get_meta(child.doctype)
+					for subfield in child_meta.get_table_fields():
+						sub_children = child.get(subfield.fieldname)
+						if sub_children:
+							# Clear existing sub-children in DB for this child to avoid duplicates on update
+							frappe.db.delete(subfield.options, {"parent": child.name, "parentfield": subfield.fieldname})
+							
+							for sub_child in sub_children:
+								sub_child.parent = child.name
+								sub_child.parenttype = child.doctype
+								sub_child.parentfield = subfield.fieldname
+								# Use db_insert to bypass validation since we already validated the parent
+								sub_child.db_insert()
+							
+							# Recurse further if needed
+							save_deep_children(child)
+
 		# Update fields
+		table_fields = [f.fieldname for f in doc.meta.get_table_fields()]
 		for key, value in doc_data.items():
-			if key not in ['doctype', 'name']:
-				# Handle child tables
-				if key in table_fields:
-					# Clear existing child table
-					doc.set(key, [])
-					# Add new rows if value is a list
-					if isinstance(value, list):
-						for row_data in value:
-							if isinstance(row_data, dict):
-								# Ensure doctype is set for child table rows
-								row_data['doctype'] = doc.meta.get_field(key).options
-								doc.append(key, row_data)
-					elif value is None or (isinstance(value, list) and len(value) == 0):
-						# Already cleared above
-						pass
-				else:
-					# Regular field
-					doc.set(key, value)
+			if key in ['doctype', 'name']:
+				continue
+				
+			if key in table_fields:
+				if isinstance(value, list):
+					child_dt = doc.meta.get_field(key).options
+					# Set the table field with nested dicts. doc.set is recursive.
+					doc.set(key, prepare_dict_recursive(child_dt, value, key, doctype))
+			else:
+				doc.set(key, value)
+		
+		# Only perform deep save if we actually updated table fields in this request
+		updated_tables = any(key in table_fields for key in doc_data.keys())
 		
 		doc.save()
+		
+		if updated_tables and doctype == "Menu Product":
+			save_deep_children(doc)
 		
 		return {
 			'success': True,

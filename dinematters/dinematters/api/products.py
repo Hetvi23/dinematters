@@ -8,7 +8,8 @@ Matches format from BACKEND_API_DOCUMENTATION.md
 
 import frappe
 from frappe import _
-from frappe.utils import flt, cint
+from frappe.utils import flt, cint, get_url
+
 from dinematters.dinematters.utils.api_helpers import (
 	validate_restaurant_for_api,
 	get_product_from_id
@@ -105,10 +106,8 @@ def get_top_picks(restaurant_id):
 		}
 
 
-
-
 @frappe.whitelist(allow_guest=True)
-def get_products(restaurant_id, category=None, type=None, vegetarian=None, search=None, page=1, limit=50):
+def get_products(restaurant_id, category=None, type=None, vegetarian=None, search=None, page=1, limit=50, include_inactive=0):
 	"""
 	GET /api/v1/products
 	Get all products/dishes with filters and pagination
@@ -119,7 +118,9 @@ def get_products(restaurant_id, category=None, type=None, vegetarian=None, searc
 		restaurant = validate_restaurant_for_api(restaurant_id)
 		
 		# Build filters
-		filters = {"is_active": 1, "restaurant": restaurant}
+		filters = {"restaurant": restaurant}
+		if not cint(include_inactive):
+			filters["is_active"] = 1
 		
 		if category:
 			filters["category_name"] = category
@@ -357,11 +358,17 @@ def format_product_from_row(product_row, media_rows, customization_questions, op
 		for q in customization_questions:
 			q_data = {
 				"id": q.get("question_id"),
+				"question_id": q.get("question_id"),
+				"name": q.get("name"),
 				"title": q.get("title"),
+				"question_type": q.get("question_type"),
 				"type": q.get("question_type"),
+				"is_required": bool(q.get("is_required")),
 				"required": bool(q.get("is_required")),
+				"display_order": cint(q.get("display_order")),
 				"displayOrder": cint(q.get("display_order"))
 			}
+
 			if q.get("subtitle"):
 				q_data["subtitle"] = q.get("subtitle")
 				
@@ -369,22 +376,28 @@ def format_product_from_row(product_row, media_rows, customization_questions, op
 			for opt in options_by_question.get(q.get("name"), []):
 				opt_data = {
 					"id": opt.get("option_id"),
+					"option_id": opt.get("option_id"),
+					"name": opt.get("name"),
 					"label": opt.get("label"),
 					"price": flt(opt.get("price")) or 0,
+					"display_order": cint(opt.get("display_order")),
 					"displayOrder": cint(opt.get("display_order"))
 				}
+
 				if opt.get("is_vegetarian") is not None:
 					opt_data["isVegetarian"] = bool(opt.get("is_vegetarian"))
+					opt_data["is_vegetarian"] = bool(opt.get("is_vegetarian"))
 				if opt.get("is_default"):
 					opt_data["isDefault"] = True
+					opt_data["is_default"] = True
 				options.append(opt_data)
 			
-			if options:
-				q_data["options"] = options
+			q_data["options"] = options
 			questions.append(q_data)
 		
 		if questions:
 			product["customizationQuestions"] = questions
+			product["customization_questions"] = questions
 
 	# Add recommendations
 	recs = product_row.get("recommendations")
@@ -418,7 +431,8 @@ def format_product_from_row_minimal(product_row, media_rows=None, has_customizat
 		"servingSize": product_row.get("servingSize") or "1",
 		"displayOrder": cint(product_row.get("display_order")) if product_row.get("display_order") is not None else 0,
 		"isActive": bool(product_row.get("is_active")) if product_row.get("is_active") is not None else True,
-		"hasCustomizations": has_customizations
+		"hasCustomizations": has_customizations,
+		"docname": product_row.get("docname") or product_row.get("name")
 	}
 
 	if product_row.get("original_price"):
@@ -442,9 +456,14 @@ def format_product_from_row_minimal(product_row, media_rows=None, has_customizat
 			media_item.get("media_url")
 		)
 
-		if media_asset_data["url"]:
+		# Ensure URL is absolute if it's a local file
+		url = media_asset_data["url"]
+		if url and url.startswith("/files/"):
+			url = get_url(url)
+
+		if url:
 			media_data = {
-				"url": media_asset_data["url"],
+				"url": url,
 				"type": media_item.get("media_type") or "image",
 				"blurPlaceholder": media_asset_data.get("blur_placeholder"),
 				"variants": media_asset_data.get("variants", {}),
@@ -460,9 +479,9 @@ def format_product_from_row_minimal(product_row, media_rows=None, has_customizat
 
 			media.append(media_data)
 
-	if media:
-		product["media"] = media
-	elif product_row.get("has_no_media"):
+	product["media"] = media
+	product["product_media"] = media_rows # Use the original rows for dashboard compatibility
+	if not media and product_row.get("has_no_media"):
 		product["hasNoMedia"] = True
 
 	return product

@@ -11,6 +11,7 @@
   "category_id",
   "category_name",
   "display_name",
+  "is_active",
   "column_break_1",
   "is_special",
   "display_order",
@@ -51,6 +52,13 @@
    "fieldtype": "Data",
    "label": "Display Name",
    "reqd": 1
+  },
+  {
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "default": "1",
+   "in_list_view": 1,
+   "label": "Is Active"
   },
   {
    "fieldname": "column_break_1",

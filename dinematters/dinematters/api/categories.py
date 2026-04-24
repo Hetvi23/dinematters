@@ -8,13 +8,13 @@ Matches format from BACKEND_API_DOCUMENTATION.md
 
 import frappe
 from frappe import _
-from frappe.utils import get_url
+from frappe.utils import get_url, cint
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
 from dinematters.dinematters.media.utils import format_media_field
 
 
 @frappe.whitelist(allow_guest=True)
-def get_categories(restaurant_id):
+def get_categories(restaurant_id, include_inactive=0):
 	"""
 	GET /api/v1/categories
 	Get all categories with product counts
@@ -23,6 +23,11 @@ def get_categories(restaurant_id):
 	try:
 		# Validate restaurant
 		restaurant = validate_restaurant_for_api(restaurant_id)
+		
+		cat_filters = {"restaurant": restaurant}
+		from frappe.utils import cint
+		if not cint(include_inactive):
+			cat_filters["is_active"] = 1
 		
 		categories = frappe.get_all(
 			"Menu Category",
@@ -34,7 +39,7 @@ def get_categories(restaurant_id):
 				"is_special as isSpecial",
 				"category_image"
 			],
-			filters={"restaurant": restaurant},
+			filters=cat_filters,
 			order_by="display_order, category_name"
 		)
 		
@@ -42,9 +47,13 @@ def get_categories(restaurant_id):
 		formatted_categories = []
 		for cat in categories:
 			# Count products in this category for this restaurant
+			product_count_filters = {"category_name": cat["name"], "restaurant": restaurant}
+			if not cint(include_inactive):
+				product_count_filters["is_active"] = 1
+				
 			product_count = frappe.db.count(
 				"Menu Product",
-				filters={"category_name": cat["name"], "is_active": 1, "restaurant": restaurant}
+				filters=product_count_filters
 			)
 			
 			category_data = {
@@ -171,5 +180,23 @@ def get_categories(restaurant_id):
 			}
 		}
 
-
-
+@frappe.whitelist()
+def update_category_order(category_orders):
+	"""
+	POST /api/method/dinematters.dinematters.api.categories.update_category_order
+	Update the display order for multiple categories
+	category_orders: list of {"name": "...", "display_order": ...} or JSON string
+	"""
+	try:
+		import json
+		if isinstance(category_orders, str):
+			category_orders = json.loads(category_orders)
+			
+		for order in category_orders:
+			frappe.db.set_value("Menu Category", order["name"], "display_order", order["display_order"])
+			
+		frappe.db.commit()
+		return {"success": True}
+	except Exception as e:
+		frappe.log_error(f"Error in update_category_order: {str(e)}")
+		return {"success": False, "error": str(e)}

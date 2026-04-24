@@ -49,6 +49,7 @@
    "label": "Is Default"
   },
   {
+   "default": "1",
    "fieldname": "is_vegetarian",
    "fieldtype": "Check",
    "label": "Is Vegetarian"
