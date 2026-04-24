@@ -39,9 +39,25 @@ class MenuProduct(Document):
 			frappe.cache().delete_value(f"top_picks:{self.restaurant}")
 	
 	def on_trash(self):
-		"""Clear top picks cache on deletion"""
+		"""Cleanup associated assets and references on deletion"""
+		# 1. Clear top picks cache
 		if self.get('restaurant'):
 			frappe.cache().delete_value(f"top_picks:{self.restaurant}")
+		
+		# 2. Delete associated Media Assets
+		media_assets = frappe.get_all("Media Asset", filters={"owner_doctype": "Menu Product", "owner_name": self.name}, fields=["name"])
+		for asset in media_assets:
+			frappe.delete_doc("Media Asset", asset.name, ignore_permissions=True)
+		
+		# 3. Cleanup non-transactional references
+		# Delete cart entries for this product
+		frappe.db.delete("Cart Entry", {"product": self.name})
+		
+		# Delete recommendations for this product
+		frappe.db.delete("Menu Recommendation", {"product": self.name})
+		
+		# Delete legacy signature dish entries
+		frappe.db.delete("Legacy Signature Dish", {"product": self.name})
 	
 	def generate_slug_from_name(self, name):
 		"""Generate a slug-like string from name"""

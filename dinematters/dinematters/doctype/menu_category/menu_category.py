@@ -26,6 +26,13 @@ class MenuCategory(Document):
 					frappe.DuplicateEntryError
 				)
 
+	
+	def on_trash(self):
+		"""Cascade delete all products in this category"""
+		products = frappe.get_all("Menu Product", filters={"category": self.name}, fields=["name"])
+		for product in products:
+			frappe.delete_doc("Menu Product", product.name, force=True, ignore_permissions=True)
+
 	def generate_id_from_name(self, name):
 		"""Generate a slug-like ID from name"""
 		if not name:

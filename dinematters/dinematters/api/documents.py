@@ -382,7 +382,7 @@ def delete_multiple_docs(doctype, names, force=False):
 		frappe.db.commit()
 		
 		return {
-			'success': True,
+			'success': len(errors) == 0,
 			'deleted_count': deleted_count,
 			'errors': errors
 		}

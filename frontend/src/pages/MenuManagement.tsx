@@ -192,20 +192,26 @@ export default function MenuManagement() {
   const handleDeleteCategory = async (category: any) => {
     const confirmed = await confirm({
       title: 'Delete Category',
-      description: `Are you sure you want to delete "${category.display_name || category.category_name}"? This will also remove its association with all products.`,
+      description: `Are you sure you want to delete "${category.display_name || category.category_name}"? This will permanently delete ALL products within this category and all their data. This action cannot be undone.`,
       variant: 'destructive'
     })
 
     if (confirmed) {
       try {
-        await deleteDoc({
+        const response = await deleteDoc({
           doctype: 'Menu Category',
           names: [category.name]
         })
-        toast.success('Category deleted')
-        mutateCategories()
-        if (selectedCategoryId === category.name) {
-          setSelectedCategoryId(null)
+        
+        if (response.success) {
+          toast.success('Category deleted')
+          mutateCategories()
+          if (selectedCategoryId === category.name) {
+            setSelectedCategoryId(null)
+          }
+        } else {
+          const errorMsg = response.errors?.[0] || 'Failed to delete category'
+          toast.error(errorMsg)
         }
       } catch (error) {
         toast.error('Failed to delete category')
@@ -222,13 +228,19 @@ export default function MenuManagement() {
     if (!confirmed) return
 
     try {
-      await deleteDoc({
+      const response = await deleteDoc({
         doctype: 'Menu Product',
         names: [product.docname],
         force: true
       })
-      mutateProducts()
-      toast.success('Product deleted')
+
+      if (response.success) {
+        mutateProducts()
+        toast.success('Product deleted')
+      } else {
+        const errorMsg = response.errors?.[0] || 'Failed to delete product'
+        toast.error(errorMsg)
+      }
     } catch (error) {
       toast.error('Failed to delete product')
     }
