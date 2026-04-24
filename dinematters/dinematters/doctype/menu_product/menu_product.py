@@ -54,10 +54,11 @@ class MenuProduct(Document):
 		frappe.db.delete("Cart Entry", {"product": self.name})
 		
 		# Delete recommendations for this product
-		frappe.db.delete("Menu Recommendation", {"product": self.name})
+		frappe.db.delete("Menu Recommendation", {"source_product": self.name})
+		frappe.db.delete("Menu Recommendation", {"recommended_product": self.name})
 		
 		# Delete legacy signature dish entries
-		frappe.db.delete("Legacy Signature Dish", {"product": self.name})
+		frappe.db.delete("Legacy Signature Dish", {"dish": self.name})
 	
 	def generate_slug_from_name(self, name):
 		"""Generate a slug-like string from name"""
