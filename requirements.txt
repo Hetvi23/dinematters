@@ -3,3 +3,7 @@ reportlab
 Pillow
 segno
 qrcode-artistic
+openai
+anthropic
+google-generativeai
+pydantic
