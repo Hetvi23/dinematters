@@ -12,7 +12,11 @@ class MenuProduct(Document):
 		"""Validate Product Media constraints and per-restaurant uniqueness"""
 		# Ensure product_id is set
 		if not self.product_id and self.product_name:
-			self.product_id = self.generate_product_id_from_name(self.product_name)
+			self.product_id = self.generate_slug_from_name(self.product_name)
+		
+		# Ensure seo_slug is set
+		if not self.seo_slug and self.product_name:
+			self.seo_slug = self.generate_slug_from_name(self.product_name)
 		
 		# Check for duplicate product_id within the same restaurant
 		if self.product_id and self.restaurant:
@@ -39,32 +43,24 @@ class MenuProduct(Document):
 		if self.get('restaurant'):
 			frappe.cache().delete_value(f"top_picks:{self.restaurant}")
 	
-	def generate_product_id_from_name(self, product_name):
-		"""Generate a slug-like product_id from product_name"""
-		if not product_name:
+	def generate_slug_from_name(self, name):
+		"""Generate a slug-like string from name"""
+		if not name:
 			return None
 		
 		# Convert to lowercase
-		product_id = product_name.lower()
+		slug = name.lower()
 		
 		# Replace spaces and special characters with hyphens
-		product_id = re.sub(r'[^\w\s-]', '', product_id)  # Remove special chars
-		product_id = re.sub(r'[-\s]+', '-', product_id)  # Replace spaces and multiple hyphens with single hyphen
-		product_id = product_id.strip('-')  # Remove leading/trailing hyphens
+		slug = re.sub(r'[^\w\s-]', '', slug)  # Remove special chars
+		slug = re.sub(r'[-\s]+', '-', slug)  # Replace spaces and multiple hyphens with single hyphen
+		slug = slug.strip('-')  # Remove leading/trailing hyphens
 		
 		# Limit length to 140 characters (Frappe name field limit)
-		if len(product_id) > 140:
-			product_id = product_id[:140].rstrip('-')
+		if len(slug) > 140:
+			slug = slug[:140].rstrip('-')
 		
-		return product_id
-	
-	def validate(self):
-		"""Validate Product Media constraints"""
-		# Ensure product_id is set
-		if not self.product_id and self.product_name:
-			self.product_id = self.generate_product_id_from_name(self.product_name)
-		
-		self.validate_product_media()
+		return slug
 	
 	def validate_product_media(self):
 		"""Validate Product Media:
@@ -131,6 +127,3 @@ class MenuProduct(Document):
 				_('Maximum 1 video allowed per product. Currently {0} videos found.').format(video_count),
 				title=_('Maximum Videos Exceeded')
 			)
-
-
-

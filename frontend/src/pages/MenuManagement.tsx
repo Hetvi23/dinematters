@@ -12,11 +12,10 @@ import { toast } from 'sonner'
 import { useConfirm } from '@/hooks/useConfirm'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import DynamicForm from '@/components/DynamicForm'
-import { Badge } from '@/components/ui/badge'
 import { useFrappeGetCall } from '@/lib/frappe'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   DndContext,
   closestCenter,
@@ -405,6 +404,12 @@ export default function MenuManagement() {
               mode={formConfig.mode}
               onSave={handleFormSave}
               onCancel={() => setIsFormOpen(false)}
+              hideFields={
+                formConfig.doctype === 'Menu Category' 
+                  ? ['category_id', 'restaurant'] 
+                  : ['product_id', 'seo_slug', 'category_name', 'restaurant']
+              }
+              readOnlyFields={['restaurant']}
               initialData={
                 formConfig.mode === 'create' 
                   ? { 

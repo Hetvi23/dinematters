@@ -712,10 +712,10 @@ export default function Dashboard() {
                        <Crown className="h-3 w-3 text-amber-500" />
                     </div>
                     <p className="text-sm font-bold">
-                       {analyticsData?.qrRoas?.sort((a: any, b: any) => b.revenue - a.revenue)[0]?.source || 'Scanning Data...'}
+                       {[...(analyticsData?.qrRoas || [])].sort((a: any, b: any) => b.revenue - a.revenue)[0]?.source || 'Scanning Data...'}
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-1 italic">
-                       This source contributes to {Math.round((analyticsData?.qrRoas?.sort((a: any, b: any) => b.revenue - a.revenue)[0]?.revenue / (totalRevenue || 1)) * 100) || 0}% of your total digital revenue.
+                       This source contributes to {Math.round(([...(analyticsData?.qrRoas || [])].sort((a: any, b: any) => b.revenue - a.revenue)[0]?.revenue / (totalRevenue || 1)) * 100) || 0}% of your total digital revenue.
                     </p>
                  </div>
                </LockedInsight>

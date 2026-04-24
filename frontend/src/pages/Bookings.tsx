@@ -188,7 +188,7 @@ export default function Bookings() {
     return hours * 60 + minutes
   }
 
-  const filteredBookings = bookings.sort((a, b) => {
+  const filteredBookings = [...bookings].sort((a, b) => {
       // Sort by time slot (earliest first)
       const timeA = parseTimeSlot(a.timeSlot)
       const timeB = parseTimeSlot(b.timeSlot)
