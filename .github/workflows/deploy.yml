@@ -47,7 +47,7 @@ jobs:
             "export SITE_CONFIG_JSON=\$(cat); \
              cd /home/frappe/frappe-bench && \
              if [ -f apps/dinematters/scripts/deploy.sh ]; then \
-               bash apps/dinematters/scripts/deploy.sh $BRANCH; \
+               bash apps/dinematters/scripts/deploy.sh $BRANCH backend.dinematters.com; \
              else \
                echo 'New script not found at apps/dinematters/scripts/deploy.sh, falling back to ./deploy.sh for migration...'; \
                bash ./deploy.sh $BRANCH; \
