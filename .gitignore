@@ -34,3 +34,5 @@ venv/
 .venv/
 
 package-lock.json
+
+DinemattersProd_key.pem

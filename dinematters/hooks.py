@@ -261,10 +261,14 @@ scheduler_events = {
 		"*/30 * * * *": [
 			"dinematters.dinematters.tasks.marketing_tasks.fire_triggers",
 		],
-        # Google Growth: fetch insights daily
+		# Google Growth: fetch insights daily
         "0 1 * * *": [
             "dinematters.dinematters.api.google_business.fetch_all_restaurant_insights"
-        ]
+        ],
+		# Storage Maintenance: run weekly cleanup
+		"0 4 * * 0": [
+			"dinematters.dinematters.media.r2_cleanup.run_r2_cleanup"
+		]
 	}
 }
 
