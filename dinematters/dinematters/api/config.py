@@ -42,6 +42,13 @@ def get_restaurant_config(restaurant_id):
 	from dinematters.dinematters.tasks.subscription_tasks import sync_restaurant_subscription
 	
 	try:
+		# Cache full response for guests (60s TTL)
+		if frappe.session.user == "Guest":
+			cache_key = f"restaurant_config:{restaurant_id}"
+			cached = frappe.cache().get_value(cache_key)
+			if cached:
+				return json.loads(cached)
+
 		# Fail-safe: Sync subscription if overdue (only for authenticated users to save guest performance)
 		if frappe.session.user != "Guest":
 			# Fast-path check: avoid loading full Doc if no plan switch is pending
@@ -296,12 +303,23 @@ def get_restaurant_config(restaurant_id):
 
 		# Try to include Home Feature images (menu, book-table, legacy, offers-events, dine-play)
 		try:
-			features_resp = get_home_features(restaurant_id)
+			features_cache_key = f"home_features:{restaurant_id}"
+			cached_features = frappe.cache().get_value(features_cache_key)
+			if cached_features:
+				features_resp = json.loads(cached_features)
+			else:
+				features_resp = get_home_features(restaurant_id)
+				if isinstance(features_resp, dict) and features_resp.get("success"):
+					frappe.cache().set_value(features_cache_key, json.dumps(features_resp), expires_in_sec=600)
+
 			if isinstance(features_resp, dict) and features_resp.get("success"):
 				response_data["homeFeatures"] = features_resp.get("data", {}).get("features", [])
 		except Exception:
 			# Non-fatal: if fetching features fails, continue without them
 			pass
+
+		if frappe.session.user == "Guest":
+			frappe.cache().set_value(cache_key, json.dumps({"success": True, "data": response_data}), expires_in_sec=60)
 
 		return {
 			"success": True,

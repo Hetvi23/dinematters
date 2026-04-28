@@ -180,7 +180,6 @@ has_permission = {
 	"Home Feature": "dinematters.dinematters.utils.permission_helpers.has_restaurant_permission",
 	"Legacy Content": "dinematters.dinematters.utils.permission_helpers.has_restaurant_permission",
 	"AI Image Generation": "dinematters.dinematters.utils.permission_helpers.has_restaurant_permission",
-	"AI Image Generation": "dinematters.dinematters.utils.permission_helpers.has_restaurant_permission",
 }
 
 # DocType Class
@@ -224,9 +223,10 @@ doc_events = {
 	},
 	"Menu Product": {
 		"on_update": [
-            "dinematters.dinematters.api.realtime.notify_product_update",
-            "dinematters.dinematters.api.google_business.handle_product_update"
-        ],
+			"dinematters.dinematters.api.products.invalidate_product_cache",
+			"dinematters.dinematters.api.realtime.notify_product_update",
+			"dinematters.dinematters.api.google_business.handle_product_update"
+		],
 	},
 	"Cart Entry": {
 		"after_insert": "dinematters.dinematters.api.realtime.notify_cart_update",
@@ -273,6 +273,8 @@ scheduler_events = {
 }
 
 extend_bootinfo = "dinematters.dinematters.utils.boot_helpers.extend_bootinfo"
+
+
 
 # Testing
 # -------

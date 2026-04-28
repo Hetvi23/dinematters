@@ -213,22 +213,27 @@ def get_cart(restaurant_id, session_id=None, coupon_code=None, loyalty_coins=0, 
 		
 		# Format cart items
 		items = []
-		from dinematters.dinematters.api.products import format_product
-		
-		for entry in entries:
-			if not frappe.db.exists("Menu Product", entry.product): continue
-			product = frappe.get_doc("Menu Product", entry.product)
-			customizations = json.loads(entry.customizations) if entry.customizations else {}
+		if entries:
+			product_names = [e.product for e in entries]
+			from dinematters.dinematters.api.products import format_products_for_listing
+			products = frappe.get_all("Menu Product", filters={"name": ["in", product_names]}, fields=["*"])
+			formatted_products = format_products_for_listing(products)
+			product_map = {p.get("docname"): p for p in formatted_products}
 			
-			items.append({
-				"entryId": entry.entry_id,
-				"dishId": product.product_id,
-				"dish": format_product(product),
-				"quantity": entry.quantity,
-				"customizations": customizations,
-				"unitPrice": flt(entry.unit_price),
-				"totalPrice": flt(entry.total_price)
-			})
+			for entry in entries:
+				if entry.product not in product_map: continue
+				dish = product_map[entry.product]
+				customizations = json.loads(entry.customizations) if entry.customizations else {}
+				
+				items.append({
+					"entryId": entry.entry_id,
+					"dishId": dish.get("id"),
+					"dish": dish,
+					"quantity": entry.quantity,
+					"customizations": customizations,
+					"unitPrice": flt(entry.unit_price),
+					"totalPrice": flt(entry.total_price)
+				})
 		
 		# Use the NEW pricing engine for the summary
 		from dinematters.dinematters.utils.pricing import calculate_cart_totals
@@ -420,11 +425,10 @@ def find_existing_cart_entry(user, session_id, restaurant, dish_id, customizatio
 	elif session_id:
 		filters["session_id"] = session_id
 	
-	entries = frappe.get_all("Cart Entry", filters=filters)
+	entries = frappe.get_all("Cart Entry", filters=filters, fields=["name", "customizations"])
 	
 	for entry in entries:
-		entry_doc = frappe.get_doc("Cart Entry", entry.name)
-		entry_customizations = json.loads(entry_doc.customizations) if entry_doc.customizations else {}
+		entry_customizations = json.loads(entry.customizations) if entry.customizations else {}
 		
 		# Compare customizations (simple dict comparison)
 		if customizations == entry_customizations:
