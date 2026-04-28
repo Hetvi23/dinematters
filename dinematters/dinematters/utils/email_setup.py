@@ -17,22 +17,36 @@ def setup_hostinger_email():
         email = "contact@dinematters.com"
         settings.db_set("hostinger_email", email)
         
-    password = settings.get_password("hostinger_password", raise_exception=False)
-
+    # Safely read password, catching decryption errors from bad site restores
+    password = None
+    from frappe.utils.password import remove_encrypted_password
+    try:
+        password = settings.get_password("hostinger_password", raise_exception=False)
+    except Exception:
+        remove_encrypted_password("Dinematters Settings", "Dinematters Settings", "hostinger_password")
+        
     if not password:
         password = "Dinematters@2025"
         from frappe.utils.password import set_encrypted_password
         set_encrypted_password("Dinematters Settings", "Dinematters Settings", password, "hostinger_password")
 
+    # Remove corrupt outgoing Email Account credentials to bypass ORM save blocks
+    try:
+        remove_encrypted_password("Email Account", email_account_name)
+    except Exception:
+        pass
+
+
     # Update Email Domain to prevent bad Titan defaults from overriding Hostinger
     if frappe.db.exists("Email Domain", "dinematters.com"):
-        domain_doc = frappe.get_doc("Email Domain", "dinematters.com")
-        domain_doc.smtp_server = "smtp.hostinger.com"
-        domain_doc.use_tls = 1
-        domain_doc.use_ssl_for_outgoing = 0
-        domain_doc.smtp_port = 587
-        domain_doc.save(ignore_permissions=True)
+        frappe.db.set_value("Email Domain", "dinematters.com", {
+            "smtp_server": "smtp.hostinger.com",
+            "use_tls": 1,
+            "use_ssl_for_outgoing": 0,
+            "smtp_port": 587
+        })
         frappe.db.commit()
+
 
     # Fetch or create target record
     if not frappe.db.exists("Email Account", email_account_name):
@@ -47,16 +61,11 @@ def setup_hostinger_email():
     doc.use_tls = 1
     doc.use_ssl_for_outgoing = 0
     doc.smtp_port = 587
-    doc.enable_outgoing = 0
+    doc.enable_outgoing = 1
     doc.default_outgoing = 1
-    
+
+    doc.password = password
     doc.save(ignore_permissions=True)
-    
-    # Ensure password encryption executes securely at the database level
-    from frappe.utils.password import set_encrypted_password
-    set_encrypted_password("Email Account", doc.name, password)
-    
-    # Enforce outgoing parameters directly via database bypass
-    frappe.db.set_value("Email Account", doc.name, {"enable_outgoing": 1, "default_outgoing": 1})
+
     frappe.db.commit()
     print(f"Successfully configured Hostinger SMTP for {email} via DB Bypass!")

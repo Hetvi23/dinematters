@@ -59,7 +59,7 @@ echo "Fetching from $REMOTE..."
 git fetch "$REMOTE" "$GIT_BRANCH"
 
 # Force reset to target branch
-git reset --hard "$REMOTE/$GIT_BRANCH"
+git reset --hard FETCH_HEAD
 echo "Code synced to $(git rev-parse --short HEAD)"
 
 # ─── 3. Backend Setup ────────────────────────────────────────────────────────
