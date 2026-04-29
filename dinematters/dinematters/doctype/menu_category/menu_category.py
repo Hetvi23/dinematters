@@ -12,6 +12,10 @@ class MenuCategory(Document):
 		# Auto-generate category_id if missing
 		if not self.category_id and self.category_name:
 			self.category_id = self.generate_id_from_name(self.category_name)
+			
+		# Unify Display Name with Category Name always
+		if self.category_name:
+			self.display_name = self.category_name
 
 		if self.category_id and self.restaurant:
 			# Check if any other category with same ID exists for this restaurant

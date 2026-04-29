@@ -1746,6 +1746,7 @@ function LinkField({
   onChange: (value: string) => void
   isReadOnly: boolean
 }) {
+  const { selectedRestaurant } = useRestaurant()
   const linkedDoctype = field.options || ''
 
   // Determine which fields to fetch based on common doctype patterns
@@ -1756,22 +1757,27 @@ function LinkField({
       case 'Menu Category':
         return ['name', 'display_name', 'category_name']
       default:
-        // Try to get name field and common title fields
         return ['name']
     }
   }
 
   const fields = getFieldsForDoctype(linkedDoctype)
 
+  const filters: any[] = []
+  if (linkedDoctype === 'Menu Category' && selectedRestaurant) {
+    filters.push(['restaurant', '=', selectedRestaurant])
+  }
+
   // Fetch linked records
   const { data: linkedRecords, isLoading } = useFrappeGetDocList(
     linkedDoctype,
     {
       fields: fields,
+      filters: filters.length > 0 ? filters : undefined,
       limit: 1000,
       orderBy: { field: fields[1] || 'name', order: 'asc' }
     },
-    linkedDoctype ? `link-${linkedDoctype}` : null
+    linkedDoctype ? `link-${linkedDoctype}-${selectedRestaurant || 'all'}` : null
   )
 
   // Get display value for selected record

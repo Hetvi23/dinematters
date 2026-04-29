@@ -32,6 +32,14 @@ class MenuProduct(Document):
 				)
 		
 		self.validate_product_media()
+		
+		# Compute has_no_media based on presence of product media
+		self.has_no_media = 1
+		if self.product_media:
+			for media_item in self.product_media:
+				if media_item.media_url:
+					self.has_no_media = 0
+					break
 	
 	def after_save(self):
 		"""Clear top picks cache for the restaurant"""
