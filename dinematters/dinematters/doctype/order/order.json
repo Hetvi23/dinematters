@@ -144,19 +144,19 @@
    "options": "Phone"
   },
   {
+   "description": "Customer record for cross-restaurant analytics",
    "fieldname": "platform_customer",
    "fieldtype": "Link",
    "label": "Platform Customer",
    "options": "Customer",
-   "read_only": 1,
-   "description": "Customer record for cross-restaurant analytics"
+   "read_only": 1
   },
   {
+   "default": "dine_in",
    "fieldname": "order_type",
    "fieldtype": "Select",
    "label": "Order Type",
-   "options": "dine_in\ntakeaway\ndelivery",
-   "default": "dine_in"
+   "options": "dine_in\ntakeaway\ndelivery"
   },
   {
    "fieldname": "pickup_time",
@@ -164,10 +164,10 @@
    "label": "Pickup Time"
   },
   {
+   "description": "Table number from scanned QR code (format: restaurant-id/table-number)",
    "fieldname": "table_number",
    "fieldtype": "Int",
-   "label": "Table Number",
-   "description": "Table number from scanned QR code (format: restaurant-id/table-number)"
+   "label": "Table Number"
   },
   {
    "fieldname": "section_break_items",
@@ -261,34 +261,34 @@
    "label": "Delivery Fee"
   },
   {
+   "default": "0",
    "fieldname": "packaging_fee",
    "fieldtype": "Currency",
-   "label": "Packaging Fee",
-   "default": "0"
+   "label": "Packaging Fee"
   },
   {
    "default": "0",
+   "description": "Fee earned by DineMatters platform for delivery management",
    "fieldname": "logistics_platform_fee",
    "fieldtype": "Currency",
    "label": "Logistics Platform Fee",
-   "read_only": 1,
-   "description": "Fee earned by DineMatters platform for delivery management"
+   "read_only": 1
   },
   {
    "default": "0",
+   "description": "Actual courier cost before platform fee and markup",
    "fieldname": "delivery_courier_fee",
    "fieldtype": "Currency",
    "label": "Delivery Courier Fee",
-   "read_only": 1,
-   "description": "Actual courier cost before platform fee and markup"
+   "read_only": 1
   },
   {
    "default": "0",
+   "description": "Restaurant profit markup on delivery",
    "fieldname": "delivery_markup",
    "fieldtype": "Currency",
    "label": "Delivery Markup",
-   "read_only": 1,
-   "description": "Restaurant profit markup on delivery"
+   "read_only": 1
   },
   {
    "fieldname": "total",
@@ -347,48 +347,48 @@
    "label": "Transaction ID"
   },
   {
+   "description": "Razorpay order ID for payment processing",
    "fieldname": "razorpay_order_id",
    "fieldtype": "Data",
    "label": "Razorpay Order ID",
-   "read_only": 1,
-   "description": "Razorpay order ID for payment processing"
+   "read_only": 1
   },
   {
+   "description": "Razorpay payment ID after successful payment",
    "fieldname": "razorpay_payment_id",
    "fieldtype": "Data",
    "label": "Razorpay Payment ID",
-   "read_only": 1,
-   "description": "Razorpay payment ID after successful payment"
+   "read_only": 1
   },
   {
+   "default": 0,
+   "description": "Flag indicating this order was created for tokenization (system use only)",
    "fieldname": "is_tokenization",
    "fieldtype": "Check",
-   "label": "Is Tokenization",
-   "default": 0,
    "in_list_view": 0,
-   "description": "Flag indicating this order was created for tokenization (system use only)"
+   "label": "Is Tokenization"
   },
   {
+   "default": 0,
+   "description": "Flag indicating this order was created via WhatsApp redirect (GOLD plan)",
    "fieldname": "is_whatsapp_order",
    "fieldtype": "Check",
-   "label": "Is WhatsApp Order",
-   "default": 0,
    "in_list_view": 1,
-   "description": "Flag indicating this order was created via WhatsApp redirect (GOLD plan)"
+   "label": "Is WhatsApp Order"
   },
   {
+   "description": "Platform fee amount in paise (1.5% of total)",
    "fieldname": "platform_fee_amount",
    "fieldtype": "Int",
    "label": "Platform Fee Amount (Paise)",
-   "read_only": 1,
-   "description": "Platform fee amount in paise (1.5% of total)"
+   "read_only": 1
   },
   {
+   "description": "Amount transferred to restaurant in paise",
    "fieldname": "restaurant_transfer_amount",
    "fieldtype": "Int",
    "label": "Restaurant Transfer Amount (Paise)",
-   "read_only": 1,
-   "description": "Amount transferred to restaurant in paise"
+   "read_only": 1
   },
   {
    "fieldname": "section_break_delivery",
@@ -407,29 +407,29 @@
    "options": "borzo\nflash\nmanual"
   },
   {
+   "default": "auto",
    "fieldname": "delivery_mode",
    "fieldtype": "Select",
    "label": "Delivery Mode",
-   "options": "auto\nmanual",
-   "default": "auto"
+   "options": "auto\nmanual"
   },
   {
+   "description": "External ID from delivery partner",
    "fieldname": "delivery_id",
    "fieldtype": "Data",
-   "label": "Delivery ID",
-   "description": "External ID from delivery partner"
+   "label": "Delivery ID"
   },
   {
+   "description": "Current status from delivery partner",
    "fieldname": "delivery_status",
    "fieldtype": "Data",
-   "label": "Delivery Status",
-   "description": "Current status from delivery partner"
+   "label": "Delivery Status"
   },
   {
+   "description": "ETA from delivery partner",
    "fieldname": "delivery_eta",
    "fieldtype": "Data",
-   "label": "Delivery ETA",
-   "description": "ETA from delivery partner"
+   "label": "Delivery ETA"
   },
   {
    "fieldname": "delivery_rider_name",
@@ -538,30 +538,30 @@
    "label": "Customer Feedback"
   },
   {
+   "description": "1-5 stars from customer",
    "fieldname": "customer_rating",
    "fieldtype": "Int",
    "label": "Customer Rating",
-   "description": "1-5 stars from customer",
    "non_negative": 1
   },
   {
+   "description": "Feedback or review shared by customer for this order",
    "fieldname": "customer_feedback",
    "fieldtype": "Small Text",
-   "label": "Customer Feedback",
-   "description": "Feedback or review shared by customer for this order"
+   "label": "Customer Feedback"
   },
   {
+   "description": "1-5 stars for food quality",
    "fieldname": "food_rating",
    "fieldtype": "Int",
    "label": "Food Rating",
-   "description": "1-5 stars for food quality",
    "non_negative": 1
   },
   {
+   "description": "1-5 stars for service quality",
    "fieldname": "service_rating",
    "fieldtype": "Int",
    "label": "Service Rating",
-   "description": "1-5 stars for service quality",
    "non_negative": 1
   },
   {
@@ -569,8 +569,8 @@
    "fieldtype": "Data",
    "label": "Idempotency Key",
    "read_only": 1,
-   "unique": 1,
-   "search_index": 1
+   "search_index": 1,
+   "unique": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -605,5 +605,6 @@
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
+ "title_field": "customer_name",
  "track_changes": 1
 }

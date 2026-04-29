@@ -6,7 +6,6 @@
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
- "issingle": 0,
  "field_order": [
   "restaurant",
   "section_break_branding",
@@ -110,11 +109,11 @@
    "label": "Primary Color"
   },
   {
+   "default": "dark",
    "fieldname": "default_theme",
    "fieldtype": "Select",
    "label": "Default Theme",
-   "options": "light\ndark",
-    "default": "dark"
+   "options": "light\ndark"
   },
   {
    "fieldname": "logo",
@@ -122,10 +121,10 @@
    "label": "Logo"
   },
   {
+   "description": "Upload a hero video file (mp4/webm) or attach a URL",
    "fieldname": "hero_video",
    "fieldtype": "Attach",
-   "label": "Hero Video",
-   "description": "Upload a hero video file (mp4/webm) or attach a URL"
+   "label": "Hero Video"
   },
   {
    "fieldname": "apple_touch_icon",
@@ -198,16 +197,16 @@
   {
    "fieldname": "menu_theme_background_sources",
    "fieldtype": "JSON",
+   "hidden": 1,
    "label": "Theme Background Sources",
-   "read_only": 1,
-   "hidden": 1
+   "read_only": 1
   },
   {
    "fieldname": "menu_theme_background_history",
    "fieldtype": "JSON",
+   "hidden": 1,
    "label": "Theme Background History",
-   "read_only": 1,
-   "hidden": 1
+   "read_only": 1
   },
   {
    "fieldname": "menu_theme_last_error",
@@ -261,19 +260,19 @@
    "label": "Settings"
   },
   {
+   "default": "INR",
    "fieldname": "currency",
    "fieldtype": "Link",
    "label": "Currency",
-   "options": "Currency",
-   "default": "INR"
+   "options": "Currency"
   },
   {
+   "default": "2 Columns",
+   "description": "Choose the default layout for the menu page",
    "fieldname": "menu_layout",
    "fieldtype": "Select",
    "label": "Menu Layout",
-   "options": "1 Column\n2 Columns",
-   "default": "2 Columns",
-   "description": "Choose the default layout for the menu page"
+   "options": "1 Column\n2 Columns"
   },
   {
    "default": "1",
@@ -317,17 +316,17 @@
   },
   {
    "default": "0",
+   "description": "Enable restaurant-specific loyalty points and referral rewards",
    "fieldname": "enable_loyalty",
    "fieldtype": "Check",
-   "label": "Enable Loyalty & Referrals",
-   "description": "Enable restaurant-specific loyalty points and referral rewards"
+   "label": "Enable Loyalty & Referrals"
   },
   {
    "default": "0",
+   "description": "Require OTP verification before table booking, coupons, events, games",
    "fieldname": "verify_my_user",
    "fieldtype": "Check",
-   "label": "Verify My User",
-   "description": "Require OTP verification before table booking, coupons, events, games"
+   "label": "Verify My User"
   },
   {
    "fieldname": "section_break_social_media",
@@ -335,68 +334,69 @@
    "label": "Social Media & Contact"
   },
   {
+   "description": "Link to redirect to Google review page",
    "fieldname": "google_review_link",
    "fieldtype": "Data",
    "label": "Google Review Link",
-   "options": "URL",
-   "description": "Link to redirect to Google review page",
-   "length": 1000
+   "length": 1000,
+   "options": "URL"
   },
   {
+   "description": "Link to Instagram profile",
    "fieldname": "instagram_profile_link",
    "fieldtype": "Data",
    "label": "Instagram Profile Link",
-   "options": "URL",
-   "description": "Link to Instagram profile",
-   "length": 1000
+   "length": 1000,
+   "options": "URL"
   },
   {
    "fieldname": "column_break_social_media",
    "fieldtype": "Column Break"
   },
   {
+   "description": "Link to Facebook profile",
    "fieldname": "facebook_profile_link",
    "fieldtype": "Data",
    "label": "Facebook Profile Link",
-   "options": "URL",
-   "description": "Link to Facebook profile",
-   "length": 1000
+   "length": 1000,
+   "options": "URL"
   },
   {
+   "description": "Phone number for WhatsApp contact",
    "fieldname": "whatsapp_phone_number",
    "fieldtype": "Data",
    "label": "WhatsApp Phone Number",
-   "options": "Phone",
-   "description": "Phone number for WhatsApp contact"
+   "options": "Phone"
   },
   {
+   "description": "Link to Swiggy restaurant page",
    "fieldname": "swiggy_link",
    "fieldtype": "Data",
    "label": "Swiggy Link",
-   "options": "URL",
-   "description": "Link to Swiggy restaurant page",
-   "length": 1000
+   "length": 1000,
+   "options": "URL"
   },
   {
+   "description": "Link to Zomato restaurant page",
    "fieldname": "zomato_link",
    "fieldtype": "Data",
    "label": "Zomato Link",
-   "options": "URL",
-   "description": "Link to Zomato restaurant page",
-   "length": 1000
+   "length": 1000,
+   "options": "URL"
   },
   {
+   "description": "JSON array of FCM device tokens for merchant dashboard push notifications (new orders).",
    "fieldname": "merchant_push_tokens",
    "fieldtype": "Small Text",
-   "label": "Merchant Push Tokens",
-   "description": "JSON array of FCM device tokens for merchant dashboard push notifications (new orders).",
-   "read_only": 1,
    "hidden": 1,
    "in_list_view": 0,
-   "no_copy": 1
+   "label": "Merchant Push Tokens",
+   "no_copy": 1,
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
+ "issingle": 0,
  "links": [],
  "modified": "2025-01-15 10:00:00.000000",
  "modified_by": "Administrator",
@@ -436,5 +436,6 @@
  "sort_field": "restaurant",
  "sort_order": "ASC",
  "states": [],
+ "title_field": "restaurant_name",
  "track_changes": 1
 }

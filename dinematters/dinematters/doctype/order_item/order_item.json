@@ -27,11 +27,11 @@
    "reqd": 1
   },
   {
+   "fetch_from": "product.product_name",
    "fieldname": "product_name",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Product Name",
-   "fetch_from": "product.product_name",
    "read_only": 1
   },
   {
@@ -92,10 +92,6 @@
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
+ "title_field": "product_name",
  "track_changes": 0
 }
-
-
-
-
-

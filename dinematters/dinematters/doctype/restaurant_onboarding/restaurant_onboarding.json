@@ -1,11 +1,11 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "field:restaurant_name",
  "creation": "2026-04-16 12:00:00.000000",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
- "hidden": 1,
  "field_order": [
   "restaurant_name",
   "linked_restaurant",
@@ -70,11 +70,11 @@
    "label": "Restaurant Name"
   },
   {
+   "description": "Select an existing restaurant to link this onboarding to.",
    "fieldname": "linked_restaurant",
    "fieldtype": "Link",
    "label": "Linked Restaurant (Existing)",
-   "options": "Restaurant",
-   "description": "Select an existing restaurant to link this onboarding to."
+   "options": "Restaurant"
   },
   {
    "default": "Pending",
@@ -119,18 +119,18 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "Primary WhatsApp for customer contact",
    "fieldname": "whatsapp_number",
    "fieldtype": "Data",
    "label": "WhatsApp Number",
-   "options": "Phone",
-   "description": "Primary WhatsApp for customer contact"
+   "options": "Phone"
   },
   {
+   "description": "Send this link to the restaurant owner",
    "fieldname": "onboarding_link",
    "fieldtype": "Data",
    "label": "Onboarding Link",
-   "read_only": 1,
-   "description": "Send this link to the restaurant owner"
+   "read_only": 1
   },
   {
    "fieldname": "section_break_legal",
@@ -148,10 +148,10 @@
    "label": "GST Number"
   },
   {
+   "default": 5.0,
    "fieldname": "tax_rate",
    "fieldtype": "Percent",
-   "label": "Tax Rate (%)",
-   "default": 5.0
+   "label": "Tax Rate (%)"
   },
   {
    "fieldname": "pan_number",
@@ -195,52 +195,52 @@
    "label": "Subtitle"
   },
   {
+   "default": "dark",
    "fieldname": "default_theme",
    "fieldtype": "Select",
    "label": "Default Theme",
-   "options": "light\ndark",
-   "default": "dark"
+   "options": "light\ndark"
   },
   {
+   "default": "2 Columns",
    "fieldname": "menu_layout",
    "fieldtype": "Select",
    "label": "Menu Layout",
-   "options": "1 Column\n2 Columns",
-   "default": "2 Columns"
+   "options": "1 Column\n2 Columns"
   },
   {
    "fieldname": "column_break_config",
    "fieldtype": "Column Break"
   },
   {
+   "default": 1,
    "fieldname": "enable_table_booking",
    "fieldtype": "Check",
-   "label": "Enable Table Booking",
-   "default": 1
+   "label": "Enable Table Booking"
   },
   {
+   "default": 1,
    "fieldname": "enable_banquet_booking",
    "fieldtype": "Check",
-   "label": "Enable Banquet Booking",
-   "default": 1
+   "label": "Enable Banquet Booking"
   },
   {
+   "default": 1,
    "fieldname": "enable_events",
    "fieldtype": "Check",
-   "label": "Enable Events",
-   "default": 1
+   "label": "Enable Events"
   },
   {
+   "default": 1,
    "fieldname": "enable_offers",
    "fieldtype": "Check",
-   "label": "Enable Offers",
-   "default": 1
+   "label": "Enable Offers"
   },
   {
+   "default": 1,
    "fieldname": "enable_experience_lounge",
    "fieldtype": "Check",
-   "label": "Enable Experience Lounge",
-   "default": 1
+   "label": "Enable Experience Lounge"
   },
   {
    "fieldname": "section_break_address",
@@ -366,13 +366,13 @@
    "read_only": 1
   }
  ],
+ "hidden": 1,
  "index_web_pages_for_search": 1,
  "modified": "2026-04-16 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Dinematters",
  "name": "Restaurant Onboarding",
  "naming_rule": "By fieldname",
- "autoname": "field:restaurant_name",
  "owner": "Administrator",
  "permissions": [
   {
@@ -397,5 +397,6 @@
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "restaurant_name"
 }
