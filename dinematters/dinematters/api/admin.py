@@ -11,7 +11,7 @@ def check_admin_access():
     try:
         # Check if user is System Manager or has specific role
         # Allow System Managers and specific admin roles
-        has_admin_access = frappe.has_role('System Manager') or frappe.has_role('Administrator') or frappe.has_role('Dinematters Admin')
+        has_admin_access = frappe.session.user == 'Administrator' or "System Manager" in frappe.get_roles() or "Administrator" in frappe.get_roles() or "Dinematters Admin" in frappe.get_roles()
         
         return {
             'success': True,
