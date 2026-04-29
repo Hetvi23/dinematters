@@ -418,8 +418,8 @@ export default function MenuManagement() {
               onCancel={() => setIsFormOpen(false)}
               hideFields={
                 formConfig.doctype === 'Menu Category' 
-                  ? ['category_id', 'restaurant'] 
-                  : ['product_id', 'seo_slug', 'category_name', 'restaurant']
+                  ? ['category_id', 'restaurant', 'display_name'] 
+                  : ['product_id', 'seo_slug', 'category_name', 'restaurant', 'main_category', 'has_no_media']
               }
               readOnlyFields={['restaurant']}
               initialData={
