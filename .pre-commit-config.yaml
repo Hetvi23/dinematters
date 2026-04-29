@@ -65,5 +65,6 @@ repos:
 
 ci:
     autoupdate_schedule: weekly
-    skip: []
+    skip: [eslint]
+
     submodules: false
