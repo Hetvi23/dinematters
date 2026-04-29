@@ -10,11 +10,8 @@ def check_admin_access():
     """
     try:
         # Check if user is System Manager or has specific role
-        user_roles = frappe.get_roles()
-        
         # Allow System Managers and specific admin roles
-        admin_roles = ['System Manager', 'Administrator', 'Dinematters Admin']
-        has_admin_access = any(role in admin_roles for role in user_roles)
+        has_admin_access = frappe.session.user == 'Administrator' or "System Manager" in frappe.get_roles() or "Administrator" in frappe.get_roles() or "Dinematters Admin" in frappe.get_roles()
         
         return {
             'success': True,
@@ -387,52 +384,7 @@ def toggle_restaurant_status(restaurant_id, is_active):
             'success': False,
             'error': str(e)
         }
-    try:
-        # Check admin access first
-        access_check = check_admin_access()
-        if not access_check.get('success') or not access_check.get('data', {}).get('allowed'):
-            return {
-                'success': False,
-                'error': 'Admin access required'
-            }
-        
-        # Get subscription statistics
-        stats = frappe.db.sql("""
-            SELECT 
-                COUNT(*) as total_restaurants,
-                SUM(CASE WHEN COALESCE(rc.subscription_plan, 'SILVER') = 'SILVER' THEN 1 ELSE 0 END) as silver_count,
-                SUM(CASE WHEN COALESCE(rc.subscription_plan, 'SILVER') = 'GOLD' THEN 1 ELSE 0 END) as gold_count,
-                SUM(CASE WHEN COALESCE(rc.subscription_plan, 'SILVER') = 'DIAMOND' THEN 1 ELSE 0 END) as diamond_count,
-                SUM(CASE WHEN r.is_active = 1 THEN 1 ELSE 0 END) as active_count,
-                SUM(CASE WHEN r.is_active = 0 THEN 1 ELSE 0 END) as inactive_count
-            FROM `tabRestaurant` r
-            LEFT JOIN `tabRestaurantConfig` rc ON r.name = rc.parent
-        """, as_dict=True)
-        
-        if stats:
-            return {
-                'success': True,
-                'data': stats[0]
-            }
-        else:
-            return {
-                'success': True,
-                'data': {
-                    'total_restaurants': 0,
-                    'silver_count': 0,
-                    'gold_count': 0,
-                    'diamond_count': 0,
-                    'active_count': 0,
-                    'inactive_count': 0
-                }
-            }
-        
-    except Exception as e:
-        frappe.log_error("Admin API Error", f"Error getting subscription stats: {str(e)}")
-        return {
-            'success': False,
-            'error': str(e)
-        }
+
 
 @frappe.whitelist()
 def delete_restaurant(restaurant_id):

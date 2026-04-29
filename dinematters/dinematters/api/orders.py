@@ -353,10 +353,8 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 				})
 				usage_doc.insert(ignore_permissions=True)
 				
-				# Increment coupon usage count
-				frappe.db.set_value("Coupon", applied_coupon, "usage_count", 
-					frappe.db.get_value("Coupon", applied_coupon, "usage_count") + 1)
-				frappe.db.commit()
+				# Increment coupon usage count atomically
+				frappe.db.sql("UPDATE `tabCoupon` SET usage_count = COALESCE(usage_count, 0) + 1 WHERE name = %s", (applied_coupon,))
 			except Exception as e:
 				frappe.log_error(f"Error tracking coupon usage: {str(e)}")
 				# Don't fail order if usage tracking fails
@@ -417,8 +415,6 @@ def create_order(restaurant_id, items, cooking_requests=None, customer_info=None
 					reset_referral_cycle(platform_customer, restaurant)
 				except Exception as e:
 					frappe.log_error(f"Error resetting referral cycle: {str(e)}")
-					
-			frappe.db.commit()
 		except Exception as e:
 			frappe.log_error(f"Error in loyalty earning/referral logic: {str(e)}")
 		
@@ -779,10 +775,48 @@ def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=Fa
 				"foodRating": cint(o.get("food_rating")) if o.get("food_rating") is not None else None,
 				"serviceRating": cint(o.get("service_rating")) if o.get("service_rating") is not None else None,
 			}
-			if include_items:
-				order_doc = frappe.get_doc("Order", o.get("name"))
-				order_data["items"] = _format_order_items_light(order_doc)
 			orders.append(order_data)
+
+		if include_items and order_list:
+			order_names = [o.get("name") for o in order_list]
+			all_items = frappe.get_all(
+				"Order Item",
+				filters={"parent": ["in", order_names]},
+				fields=["parent", "product", "quantity", "unit_price", "total_price", "customizations"]
+			)
+			
+			product_names = list({i.product for i in all_items})
+			product_map = {}
+			if product_names:
+				products = frappe.get_all("Menu Product", filters={"name": ["in", product_names]}, fields=["*"])
+				from dinematters.dinematters.api.products import format_products_for_listing
+				formatted_products = format_products_for_listing(products)
+				product_map = {p.get("docname"): p for p in formatted_products}
+
+			from collections import defaultdict
+			items_by_order = defaultdict(list)
+			for item in all_items:
+				dish_id = item.product
+				full = product_map.get(dish_id) or {}
+				
+				dish = {
+					"id": full.get("id") or dish_id,
+					"name": full.get("name") or dish_id,
+					"price": flt(item.unit_price),
+				}
+				if full.get("media"):
+					dish["media"] = full["media"]
+					
+				items_by_order[item.parent].append({
+					"dishId": dish_id,
+					"quantity": item.quantity,
+					"customizations": json.loads(item.customizations) if item.customizations else {},
+					"totalPrice": flt(item.total_price),
+					"dish": dish
+				})
+				
+			for order_data, o in zip(orders, order_list):
+				order_data["items"] = items_by_order.get(o.get("name"), [])
 
 		return {
 			"success": True,

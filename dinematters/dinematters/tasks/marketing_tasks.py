@@ -619,34 +619,47 @@ def _send_message(channel, phone, message, settings, subject=None, template_name
 
 
 def _send_sms(phone, message, settings):
-    """Send via MSG91 (primary) or Fast2SMS (fallback). Max 160 chars recommended."""
-    auth_key = getattr(settings, "msg91_auth_key", None)
-    if not auth_key:
-        return _send_sms_fast2sms(phone, message, settings)
-
+    """Send via Fast2SMS. Max 160 chars recommended."""
+    api_key = getattr(settings, "fast2sms_api_key", None)
+    if not api_key:
+        return False, "No Fast2SMS API key configured"
+    
     import requests
-    sender_id = getattr(settings, "marketing_msg91_sms_sender_id", None) or getattr(settings, "fast2sms_sender_id", "DINMAT")
-    template_id = getattr(settings, "marketing_msg91_campaign_template", None) or getattr(settings, "fast2sms_dlt_template_id", None)
-
     phone_clean = phone.replace("+91", "").replace("+", "").strip()
-    payload = {
-        "sender": sender_id,
-        "route": "4",
-        "country": "91",
-        "sms": [{"message": message[:320], "to": [phone_clean]}]
-    }
-    if template_id:
-        payload["DLT_TE_ID"] = template_id
+    
+    sender_id = getattr(settings, "fast2sms_sender_id", None)
+    template_id = getattr(settings, "fast2sms_dlt_template_id", None)
+    
+    if sender_id and template_id:
+        payload = {
+            "route": "dlt",
+            "sender_id": sender_id,
+            "message": template_id,
+            "variables_values": message[:30],
+            "numbers": phone_clean
+        }
+        try:
+            res = requests.post(
+                "https://www.fast2sms.com/dev/bulkV2",
+                headers={"authorization": api_key, "Content-Type": "application/json"},
+                json=payload, timeout=10
+            )
+            data = res.json() if res.text else {}
+            return (True, None) if data.get("return") else (False, str(data.get("message", "Fast2SMS DLT error")))
+        except Exception as e:
+            return False, str(e)
+    else:
+        try:
+            res = requests.get(
+                "https://www.fast2sms.com/dev/bulkV2",
+                params={"authorization": api_key, "message": message[:320], "numbers": phone_clean, "route": "q"},
+                timeout=10
+            )
+            data = res.json() if res.text else {}
+            return (True, None) if data.get("return") else (False, str(data.get("message", "Fast2SMS error")))
+        except Exception as e:
+            return False, str(e)
 
-    res = requests.post(
-        "https://api.msg91.com/api/v5/flow/",
-        headers={"authkey": auth_key, "Content-Type": "application/json"},
-        json=payload, timeout=10
-    )
-    data = res.json()
-    if data.get("type") == "success":
-        return True, None
-    return False, data.get("message", "MSG91 error")
 
 
 def _send_sms_fast2sms(phone, message, settings):

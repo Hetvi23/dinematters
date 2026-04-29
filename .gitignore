@@ -36,3 +36,4 @@ venv/
 package-lock.json
 
 DinemattersProd_key.pem
+Flash-access-token.csv

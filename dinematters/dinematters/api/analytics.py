@@ -293,7 +293,6 @@ def log_event(restaurant_id, event_type, event_value=None, session_id=None, plat
 			"platform": platform
 		})
 		doc.insert(ignore_permissions=True)
-		frappe.db.commit()
 
 		return {"success": True}
 	except Exception as e:
@@ -308,6 +307,10 @@ def get_dashboard_summary(restaurant_id):
 	ALL values are computed from real data – no mocks, no Math.random().
 	"""
 	try:
+		cache_key = f"dashboard_summary:{restaurant_id}"
+		cached = frappe.cache().get_value(cache_key)
+		if cached:
+			return json.loads(cached)
 		# Ensure restaurant_id is lowercase (DocNames in DineMatters are lowercase slugs)
 		restaurant_id = restaurant_id.lower() if restaurant_id else restaurant_id
 		
@@ -627,6 +630,7 @@ def get_dashboard_summary(restaurant_id):
 					"orders": social_revenue_raw.orders
 				})
 
+		frappe.cache().set_value(cache_key, json.dumps(summary), expires_in_sec=300)
 		return summary
 	except Exception as e:
 		frappe.log_error(f"Error in get_dashboard_summary: {str(e)}")

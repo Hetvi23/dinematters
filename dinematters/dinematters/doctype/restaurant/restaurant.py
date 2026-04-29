@@ -936,8 +936,7 @@ def create_default_home_features(self):
 		if existing_features:
 			return
 		
-		# Ensure SVG files exist in File doctype
-		self.ensure_svg_files_exist()
+		# Default features mapping
 		
 		# Create default Home Features
 		default_features = [

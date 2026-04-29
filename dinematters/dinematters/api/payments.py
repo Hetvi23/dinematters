@@ -483,8 +483,7 @@ def process_loyalty_and_coupons(order):
 					"discount_amount": order.discount
 				})
 				usage_doc.insert(ignore_permissions=True)
-				frappe.db.set_value("Coupon", order.coupon, "usage_count",
-					int(frappe.db.get_value("Coupon", order.coupon, "usage_count") or 0) + 1)
+				frappe.db.sql("UPDATE `tabCoupon` SET usage_count = COALESCE(usage_count, 0) + 1 WHERE name = %s", (order.coupon,))
 				frappe.db.commit()
 		except Exception as e:
 			frappe.log_error(f"Coupon usage tracking failed for order {order.name}: {str(e)}")

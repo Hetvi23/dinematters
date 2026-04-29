@@ -7,8 +7,8 @@ set -e
 
 BENCH_PATH="/home/frappe/frappe-bench"
 APP_PATH="${BENCH_PATH}/apps/dinematters"
-SITE="backend.dinematters.com"
 GIT_BRANCH="${1:-main}"
+SITE="${2:-backend.dinematters.com}"
 
 echo "============================================================"
 echo "DineMatters Robust Deployment — Site: $SITE | Branch: $GIT_BRANCH"
@@ -59,7 +59,7 @@ echo "Fetching from $REMOTE..."
 git fetch "$REMOTE" "$GIT_BRANCH"
 
 # Force reset to target branch
-git reset --hard "$REMOTE/$GIT_BRANCH"
+git reset --hard FETCH_HEAD
 echo "Code synced to $(git rev-parse --short HEAD)"
 
 # ─── 3. Backend Setup ────────────────────────────────────────────────────────

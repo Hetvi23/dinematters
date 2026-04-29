@@ -21,6 +21,13 @@ import json
 from collections import defaultdict
 
 
+def invalidate_product_cache(doc, method=None):
+	"""Invalidates caches associated with a Menu Product when updated"""
+	restaurant_id = doc.get("restaurant") or doc.get("restaurant_id")
+	if restaurant_id:
+		frappe.cache().delete_key(f"top_picks:{restaurant_id}")
+
+
 @frappe.whitelist(allow_guest=True)
 def get_top_picks(restaurant_id):
 	"""
@@ -178,7 +185,7 @@ def get_products(restaurant_id, category=None, type=None, vegetarian=None, searc
 		# Get total count for pagination
 		# Note: frappe.db.count doesn't support or_filters, so we use get_all with limit=0
 		if or_filters:
-			total = len(frappe.get_all("Menu Product", filters=filters, or_filters=or_filters, limit=0))
+			total = len(frappe.get_all("Menu Product", filters=filters, or_filters=or_filters, fields=["name"]))
 		else:
 			total = frappe.db.count("Menu Product", filters=filters)
 		

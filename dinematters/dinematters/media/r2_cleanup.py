@@ -33,14 +33,34 @@ def run_r2_cleanup():
 			if var.object_key:
 				registered_keys.add(var.object_key)
 				
-		# Collect standalone integrations
+		# Collect standalone integrations safely across all media-bearing schemas
 		active_urls = set()
-		for row in frappe.db.get_all("Menu Product", fields=["image"]):
-			if row.image:
-				active_urls.add(row.image)
-		for row in frappe.db.get_all("Restaurant Config", fields=["logo"]):
-			if row.logo:
-				active_urls.add(row.logo)
+		
+		# 1. Product Media
+		for row in frappe.db.get_all("Product Media", fields=["media_url"]):
+			if row.media_url:
+				active_urls.add(row.media_url)
+				
+		# 2. Menu Category
+		for row in frappe.db.get_all("Menu Category", fields=["category_image"]):
+			if row.category_image:
+				active_urls.add(row.category_image)
+				
+		# 3. Restaurant Config
+		for row in frappe.db.get_all("Restaurant Config", fields=["logo", "hero_video", "apple_touch_icon", "menu_theme_background_active", "menu_theme_background_preview"]):
+			for field in ["logo", "hero_video", "apple_touch_icon", "menu_theme_background_active", "menu_theme_background_preview"]:
+				if row.get(field):
+					active_urls.add(row.get(field))
+					
+		# 4. Game, Offer, Home Feature, Event (using image_src)
+		for doctype in ["Game", "Offer", "Home Feature", "Event"]:
+			try:
+				for row in frappe.db.get_all(doctype, fields=["image_src"]):
+					if row.image_src:
+						active_urls.add(row.image_src)
+			except Exception:
+				pass
+
 				
 		# 2. Paginate completely through Cloudflare R2 contents
 		deleted_count = 0
