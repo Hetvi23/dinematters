@@ -63,7 +63,10 @@ repos:
                 dinematters/public/js/lib/.*
             )$
 
+# trigger CI
 ci:
     autoupdate_schedule: weekly
-    skip: []
+    skip: [eslint, ruff, ruff-format]
+
+
     submodules: false
