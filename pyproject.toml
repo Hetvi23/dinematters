@@ -16,7 +16,8 @@ dependencies = [
     "reportlab",
     "Pillow",
     "segno",
-    "qrcode-artistic"
+    "qrcode-artistic",
+    "razorpay"
 ]
 
 [build-system]

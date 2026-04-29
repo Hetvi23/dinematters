@@ -8,3 +8,4 @@ anthropic
 google-generativeai
 pydantic
 markdown-pdf
+razorpay
