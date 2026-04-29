@@ -5,6 +5,7 @@
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
+ "istable": 1,
  "field_order": [
   "reel_link",
   "title",
@@ -32,7 +33,6 @@
   }
  ],
  "index_web_pages_for_search": 1,
- "istable": 1,
  "links": [],
  "modified": "2025-01-15 10:00:00.000000",
  "modified_by": "Administrator",
@@ -45,6 +45,5 @@
  "sort_field": "display_order",
  "sort_order": "ASC",
  "states": [],
- "title_field": "title",
  "track_changes": 0
 }

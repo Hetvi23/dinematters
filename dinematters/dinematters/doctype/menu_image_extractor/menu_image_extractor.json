@@ -42,27 +42,27 @@
    "label": "Upload Information"
   },
   {
-   "description": "Select the restaurant for this menu extraction",
    "fieldname": "restaurant",
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Restaurant",
    "options": "Restaurant",
-   "reqd": 1
+   "reqd": 1,
+   "description": "Select the restaurant for this menu extraction"
   },
   {
-   "description": "Optional: Restaurant name for API extraction accuracy (auto-filled from Restaurant field)",
    "fieldname": "restaurant_name",
    "fieldtype": "Data",
-   "label": "Restaurant Name (Optional)"
+   "label": "Restaurant Name (Optional)",
+   "description": "Optional: Restaurant name for API extraction accuracy (auto-filled from Restaurant field)"
   },
   {
    "default": "1",
-   "description": "Automatically generate premium descriptions for dishes missing descriptions",
    "fieldname": "generate_descriptions",
    "fieldtype": "Check",
-   "label": "Generate Descriptions Automatically"
+   "label": "Generate Descriptions Automatically",
+   "description": "Automatically generate premium descriptions for dishes missing descriptions"
   },
   {
    "fieldname": "column_break_1",
@@ -90,12 +90,12 @@
    "label": "Menu Images"
   },
   {
-   "description": "Upload multiple menu images (PNG, JPEG, WebP). Maximum 20 images.",
    "fieldname": "menu_images",
    "fieldtype": "Table",
    "label": "Menu Images",
    "options": "Menu Image Item",
-   "reqd": 0
+   "reqd": 0,
+   "description": "Upload multiple menu images (PNG, JPEG, WebP). Maximum 20 images."
   },
   {
    "fieldname": "section_break_extraction",
@@ -107,29 +107,29 @@
    "label": "Extract Menu Data"
   },
   {
-   "depends_on": "eval:doc.extraction_status == 'Completed'",
    "fieldname": "generate_recommendations_button",
    "fieldtype": "Button",
-   "label": "Generate Recommendations"
+   "label": "Generate Recommendations",
+   "depends_on": "eval:doc.extraction_status == 'Completed'"
   },
   {
-   "depends_on": "eval:doc.extraction_status == 'Pending Approval'",
    "fieldname": "section_break_extracted_data",
    "fieldtype": "Section Break",
-   "label": "Extracted Data (Review and Edit Before Approval)"
+   "label": "Extracted Data (Review and Edit Before Approval)",
+   "depends_on": "eval:doc.extraction_status == 'Pending Approval'"
   },
   {
-   "depends_on": "eval:doc.extraction_status == 'Pending Approval'",
    "fieldname": "extracted_dishes",
    "fieldtype": "Table",
    "label": "Extracted Dishes",
-   "options": "Extracted Dish"
+   "options": "Extracted Dish",
+   "depends_on": "eval:doc.extraction_status == 'Pending Approval'"
   },
   {
-   "depends_on": "eval:doc.extraction_status == 'Completed' || doc.extraction_status == 'Failed'",
    "fieldname": "section_break_results",
    "fieldtype": "Section Break",
-   "label": "Extraction Results"
+   "label": "Extraction Results",
+   "depends_on": "eval:doc.extraction_status == 'Completed' || doc.extraction_status == 'Failed'"
   },
   {
    "fieldname": "extraction_log",
@@ -201,10 +201,10 @@
   {
    "fieldname": "batch_results",
    "fieldtype": "Code",
-   "hidden": 1,
    "label": "Batch Results (Internal)",
    "options": "JSON",
-   "read_only": 1
+   "read_only": 1,
+   "hidden": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -232,6 +232,6 @@
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "title_field": "restaurant_name",
  "track_changes": 1
 }
+

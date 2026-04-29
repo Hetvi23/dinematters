@@ -85,8 +85,8 @@
    "default": "0",
    "fieldname": "display_order",
    "fieldtype": "Int",
-   "in_list_view": 1,
-   "label": "Display Order"
+   "label": "Display Order",
+   "in_list_view": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -129,6 +129,5 @@
  "sort_field": "display_order",
  "sort_order": "ASC",
  "states": [],
- "title_field": "title",
  "track_changes": 1
 }

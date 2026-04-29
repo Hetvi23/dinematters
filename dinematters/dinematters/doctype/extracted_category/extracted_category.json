@@ -62,6 +62,7 @@
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "title_field": "category_name",
  "track_changes": 1
 }
+
+

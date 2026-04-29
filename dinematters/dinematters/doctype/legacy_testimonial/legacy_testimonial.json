@@ -5,14 +5,15 @@
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
+ "istable": 1,
  "field_order": [
-  "customer_name",
-  "location",
-  "rating",
-  "text",
-  "dish_images",
-  "avatar",
-  "display_order"
+ "customer_name",
+ "location",
+ "rating",
+ "text",
+ "dish_images",
+ "avatar",
+ "display_order"
  ],
  "fields": [
   {
@@ -47,10 +48,10 @@
    "options": "Legacy Testimonial Image"
   },
   {
-   "description": "Customer avatar image",
    "fieldname": "avatar",
    "fieldtype": "Attach Image",
-   "label": "Avatar"
+   "label": "Avatar",
+   "description": "Customer avatar image"
   },
   {
    "default": "0",
@@ -61,7 +62,6 @@
   }
  ],
  "index_web_pages_for_search": 1,
- "istable": 1,
  "links": [],
  "modified": "2025-01-15 10:00:00.000000",
  "modified_by": "Administrator",
@@ -74,6 +74,5 @@
  "sort_field": "display_order",
  "sort_order": "ASC",
  "states": [],
- "title_field": "customer_name",
  "track_changes": 0
 }

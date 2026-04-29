@@ -16,7 +16,7 @@
   "sent_at",
   "section_break_message",
   "message_template",
-  "whatsapp_template_name",
+   "whatsapp_template_name",
   "email_subject",
   "column_break_coupon",
   "include_coupon",
@@ -76,10 +76,10 @@
    "reqd": 1
   },
   {
-   "description": "Leave blank to send immediately on submit.",
    "fieldname": "scheduled_at",
    "fieldtype": "Datetime",
-   "label": "Scheduled At"
+   "label": "Scheduled At",
+   "description": "Leave blank to send immediately on submit."
   },
   {
    "fieldname": "sent_at",
@@ -93,18 +93,18 @@
    "label": "Message Content"
   },
   {
-   "description": "Supports variables: {{customer_name}}, {{restaurant_name}}, {{loyalty_balance}}, {{coupon_code}}",
    "fieldname": "message_template",
    "fieldtype": "Long Text",
    "label": "Message Body",
+   "description": "Supports variables: {{customer_name}}, {{restaurant_name}}, {{loyalty_balance}}, {{coupon_code}}",
    "reqd": 1
   },
   {
-   "depends_on": "eval:doc.channel == 'Email'",
-   "description": "Subject line for Email campaigns. Required when channel is Email.",
    "fieldname": "email_subject",
    "fieldtype": "Data",
-   "label": "Email Subject Line"
+   "label": "Email Subject Line",
+   "depends_on": "eval:doc.channel == 'Email'",
+   "description": "Subject line for Email campaigns. Required when channel is Email."
   },
   {
    "fieldname": "column_break_coupon",
@@ -155,27 +155,27 @@
   },
   {
    "default": "0",
-   "description": "Total Amount deducted from wallet for this campaign.",
    "fieldname": "total_cost_coins",
    "fieldtype": "Float",
-   "label": "Total Cost (\u20b9)",
-   "read_only": 1
+   "label": "Total Cost (₹)",
+   "read_only": 1,
+   "description": "Total Amount deducted from wallet for this campaign."
   },
   {
    "default": "0",
-   "description": "Orders placed within 24h of receiving this campaign message.",
    "fieldname": "total_conversions",
    "fieldtype": "Int",
    "label": "Total Conversions",
-   "read_only": 1
+   "read_only": 1,
+   "description": "Orders placed within 24h of receiving this campaign message."
   },
   {
    "default": "0",
-   "description": "Total GMV from converted orders.",
    "fieldname": "revenue_attributed",
    "fieldtype": "Float",
    "label": "Revenue Attributed (\u20b9)",
-   "read_only": 1
+   "read_only": 1,
+   "description": "Total GMV from converted orders."
   },
   {
    "fieldname": "notes",
@@ -206,15 +206,14 @@
   },
   {
    "create": 1,
-   "delete": 1,
    "read": 1,
    "role": "Restaurant Admin",
-   "write": 1
+   "write": 1,
+   "delete": 1
   }
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "title_field": "coupon_code",
  "track_changes": 1
 }

@@ -79,8 +79,8 @@
    "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Number of Diners",
-   "non_negative": 1,
-   "reqd": 1
+   "reqd": 1,
+   "non_negative": 1
   },
   {
    "fieldname": "date",
@@ -111,19 +111,19 @@
    "label": "Table Assignment"
   },
   {
-   "description": "Table assigned to this booking",
    "fieldname": "assigned_table",
    "fieldtype": "Link",
    "label": "Assigned Table",
-   "options": "Restaurant Table"
+   "options": "Restaurant Table",
+   "description": "Table assigned to this booking"
   },
   {
-   "description": "How the table was assigned",
    "fieldname": "table_assignment_method",
    "fieldtype": "Select",
    "label": "Assignment Method",
    "options": "\nauto\nmanual",
-   "read_only": 1
+   "read_only": 1,
+   "description": "How the table was assigned"
   },
   {
    "fieldname": "column_break_table",
@@ -131,10 +131,10 @@
   },
   {
    "default": "1",
-   "description": "Automatically assign a suitable table when booking is confirmed",
    "fieldname": "auto_assign_table",
    "fieldtype": "Check",
-   "label": "Auto Assign Table"
+   "label": "Auto Assign Table",
+   "description": "Automatically assign a suitable table when booking is confirmed"
   },
   {
    "fieldname": "section_break_customer",
@@ -274,6 +274,5 @@
  "sort_field": "date",
  "sort_order": "DESC",
  "states": [],
- "title_field": "customer_name",
  "track_changes": 1
 }

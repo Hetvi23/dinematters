@@ -2,7 +2,6 @@
  "actions": [],
  "allow_rename": 1,
  "autoname": "hash",
- "title_field": "product_name",
  "creation": "2024-01-15 10:00:00",
  "doctype": "DocType",
  "editable_grid": 1,

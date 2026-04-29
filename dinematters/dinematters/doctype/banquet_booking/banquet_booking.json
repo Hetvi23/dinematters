@@ -64,8 +64,8 @@
    "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Number of Guests",
-   "non_negative": 1,
-   "reqd": 1
+   "reqd": 1,
+   "non_negative": 1
   },
   {
    "fieldname": "event_type",
@@ -173,6 +173,5 @@
  "sort_field": "date",
  "sort_order": "DESC",
  "states": [],
- "title_field": "customer_name",
  "track_changes": 1
 }
