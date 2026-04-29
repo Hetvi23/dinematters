@@ -7,8 +7,15 @@ from frappe.model.document import Document
 
 class DinemattersSettings(Document):
 	"""Site-wide settings for Dinematters (OTP, etc.). Single doc."""
-	
+
 	def on_update(self):
-		from dinematters.dinematters.utils.email_setup import setup_hostinger_email
-		setup_hostinger_email()
+		"""Only sync SMTP config when Hostinger credentials actually changed."""
+		doc_before = self.get_doc_before_save()
+		
+		email_changed = not doc_before or doc_before.get("hostinger_email") != self.hostinger_email
+		password_changed = not doc_before or self.has_value_changed("hostinger_password")
+
+		if email_changed or password_changed:
+			from dinematters.dinematters.utils.email_setup import setup_hostinger_email
+			setup_hostinger_email()
 
