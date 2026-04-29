@@ -1,5 +1,5 @@
 import frappe
-from dinematters.dinematters.tasks.subscription_tasks import process_daily_subscription_floors, process_lite_feature_renewals
+from dinematters.dinematters.tasks.subscription_tasks import process_daily_subscription_floors, process_silver_feature_renewals
 from frappe.utils import getdate, now_datetime, add_days, today
 
 def test_it():
@@ -230,7 +230,7 @@ def test_it():
     res_gold.save()
 
     # 3. Run renewal task
-    process_lite_feature_renewals()
+    process_silver_feature_renewals()
 
     # 4. Verify results
     silver_bal = frappe.db.get_value("Restaurant", res_silver_name, "coins_balance")
