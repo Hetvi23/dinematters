@@ -21,7 +21,8 @@ import {
   Wallet,
   History,
   ShieldAlert,
-  Crown,
+  Gem,
+  Trophy,
   Smartphone,
   Download,
 } from 'lucide-react'
@@ -245,7 +246,7 @@ export default function AutopaySetupPage() {
               razorpay_signature: response.razorpay_signature,
             })
             if (confirmRes.message?.mandate_active) {
-              toast.success('✅ Autopay mandate activated!', {
+              toast.success('Autopay mandate activated!', {
                 description: 'Your payment method is saved for automatic top-ups.'
               })
             } else {
@@ -298,7 +299,7 @@ export default function AutopaySetupPage() {
             }}
           >
              <Download className="h-4 w-4" />
-             Help? Download Guide
+             Download Guide
           </Button>
           <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate('/ledger')}>
              <History className="h-4 w-4" />
@@ -332,63 +333,83 @@ export default function AutopaySetupPage() {
         </Card>
       )}
 
-      {/* Subscription Tier Switcher - Refactored to Comparison Modal */}
-      <Card className="border-none shadow-xl bg-gradient-to-br from-background via-background to-primary/5 overflow-hidden ring-1 ring-border/50">
-        <CardContent className="p-0">
-           <div className="flex flex-col md:flex-row items-center p-6 gap-8">
-              <div className="flex-1 space-y-4">
-                 <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "p-3 rounded-2xl shadow-inner",
-                      planType === 'DIAMOND' ? "bg-indigo-500/10 text-indigo-500" : 
-                      planType === 'GOLD' ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                    )}>
-                       {planType === 'DIAMOND' ? <Crown className="h-8 w-8" /> : 
-                        planType === 'GOLD' ? <Crown className="h-8 w-8" /> : <Smartphone className="h-8 w-8" />}
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                           <h3 className="text-2xl font-black uppercase tracking-tight">{planType} PLAN</h3>
-                           <Badge className={cn(
-                             "text-[10px] font-bold tracking-tighter",
-                             planType === 'DIAMOND' ? "bg-indigo-500" : "bg-primary"
-                           )}>Active</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground font-medium">
-                          {planType === 'DIAMOND' ? 'Elite business automation & logistics mastery.' : 
-                           planType === 'GOLD' ? 'Popular choice for growing digital brands.' : 
-                           'Free baseline digital presence.'}
-                        </p>
-                    </div>
+      {/* Subscription Tier Switcher - Concise Professional Redesign */}
+      <Card className="border-none shadow-xl bg-card overflow-hidden ring-1 ring-border/50 relative">
+        <div className={cn(
+          "absolute -top-24 -right-24 w-48 h-48 blur-[80px] opacity-15 rounded-full",
+          planType === 'DIAMOND' ? "bg-indigo-500" : 
+          planType === 'GOLD' ? "bg-primary" : "bg-muted"
+        )} />
+        
+        <CardContent className="p-0 relative z-10">
+           <div className="flex flex-col md:flex-row items-center divide-y md:divide-y-0 md:divide-x divide-border/40">
+              {/* Plan Info Section */}
+              <div className="flex-1 p-5 flex items-center gap-4 w-full">
+                 <div className={cn(
+                   "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-md",
+                   planType === 'DIAMOND' ? "bg-indigo-500 text-white" : 
+                   planType === 'GOLD' ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+                 )}>
+                    {planType === 'DIAMOND' ? <Gem className="h-6 w-6" /> : 
+                     planType === 'GOLD' ? <Trophy className="h-6 w-6" /> : <Smartphone className="h-6 w-6" />}
                  </div>
+                 
+                 <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                       <h3 className="text-xl font-black tracking-tight truncate">{planType} PLAN</h3>
+                       <Badge className={cn(
+                         "px-2 py-0 text-[9px] font-black uppercase tracking-wider rounded-full h-4 shrink-0",
+                         planType === 'DIAMOND' ? "bg-indigo-500/10 text-indigo-500 border border-indigo-500/20" : 
+                         planType === 'GOLD' ? "bg-primary/10 text-primary border border-primary/20" : "bg-muted text-muted-foreground"
+                       )} variant="outline">
+                          Active
+                       </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground font-medium truncate max-w-[280px]">
+                      {planType === 'DIAMOND' ? 'Elite business automation & logistics.' : 
+                       planType === 'GOLD' ? 'Professional digital growth tools.' : 
+                       'Essential digital presence.'}
+                    </p>
+                 </div>
+              </div>
 
-                 <div className="flex flex-wrap gap-3">
-                    <div className="flex-1 min-w-[200px] p-2 px-4 bg-muted/40 rounded-xl border border-border/50">
-                       <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-0.5">Monthly Cost</p>
-                       <p className="text-sm font-bold whitespace-nowrap">
-                          {planType === 'SILVER' ? '₹0' : 
-                           planType === 'GOLD' ? `₹${billingInfo?.plan_defaults.pro_monthly}/mo` : 
-                           `${billingInfo?.plan_defaults.lux_commission}% Success Share`}
-                       </p>
-                    </div>
-                    <div className="p-2 px-4 bg-muted/40 rounded-xl border border-border/50">
-                       <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-0.5">Status</p>
-                       <p className="text-sm font-bold text-emerald-500 flex items-center gap-1 whitespace-nowrap"><ShieldCheck className="h-3.5 w-3.5" /> Verified</p>
-                    </div>
+              {/* Investment Section */}
+              <div className="p-5 flex flex-col justify-center min-w-[160px] w-full md:w-auto">
+                 <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">Monthly Cost</p>
+                 <p className="text-base font-bold">
+                    {planType === 'SILVER' ? '₹0' : 
+                     planType === 'GOLD' ? `₹${billingInfo?.plan_defaults.pro_monthly}` : 
+                     `${billingInfo?.plan_defaults.lux_commission}% Share`}
+                 </p>
+              </div>
+              
+              {/* Status Section */}
+              <div className="p-5 flex flex-col justify-center min-w-[120px] w-full md:w-auto">
+                 <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">Status</p>
+                 <div className="flex items-center gap-1.5 text-emerald-500 font-bold">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    <span className="text-xs">Verified</span>
                  </div>
               </div>
               
-              <div className="shrink-0 flex flex-col gap-3 w-full md:w-auto">
-                 <Button 
-                  onClick={() => setShowComparison(true)}
-                  className="gap-2 bg-foreground text-background hover:bg-foreground/90 font-bold px-8 h-12 rounded-xl"
-                 >
-                    <Zap className="h-4 w-4" />
-                    Update Subscription Plan
-                 </Button>
-                 <p className="text-[10px] text-center text-muted-foreground font-medium uppercase tracking-widest">
-                    Compare tiers & features
-                 </p>
+              {/* Action Section */}
+              <div className="p-5 flex items-center justify-center bg-muted/30 w-full md:w-auto">
+                 <div className="flex flex-col items-center gap-2">
+                    <Button 
+                      onClick={() => setShowComparison(true)}
+                      size="sm"
+                      className="gap-2 bg-foreground text-background hover:bg-foreground/90 font-bold px-6 h-9 rounded-lg shadow-sm"
+                    >
+                       <Zap className="h-3.5 w-3.5" />
+                       Manage Plan
+                    </Button>
+                    <button 
+                      onClick={() => setShowComparison(true)}
+                      className="text-[9px] text-muted-foreground hover:text-foreground font-bold uppercase tracking-widest transition-colors"
+                    >
+                       Compare Tiers
+                    </button>
+                 </div>
               </div>
            </div>
         </CardContent>

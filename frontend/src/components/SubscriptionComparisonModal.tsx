@@ -110,7 +110,7 @@ export function SubscriptionComparisonModal({
                 onClick={() => onSelectPlan('SILVER')}
                 disabled={currentPlan === 'SILVER' || isChangingPlan}
                >
-                 {currentPlan === 'SILVER' ? 'Current Plan' : 'Switch'}
+                 {currentPlan === 'SILVER' ? 'Current Plan' : 'Downgrade'}
                </Button>
             </div>
             {/* Gold */}
@@ -121,14 +121,15 @@ export function SubscriptionComparisonModal({
                   <p className="text-2xl font-black">₹{planDefaults.pro_monthly}</p>
                   <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Per Month</p>
                </div>
-               <Button 
-                size="sm" 
-                className="w-full h-8 text-xs font-bold rounded-lg bg-primary text-white"
-                onClick={() => onSelectPlan('GOLD')}
-                disabled={currentPlan === 'GOLD' || isChangingPlan}
-               >
-                 {currentPlan === 'GOLD' ? 'Current Plan' : 'Upgrade'}
-               </Button>
+                <Button 
+                 size="sm" 
+                 className="w-full h-8 text-xs font-bold rounded-lg bg-primary text-white"
+                 onClick={() => onSelectPlan('GOLD')}
+                 disabled={currentPlan === 'GOLD' || isChangingPlan}
+                >
+                  {currentPlan === 'GOLD' ? 'Current Plan' : 
+                   currentPlan === 'DIAMOND' ? 'Downgrade' : 'Upgrade'}
+                </Button>
             </div>
             {/* Diamond */}
             <div className="text-center space-y-3 p-3 rounded-2xl bg-indigo-500/5 border border-indigo-500/10">
