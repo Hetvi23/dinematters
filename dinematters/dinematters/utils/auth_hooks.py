@@ -1,4 +1,5 @@
 import frappe
+from dinematters.dinematters.utils.roles import DESK_RESTRICTED_ROLES, GLOBAL_ADMIN_ROLES
 
 def restrict_merchant_desk_access():
     """
@@ -19,13 +20,13 @@ def restrict_merchant_desk_access():
     user_roles = frappe.get_roles()
     
     # Define roles that are BANNED from the Desk
-    merchant_roles = ["Restaurant Admin", "Restaurant Staff"]
+    merchant_roles = DESK_RESTRICTED_ROLES
     
     # Check if user has any merchant roles
     is_merchant = any(role in merchant_roles for role in user_roles)
     
     # System Managers and Administrators should ALWAYS have access for support
-    is_admin = any(role in ["Administrator", "System Manager"] for role in user_roles)
+    is_admin = any(role in GLOBAL_ADMIN_ROLES for role in user_roles)
     
     if is_merchant and not is_admin:
         # User is a merchant trying to enter the Desk. 

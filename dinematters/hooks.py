@@ -10,6 +10,7 @@ app_license = "mit"
 
 # Apps
 # ------------------
+after_migrate = ["dinematters.scripts.setup_roles.setup"]
 
 # required_apps = []
 

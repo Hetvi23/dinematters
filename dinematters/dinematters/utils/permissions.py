@@ -7,6 +7,7 @@ Utility functions for Restaurant User Permissions
 
 import frappe
 from frappe import _
+from dinematters.dinematters.utils.roles import GLOBAL_ADMIN_ROLES, SUPERVISOR_ROLES
 
 
 def create_restaurant_user_permission(user, restaurant, is_default=0):
@@ -110,8 +111,10 @@ def get_user_restaurant_ids(user):
 	"""Get list of restaurant IDs user has access to based on Restaurant User records
 	Optimized with Request-Level Caching and Redis Caching for Production Scale.
 	"""
-	if user == "Administrator":
-		# Administrator has access to all restaurants
+	user_roles = frappe.get_roles(user)
+	has_global_access = any(role in GLOBAL_ADMIN_ROLES or role in SUPERVISOR_ROLES for role in user_roles)
+	if has_global_access:
+		# Administrator, System Manager, and Supervisors have access to all restaurants
 		# Cache results in frappe.local to ensure it only runs once per request
 		if not hasattr(frappe.local, "all_restaurant_ids"):
 			# Use direct SQL to avoid any hooks when fetching the list of all restaurants
@@ -149,7 +152,8 @@ def get_user_restaurant_ids(user):
 
 def validate_restaurant_access(user, restaurant):
 	"""Validate user has access to restaurant"""
-	if user == "Administrator":
+	user_roles = frappe.get_roles(user)
+	if any(role in GLOBAL_ADMIN_ROLES or role in SUPERVISOR_ROLES for role in user_roles):
 		return True
 	
 	# Check if restaurant exists and is active

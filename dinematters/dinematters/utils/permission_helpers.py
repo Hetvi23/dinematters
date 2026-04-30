@@ -7,6 +7,7 @@ Permission helper functions for Restaurant-based access control
 
 import frappe
 from dinematters.dinematters.utils.permissions import get_user_restaurant_ids
+from dinematters.dinematters.utils.roles import GLOBAL_ADMIN_ROLES, SUPERVISOR_ROLES
 
 
 def get_restaurant_permission_query_conditions(user, doctype=None, **kwargs):
@@ -16,7 +17,8 @@ def get_restaurant_permission_query_conditions(user, doctype=None, **kwargs):
 	if not user:
 		user = frappe.session.user
 	
-	if user == "Administrator":
+	user_roles = frappe.get_roles(user)
+	if any(role in GLOBAL_ADMIN_ROLES or role in SUPERVISOR_ROLES for role in user_roles):
 		return ""
 	
 	try:
@@ -69,7 +71,8 @@ def has_restaurant_permission(doc, ptype="read", user=None, **kwargs):
 		if not user:
 			user = frappe.session.user
 		
-		if user == "Administrator":
+		user_roles = frappe.get_roles(user)
+		if any(role in GLOBAL_ADMIN_ROLES or role in SUPERVISOR_ROLES for role in user_roles):
 			return True
 		
 		# Recursion Guard
@@ -148,7 +151,8 @@ def get_restaurant_user_permission_query_conditions(user, doctype="Restaurant Us
 	if not user:
 		user = frappe.session.user
 	
-	if user == "Administrator":
+	user_roles = frappe.get_roles(user)
+	if any(role in GLOBAL_ADMIN_ROLES or role in SUPERVISOR_ROLES for role in user_roles):
 		return ""
 	
 	restaurant_ids = get_user_restaurant_ids(user)
