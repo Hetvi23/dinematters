@@ -788,7 +788,26 @@ def get_customer_orders(restaurant_id, phone, page=1, limit=20, include_items=Fa
 			product_names = list({i.product for i in all_items})
 			product_map = {}
 			if product_names:
-				products = frappe.get_all("Menu Product", filters={"name": ["in", product_names]}, fields=["*"])
+				products = frappe.get_all("Menu Product", filters={"name": ["in", product_names]}, fields=[
+					"name as docname",
+					"product_id as id",
+					"product_name as name",
+					"price",
+					"original_price",
+					"category_name as category",
+					"product_type as type",
+					"description",
+					"is_vegetarian",
+					"calories",
+					"estimated_time as estimatedTime",
+					"serving_size as servingSize",
+					"has_no_media",
+					"main_category as mainCategory",
+					"display_order",
+					"is_active",
+					"recommendations",
+					"seo_slug"
+				])
 				from dinematters.dinematters.api.products import format_products_for_listing
 				formatted_products = format_products_for_listing(products)
 				product_map = {p.get("docname"): p for p in formatted_products}
