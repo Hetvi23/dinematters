@@ -307,7 +307,10 @@ extend_bootinfo = "dinematters.dinematters.utils.boot_helpers.extend_bootinfo"
 # Request Events
 # ----------------
 # CORS Configuration for Frontend Access
-before_request = ["dinematters.dinematters.utils.cors_helpers.handle_cors_preflight"]
+before_request = [
+    "dinematters.dinematters.utils.cors_helpers.handle_cors_preflight",
+    "dinematters.dinematters.utils.auth_hooks.restrict_merchant_desk_access"
+]
 after_request = ["dinematters.dinematters.utils.cors_helpers.add_cors_headers"]
 
 # Job Events
