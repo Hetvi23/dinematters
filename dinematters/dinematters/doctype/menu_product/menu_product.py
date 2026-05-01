@@ -18,18 +18,26 @@ class MenuProduct(Document):
 		if not self.seo_slug and self.product_name:
 			self.seo_slug = self.generate_slug_from_name(self.product_name)
 		
-		# Check for duplicate product_id within the same restaurant
-		if self.product_id and self.restaurant:
-			duplicate = frappe.db.get_value(
-				"Menu Product",
-				{"product_id": self.product_id, "restaurant": self.restaurant, "name": ["!=", self.name]},
-				"name"
-			)
-			if duplicate:
-				frappe.throw(
-					_("Product ID '{0}' already exists for restaurant '{1}'").format(self.product_id, self.restaurant),
-					frappe.DuplicateEntryError
-				)
+		# Auto-resolve duplicates for product_id and seo_slug
+		if self.restaurant:
+			self.resolve_duplicate_slugs()
+
+	def resolve_duplicate_slugs(self):
+		# check product_id
+		if self.product_id:
+			original_pid = self.product_id
+			counter = 1
+			while frappe.db.exists("Menu Product", {"product_id": self.product_id, "restaurant": self.restaurant, "name": ["!=", self.name]}):
+				self.product_id = f"{original_pid}-{counter}"
+				counter += 1
+
+		# check seo_slug
+		if self.seo_slug:
+			original_slug = self.seo_slug
+			counter = 1
+			while frappe.db.exists("Menu Product", {"seo_slug": self.seo_slug, "restaurant": self.restaurant, "name": ["!=", self.name]}):
+				self.seo_slug = f"{original_slug}-{counter}"
+				counter += 1
 		
 		self.validate_product_media()
 		

@@ -15,7 +15,8 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { useFrappePostCall } from 'frappe-react-sdk'
@@ -284,8 +285,8 @@ export function AiRechargeModal({ open, onClose, restaurant, onSuccess }: CoinRe
             </div>
             {isCustom && (
               <div className="flex items-center gap-1.5">
-                <Input
-                  type="number"
+                <NumberInput
+                  
                   min={300}
                   step={1}
                   placeholder="e.g. 1500"

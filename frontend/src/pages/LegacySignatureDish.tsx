@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useFrappeGetDocList, useFrappePostCall, useFrappeUpdateDoc, useFrappeDeleteDoc } from '@/lib/frappe'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
@@ -134,7 +135,7 @@ export default function LegacySignatureDishPage() {
                   </div>
                   <div>
                     <Label htmlFor="display_order">Display Order</Label>
-                    <Input type="number" name="display_order" defaultValue={editingItem?.display_order || 0} />
+                    <NumberInput  name="display_order" defaultValue={editingItem?.display_order || 0} />
                   </div>
                   <div className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>

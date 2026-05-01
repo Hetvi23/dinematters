@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -337,8 +338,8 @@ export default function ProductMediaTable({ value = [], onChange, required, disa
                     </TableCell>
                     <TableCell>
                       {isEditing ? (
-                        <Input
-                          type="number"
+                        <NumberInput
+                          
                           min="0"
                           value={editData.display_order ?? index + 1}
                           onChange={(e) => setEditData({ ...editData, display_order: parseInt(e.target.value) || 0 })}

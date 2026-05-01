@@ -3,7 +3,8 @@ import { useRestaurant } from '@/contexts/RestaurantContext'
 import { useFrappePostCall } from '@/lib/frappe'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
@@ -262,9 +263,9 @@ export default function CustomerInsights() {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="amount">Number of Points</Label>
-              <Input
+              <NumberInput
                 id="amount"
-                type="number"
+                
                 placeholder="e.g. 50"
                 value={adjustAmount}
                 onChange={(e) => setAdjustAmount(e.target.value)}

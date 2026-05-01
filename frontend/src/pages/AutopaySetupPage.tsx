@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -491,8 +492,8 @@ export default function AutopaySetupPage() {
                 <Label className="text-sm font-bold">Auto Top-up Threshold (₹)</Label>
                 <div className="relative">
                   <IndianRupee className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    type="number" 
+                  <NumberInput 
+                     
                     min="300"
                     className={cn(
                       "pl-9 bg-muted/30 border-transparent focus:bg-background focus:border-primary",
@@ -516,8 +517,8 @@ export default function AutopaySetupPage() {
                 <Label className="text-sm font-bold">Top-up Amount (₹)</Label>
                 <div className="relative">
                   <IndianRupee className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    type="number" 
+                  <NumberInput 
+                     
                     min="500"
                     className={cn(
                       "pl-9 bg-muted/30 border-transparent focus:bg-background focus:border-primary",

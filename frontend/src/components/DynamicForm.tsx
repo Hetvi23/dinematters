@@ -3,7 +3,8 @@ import { useDocTypeMeta, DocTypeField } from '@/lib/doctype'
 import { usePermissions } from '@/lib/permissions'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -528,6 +529,12 @@ export default function DynamicForm({
 
       toast.success(`${doctype} ${actualMode === 'create' ? 'created' : 'updated'} successfully`)
 
+      if (mode !== 'create') {
+        try {
+          await refreshDoc();
+        } catch (e) {}
+      }
+
       if (onSave) {
         onSave(savedDoc)
       }
@@ -1016,9 +1023,9 @@ export default function DynamicForm({
                 </span>
               )}
             </Label>
-            <Input
+            <NumberInput
               id={field.fieldname}
-              type="number"
+              
               value={value}
               onChange={(e) => handleFieldChange(field.fieldname, parseFloat(e.target.value) || 0)}
               readOnly={isEffectivelyReadOnly}

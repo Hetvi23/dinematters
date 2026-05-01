@@ -16,7 +16,8 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Label } from '@/components/ui/label'
 import { 
   Shield, 
@@ -597,8 +598,8 @@ export default function AdminRestaurantManagement() {
           <div className="px-8 pb-8 space-y-5">
             <div className="space-y-2">
               <Label className="text-xs font-semibold text-muted-foreground">Magnitude (Amount)</Label>
-              <Input
-                type="number"
+              <NumberInput
+                
                 value={coinAmount}
                 onChange={(e) => setCoinAmount(e.target.value)}
                 placeholder="0.00"
@@ -670,11 +671,11 @@ export default function AdminRestaurantManagement() {
                   <Label className="text-xs font-semibold text-muted-foreground ml-1">
                     Monthly Floor (₹)
                   </Label>
-                  <Input type="number" value={editMonthlyMinimum} onChange={(e) => setEditMonthlyMinimum(e.target.value)} className="h-11 rounded-xl bg-background border-slate-300 font-bold text-foreground" />
+                  <NumberInput  value={editMonthlyMinimum} onChange={(e) => setEditMonthlyMinimum(e.target.value)} className="h-11 rounded-xl bg-background border-slate-300 font-bold text-foreground" />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold text-muted-foreground ml-1">Network Fee (%)</Label>
-                  <Input type="number" value={editPlatformFee} onChange={(e) => setEditPlatformFee(e.target.value)} className="h-11 rounded-xl bg-background border-slate-300 font-bold text-foreground" />
+                  <NumberInput  value={editPlatformFee} onChange={(e) => setEditPlatformFee(e.target.value)} className="h-11 rounded-xl bg-background border-slate-300 font-bold text-foreground" />
                 </div>
               </div>
             </div>

@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useFrappePostCall } from '@/lib/frappe'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -704,16 +705,16 @@ function AdminRestaurantDetailsPage() {
                   <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <Label>Platform Fee (%)</Label>
-                      <Input 
-                        type="number"
+                      <NumberInput 
+                        
                         value={restaurant.platform_fee_percent} 
                         onChange={(e) => setRestaurant({...restaurant, platform_fee_percent: parseFloat(e.target.value)})}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Monthly Minimum (₹)</Label>
-                      <Input 
-                         type="number"
+                      <NumberInput 
+                         
                         value={restaurant.monthly_minimum} 
                         onChange={(e) => setRestaurant({...restaurant, monthly_minimum: parseFloat(e.target.value)})}
                       />
@@ -866,8 +867,8 @@ function AdminRestaurantDetailsPage() {
                     <div className="space-y-2">
                       <Label>Base Amount (₹)</Label>
                       <div className="flex gap-2">
-                        <Input 
-                          type="number"
+                        <NumberInput 
+                          
                           placeholder="e.g. 1000"
                           value={manualRechargeAmount}
                           onChange={(e) => {
@@ -1070,8 +1071,8 @@ function AdminRestaurantDetailsPage() {
                        </div>
                        <div className="space-y-2">
                           <Label>Tax Rate (%)</Label>
-                          <Input 
-                            type="number"
+                          <NumberInput 
+                            
                             value={restaurant.tax_rate} 
                             onChange={(e) => setRestaurant({...restaurant, tax_rate: parseFloat(e.target.value)})}
                           />
@@ -1085,24 +1086,24 @@ function AdminRestaurantDetailsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                        <div className="space-y-2">
                           <Label>Default Deliv. Fee</Label>
-                          <Input 
-                            type="number"
+                          <NumberInput 
+                            
                             value={restaurant.default_delivery_fee} 
                             onChange={(e) => setRestaurant({...restaurant, default_delivery_fee: parseFloat(e.target.value)})}
                           />
                        </div>
                        <div className="space-y-2">
                           <Label>Pack. Fee</Label>
-                          <Input 
-                            type="number"
+                          <NumberInput 
+                            
                             value={restaurant.default_packaging_fee} 
                             onChange={(e) => setRestaurant({...restaurant, default_packaging_fee: parseFloat(e.target.value)})}
                           />
                        </div>
                        <div className="space-y-2">
                           <Label>Prep Time (m)</Label>
-                          <Input 
-                            type="number"
+                          <NumberInput 
+                            
                             value={restaurant.estimated_prep_time} 
                             onChange={(e) => setRestaurant({...restaurant, estimated_prep_time: parseInt(e.target.value)})}
                           />
@@ -1126,8 +1127,8 @@ function AdminRestaurantDetailsPage() {
                         </div>
                         <div className="space-y-2">
                           <Label>Update Tables</Label>
-                          <Input 
-                             type="number"
+                          <NumberInput 
+                             
                              value={restaurant.tables} 
                              onChange={(e) => setRestaurant({...restaurant, tables: parseInt(e.target.value)})}
                           />

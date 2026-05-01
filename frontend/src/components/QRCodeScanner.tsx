@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { QrCode, Camera, X, CheckCircle2, Loader2, ZapOff, Hash } from 'lucide-react'
@@ -309,9 +310,9 @@ export default function QRCodeScanner({ onScan, restaurantId, open, onOpenChange
               Table Number
             </Label>
             <div className="flex gap-2">
-              <Input
+              <NumberInput
                 id="table-manual-input"
-                type="number"
+                
                 min="1"
                 placeholder="e.g. 5"
                 value={manualInput}

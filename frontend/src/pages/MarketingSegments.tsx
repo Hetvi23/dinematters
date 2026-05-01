@@ -8,7 +8,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
@@ -269,21 +270,21 @@ export default function MarketingSegments() {
                   {form.criteria_type === 'Loyal Regulars' && (
                     <div className="space-y-2 animate-in fade-in zoom-in-95">
                       <Label className="text-xs font-bold uppercase text-muted-foreground">Minimum Visits</Label>
-                      <Input type="number" value={form.min_visit_count} onChange={e => setForm(f => ({ ...f, min_visit_count: parseInt(e.target.value) }))} className="bg-background" />
+                      <NumberInput  value={form.min_visit_count} onChange={e => setForm(f => ({ ...f, min_visit_count: parseInt(e.target.value) }))} className="bg-background" />
                     </div>
                   )}
 
                   {form.criteria_type === 'At-Risk' && (
                     <div className="space-y-2 animate-in fade-in zoom-in-95">
                       <Label className="text-xs font-bold uppercase text-muted-foreground">Days Since Last Visit</Label>
-                      <Input type="number" value={form.days_since_last_visit} onChange={e => setForm(f => ({ ...f, days_since_last_visit: parseInt(e.target.value) }))} className="bg-background" />
+                      <NumberInput  value={form.days_since_last_visit} onChange={e => setForm(f => ({ ...f, days_since_last_visit: parseInt(e.target.value) }))} className="bg-background" />
                     </div>
                   )}
 
                   {form.criteria_type === 'High Spenders' && (
                     <div className="space-y-2 animate-in fade-in zoom-in-95">
                       <Label className="text-xs font-bold uppercase text-muted-foreground">Minimum Lifetime Spend (₹)</Label>
-                      <Input type="number" value={form.min_total_spent} onChange={e => setForm(f => ({ ...f, min_total_spent: parseInt(e.target.value) }))} className="bg-background" />
+                      <NumberInput  value={form.min_total_spent} onChange={e => setForm(f => ({ ...f, min_total_spent: parseInt(e.target.value) }))} className="bg-background" />
                     </div>
                   )}
 

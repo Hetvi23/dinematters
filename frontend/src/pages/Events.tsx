@@ -32,6 +32,11 @@ import { toast } from 'sonner'
 import { cn, getFrappeError } from '@/lib/utils'
 import { useDataTable } from '@/hooks/useDataTable'
 import { DataPagination } from '@/components/ui/DataPagination'
+import { Switch } from '@/components/ui/switch'
+import { Checkbox } from '@/components/ui/checkbox'
+import { DatePicker } from '@/components/ui/date-picker'
+import { TimeInput } from '@/components/ui/time-input'
+import { Textarea } from '@/components/ui/textarea'
 
 export default function Events() {
   const { selectedRestaurant, isDiamond } = useRestaurant()
@@ -311,8 +316,6 @@ export default function Events() {
 }
 
 function EventDialog({ open, onClose, event, onSave }: any) {
-  const [activeTab, setActiveTab] = useState<'basic' | 'schedule' | 'media'>('basic')
-  
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -360,7 +363,6 @@ function EventDialog({ open, onClose, event, onSave }: any) {
         recurring_days: '',
       })
     }
-    setActiveTab('basic')
   }, [event, open])
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -376,229 +378,165 @@ function EventDialog({ open, onClose, event, onSave }: any) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-xl p-0 overflow-hidden border-none shadow-3xl rounded-3xl">
-        <div className="bg-black text-white p-8 pb-6 border-b border-white/10">
-           <DialogHeader>
-              <DialogTitle className="text-2xl font-black tracking-tight uppercase italic">{event ? 'Modify Horizon' : 'Establish New Event'}</DialogTitle>
-              <DialogDescription className="text-xs font-bold text-white/50 uppercase tracking-widest mt-1">
-                 {event ? `Payload Integrity: ${event.name}` : 'Programming global floor occurrence'}
-              </DialogDescription>
-           </DialogHeader>
-           
-           <div className="flex bg-white/10 p-1 rounded-xl mt-6">
-              {[
-                { label: 'Core', value: 'basic' },
-                { label: 'Schedule', value: 'schedule' },
-                { label: 'Media', value: 'media' }
-              ].map(tab => (
-                 <button 
-                  key={tab.value}
-                  type="button"
-                  onClick={() => setActiveTab(tab.value as any)}
-                  className={cn("flex-1 h-9 rounded-lg text-xs font-black uppercase transition-all", activeTab === tab.value ? "bg-white text-black shadow-xl" : "text-white/40 hover:text-white/60")}
-                >
-                  {tab.label}
-                </button>
-              ))}
-           </div>
-        </div>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{event ? 'Edit Event' : 'Add New Event'}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-6 py-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="title">Event Title</Label>
+              <Input 
+                id="title" 
+                value={formData.title} 
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                placeholder="Saturday Night Party"
+                required
+              />
+            </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
-            {activeTab === 'basic' && (
-               <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
-                  <div className="space-y-2">
-                    <Label htmlFor="title" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Network Identifier (Title) *</Label>
-                    <Input
-                      id="title"
-                      value={formData.title}
-                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      placeholder="e.g. SYNCED JAZZ NIGHT"
-                      className="h-12 rounded-2xl bg-muted/30 border-none font-bold placeholder:italic"
-                      required
-                    />
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea 
+                id="description" 
+                value={formData.description} 
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Describe the event details, activities, etc."
+                className="min-h-[100px]"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="event_type">Category</Label>
+              <Select 
+                value={formData.event_type} 
+                onValueChange={(val) => setFormData({ ...formData, event_type: val })}
+              >
+                <SelectTrigger id="event_type">
+                  <SelectValue placeholder="Select Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {['Live Music', 'Happy Hour', 'Workshop', 'Pop-up Kitchen', 'Themed Night', 'Private Event'].map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="is_active">Status</Label>
+              <Select 
+                value={formData.is_active ? 'active' : 'inactive'} 
+                onValueChange={(val) => setFormData({ ...formData, is_active: val === 'active' })}
+              >
+                <SelectTrigger id="is_active">
+                  <SelectValue placeholder="Select Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <DatePicker
+                label="Start Date"
+                value={formData.start_date}
+                onChange={(val) => setFormData({ ...formData, start_date: val })}
+                placeholder="Select Event Date"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <DatePicker
+                label="End Date (Optional)"
+                value={formData.end_date}
+                onChange={(val) => setFormData({ ...formData, end_date: val })}
+                placeholder="Select End Date"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <TimeInput
+                label="Start Time"
+                value={formData.start_time}
+                onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <TimeInput
+                label="End Time"
+                value={formData.end_time}
+                onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="location">Location</Label>
+              <Input 
+                id="location" 
+                value={formData.location} 
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                placeholder="Main Hall / Rooftop / Garden"
+              />
+            </div>
+
+            <div className="space-y-2 col-span-2">
+              <Label>Event Image (URL)</Label>
+              <Input 
+                value={formData.image} 
+                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                placeholder="https://example.com/image.jpg"
+              />
+              {formData.image && (
+                <div className="mt-2 relative h-32 w-48 rounded-lg overflow-hidden border">
+                  <img src={formData.image} alt="Preview" className="h-full w-full object-cover" />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Recurring Section */}
+          <div className="space-y-4 border-t pt-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base font-semibold">Recurring Event</Label>
+                <p className="text-sm text-muted-foreground">Set if this event repeats automatically</p>
+              </div>
+              <Switch 
+                checked={formData.is_recurring} 
+                onCheckedChange={(val) => setFormData({ ...formData, is_recurring: val })}
+              />
+            </div>
+
+            {formData.is_recurring && (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300 space-y-4">
+                <div className="space-y-2">
+                  <Label>Days of the week</Label>
+                  <div className="flex flex-wrap gap-3">
+                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                      <div key={day} className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`day-${day}`} 
+                          checked={formData.recurring_days?.includes(day)}
+                          onCheckedChange={() => toggleDay(day)}
+                        />
+                        <Label htmlFor={`day-${day}`} className="text-xs font-normal">{day}</Label>
+                      </div>
+                    ))}
                   </div>
-
-                  <div className="grid grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <Label htmlFor="event_type" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Class Identifier</Label>
-                      <Select value={formData.event_type} onValueChange={(v) => setFormData({ ...formData, event_type: v })}>
-                        <SelectTrigger className="h-11 rounded-2xl bg-muted/30 border-none">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-2xl border-none shadow-2xl">
-                          {['Live Music', 'Happy Hour', 'Workshop', 'Pop-up Kitchen', 'Themed Night', 'Private Event'].map(type => (
-                             <SelectItem key={type} value={type} className="font-bold">{type}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="location" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Deployment Sector</Label>
-                      <Input
-                        id="location"
-                        value={formData.location}
-                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                        placeholder="e.g. ROOFTOP DECK"
-                        className="h-11 rounded-2xl bg-muted/30 border-none font-semibold"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="description" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Mission Brief (Description)</Label>
-                    <textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="Operational details and engagement goals..."
-                      className="w-full min-h-[100px] p-4 rounded-2xl bg-muted/30 border-none text-sm font-medium focus:ring-2 focus:ring-black outline-none italic"
-                    />
-                  </div>
-               </div>
-            )}
-
-            {activeTab === 'schedule' && (
-               <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
-                  <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-2xl border border-border/40">
-                     <div className="flex-1 flex items-center gap-3">
-                        <Zap className={cn("h-5 w-5", formData.is_recurring ? "text-indigo-600" : "text-muted-foreground/30")} />
-                        <div className="flex flex-col">
-                           <span className="text-sm font-black uppercase italic tracking-tight">Recurring Logic</span>
-                           <span className="text-[10px] font-bold text-muted-foreground uppercase">Enable schedule frequency</span>
-                        </div>
-                     </div>
-                     <input
-                        type="checkbox"
-                        checked={formData.is_recurring}
-                        onChange={(e) => setFormData({ ...formData, is_recurring: e.target.checked })}
-                        className="h-6 w-10 appearance-none bg-muted-foreground/20 rounded-full checked:bg-black transition-all cursor-pointer relative before:content-[''] before:absolute before:h-4 before:w-4 before:bg-white before:rounded-full before:top-1 before:left-1 checked:before:translate-x-4 before:transition-transform"
-                      />
-                  </div>
-
-                  {formData.is_recurring && (
-                     <div className="space-y-4 p-4 border-2 border-dashed border-indigo-100 rounded-2xl animate-in zoom-in-95 duration-200">
-                        <Label className="text-[10px] font-black uppercase tracking-widest text-indigo-600">Active Duty Shards (Days)</Label>
-                        <div className="flex justify-between gap-1">
-                           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-                              <button
-                                 key={day}
-                                 type="button"
-                                 onClick={() => toggleDay(day)}
-                                 className={cn(
-                                    "flex-1 h-10 rounded-xl text-[10px] font-black uppercase border-2 transition-all",
-                                    formData.recurring_days.includes(day) 
-                                       ? "border-black bg-black text-white shadow-lg" 
-                                       : "border-muted/50 text-muted-foreground hover:border-black/20"
-                                 )}
-                              >
-                                 {day}
-                              </button>
-                           ))}
-                        </div>
-                     </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <Label htmlFor="start_date" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Activation Point</Label>
-                      <Input
-                        id="start_date"
-                        type="date"
-                        value={formData.start_date}
-                        onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                        className="h-11 rounded-2xl bg-muted/30 border-none font-bold"
-                        required
-                      />
-                    </div>
-                    {!formData.is_recurring && (
-                       <div className="space-y-2">
-                         <Label htmlFor="end_date" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Termination Point</Label>
-                         <Input
-                           id="end_date"
-                           type="date"
-                           value={formData.end_date}
-                           onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                           className="h-11 rounded-2xl bg-muted/30 border-none font-bold"
-                         />
-                       </div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <Label htmlFor="start_time" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Operations Start</Label>
-                      <Input
-                        id="start_time"
-                        type="time"
-                        value={formData.start_time}
-                        onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                        className="h-11 rounded-2xl bg-muted/30 border-none font-bold"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                       <Label htmlFor="end_time" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Operations End</Label>
-                       <Input
-                         id="end_time"
-                         type="time"
-                         value={formData.end_time}
-                         onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-                         className="h-11 rounded-2xl bg-muted/30 border-none font-bold"
-                       />
-                    </div>
-                  </div>
-               </div>
-            )}
-
-            {activeTab === 'media' && (
-               <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
-                  <div className="space-y-2">
-                    <Label htmlFor="image" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Key Visual Payload (Image URL)</Label>
-                    <Input
-                      id="image"
-                      value={formData.image}
-                      onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                      placeholder="https://cloud.infrastructure.io/v1/event-asset.jpg"
-                      className="h-11 rounded-2xl bg-muted/30 border-none font-medium"
-                    />
-                  </div>
-                  
-                  {formData.image && (
-                     <div className="aspect-video rounded-3xl overflow-hidden border-2 border-dashed border-muted/50 p-2">
-                        <img src={formData.image} alt="Preview" className="w-full h-full object-cover rounded-2xl shadow-2xl" />
-                     </div>
-                  )}
-
-                  <div className="flex items-center gap-3 p-4 bg-green-500/5 rounded-2xl border border-green-500/10 mt-6">
-                     <div className="h-8 w-8 rounded-full bg-green-500/10 flex items-center justify-center">
-                        <Zap className="h-4 w-4 text-green-600" />
-                     </div>
-                     <div className="flex-1">
-                        <Label htmlFor="is_active_check" className="text-xs font-black uppercase tracking-widest text-green-700">Immediate Broadcast</Label>
-                        <p className="text-[9px] font-bold text-green-600/60 uppercase">Establish live connection upon save</p>
-                     </div>
-                     <input
-                        type="checkbox"
-                        id="is_active_check"
-                        checked={formData.is_active}
-                        onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                        className="h-5 w-5 rounded-full accent-green-600"
-                      />
-                  </div>
-               </div>
+                </div>
+              </div>
             )}
           </div>
 
-          <DialogFooter className="p-8 bg-muted/10 border-t border-border/40">
-            <div className="flex justify-between w-full items-center">
-               <Button type="button" variant="ghost" onClick={onClose} className="rounded-xl h-12 font-black uppercase text-xs">
-                 Abort Programming
-               </Button>
-               <Button type="submit" className="rounded-xl h-12 px-8 font-black uppercase text-xs bg-black text-white hover:bg-black/90 shadow-2xl shadow-black/20">
-                 {event ? 'Commit Changes' : 'Ignite Horizon'}
-               </Button>
-            </div>
+          <DialogFooter className="pt-4 border-t">
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit">
+              {event ? 'Update Event' : 'Create Event'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

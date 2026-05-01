@@ -18,17 +18,12 @@ class MenuCategory(Document):
 			self.display_name = self.category_name
 
 		if self.category_id and self.restaurant:
-			# Check if any other category with same ID exists for this restaurant
-			duplicate = frappe.db.get_value(
-				"Menu Category",
-				{"category_id": self.category_id, "restaurant": self.restaurant, "name": ["!=", self.name]},
-				"name"
-			)
-			if duplicate:
-				frappe.throw(
-					_("Category ID '{0}' already exists for restaurant '{1}'").format(self.category_id, self.restaurant),
-					frappe.DuplicateEntryError
-				)
+			# Auto-resolve duplicates for category_id
+			original_id = self.category_id
+			counter = 1
+			while frappe.db.exists("Menu Category", {"category_id": self.category_id, "restaurant": self.restaurant, "name": ["!=", self.name]}):
+				self.category_id = f"{original_id}-{counter}"
+				counter += 1
 
 	
 	def on_trash(self):

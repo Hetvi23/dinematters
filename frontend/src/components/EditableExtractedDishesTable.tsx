@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -185,8 +186,8 @@ export default function EditableExtractedDishesTable({
                   </TableCell>
                   <TableCell className="text-right">
                     {isEditing ? (
-                      <Input
-                        type="number"
+                      <NumberInput
+                        
                         value={price}
                         onChange={(e) => handleFieldChange(index, 'price', parseFloat(e.target.value) || 0)}
                         className="h-10 text-sm font-black text-right bg-background/50 border-primary/20 focus-visible:ring-primary/30 rounded-xl"
