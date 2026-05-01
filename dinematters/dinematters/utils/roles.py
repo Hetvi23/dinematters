@@ -22,3 +22,23 @@ DESK_RESTRICTED_ROLES = [
     "Restaurant Admin", 
     "Restaurant Staff"
 ]
+
+
+def is_global_admin(user=None):
+	"""Check if user has root/global admin roles."""
+	import frappe
+	if not user: user = frappe.session.user
+	if user == "Administrator": return True
+	
+	user_roles = frappe.get_roles(user)
+	return any(role in GLOBAL_ADMIN_ROLES for role in user_roles)
+
+
+def is_supervisor(user=None):
+	"""Check if user has supervisor/platform support roles."""
+	import frappe
+	if not user: user = frappe.session.user
+	if is_global_admin(user): return True
+	
+	user_roles = frappe.get_roles(user)
+	return any(role in SUPERVISOR_ROLES for role in user_roles)

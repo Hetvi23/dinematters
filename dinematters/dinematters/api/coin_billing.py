@@ -9,6 +9,7 @@ import math
 from datetime import datetime
 from frappe import _
 from dinematters.dinematters.utils.razorpay_utils import get_razorpay_client, get_razorpay_config
+from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
 
 # ─── Constants ───────────────────────────────────────────────────────────────
 INR_PER_WALLET_UNIT = 1
@@ -334,9 +335,8 @@ def refund_coins(restaurant, amount, description="", ref_doctype=None, ref_name=
 @frappe.whitelist(allow_guest=False)
 def get_coin_billing_info(restaurant):
     """Returns the restaurant's coin balance and billing settings."""
-    from dinematters.dinematters.tasks.subscription_tasks import sync_restaurant_subscription
-    
     # Fail-safe: Check for overdue plan switches before returning info
+    restaurant = validate_restaurant_for_api(restaurant, frappe.session.user)
     sync_restaurant_subscription(restaurant)
     
     res = frappe.get_doc("Restaurant", restaurant)
@@ -377,6 +377,7 @@ def update_subscription_plan(restaurant, plan_type):
     if plan_type not in ["SILVER", "GOLD", "DIAMOND"]:
         frappe.throw(_("Invalid plan type. Options: SILVER, GOLD, DIAMOND"))
     
+    restaurant = validate_restaurant_for_api(restaurant, frappe.session.user)
     current_plan = frappe.db.get_value("Restaurant", restaurant, "plan_type")
     if current_plan == plan_type:
         return {"success": True, "message": f"Already on {plan_type} plan."}
@@ -421,6 +422,7 @@ def update_subscription_plan(restaurant, plan_type):
 @frappe.whitelist(allow_guest=False)
 def update_autopay_settings(restaurant, enabled, threshold, amount):
     """Update autopay configuration."""
+    restaurant = validate_restaurant_for_api(restaurant, frappe.session.user)
     frappe.db.set_value("Restaurant", restaurant, {
         "auto_recharge_enabled": 1 if enabled else 0,
         "auto_recharge_threshold": float(threshold),
@@ -435,6 +437,7 @@ def create_coin_purchase_order(restaurant, amount):
     Create Razorpay order for manual coin purchase.
     Implements upfront 18% GST collection.
     """
+    restaurant = validate_restaurant_for_api(restaurant, frappe.session.user)
     base_amount = float(amount)
     bonus_units = get_bonus_units(base_amount)
     total_units = base_amount + bonus_units
@@ -477,6 +480,7 @@ def verify_coin_purchase(restaurant, razorpay_order_id, razorpay_payment_id, raz
     """
     Verify a successful manual coin purchase and credit the restaurant.
     """
+    restaurant = validate_restaurant_for_api(restaurant, frappe.session.user)
     # 1. Verify Signature
     client = get_razorpay_client()
     cfg = get_razorpay_config()
@@ -585,6 +589,7 @@ def process_referral_bonus(restaurant):
 @frappe.whitelist(allow_guest=False)
 def get_coin_transactions(restaurant, limit=20, offset=0, from_date=None, to_date=None, type=None):
     """Fetch paginated coin transactions for a restaurant with advanced filtering."""
+    restaurant = validate_restaurant_for_api(restaurant, frappe.session.user)
     filters = {"restaurant": restaurant}
     
     if from_date and to_date:

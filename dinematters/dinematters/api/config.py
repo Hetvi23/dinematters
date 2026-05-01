@@ -12,6 +12,7 @@ from frappe.utils import get_url, flt, cint
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api, get_restaurant_context
 from dinematters.dinematters.media.utils import get_media_asset_data, get_media_assets_batch
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
+from dinematters.dinematters.utils.roles import is_supervisor
 import json
 
 
@@ -20,8 +21,8 @@ def _get_user_role_for_restaurant(user, restaurant):
 	if not user or user == "Guest":
 		return None
 	
-	# Global Admins
-	if user == "Administrator" or "System Manager" in frappe.get_roles(user) or "Restaurant Admin" in frappe.get_roles(user):
+	# Global Admins & Supervisors
+	if user == "Administrator" or is_supervisor(user) or "Restaurant Admin" in frappe.get_roles(user):
 		return "Restaurant Admin"
 		
 	# Check specific restaurant role

@@ -12,6 +12,7 @@ from frappe.utils import flt, get_datetime_str, getdate, today
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api
 from dinematters.dinematters.utils.customer_helpers import require_verified_phone, get_or_create_customer
 from dinematters.dinematters.utils.feature_gate import require_plan
+from dinematters.dinematters.utils.roles import is_supervisor, is_global_admin
 import json
 
 
@@ -115,7 +116,13 @@ def get_table_bookings(restaurant_id, status=None, date_from=None, date_to=None,
 	"""
 	try:
 		# Validate restaurant (allow guest access for public bookings)
-		restaurant = validate_restaurant_for_api(restaurant_id)
+		restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user if admin_mode else None)
+		
+		# Security: If admin_mode is requested, verify user has restaurant access
+		if admin_mode:
+			from dinematters.dinematters.utils.permissions import validate_restaurant_access
+			if not validate_restaurant_access(frappe.session.user, restaurant):
+				return {"success": False, "error": {"code": "PERMISSION_DENIED", "message": "Admin access required"}}
 		
 		# Get user
 		user = frappe.session.user if frappe.session.user != "Guest" else None
@@ -539,7 +546,7 @@ def confirm_booking(booking_id, restaurant_id, assigned_table=None):
 	"""
 	try:
 		# Validate restaurant
-		restaurant = validate_restaurant_for_api(restaurant_id)
+		restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user)
 		
 		# Get booking
 		booking = frappe.get_doc("Table Booking", booking_id)
@@ -596,7 +603,7 @@ def reject_booking(booking_id, restaurant_id, reason=None):
 	"""
 	try:
 		# Validate restaurant
-		restaurant = validate_restaurant_for_api(restaurant_id)
+		restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user)
 		
 		# Get booking
 		booking = frappe.get_doc("Table Booking", booking_id)
@@ -642,7 +649,7 @@ def reassign_table(booking_id, restaurant_id, new_table_id):
 	"""
 	try:
 		# Validate restaurant
-		restaurant = validate_restaurant_for_api(restaurant_id)
+		restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user)
 		
 		# Get booking
 		booking = frappe.get_doc("Table Booking", booking_id)
@@ -694,7 +701,7 @@ def mark_no_show(booking_id, restaurant_id):
 	"""
 	try:
 		# Validate restaurant
-		restaurant = validate_restaurant_for_api(restaurant_id)
+		restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user)
 		
 		# Get booking
 		booking = frappe.get_doc("Table Booking", booking_id)
@@ -736,7 +743,7 @@ def mark_completed(booking_id, restaurant_id):
 	"""
 	try:
 		# Validate restaurant
-		restaurant = validate_restaurant_for_api(restaurant_id)
+		restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user)
 		
 		# Get booking
 		booking = frappe.get_doc("Table Booking", booking_id)
@@ -779,7 +786,7 @@ def get_admin_bookings(restaurant_id, date_from=None, date_to=None, status=None,
 	"""
 	try:
 		# Validate restaurant
-		restaurant = validate_restaurant_for_api(restaurant_id)
+		restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user)
 		
 		# Build filters
 		filters = {"restaurant": restaurant}

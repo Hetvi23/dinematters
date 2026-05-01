@@ -17,6 +17,7 @@ from dinematters.dinematters.utils.api_helpers import (
 from dinematters.dinematters.utils.customization_helpers import load_product_customizations, validate_customizations
 from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
 from dinematters.dinematters.utils.feature_gate import require_plan
+from dinematters.dinematters.utils.roles import is_supervisor, is_global_admin
 from dinematters.dinematters.utils.customer_helpers import (
 	require_verified_phone,
 	validate_customer_session,
@@ -453,7 +454,13 @@ def get_orders(restaurant_id, status=None, page=1, limit=20, session_id=None, ad
 	"""
 	try:
 		# Validate restaurant
-		restaurant = validate_restaurant_for_api(restaurant_id)
+		restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user if admin_mode else None)
+		
+		# Security: If admin_mode is requested, verify user has restaurant access
+		if admin_mode:
+			from dinematters.dinematters.utils.permissions import validate_restaurant_access
+			if not validate_restaurant_access(frappe.session.user, restaurant):
+				return {"success": False, "error": {"code": "PERMISSION_DENIED", "message": "Admin access required"}}
 		
 		user = frappe.session.user if frappe.session.user != "Guest" else None
 		if not user and not session_id:
