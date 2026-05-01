@@ -90,7 +90,7 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "SEO Slug",
-   "unique": 1
+   "unique": 0
   },
   {
    "fieldname": "column_break_1",

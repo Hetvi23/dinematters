@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { Truck, ShoppingBag, Clock, DollarSign, Settings, Percent, FileText } from 'lucide-react'
@@ -253,8 +254,8 @@ export default function OrderSettings() {
                     <span className="flex h-8 items-center border-r border-input px-3 text-sm leading-none text-muted-foreground font-medium">
                       ₹
                     </span>
-                    <Input
-                      type="number"
+                    <NumberInput
+                      
                       disabled={restaurantDoc?.preferred_logistics_provider === 'Borzo' || restaurantDoc?.preferred_logistics_provider === 'Flash'}
                       className="h-8 border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:border-0"
                       value={settings.default_delivery_fee || ''}
@@ -274,8 +275,8 @@ export default function OrderSettings() {
                     <span className="flex h-8 items-center border-r border-input px-3 text-sm leading-none text-muted-foreground font-medium">
                       ₹
                     </span>
-                    <Input
-                      type="number"
+                    <NumberInput
+                      
                       className="h-8 border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:border-0"
                       value={settings.minimum_order_value || ''}
                       onChange={(e) => handleNumberChange('minimum_order_value', e.target.value)}
@@ -302,8 +303,8 @@ export default function OrderSettings() {
                   <Clock className="w-4 h-4" />
                   Estimated Preparation Time (mins)
                 </Label>
-                <Input
-                  type="number"
+                <NumberInput
+                  
                   value={settings.estimated_prep_time || ''}
                   onChange={(e) => handleNumberChange('estimated_prep_time', e.target.value)}
                 />
@@ -334,8 +335,8 @@ export default function OrderSettings() {
                   <Label>Packaging Fee Value</Label>
                   <div className="flex items-center rounded-md border border-input bg-background overflow-hidden px-3 h-10">
                     {settings.packaging_fee_type === 'Fixed' && <span className="mr-2 text-sm text-muted-foreground font-medium">₹</span>}
-                    <Input
-                      type="number"
+                    <NumberInput
+                      
                       className="h-8 border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:border-0 p-0"
                       value={settings.default_packaging_fee || ''}
                       onChange={(e) => handleNumberChange('default_packaging_fee', e.target.value)}
@@ -356,8 +357,8 @@ export default function OrderSettings() {
                   Tax Rate (%)
                 </Label>
                 <div className="flex items-center rounded-md border border-input bg-background overflow-hidden px-3">
-                  <Input
-                    type="number"
+                  <NumberInput
+                    
                     className="h-8 border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:border-0 p-0"
                     value={settings.tax_rate || ''}
                     onChange={(e) => handleNumberChange('tax_rate', e.target.value)}

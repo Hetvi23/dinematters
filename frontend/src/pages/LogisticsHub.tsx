@@ -4,7 +4,8 @@ import { useFrappePostCall, useFrappeGetDoc } from '@/lib/frappe'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { Truck, Percent, Info, Coins, CheckCircle2, Wallet, User } from 'lucide-react'
@@ -245,8 +246,8 @@ export default function LogisticsHub() {
                 {(isSelf || settings.delivery_markup_type === 'Fixed') && (
                   <span className="text-muted-foreground mr-2 text-sm">₹</span>
                 )}
-                <Input
-                  type="number"
+                <NumberInput
+                  
                   min="0"
                   className="border-0 shadow-none focus-visible:ring-0 p-0"
                   value={isSelf ? (settings.default_delivery_fee || '') : (settings.delivery_markup_value || '')}

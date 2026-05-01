@@ -7,7 +7,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
@@ -249,18 +250,18 @@ export default function MarketingAutomation() {
             </div>
             <div className="space-y-2">
               <Label>Delay (Hours after event)</Label>
-              <Input type="number" min={0} value={editTrigger.delay_hours ?? 2} onChange={e => setEditTrigger(t => ({ ...t, delay_hours: parseInt(e.target.value) }))} />
+              <NumberInput  min={0} value={editTrigger.delay_hours ?? 2} onChange={e => setEditTrigger(t => ({ ...t, delay_hours: parseInt(e.target.value) }))} />
             </div>
             {editTrigger.trigger_event === 'X Days After Last Visit' && (
               <div className="space-y-2">
                 <Label>Days Inactive</Label>
-                <Input type="number" min={1} value={editTrigger.days_since_visit ?? 30} onChange={e => setEditTrigger(t => ({ ...t, days_since_visit: parseInt(e.target.value) }))} />
+                <NumberInput  min={1} value={editTrigger.days_since_visit ?? 30} onChange={e => setEditTrigger(t => ({ ...t, days_since_visit: parseInt(e.target.value) }))} />
               </div>
             )}
             {editTrigger.trigger_event === 'On Loyalty Milestone' && (
               <div className="space-y-2">
                 <Label>Milestone (₹)</Label>
-                <Input type="number" min={1} value={editTrigger.loyalty_milestone_points ?? 500} onChange={e => setEditTrigger(t => ({ ...t, loyalty_milestone_points: parseInt(e.target.value) }))} />
+                <NumberInput  min={1} value={editTrigger.loyalty_milestone_points ?? 500} onChange={e => setEditTrigger(t => ({ ...t, loyalty_milestone_points: parseInt(e.target.value) }))} />
               </div>
             )}
             <div className="space-y-2 md:col-span-2">

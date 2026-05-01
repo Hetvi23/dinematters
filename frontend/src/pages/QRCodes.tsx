@@ -3,7 +3,8 @@ import { useFrappeGetDoc, useFrappePostCall, useFrappeUpdateDoc } from '@/lib/fr
 import { useRestaurant } from '@/contexts/RestaurantContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -215,13 +216,13 @@ export default function QRCodes() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  
+
   // Background Upload States
   const [showGenModal, setShowGenModal] = useState(false)
   const [bgFile, setBgFile] = useState<File | null>(null)
   const [bgPreview, setBgPreview] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  
+
   const [isLoadingAssets, setIsLoadingAssets] = useState(false)
   const [tableAssets, setTableAssets] = useState<any[]>([])
   const [analyticsData, setAnalyticsData] = useState<any>(null)
@@ -282,10 +283,10 @@ export default function QRCodes() {
     if (!selectedRestaurant) return
     setIsLoadingAssets(true)
     try {
-      const response: any = qrMode === 'takeaway' 
+      const response: any = qrMode === 'takeaway'
         ? await getSpecialAssets({ restaurant: selectedRestaurant, force: 0 })
         : await getTableAssets({ restaurant: selectedRestaurant, force: 0 })
-      
+
       const items = response?.message?.items || []
       setTableAssets(items)
     } catch (e) {
@@ -335,15 +336,15 @@ export default function QRCodes() {
     if (qrMode === 'dine_in' && (!tables || tables <= 0)) {
       return toast.error('Set number of tables first')
     }
-    
+
     setIsGenerating(true)
     try {
       let finalBgUrl = null
-      
+
       // 1. Upload background file if provided
       if (bgFile) {
         toast.info('Uploading background image...', { id: 'qr-gen' })
-        
+
         const formData = new FormData()
         formData.append('file', bgFile)
         formData.append('filename', bgFile.name)
@@ -361,24 +362,24 @@ export default function QRCodes() {
         if (!uploadResponse.ok) {
           throw new Error('Upload failed: ' + uploadResponse.statusText)
         }
-        
+
         const uploadJson = await uploadResponse.json()
         finalBgUrl = uploadJson?.message?.file_url ?? null
-        
+
         if (!finalBgUrl) throw new Error('Upload failed (no file URL returned)')
       }
 
       toast.info('Generating QR codes PDF...', { id: 'qr-gen' })
-      const response: any = await generateQrCodes({ 
-        restaurant: selectedRestaurant, 
+      const response: any = await generateQrCodes({
+        restaurant: selectedRestaurant,
         layout: pdfLayout,
         background_image: finalBgUrl || undefined,
         qr_type: qrMode
       })
-      
+
       const msg = response?.message
       const url: string | null = typeof msg === 'string' ? msg : msg?.pdf_url ?? null
-      
+
       if (url) {
         const finalUrl = url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`
         setQrCodeUrl(finalUrl)
@@ -386,7 +387,7 @@ export default function QRCodes() {
         setShowGenModal(false)
         setBgFile(null)
         setBgPreview(null)
-        
+
         await refreshRestaurant()
         setTableAssets([])
         if (activeTab === 'tables') {
@@ -394,9 +395,9 @@ export default function QRCodes() {
         }
       }
     } catch (error: any) {
-      toast.error('Failed to generate QR codes', { 
+      toast.error('Failed to generate QR codes', {
         id: 'qr-gen',
-        description: getFrappeError(error) 
+        description: getFrappeError(error)
       })
     } finally {
       setIsGenerating(false)
@@ -610,19 +611,19 @@ export default function QRCodes() {
                 QR Code Settings
               </CardTitle>
               <CardDescription>Configure your QR code type and generation preferences</CardDescription>
-              
+
               <div className="mt-4 inline-flex p-1 bg-muted rounded-lg border border-border/50">
-                <Button 
-                  variant={qrMode === 'dine_in' ? 'default' : 'ghost'} 
-                  size="sm" 
+                <Button
+                  variant={qrMode === 'dine_in' ? 'default' : 'ghost'}
+                  size="sm"
                   onClick={() => setQrMode('dine_in')}
                   className="h-8 rounded-md text-xs"
                 >
                   Dine-In (Tables)
                 </Button>
-                <Button 
-                  variant={qrMode === 'takeaway' ? 'default' : 'ghost'} 
-                  size="sm" 
+                <Button
+                  variant={qrMode === 'takeaway' ? 'default' : 'ghost'}
+                  size="sm"
                   onClick={() => setQrMode('takeaway')}
                   className="h-8 rounded-md text-xs"
                 >
@@ -650,13 +651,12 @@ export default function QRCodes() {
                 <div className="space-y-2">
                   <Label htmlFor="tables-input">Number of Tables</Label>
                   <div className="flex gap-2">
-                    <Input
+                    <NumberInput
                       id="tables-input"
-                      type="number"
                       min="1"
                       max="500"
                       value={tables}
-                      onChange={(e) => setTables(parseInt(e.target.value) || 0)}
+                      onChange={(e: { target: { value: string } }) => setTables(parseInt(e.target.value) || 0)}
                       disabled={isUpdating}
                       className="flex-1 max-w-[140px]"
                     />
@@ -826,15 +826,15 @@ export default function QRCodes() {
                 </Badge>
                 <div className="flex-1 w-24 h-px bg-border" />
               </div>
-              
+
               <div className="flex p-0.5 bg-muted rounded-md border text-[10px]">
-                <button 
+                <button
                   onClick={() => setQrMode('dine_in')}
                   className={cn("px-2 py-1 rounded-sm transition-all", qrMode === 'dine_in' ? "bg-background shadow-sm font-bold" : "text-muted-foreground")}
                 >
                   Dine-In
                 </button>
-                <button 
+                <button
                   onClick={() => setQrMode('takeaway')}
                   className={cn("px-2 py-1 rounded-sm transition-all", qrMode === 'takeaway' ? "bg-background shadow-sm font-bold" : "text-muted-foreground")}
                 >
@@ -866,8 +866,8 @@ export default function QRCodes() {
                   <p className="text-muted-foreground">No table QR assets cached yet.</p>
                   <p className="text-xs text-muted-foreground">Generate the PDF first — assets are created automatically.</p>
                   <div className="flex gap-2 justify-center">
-                    <Button 
-                      onClick={() => setShowGenModal(true)} 
+                    <Button
+                      onClick={() => setShowGenModal(true)}
                       disabled={isGenerating || isDeleting}
                       className="shadow-sm"
                     >
@@ -884,10 +884,10 @@ export default function QRCodes() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {tableAssets.map((asset: any) => {
-                  const assetKey = qrMode === 'dine_in' 
-                    ? `table-${asset.table_number}` 
+                  const assetKey = qrMode === 'dine_in'
+                    ? `table-${asset.table_number}`
                     : `special-${asset.order_type || asset.table_number}`
-                  
+
                   return (
                     <TableQRCard
                       key={assetKey}
@@ -1029,20 +1029,20 @@ export default function QRCodes() {
           <DialogHeader>
             <DialogTitle>Generate QR Codes PDF</DialogTitle>
             <DialogDescription>
-              {qrMode === 'dine_in' 
-                ? 'Generating production-ready PDF for your restaurant tables.' 
+              {qrMode === 'dine_in'
+                ? 'Generating production-ready PDF for your restaurant tables.'
                 : 'Generating special QRs for Takeaway and Delivery orders.'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex justify-center p-1 bg-muted rounded-lg mb-4">
-            <button 
+            <button
               className={cn("flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all", qrMode === 'dine_in' ? "bg-background shadow-sm" : "hover:bg-background/50")}
               onClick={() => setQrMode('dine_in')}
             >
               Dine-In
             </button>
-            <button 
+            <button
               className={cn("flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all", qrMode === 'takeaway' ? "bg-background shadow-sm" : "hover:bg-background/50")}
               onClick={() => setQrMode('takeaway')}
             >
@@ -1055,7 +1055,7 @@ export default function QRCodes() {
             <div className="space-y-3">
               <Label className="text-sm font-semibold">Background Image (Optional)</Label>
               {!bgPreview ? (
-                <div 
+                <div
                   className="relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 py-10 transition-colors hover:bg-muted/50 cursor-pointer"
                   onClick={() => fileInputRef.current?.click()}
                   onDragOver={(e) => e.preventDefault()}
@@ -1089,15 +1089,15 @@ export default function QRCodes() {
                 </div>
               ) : (
                 <div className="relative overflow-hidden rounded-xl border group">
-                  <img 
-                    src={bgPreview} 
-                    alt="Background Preview" 
-                    className="aspect-[4/3] w-full object-cover transition-transform group-hover:scale-105" 
+                  <img
+                    src={bgPreview}
+                    alt="Background Preview"
+                    className="aspect-[4/3] w-full object-cover transition-transform group-hover:scale-105"
                   />
                   <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
-                    <Button 
-                      variant="destructive" 
-                      size="sm" 
+                    <Button
+                      variant="destructive"
+                      size="sm"
                       onClick={() => {
                         setBgFile(null)
                         setBgPreview(null)

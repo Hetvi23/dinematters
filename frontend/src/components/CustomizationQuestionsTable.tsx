@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -448,8 +449,8 @@ export default function CustomizationQuestionsTable({
                                       </TableCell>
                                       <TableCell className="py-2 text-right">
                                         {isEditingOpt ? (
-                                          <Input
-                                            type="number"
+                                          <NumberInput
+                                            
                                             value={option.price ?? 0}
                                             onChange={(e) => handleOptionChange(questionIndex, optionIndex, 'price', parseFloat(e.target.value) || 0)}
                                             className="h-7 text-xs text-right w-20 ml-auto bg-background"

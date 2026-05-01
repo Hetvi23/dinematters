@@ -5,7 +5,8 @@ import { useRestaurant } from '@/contexts/RestaurantContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { DatePicker } from '@/components/ui/date-picker'
 import { 
   Table, 
@@ -417,10 +418,10 @@ export default function PaymentSettings() {
                                     <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Refund Amount (Optional)</label>
                                     <div className="relative">
                                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold">₹</span>
-                                      <Input 
+                                      <NumberInput 
                                         placeholder={`Full Amount: ${p.amount / 100}`} 
                                         className="pl-8 bg-muted/30 border-muted/50 focus:border-primary rounded-xl h-11"
-                                        type="number"
+                                        
                                         value={refundAmount}
                                         onChange={(e) => setRefundAmount(e.target.value)}
                                       />

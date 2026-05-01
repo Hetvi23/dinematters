@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { toast } from 'sonner'
 import { Coins, Share2, TrendingUp, Gift, Info, Trophy, Settings } from 'lucide-react'
 import { LockedFeature } from '@/components/FeatureGate/LockedFeature'
@@ -200,8 +201,8 @@ export default function LoyaltySettings() {
               </div>
               <div className="grid gap-2">
                 <Label>Minimum Billing to use points (₹)</Label>
-                <Input 
-                  type="number" 
+                <NumberInput 
+                   
                   value={settings.min_billing_for_redemption}
                   onChange={(e) => handleNumberChange('min_billing_for_redemption', e.target.value)}
                 />
@@ -209,8 +210,8 @@ export default function LoyaltySettings() {
               </div>
               <div className="grid gap-2">
                 <Label>Minimum Redemption Threshold (Coins)</Label>
-                <Input 
-                  type="number" 
+                <NumberInput 
+                   
                   value={settings.min_redemption_threshold}
                   onChange={(e) => handleNumberChange('min_redemption_threshold', e.target.value)}
                 />
@@ -238,8 +239,8 @@ export default function LoyaltySettings() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label className="text-[11px]">Max Rewards per Cycle</Label>
-                  <Input 
-                    type="number" 
+                  <NumberInput 
+                     
                     value={settings.max_opens_rewarded_per_share}
                     onChange={(e) => handleNumberChange('max_opens_rewarded_per_share', e.target.value)}
                   />
@@ -247,8 +248,8 @@ export default function LoyaltySettings() {
                 </div>
                 <div className="grid gap-2">
                   <Label className="text-[11px]">Points per unique open</Label>
-                  <Input 
-                    type="number" 
+                  <NumberInput 
+                     
                     value={settings.coins_per_unique_open}
                     onChange={(e) => handleNumberChange('coins_per_unique_open', e.target.value)}
                   />
@@ -268,16 +269,16 @@ export default function LoyaltySettings() {
             <CardContent className="space-y-6">
               <div className="grid gap-2">
                 <Label className="flex items-center gap-2">Referrer Bonus (friend orders)</Label>
-                <Input 
-                  type="number" 
+                <NumberInput 
+                   
                   value={settings.referral_order_reward_coins}
                   onChange={(e) => handleNumberChange('referral_order_reward_coins', e.target.value)}
                 />
               </div>
               <div className="grid gap-2">
                 <Label>New User Reward (Points)</Label>
-                <Input 
-                  type="number" 
+                <NumberInput 
+                   
                   value={settings.new_user_welcome_reward_coins}
                   onChange={(e) => handleNumberChange('new_user_welcome_reward_coins', e.target.value)}
                 />
@@ -286,8 +287,8 @@ export default function LoyaltySettings() {
                 <Label>Welcome Discount (₹)</Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">₹</span>
-                  <Input 
-                    type="number" 
+                  <NumberInput 
+                     
                     className="pl-7"
                     value={settings.welcome_coupon_discount}
                     onChange={(e) => handleNumberChange('welcome_coupon_discount', e.target.value)}

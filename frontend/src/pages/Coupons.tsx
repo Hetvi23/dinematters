@@ -2,7 +2,8 @@ import { useState, useMemo, useEffect } from 'react'
 import { useFrappeGetDocList, useFrappePostCall, useFrappeUpdateDoc, useFrappeDeleteDoc } from '@/lib/frappe'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -654,7 +655,7 @@ function CouponDialog({ open, onClose, coupon, onSave }: any) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="combo_price">Combo Price ({formatAmountNoDecimals(0).replace('0', '')})*</Label>
-                  <Input id="combo_price" type="number" value={formData.combo_price} onChange={(e) => setFormData({ ...formData, combo_price: parseFloat(e.target.value) })} required min="0" />
+                  <NumberInput id="combo_price"  value={formData.combo_price} onChange={(e) => setFormData({ ...formData, combo_price: parseFloat(e.target.value) })} required min="0" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="free_item">Gift Item (BOGO)</Label>
@@ -691,7 +692,7 @@ function CouponDialog({ open, onClose, coupon, onSave }: any) {
                 {formData.discount_type !== 'delivery' && (
                   <div className="space-y-2">
                     <Label htmlFor="discount_value">Discount Value *</Label>
-                    <Input id="discount_value" type="number" value={formData.discount_value} onChange={(e) => setFormData({ ...formData, discount_value: parseFloat(e.target.value) })} required min="0" />
+                    <NumberInput id="discount_value"  value={formData.discount_value} onChange={(e) => setFormData({ ...formData, discount_value: parseFloat(e.target.value) })} required min="0" />
                   </div>
                 )}
               </div>
@@ -714,11 +715,11 @@ function CouponDialog({ open, onClose, coupon, onSave }: any) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="discount_value">Discount Value *</Label>
-                <Input id="discount_value" type="number" value={formData.discount_value} onChange={(e) => setFormData({ ...formData, discount_value: parseFloat(e.target.value) })} required min="0" />
+                <NumberInput id="discount_value"  value={formData.discount_value} onChange={(e) => setFormData({ ...formData, discount_value: parseFloat(e.target.value) })} required min="0" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="max_discount_cap">Max Cap ({formatAmountNoDecimals(0).replace('0', '')})</Label>
-                <Input id="max_discount_cap" type="number" value={formData.max_discount_cap} onChange={(e) => setFormData({ ...formData, max_discount_cap: parseFloat(e.target.value) })} min="0" />
+                <NumberInput id="max_discount_cap"  value={formData.max_discount_cap} onChange={(e) => setFormData({ ...formData, max_discount_cap: parseFloat(e.target.value) })} min="0" />
               </div>
             </div>
           )}
@@ -726,11 +727,11 @@ function CouponDialog({ open, onClose, coupon, onSave }: any) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="min_order_amount">Min Order Amount ({formatAmountNoDecimals(0).replace('0', '')})</Label>
-              <Input id="min_order_amount" type="number" value={formData.min_order_amount} onChange={(e) => setFormData({ ...formData, min_order_amount: parseFloat(e.target.value) })} min="0" />
+              <NumberInput id="min_order_amount"  value={formData.min_order_amount} onChange={(e) => setFormData({ ...formData, min_order_amount: parseFloat(e.target.value) })} min="0" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="priority">Priority</Label>
-              <Input id="priority" type="number" value={formData.priority} onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) })} min="1" />
+              <NumberInput id="priority"  value={formData.priority} onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) })} min="1" />
             </div>
           </div>
 

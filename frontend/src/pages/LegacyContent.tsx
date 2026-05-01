@@ -3,7 +3,8 @@ import * as React from 'react'
 import { useFrappeGetDoc, useFrappeGetDocList, useFrappePostCall, useFrappeUpdateDoc, useFrappeDeleteDoc } from '@/lib/frappe'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -228,7 +229,7 @@ export default function LegacyContentPage() {
             </div>
             <div>
               <Label htmlFor="display_order">Display Order</Label>
-              <Input type="number" name="display_order" defaultValue={editingData?.display_order || 0} />
+              <NumberInput  name="display_order" defaultValue={editingData?.display_order || 0} />
             </div>
           </>
         )}
@@ -268,7 +269,7 @@ export default function LegacyContentPage() {
             </div>
             <div>
               <Label htmlFor="display_order">Display Order</Label>
-              <Input type="number" name="display_order" defaultValue={editingData?.display_order || 0} />
+              <NumberInput  name="display_order" defaultValue={editingData?.display_order || 0} />
             </div>
           </>
         )}
@@ -289,7 +290,7 @@ export default function LegacyContentPage() {
             </div>
             <div>
               <Label htmlFor="display_order">Display Order</Label>
-              <Input type="number" name="display_order" defaultValue={editingData?.display_order || 0} />
+              <NumberInput  name="display_order" defaultValue={editingData?.display_order || 0} />
             </div>
           </>
         )}
@@ -306,7 +307,7 @@ export default function LegacyContentPage() {
             </div>
             <div>
               <Label htmlFor="display_order">Display Order</Label>
-              <Input type="number" name="display_order" defaultValue={editingData?.display_order || 0} />
+              <NumberInput  name="display_order" defaultValue={editingData?.display_order || 0} />
             </div>
           </>
         )}
@@ -323,7 +324,7 @@ export default function LegacyContentPage() {
             </div>
             <div>
               <Label htmlFor="display_order">Display Order</Label>
-              <Input type="number" name="display_order" defaultValue={editingData?.display_order || 0} />
+              <NumberInput  name="display_order" defaultValue={editingData?.display_order || 0} />
             </div>
           </>
         )}
