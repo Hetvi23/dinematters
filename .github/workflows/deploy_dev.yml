@@ -31,7 +31,7 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.DEV_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.DEV_SERVER_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -p 2222 -H ${{ secrets.DEV_SERVER_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy to server
         env:
@@ -40,7 +40,7 @@ jobs:
           SSH_USER: ${{ secrets.DEV_SSH_USER }}
           SITE_CONFIG_JSON: ${{ secrets.DEV_SITE_CONFIG_JSON }}
         run: |
-          echo "$SITE_CONFIG_JSON" | ssh -o StrictHostKeyChecking=no $SSH_USER@$SERVER_HOST \
+          echo "$SITE_CONFIG_JSON" | ssh -o StrictHostKeyChecking=no -p 2222 $SSH_USER@$SERVER_HOST \
             "export SITE_CONFIG_JSON=\$(cat); \
              cd /home/frappe/frappe-bench && \
              bash apps/dinematters/scripts/deploy.sh $BRANCH dev.dinematters.com"
@@ -50,7 +50,7 @@ jobs:
           SERVER_HOST: ${{ secrets.DEV_SERVER_HOST }}
           SSH_USER: ${{ secrets.DEV_SSH_USER }}
         run: |
-          SCHEDULER_STATUS=$(ssh -o StrictHostKeyChecking=no $SSH_USER@$SERVER_HOST \
+          SCHEDULER_STATUS=$(ssh -o StrictHostKeyChecking=no -p 2222 $SSH_USER@$SERVER_HOST \
             "cd /home/frappe/frappe-bench && bench --site dev.dinematters.com scheduler status")
           echo "Scheduler status: $SCHEDULER_STATUS"
           if echo "$SCHEDULER_STATUS" | grep -q "disabled"; then
@@ -63,5 +63,5 @@ jobs:
           SERVER_HOST: ${{ secrets.DEV_SERVER_HOST }}
           SSH_USER: ${{ secrets.DEV_SSH_USER }}
         run: |
-          ssh -o StrictHostKeyChecking=no $SSH_USER@$SERVER_HOST \
+          ssh -o StrictHostKeyChecking=no -p 2222 $SSH_USER@$SERVER_HOST \
             "supervisorctl status frappe-bench-web:* frappe-bench-workers:* || true"
