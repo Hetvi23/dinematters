@@ -131,7 +131,7 @@ class Restaurant(Document):
 			# Auto-set billing defaults for the new plan
 			settings = frappe.get_single("Dinematters Settings")
 			if self.plan_type == "DIAMOND":
-				self.monthly_minimum = settings.diamond_monthly_floor or 1299.0
+				self.monthly_minimum = settings.diamond_monthly_floor or 1350.0
 				self.platform_fee_percent = settings.diamond_commission_percent or 1.5
 			elif self.plan_type == "GOLD":
 				self.monthly_minimum = settings.gold_monthly_fee or 999.0
@@ -230,7 +230,7 @@ class Restaurant(Document):
 		self.billing_status = "suspended"
 		
 		# Log the reason
-		self.add_comment("Comment", text=f"⚠️ System Auto-Suspension: {reason} (Balance below -₹300)")
+		self.add_comment("Comment", text=f"⚠️ System Auto-Suspension: {reason} (Balance below -₹100)")
 		self.save(ignore_permissions=True)
 		frappe.db.commit()
 		

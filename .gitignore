@@ -37,3 +37,7 @@ package-lock.json
 
 DinemattersProd_key.pem
 Flash-access-token.csv
+dev-server-cred.md
+whatsapp_config.md
+site_config_dev.json
+site_config_prod.json

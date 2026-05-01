@@ -256,7 +256,8 @@ def handle_loyalty_settlement(doc, method=None):
 	
 	current_status = str(doc.status).lower()
 	
+	# "billed" is a terminal billing state — always settle, same as "completed"
 	# If payment is completed, we always settle regardless of order status
-	if doc.payment_status == "completed" or current_status == settle_on or (settle_on == "confirmed" and current_status in ["confirmed", "completed", "billed"]):
+	if doc.payment_status == "completed" or current_status == settle_on or current_status == "billed" or (settle_on == "confirmed" and current_status in ["confirmed", "completed", "billed"]):
 		settle_loyalty_points(doc.name)
 

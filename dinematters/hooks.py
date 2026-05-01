@@ -8,9 +8,6 @@ app_license = "mit"
 # CI/CD: Auto-deployment enabled via GitHub Actions
 # Last deployment test: 2025-12-24
 
-# Apps
-# ------------------
-after_migrate = ["dinematters.scripts.setup_roles.setup"]
 
 # required_apps = []
 

@@ -96,10 +96,10 @@ def record_transaction(restaurant, txn_type, amount, description="", payment_id=
     if txn_type in ["AI Deduction", "Commission Deduction", "Daily SILVER Floor", "Daily GOLD Floor", "Daily DIAMOND Floor", "Daily GOLD Subscription", "Daily DIAMOND Subscription", "Delivery Fee"]:
         check_and_trigger_auto_recharge(restaurant, new_balance)
 
-        # Check for system suspension (-300 grace limit)
-        if new_balance < -300:
+        # Check for system suspension (-100 grace limit)
+        if new_balance < -100:
              res_doc = frappe.get_doc("Restaurant", restaurant)
-             res_doc.suspend_restaurant_billing(reason="Exceeded -₹300 Grace Period")
+             res_doc.suspend_restaurant_billing(reason="Exceeded -₹100 Grace Period")
 
     frappe.db.commit()
     return new_balance
@@ -302,10 +302,10 @@ def deduct_coins(restaurant, amount, type, description="", ref_doctype=None, ref
     balance = frappe.db.get_value("Restaurant", restaurant, "coins_balance") or 0.0
     check_and_trigger_auto_recharge(restaurant, balance)
 
-    # For automated or platform deductions, we allow going down to the grace limit (-300)
+    # For automated or platform deductions, we allow going down to the grace limit (-100)
     # For user-triggered AI actions, we could be stricter (e.g. fail if < 0), 
     # but currently we allow usage up to the suspension limit.
-    fail_limit = -300.0
+    fail_limit = -100.0
     
     return record_transaction(
         restaurant=restaurant,
@@ -362,7 +362,7 @@ def get_coin_billing_info(restaurant):
         "plan_defaults": {
             "silver_monthly": 0.0,
             "pro_monthly": float(settings.gold_monthly_fee or 999.0),       # GOLD monthly min
-            "lux_monthly": float(settings.diamond_monthly_floor or 1299.0), # DIAMOND monthly min
+            "lux_monthly": float(settings.diamond_monthly_floor or 1350.0), # DIAMOND monthly min (₹45/day)
             "lux_commission": float(settings.diamond_commission_percent or 1.5),
             "lux_barrier": float(settings.diamond_upgrade_barrier or 1299.0) # DIAMOND upgrade balance requirement
         }
