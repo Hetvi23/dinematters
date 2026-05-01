@@ -9,7 +9,7 @@ from dinematters.dinematters.api.coin_billing import deduct_coins
 
 def process_daily_subscription_floors():
     """
-    Nightly task (23:59) to ensure GOLD (₹33.30 flat) and DIAMOND (₹43.30 min) restaurants are billed correctly.
+    Nightly task (23:59) to ensure GOLD (₹33.30 flat) and DIAMOND (₹45.00 floor) restaurants are billed correctly.
     """
     today = getdate()
     
@@ -182,6 +182,7 @@ def process_silver_feature_renewals():
         except Exception as e:
             # If deduction fails (e.g., insufficient coins), disable the feature
             frappe.db.set_value("Restaurant Config", config.name, "menu_theme_background_enabled", 0)
-            frappe.log_error(f"Menu Theme Auto-renewal failed for {config.restaurant} (Disabled): {str(e)}", "Billing Task Info")
+            _title = f"Menu Theme renewal failed for {config.restaurant}: {str(e)}"
+            frappe.log_error(_title[:140], "Billing Task Info")
 
     frappe.db.commit()

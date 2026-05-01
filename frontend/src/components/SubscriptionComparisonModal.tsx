@@ -136,7 +136,7 @@ export function SubscriptionComparisonModal({
                <div className="space-y-1">
                   <p className="text-sm font-bold uppercase tracking-tighter text-indigo-600">Diamond</p>
                   <p className="text-2xl font-black">{planDefaults.lux_commission}%</p>
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Success Share</p>
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">₹45/Day Floor + Success Share</p>
                </div>
                <Button 
                 size="sm" 

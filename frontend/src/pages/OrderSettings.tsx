@@ -153,11 +153,11 @@ export default function OrderSettings() {
               className="h-6 w-6"
             />
           </div>
-          {settings.no_ordering === 1 && (
-            <div className="mt-4 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-600 text-sm font-medium">
-              Note: A fixed daily fee (₹{((billingInfo?.plan_defaults?.pro_monthly || 999) / 30).toFixed(2)} for GOLD, ₹{((billingInfo?.plan_defaults?.lux_monthly || 1299) / 30).toFixed(2)} for DIAMOND) will be applied as revenue-based commission cannot be calculated.
-            </div>
-          )}
+              {settings.no_ordering === 1 && (
+                <div className="mt-4 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-600 text-sm font-medium">
+                  Note: A fixed daily fee (₹{((billingInfo?.plan_defaults?.pro_monthly || 999) / 30).toFixed(2)} for GOLD, ₹45.00 for DIAMOND) will be applied as revenue-based commission cannot be calculated.
+                </div>
+              )}
         </CardContent>
       </Card>
 

@@ -11,20 +11,20 @@ DineMatters offers three distinct tiers designed to grow with your restaurant.
 | :--- | :--- | :--- |
 | **SILVER** | **₹0 / Month** | Start-ups digitizing their menu for the first time. |
 | **PRO (GOLD)** | **₹999 / Month** | Established dine-in restaurants needing QR ordering & branding. ₹33.30/day |
-| **DIAMOND** | **₹1,299 Floor / Month** <br> OR **1.5% Commission** | High-volume restaurants requiring full automation & marketing. min ₹43.30/day |
+| **DIAMOND** | **₹45 Floor / Day** <br> OR **1.5% Commission** | High-volume restaurants requiring full automation & marketing. |
 
-### 💎 The Diamond Pricing Model (Example)
-The Diamond tier ensures you only pay more when you earn significantly more. You are charged either the monthly floor or the commission, **whichever is higher**.
+### 💎 The Diamond Pricing Model (Daily)
+The Diamond tier ensures you only pay more when you earn significantly more. Each day, we calculate your commission (1.5%). If it's less than ₹45, you pay the floor price of ₹45. If it's more, you only pay the commission.
 
-> **Example A: Steady Month**
-> - Monthly Revenue: ₹50,000
-> - 1.5% Commission: ₹750
-> - **Platform Charge: ₹1,299** (Floor applies)
+> **Example A: Average Day**
+> - Daily Revenue: ₹2,000
+> - 1.5% Commission: ₹30
+> - **Daily Platform Charge: ₹45** (Floor applies)
 >
-> **Example B: High Volume Month**
-> - Monthly Revenue: ₹2,00,000
-> - 1.5% Commission: ₹3,000
-> - **Platform Charge: ₹3,000** (Commission applies)
+> **Example B: High Volume Day**
+> - Daily Revenue: ₹10,000
+> - 1.5% Commission: ₹150
+> - **Daily Platform Charge: ₹150** (Commission applies)
 
 ---
 
@@ -96,4 +96,4 @@ We reward committed partners with significant recharge bonuses:
 > **Wallet Transparency**: Invoices and top-up summaries should explicitly state **"18% GST Applied Upfront"** to ensure zero confusion between payment and wallet balance.
 
 1.  **Diamond Excellence**: Position the 1.5% commission not as a "fee," but as a **"Growth Success Partner"** model.
-2.  **Safety Buffer**: The **-₹300 Wallet Grace Period** should be marketed as "Uninterrupted Service Protection," ensuring your menu never goes offline during peak hours.
+2.  **Safety Buffer**: The **-₹100 Wallet Grace Period** should be marketed as "Uninterrupted Service Protection," ensuring your menu never goes offline during peak hours.

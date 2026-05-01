@@ -131,7 +131,7 @@
    "label": "GOLD Monthly Fee"
   },
   {
-   "default": "1299",
+   "default": "1350",
    "fieldname": "diamond_monthly_floor",
    "fieldtype": "Float",
    "label": "DIAMOND Monthly Floor"

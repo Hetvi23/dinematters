@@ -375,11 +375,11 @@ export default function AutopaySetupPage() {
 
               {/* Investment Section */}
               <div className="p-5 flex flex-col justify-center min-w-[160px] w-full md:w-auto">
-                 <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">Monthly Cost</p>
+                 <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">Daily Floor</p>
                  <p className="text-base font-bold">
                     {planType === 'SILVER' ? '₹0' : 
-                     planType === 'GOLD' ? `₹${billingInfo?.plan_defaults.pro_monthly}` : 
-                     `${billingInfo?.plan_defaults.lux_commission}% Share`}
+                     planType === 'GOLD' ? `₹${((billingInfo?.plan_defaults?.pro_monthly ?? 999) / 30).toFixed(0)}` : 
+                     `₹45`}
                  </p>
               </div>
               
