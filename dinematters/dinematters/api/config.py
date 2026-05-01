@@ -304,6 +304,12 @@ def get_restaurant_config(restaurant_id):
 					"coupons": restaurant_doc.plan_type == "DIAMOND",
 					"games": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
 					"tableBooking": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
+					"events": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
+					"offers": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
+					"experience_lounge": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
+					"google_growth": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
+					"whatsapp_orders": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
+					"marketing_studio": restaurant_doc.plan_type == "DIAMOND",
 					# Digital/Branding (GOLD and DIAMOND)
 					"videoUpload": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
 					"analytics": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
