@@ -39,7 +39,7 @@ import { TimeInput } from '@/components/ui/time-input'
 import { Textarea } from '@/components/ui/textarea'
 
 export default function Events() {
-  const { selectedRestaurant, isDiamond } = useRestaurant()
+  const { selectedRestaurant, isGold } = useRestaurant()
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editingEvent, setEditingEvent] = useState<any>(null)
   const [filterType, setFilterType] = useState<string>('all')
@@ -143,8 +143,8 @@ export default function Events() {
     )
   }
 
-  if (!isDiamond) {
-    return <LockedFeature feature="events" requiredPlan={['DIAMOND']} />
+  if (!isGold) {
+    return <LockedFeature feature="events" requiredPlan={['GOLD']} />
   }
 
   return (

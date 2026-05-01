@@ -38,10 +38,9 @@ def process_daily_subscription_floors():
 
             # 3. Check for Idempotency: Has a floor recovery already been processed for this restaurant today?
             # Use list of lists to avoid dictionary key overwrite bug (ensures both >= and < are applied)
-            # We check for both old names (PRO/LUX) and new names (GOLD/DIAMOND) for safety during transition
             already_processed = frappe.db.exists("Coin Transaction", [
                 ["restaurant", "=", res.name],
-                ["transaction_type", "in", ["Daily SILVER Floor", "Daily GOLD Floor", "Daily DIAMOND Floor", "Daily GOLD Subscription", "Daily PRO Floor", "Daily LUX Floor", "Daily PRO Subscription"]],
+                ["transaction_type", "in", ["Daily SILVER Floor", "Daily GOLD Floor", "Daily DIAMOND Floor", "Daily GOLD Subscription", "Daily DIAMOND Subscription"]],
                 ["creation", ">=", start_utc.strftime("%Y-%m-%d %H:%M:%S")],
                 ["creation", "<", end_utc.strftime("%Y-%m-%d %H:%M:%S")]
             ])
