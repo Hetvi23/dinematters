@@ -39,7 +39,7 @@ export function useCurrency() {
   // Fetch Currency info via whitelisted method to bypass DocType permissions
   const { data: currencyResponse } = useFrappeGetCall('dinematters.dinematters.api.config.get_currency_info', {
     currency_code: currencyCode
-  }, `currency-${currencyCode}`, {
+  }, {
     revalidateOnFocus: false,
     enabled: !!currencyCode && !pricing?.symbol
   })
