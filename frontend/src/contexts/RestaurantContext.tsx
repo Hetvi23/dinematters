@@ -33,6 +33,12 @@ interface RestaurantContextType {
     coupons: boolean
     games: boolean
     tableBooking: boolean
+    events: boolean
+    offers: boolean
+    experience_lounge: boolean
+    marketing_studio: boolean
+    google_growth: boolean
+    whatsapp_orders: boolean
   }
   billingInfo: any | null
   googleMapsApiKey: string | null
@@ -249,6 +255,12 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
     coupons: restaurantConfig.subscription.features.coupons ?? false,
     games: restaurantConfig.subscription.features.games ?? false,
     tableBooking: restaurantConfig.subscription.features.tableBooking ?? false,
+    events: restaurantConfig.subscription.features.events ?? false,
+    offers: restaurantConfig.subscription.features.offers ?? false,
+    experience_lounge: restaurantConfig.subscription.features.experience_lounge ?? false,
+    marketing_studio: restaurantConfig.subscription.features.marketing_studio ?? false,
+    google_growth: restaurantConfig.subscription.features.google_growth ?? false,
+    whatsapp_orders: restaurantConfig.subscription.features.whatsapp_orders ?? false,
   } : {
     ordering: false,
     videoUpload: false,
@@ -258,6 +270,12 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
     coupons: false,
     games: false,
     tableBooking: false,
+    events: false,
+    offers: false,
+    experience_lounge: false,
+    marketing_studio: false,
+    google_growth: false,
+    whatsapp_orders: false,
   }
 
   const billingInfo = restaurantConfig?.subscription ? {

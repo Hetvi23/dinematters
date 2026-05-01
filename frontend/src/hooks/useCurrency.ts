@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useFrappeGetDoc } from '@/lib/frappe'
+import { useFrappeGetDoc, useFrappeGetCall } from '@/lib/frappe'
 import { useRestaurant } from '@/contexts/RestaurantContext'
 
 const FALLBACK_SYMBOLS: Record<string, string> = {
@@ -36,18 +36,22 @@ export function useCurrency() {
 
   const currencyCode = pricing?.currency || configData?.currency || restaurantData?.currency || 'INR'
 
-  // Fetch Currency doctype only when not using pricing from context
-  const { data: currencyDoc } = useFrappeGetDoc('Currency', currencyCode, {
+  // Fetch Currency info via whitelisted method to bypass DocType permissions
+  const { data: currencyResponse } = useFrappeGetCall('dinematters.dinematters.api.config.get_currency_info', {
+    currency_code: currencyCode
+  }, {
+    revalidateOnFocus: false,
     enabled: !!currencyCode && !pricing?.symbol
   })
+  const currencyInfo = currencyResponse?.message?.data
 
   const currencySymbol = useMemo(() => {
     if (pricing?.symbol) return pricing.symbol
-    if (currencyDoc?.symbol) return currencyDoc.symbol
+    if (currencyInfo?.symbol) return currencyInfo.symbol
     return FALLBACK_SYMBOLS[currencyCode] || currencyCode
-  }, [pricing?.symbol, currencyDoc?.symbol, currencyCode])
+  }, [pricing?.symbol, currencyInfo?.symbol, currencyCode])
 
-  const symbolOnRight = pricing?.symbolOnRight ?? currencyDoc?.symbol_on_right ?? false
+  const symbolOnRight = pricing?.symbolOnRight ?? currencyInfo?.symbolOnRight ?? false
   
   return {
     currency: currencyCode,

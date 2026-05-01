@@ -182,7 +182,7 @@ def unlock_whatsapp_lead(restaurant_id: str, customer_phone: str, order_id=None)
         plan_type = frappe.db.get_value("Restaurant", restaurant_id, "plan_type")
 
         # DIAMOND gets lead unlocks for free.
-        # PRO (GOLD) pays 1 coin per unlock.
+        # GOLD pays 1 coin per unlock.
         if plan_type == "DIAMOND":
             amount_to_deduct = 0
         else:

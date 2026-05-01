@@ -12,8 +12,7 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogFooter,
-  DialogDescription
+  DialogFooter
 } from '@/components/ui/dialog'
 import {
   AlertDialog,
@@ -35,11 +34,15 @@ import { DataPagination } from '@/components/ui/DataPagination'
 import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DatePicker } from '@/components/ui/date-picker'
-import { TimeInput } from '@/components/ui/time-input'
+import { TimePicker } from '@/components/ui/time-picker'
 import { Textarea } from '@/components/ui/textarea'
+import { uploadToR2 } from '@/lib/r2Upload'
+import { Upload, X } from 'lucide-react'
+
+
 
 export default function Events() {
-  const { selectedRestaurant, isDiamond } = useRestaurant()
+  const { selectedRestaurant, isGold, isDiamond } = useRestaurant()
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editingEvent, setEditingEvent] = useState<any>(null)
   const [filterType, setFilterType] = useState<string>('all')
@@ -71,8 +74,8 @@ export default function Events() {
     searchQuery,
     setSearchQuery
   } = useDataTable({
-    doctype: 'Restaurant Event',
-    fields: ['name', 'title', 'description', 'event_type', 'is_active', 'start_date', 'end_date', 'start_time', 'end_time', 'location', 'image', 'is_recurring', 'recurring_days', 'restaurant'],
+    doctype: 'Event',
+    fields: ['name', 'title', 'description', 'category', 'is_active', 'date', 'time', 'location', 'image_src', 'repeat_this_event', 'repeat_till', 'google_maps_link', 'registration_link', 'featured', 'display_order', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
     initialFilters,
     orderBy: { field: 'creation', order: 'desc' },
     initialPageSize: 12,
@@ -83,12 +86,29 @@ export default function Events() {
   const { updateDoc: updateEvent } = useFrappeUpdateDoc()
   const { deleteDoc: deleteEvent } = useFrappeDeleteDoc()
 
+  const mapFormDataToBackend = (formData: any) => {
+    const days = formData.recurring_days ? formData.recurring_days.split(',') : []
+    return {
+      ...formData,
+      repeat_this_event: formData.repeat_this_event ? 1 : 0,
+      repeat_on: formData.repeat_this_event ? 'Weekly' : '',
+      monday: days.includes('Mon') ? 1 : 0,
+      tuesday: days.includes('Tue') ? 1 : 0,
+      wednesday: days.includes('Wed') ? 1 : 0,
+      thursday: days.includes('Thu') ? 1 : 0,
+      friday: days.includes('Fri') ? 1 : 0,
+      saturday: days.includes('Sat') ? 1 : 0,
+      sunday: days.includes('Sun') ? 1 : 0,
+    }
+  }
+
   const handleCreateEvent = async (formData: any) => {
+    const mappedData = mapFormDataToBackend(formData)
     try {
       await createEvent({
         doc: {
-          doctype: 'Restaurant Event',
-          ...formData,
+          doctype: 'Event',
+          ...mappedData,
           restaurant: selectedRestaurant,
         }
       })
@@ -101,8 +121,9 @@ export default function Events() {
   }
 
   const handleUpdateEvent = async (name: string, formData: any) => {
+    const mappedData = mapFormDataToBackend(formData)
     try {
-      await updateEvent('Restaurant Event', name, formData)
+      await updateEvent('Event', name, mappedData)
       toast.success('Event details updated')
       mutate()
       setEditingEvent(null)
@@ -114,7 +135,7 @@ export default function Events() {
   const handleDeleteEvent = async () => {
     if (!eventToDelete) return
     try {
-      await deleteEvent('Restaurant Event', eventToDelete.name)
+      await deleteEvent('Event', eventToDelete.name)
       toast.success('Event eradicated')
       mutate()
       setDeleteDialogOpen(false)
@@ -143,8 +164,8 @@ export default function Events() {
     )
   }
 
-  if (!isDiamond) {
-    return <LockedFeature feature="events" requiredPlan={['DIAMOND']} />
+  if (!isGold && !isDiamond) {
+    return <LockedFeature feature="events" requiredPlan={['GOLD']} />
   }
 
   return (
@@ -219,10 +240,10 @@ export default function Events() {
                     {events.map((event: any) => (
                       <TableRow key={event.name}>
                         <TableCell className="font-bold">{event.title}</TableCell>
-                        <TableCell className="capitalize">{event.event_type || 'Standard'}</TableCell>
+                        <TableCell className="capitalize">{event.category || 'Standard'}</TableCell>
                         <TableCell>
-                          {new Date(event.start_date).toLocaleDateString()}
-                          {event.is_recurring && <Badge variant="secondary" className="ml-2 text-[10px]">Recurring</Badge>}
+                          {new Date(event.date).toLocaleDateString()}
+                          {event.repeat_this_event ? <Badge variant="secondary" className="ml-2 text-[10px]">Recurring</Badge> : null}
                         </TableCell>
                         <TableCell>
                           {event.is_active ? (
@@ -270,20 +291,17 @@ export default function Events() {
         </CardContent>
       </Card>
 
-      <EventDialog
-        open={isCreateDialogOpen || !!editingEvent}
-        onClose={() => {
-          setIsCreateDialogOpen(false)
-          setEditingEvent(null)
-        }}
-        event={editingEvent}
-        onSave={(data: any) => {
-          if (editingEvent) {
-            handleUpdateEvent(editingEvent.name, data)
-          } else {
-            handleCreateEvent(data)
-          }
-        }}
+      <EventDialog 
+        open={isCreateDialogOpen} 
+        onClose={() => setIsCreateDialogOpen(false)} 
+        onSave={handleCreateEvent} 
+      />
+      
+      <EventDialog 
+        open={!!editingEvent} 
+        onClose={() => setEditingEvent(null)} 
+        event={editingEvent} 
+        onSave={(data: any) => handleUpdateEvent(editingEvent.name, data)} 
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -316,51 +334,75 @@ export default function Events() {
 }
 
 function EventDialog({ open, onClose, event, onSave }: any) {
+  const { selectedRestaurant } = useRestaurant()
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    event_type: 'Live Music',
+    category: '',
     is_active: true,
-    start_date: '',
-    end_date: '',
-    start_time: '19:00:00',
+    date: '',
+    repeat_till: '',
+    time: '19:00:00',
     end_time: '23:00:00',
     location: '',
-    image: '',
-    is_recurring: false,
+    image_src: '',
+    repeat_this_event: false,
     recurring_days: '',
+    google_maps_link: '',
+    registration_link: '',
+    featured: false,
+    display_order: 0,
   })
+  const [isUploading, setIsUploading] = useState(false)
 
   useEffect(() => {
     if (event) {
+      // Map backend individual day flags back to the dashboard's comma-separated string for UI
+      const days = []
+      if (event.monday) days.push('Mon')
+      if (event.tuesday) days.push('Tue')
+      if (event.wednesday) days.push('Wed')
+      if (event.thursday) days.push('Thu')
+      if (event.friday) days.push('Fri')
+      if (event.saturday) days.push('Sat')
+      if (event.sunday) days.push('Sun')
+
       setFormData({
         title: event.title || '',
         description: event.description || '',
-        event_type: event.event_type || 'Live Music',
+        category: event.category || '',
         is_active: event.is_active ?? true,
-        start_date: event.start_date || '',
-        end_date: event.end_date || '',
-        start_time: event.start_time || '19:00:00',
+        date: event.date || '',
+        repeat_till: event.repeat_till || '',
+        time: event.time || '19:00:00',
         end_time: event.end_time || '23:00:00',
         location: event.location || '',
-        image: event.image || '',
-        is_recurring: event.is_recurring ?? false,
-        recurring_days: event.recurring_days || '',
+        image_src: event.image_src || '',
+        repeat_this_event: !!event.repeat_this_event,
+        recurring_days: days.join(','),
+        google_maps_link: event.google_maps_link || '',
+        registration_link: event.registration_link || '',
+        featured: !!event.featured,
+        display_order: event.display_order || 0,
       })
     } else {
       setFormData({
         title: '',
         description: '',
-        event_type: 'Live Music',
+        category: '',
         is_active: true,
-        start_date: '',
-        end_date: '',
-        start_time: '19:00:00',
+        date: '',
+        repeat_till: '',
+        time: '19:00:00',
         end_time: '23:00:00',
         location: '',
-        image: '',
-        is_recurring: false,
+        image_src: '',
+        repeat_this_event: false,
         recurring_days: '',
+        google_maps_link: '',
+        registration_link: '',
+        featured: false,
+        display_order: 0,
       })
     }
   }, [event, open])
@@ -368,6 +410,28 @@ function EventDialog({ open, onClose, event, onSave }: any) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     onSave(formData)
+  }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !selectedRestaurant) return
+
+    setIsUploading(true)
+    try {
+      const result = await uploadToR2({
+        ownerDoctype: 'Restaurant',
+        ownerName: selectedRestaurant,
+        mediaRole: 'event_image',
+        file,
+      })
+      setFormData({ ...formData, image_src: result.primary_url || '' })
+      toast.success('Image uploaded successfully')
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to upload image')
+    } finally {
+      setIsUploading(false)
+      if (e.target) e.target.value = ''
+    }
   }
 
   const toggleDay = (day: string) => {
@@ -407,20 +471,13 @@ function EventDialog({ open, onClose, event, onSave }: any) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="event_type">Category</Label>
-              <Select 
-                value={formData.event_type} 
-                onValueChange={(val) => setFormData({ ...formData, event_type: val })}
-              >
-                <SelectTrigger id="event_type">
-                  <SelectValue placeholder="Select Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {['Live Music', 'Happy Hour', 'Workshop', 'Pop-up Kitchen', 'Themed Night', 'Private Event'].map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="category">Category</Label>
+              <Input 
+                id="category" 
+                value={formData.category} 
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                placeholder="e.g. Live Music, Brunch..."
+              />
             </div>
 
             <div className="space-y-2">
@@ -440,35 +497,33 @@ function EventDialog({ open, onClose, event, onSave }: any) {
             </div>
 
             <div className="space-y-2">
-              <DatePicker
-                label="Start Date"
-                value={formData.start_date}
-                onChange={(val) => setFormData({ ...formData, start_date: val })}
-                placeholder="Select Event Date"
+              <Label htmlFor="date">Start Date</Label>
+              <DatePicker 
+                value={formData.date} 
+                onChange={(val) => setFormData({ ...formData, date: val })}
               />
             </div>
 
             <div className="space-y-2">
-              <DatePicker
-                label="End Date (Optional)"
-                value={formData.end_date}
-                onChange={(val) => setFormData({ ...formData, end_date: val })}
-                placeholder="Select End Date"
+              <Label htmlFor="repeat_till">End Date (Optional)</Label>
+              <DatePicker 
+                value={formData.repeat_till} 
+                onChange={(val) => setFormData({ ...formData, repeat_till: val })}
               />
             </div>
 
             <div className="space-y-2">
-              <TimeInput
-                label="Start Time"
-                value={formData.start_time}
-                onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+              <Label htmlFor="time">Start Time</Label>
+              <TimePicker 
+                value={formData.time} 
+                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
               />
             </div>
 
             <div className="space-y-2">
-              <TimeInput
-                label="End Time"
-                value={formData.end_time}
+              <Label htmlFor="end_time">End Time</Label>
+              <TimePicker 
+                value={formData.end_time} 
                 onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
               />
             </div>
@@ -483,16 +538,94 @@ function EventDialog({ open, onClose, event, onSave }: any) {
               />
             </div>
 
-            <div className="space-y-2 col-span-2">
-              <Label>Event Image (URL)</Label>
+            <div className="space-y-2">
+              <Label htmlFor="google_maps_link">Google Maps URL</Label>
               <Input 
-                value={formData.image} 
-                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                placeholder="https://example.com/image.jpg"
+                id="google_maps_link" 
+                value={formData.google_maps_link} 
+                onChange={(e) => setFormData({ ...formData, google_maps_link: e.target.value })}
+                placeholder="https://maps.google.com/..."
               />
-              {formData.image && (
-                <div className="mt-2 relative h-32 w-48 rounded-lg overflow-hidden border">
-                  <img src={formData.image} alt="Preview" className="h-full w-full object-cover" />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="registration_link">Registration Link (Optional)</Label>
+              <Input 
+                id="registration_link" 
+                value={formData.registration_link} 
+                onChange={(e) => setFormData({ ...formData, registration_link: e.target.value })}
+                placeholder="https://eventbrite.com/..."
+              />
+            </div>
+
+            <div className="flex items-center gap-4 pt-2 col-span-2">
+              <div className="flex items-center space-x-2">
+                <Switch 
+                  id="featured" 
+                  checked={formData.featured}
+                  onCheckedChange={(val) => setFormData({ ...formData, featured: val })}
+                />
+                <Label htmlFor="featured">Featured Event</Label>
+              </div>
+              
+              <div className="flex items-center space-x-2 ml-auto">
+                <Label htmlFor="display_order">Display Order</Label>
+                <Input 
+                  id="display_order" 
+                  type="number"
+                  className="w-20"
+                  value={formData.display_order}
+                  onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2 col-span-2">
+              <Label>Event Image</Label>
+              {formData.image_src ? (
+                <div className="relative group rounded-xl overflow-hidden aspect-video border bg-muted">
+                  <img src={formData.image_src} alt="Preview" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <Button 
+                      type="button" 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={() => setFormData({ ...formData, image_src: '' })}
+                      className="rounded-full h-8 w-8 p-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative">
+                  <input
+                    type="file"
+                    id="event-image-upload"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={isUploading}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="event-image-upload"
+                    className={cn(
+                      "flex flex-col items-center justify-center gap-3 py-10 border-2 border-dashed rounded-xl cursor-pointer transition-all hover:bg-accent hover:border-primary/50",
+                      isUploading && "opacity-50 pointer-events-none"
+                    )}
+                  >
+                    <div className="p-3 bg-primary/10 rounded-full">
+                      {isUploading ? (
+                        <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full" />
+                      ) : (
+                        <Upload className="h-5 w-5 text-primary" />
+                      )}
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-semibold">{isUploading ? 'Uploading Image...' : 'Upload Event Image'}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Recommended size: 1200x675 (16:9)</p>
+                    </div>
+                  </label>
                 </div>
               )}
             </div>
@@ -500,18 +633,18 @@ function EventDialog({ open, onClose, event, onSave }: any) {
 
           {/* Recurring Section */}
           <div className="space-y-4 border-t pt-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between col-span-2 pt-2">
               <div className="space-y-0.5">
-                <Label className="text-base font-semibold">Recurring Event</Label>
-                <p className="text-sm text-muted-foreground">Set if this event repeats automatically</p>
+                <Label>Recurring Event</Label>
+                <p className="text-[10px] text-muted-foreground">Repeat this event weekly</p>
               </div>
               <Switch 
-                checked={formData.is_recurring} 
-                onCheckedChange={(val) => setFormData({ ...formData, is_recurring: val })}
+                checked={formData.repeat_this_event}
+                onCheckedChange={(val) => setFormData({ ...formData, repeat_this_event: val })}
               />
             </div>
 
-            {formData.is_recurring && (
+            {formData.repeat_this_event && (
               <div className="animate-in fade-in slide-in-from-top-2 duration-300 space-y-4">
                 <div className="space-y-2">
                   <Label>Days of the week</Label>

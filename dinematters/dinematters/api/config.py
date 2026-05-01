@@ -11,9 +11,22 @@ from frappe import _
 from frappe.utils import get_url, flt, cint
 from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_api, get_restaurant_context
 from dinematters.dinematters.media.utils import get_media_asset_data, get_media_assets_batch
-from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info
+from dinematters.dinematters.utils.currency_helpers import get_restaurant_currency_info, get_currency_symbol
 from dinematters.dinematters.utils.roles import is_supervisor
 import json
+
+
+@frappe.whitelist(allow_guest=True)
+def get_currency_info(currency_code):
+	"""
+	GET /api/method/dinematters.dinematters.api.config.get_currency_info
+	Get currency symbol and positioning for a given currency code.
+	Bypasses direct DocType permissions for 'Currency' which are often restricted.
+	"""
+	return {
+		"success": True,
+		"data": get_currency_symbol(currency_code)
+	}
 
 
 def _get_user_role_for_restaurant(user, restaurant):
@@ -291,6 +304,12 @@ def get_restaurant_config(restaurant_id):
 					"coupons": restaurant_doc.plan_type == "DIAMOND",
 					"games": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
 					"tableBooking": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
+					"events": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
+					"offers": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
+					"experience_lounge": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
+					"google_growth": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
+					"whatsapp_orders": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
+					"marketing_studio": restaurant_doc.plan_type == "DIAMOND",
 					# Digital/Branding (GOLD and DIAMOND)
 					"videoUpload": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
 					"analytics": restaurant_doc.plan_type in ["GOLD", "DIAMOND"],
