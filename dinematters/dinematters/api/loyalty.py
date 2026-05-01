@@ -311,11 +311,11 @@ def credit_loyalty_points(customer, restaurant, coins, reason, ref_doctype=None,
 	else:
 		return redeem_loyalty_coins(customer, restaurant, coins, reason, ref_doctype, ref_name)
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_loyalty_config(restaurant_id):
 	"""Get loyalty configurations for admin"""
 	try:
-		restaurant = validate_restaurant_for_api(restaurant_id)
+		restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user)
 		if not frappe.db.exists("Restaurant Loyalty Config", {"restaurant": restaurant}):
 			return {"success": True, "data": None}
 			
@@ -362,6 +362,7 @@ def update_loyalty_config(restaurant_id, config, enable_loyalty=None):
 	except Exception as e:
 		frappe.log_error("Loyalty Save Error", frappe.get_traceback())
 		return {"success": False, "error": str(e)}
+
 @frappe.whitelist()
 @require_plan('DIAMOND')
 def get_customer_insights(restaurant_id, search_query=None):

@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 from dinematters.dinematters.utils.razorpay_utils import get_razorpay_client
+from dinematters.dinematters.utils.roles import GLOBAL_ADMIN_ROLES, SUPERVISOR_ROLES
 
 @frappe.whitelist()
 def check_admin_access():
@@ -10,8 +11,13 @@ def check_admin_access():
     """
     try:
         # Check if user is System Manager or has specific role
-        # Allow System Managers and specific admin roles
-        has_admin_access = frappe.session.user == 'Administrator' or "System Manager" in frappe.get_roles() or "Administrator" in frappe.get_roles() or "Dinematters Admin" in frappe.get_roles()
+        # Allow System Managers, Administrators, and Supervisors
+        user_roles = frappe.get_roles()
+        has_admin_access = (
+            frappe.session.user == 'Administrator' or 
+            any(role in GLOBAL_ADMIN_ROLES or role in SUPERVISOR_ROLES for role in user_roles) or
+            "Dinematters Admin" in user_roles
+        )
         
         return {
             'success': True,

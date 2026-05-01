@@ -7,6 +7,7 @@
 import frappe
 from frappe import _
 from dinematters.dinematters.utils.permissions import validate_restaurant_access
+from dinematters.dinematters.utils.roles import GLOBAL_ADMIN_ROLES, SUPERVISOR_ROLES
 from dinematters.dinematters.doctype.restaurant_user.restaurant_user import get_staff_seat_limit
 
 
@@ -17,7 +18,12 @@ from dinematters.dinematters.doctype.restaurant_user.restaurant_user import get_
 def _assert_admin(restaurant_id):
 	"""Throw if the current user is NOT a Restaurant Admin for this restaurant."""
 	user = frappe.session.user
-	if user == "Administrator" or "System Manager" in frappe.get_roles(user) or "Restaurant Admin" in frappe.get_roles(user):
+	user_roles = frappe.get_roles(user)
+	if (
+		user == "Administrator" or 
+		any(role in GLOBAL_ADMIN_ROLES or role in SUPERVISOR_ROLES for role in user_roles) or
+		"Restaurant Admin" in user_roles
+	):
 		return
 
 	role = frappe.db.get_value(

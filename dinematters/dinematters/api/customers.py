@@ -10,6 +10,7 @@ from dinematters.dinematters.utils.api_helpers import validate_restaurant_for_ap
 from dinematters.dinematters.utils.permission_helpers import get_user_restaurant_ids
 from dinematters.dinematters.utils.customer_helpers import normalize_phone
 from dinematters.dinematters.utils.feature_gate import require_plan
+from dinematters.dinematters.utils.roles import is_supervisor, is_global_admin
 
 @frappe.whitelist(allow_guest=True)
 @require_plan('DIAMOND')
@@ -34,7 +35,7 @@ def get_customer_by_phone(phone, restaurant_id):
 		if frappe.session.user != "Guest":
 			restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user)
 			restaurant_ids = get_user_restaurant_ids(frappe.session.user)
-			if "System Manager" in frappe.get_roles() or restaurant in restaurant_ids:
+			if is_supervisor() or restaurant in restaurant_ids:
 				is_authorized = True
 		
 		# If Guest, check X-Customer-Token
@@ -157,9 +158,9 @@ def normalize_order_phone_on_save(doc, event=None):
 def get_customer_profile(customer_id, restaurant_id=None):
 	"""
 	Admin: Get customer profile. If restaurant_id is provided, limit to that restaurant.
-	System Manager only.
+	System Manager or Supervisor only.
 	"""
-	if "System Manager" not in frappe.get_roles():
+	if not is_supervisor():
 		return {"success": False, "error": "Permission denied"}
 
 	try:
@@ -262,7 +263,7 @@ def get_restaurant_customers(restaurant_id, search=None, page=1, page_size=20):
 	try:
 		restaurant = validate_restaurant_for_api(restaurant_id, frappe.session.user)
 		restaurant_ids = get_user_restaurant_ids(frappe.session.user)
-		if "System Manager" not in frappe.get_roles() and restaurant not in restaurant_ids:
+		if not is_supervisor() and restaurant not in restaurant_ids:
 			return {"success": False, "error": "Permission denied"}
 
 		page = max(1, int(page))
@@ -388,7 +389,7 @@ def get_restaurant_customers(restaurant_id, search=None, page=1, page_size=20):
 				"banquetBookings": banquet_bookings
 			})
 
-		is_admin = "System Manager" in frappe.get_roles()
+		is_admin = is_supervisor()
 		
 		return {"success": True, "data": {"customers": final_customers, "isAdmin": is_admin, "totalCount": total_count}}
 	except Exception as e:

@@ -10,6 +10,7 @@ from frappe import _
 from .config import get_allowed_mime_types, get_max_upload_size
 from .storage import generate_object_key, generate_signed_upload_url, verify_object_exists
 from .utils import get_allowed_roles, get_actual_media_role
+from dinematters.dinematters.utils.roles import GLOBAL_ADMIN_ROLES, SUPERVISOR_ROLES
 import os
 
 
@@ -345,8 +346,9 @@ def get_restaurant_from_owner(owner_doctype, owner_name):
 
 def validate_restaurant_access(restaurant):
 	"""Validate that current user has access to restaurant"""
-	# System Manager has access to all
-	if "System Manager" in frappe.get_roles():
+	user_roles = frappe.get_roles()
+	# System Manager, Administrator, and Supervisors have access to all
+	if any(role in GLOBAL_ADMIN_ROLES or role in SUPERVISOR_ROLES for role in user_roles):
 		return True
 	
 	# Check if user is restaurant manager or has restaurant user role
