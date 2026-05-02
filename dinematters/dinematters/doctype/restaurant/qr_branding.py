@@ -10,6 +10,8 @@ from io import BytesIO
 
 import frappe
 from frappe.utils import get_url
+from frappe import _
+from dinematters.dinematters.utils.common import safe_log_error, resolve_and_fetch_media
 
 
 def normalize_qr_color(color):
@@ -136,71 +138,43 @@ def read_logo_bytes(logo_url):
 
 	try:
 		from PIL import Image
-		from dinematters.dinematters.media.storage import download_object
-		from dinematters.dinematters.media.config import get_cdn_config
 		
-		# Handle CDN URLs by downloading from R2
-		cdn_config = get_cdn_config()
-		cdn_base = cdn_config["base_url"]
-		if logo_url.startswith(cdn_base):
-			# Extract object key from CDN URL
-			object_key = logo_url[len(cdn_base):].lstrip('/')
-			# Download from R2 to temp file
-			with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as temp_file:
-				temp_path = temp_file.name
-			try:
-				download_object(object_key, temp_path)
-				# Check if it's an SVG file
-				if object_key.endswith('.svg') or temp_path.endswith('.svg'):
-					return convert_svg_to_png(temp_path)
+		# Handle local file paths
+		if logo_url.startswith("/"):
+			if os.path.exists(logo_url):
+				if logo_url.endswith('.svg'):
+					return convert_svg_to_png(logo_url)
 				else:
-					with Image.open(temp_path) as img:
+					with Image.open(logo_url) as img:
 						img = img.convert("RGBA")
 						img.thumbnail((320, 320), Image.Resampling.LANCZOS)
 						buffer = BytesIO()
 						img.save(buffer, format="PNG")
 						return buffer.getvalue()
+			else:
+				logo_url = get_url(logo_url)
+
+		# Use unified media fetcher (handles CDN/R2 and HTTP with User-Agent)
+		content = resolve_and_fetch_media(logo_url)
+		
+		if logo_url.endswith('.svg') or b'<svg' in content[:100]:
+			with tempfile.NamedTemporaryFile(delete=False, suffix='.svg') as temp_file:
+				temp_file.write(content)
+				temp_path = temp_file.name
+			try:
+				return convert_svg_to_png(temp_path)
 			finally:
 				if os.path.exists(temp_path):
 					os.remove(temp_path)
-		
-		# Handle local file paths
-		resolved_url = logo_url
-		if resolved_url.startswith("/"):
-			if os.path.exists(resolved_url):
-				if resolved_url.endswith('.svg'):
-					return convert_svg_to_png(resolved_url)
-				else:
-					with Image.open(resolved_url) as img:
-						img = img.convert("RGBA")
-						img.thumbnail((320, 320), Image.Resampling.LANCZOS)
-						buffer = BytesIO()
-						img.save(buffer, format="PNG")
-						return buffer.getvalue()
-			else:
-				resolved_url = get_url(resolved_url)
-
-		# Handle HTTP URLs (for localhost or other accessible URLs)
-		with urllib.request.urlopen(resolved_url, timeout=10) as response:
-			content = response.read()
-			if resolved_url.endswith('.svg') or b'<svg' in content[:100]:
-				with tempfile.NamedTemporaryFile(delete=False, suffix='.svg') as temp_file:
-					temp_file.write(content)
-					temp_path = temp_file.name
-				try:
-					return convert_svg_to_png(temp_path)
-				finally:
-					if os.path.exists(temp_path):
-						os.remove(temp_path)
-			else:
-				with Image.open(BytesIO(content)) as img:
-					img = img.convert("RGBA")
-					img.thumbnail((320, 320), Image.Resampling.LANCZOS)
-					buffer = BytesIO()
-					img.save(buffer, format="PNG")
-					return buffer.getvalue()
+		else:
+			with Image.open(BytesIO(content)) as img:
+				img = img.convert("RGBA")
+				img.thumbnail((320, 320), Image.Resampling.LANCZOS)
+				buffer = BytesIO()
+				img.save(buffer, format="PNG")
+				return buffer.getvalue()
 	except Exception as e:
-		frappe.log_error(f"Error reading logo {logo_url}: {e}", "QR Logo Read Error")
+		safe_log_error("QR Logo Error", f"Error reading logo {logo_url}: {e}")
 		return None
 
 
@@ -254,46 +228,19 @@ def read_background_image_bytes(image_url, size=(940, 980)):
 					img.save(buffer, format="JPEG", quality=75, optimize=True)
 					return buffer.getvalue()
 			else:
-				image_url = get_url(image_url) if image_url.startswith("/") else image_url
-		
-		# For non-local files, try CDN/HTTP handling
-		try:
-			from dinematters.dinematters.media.storage import download_object
-			from dinematters.dinematters.media.config import get_cdn_config
-			
-			cdn_config = get_cdn_config()
-			cdn_base = cdn_config["base_url"]
-			if image_url.startswith(cdn_base):
-				object_key = image_url[len(cdn_base):].lstrip('/')
-				with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as temp_file:
-					temp_path = temp_file.name
-				try:
-					download_object(object_key, temp_path)
-					with Image.open(temp_path) as img:
-						img = img.convert("RGB")
-						img = ImageOps.fit(img, size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.78))
-						img = ImageEnhance.Brightness(img).enhance(0.75)
-						buffer = BytesIO()
-						img.save(buffer, format="JPEG", quality=75, optimize=True)
-						return buffer.getvalue()
-				finally:
-					if os.path.exists(temp_path):
-						os.remove(temp_path)
-		except Exception:
-			pass
-		
-		# Handle HTTP URLs
-		resolved_url = get_url(image_url) if image_url.startswith("/") else image_url
-		with urllib.request.urlopen(resolved_url, timeout=10) as response:
-			with Image.open(BytesIO(response.read())) as img:
-				img = img.convert("RGB")
-				img = ImageOps.fit(img, size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.78))
-				img = ImageEnhance.Brightness(img).enhance(0.75)
-				buffer = BytesIO()
-				img.save(buffer, format="JPEG", quality=75, optimize=True)
-				return buffer.getvalue()
+				image_url = get_url(image_url)
+
+		# Use unified media fetcher
+		content = resolve_and_fetch_media(image_url)
+		with Image.open(BytesIO(content)) as img:
+			img = img.convert("RGB")
+			img = ImageOps.fit(img, size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.78))
+			img = ImageEnhance.Brightness(img).enhance(0.75)
+			buffer = BytesIO()
+			img.save(buffer, format="JPEG", quality=75, optimize=True)
+			return buffer.getvalue()
 	except Exception as e:
-		frappe.log_error(f"Error reading image {image_url}: {e}", "QR Background Image Error")
+		safe_log_error("QR Background Error", f"Error reading background image {image_url}: {e}")
 		return None
 
 

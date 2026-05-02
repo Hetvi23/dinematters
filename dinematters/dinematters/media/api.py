@@ -11,6 +11,7 @@ from .config import get_allowed_mime_types, get_max_upload_size
 from .storage import generate_object_key, generate_signed_upload_url, verify_object_exists
 from .utils import get_allowed_roles, get_actual_media_role
 from dinematters.dinematters.utils.roles import GLOBAL_ADMIN_ROLES, SUPERVISOR_ROLES
+from dinematters.dinematters.utils.common import safe_log_error
 import os
 
 
@@ -99,7 +100,7 @@ def request_upload_session(owner_doctype, owner_name, media_role, filename, cont
 		upload_session.insert(ignore_permissions=True)
 	except Exception as e:
 		# Upload session is optional, log but don't fail
-		frappe.log_error(f"Failed to create upload session: {str(e)}", "Upload Session Creation")
+		safe_log_error("Upload Session Creation", str(e))
 	
 	return {
 		"upload_id": media_id,
