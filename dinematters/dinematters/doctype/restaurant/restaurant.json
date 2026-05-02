@@ -80,6 +80,8 @@
   "coins_balance",
   "auto_recharge_enabled",
   "enable_floor_recovery",
+  "floor_recovery_activated_on",
+  "last_floor_recovery_date",
   "column_break_coins",
   "auto_recharge_threshold",
   "auto_recharge_amount",
@@ -630,6 +632,18 @@
    "hidden": 1,
    "label": "Enable Daily Floor Recovery",
    "description": "If disabled, this restaurant will NOT be charged the daily floor/minimum recovery fee."
+  },
+  {
+   "fieldname": "floor_recovery_activated_on",
+   "fieldtype": "Date",
+   "label": "Floor Recovery Activated On",
+   "description": "The date when floor recovery was first enabled for this restaurant."
+  },
+  {
+   "fieldname": "last_floor_recovery_date",
+   "fieldtype": "Date",
+   "label": "Last Floor Recovery Date",
+   "description": "The date of the last monthly floor check/deduction."
   },
   {
    "fieldname": "column_break_coins",

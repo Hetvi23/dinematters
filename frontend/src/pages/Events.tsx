@@ -7,11 +7,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogFooter
 } from '@/components/ui/dialog'
 import {
@@ -52,13 +52,13 @@ export default function Events() {
   const initialFilters = useMemo(() => {
     if (!selectedRestaurant) return []
     const f: any[] = [['restaurant', '=', selectedRestaurant]]
-    
+
     if (filterType === 'active') {
       f.push(['is_active', '=', 1])
     } else if (filterType === 'inactive') {
       f.push(['is_active', '=', 0])
     }
-    
+
     return f
   }, [selectedRestaurant, filterType])
 
@@ -156,7 +156,7 @@ export default function Events() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8">
         <div className="h-20 w-20 bg-muted rounded-full flex items-center justify-center mb-4">
-           <Calendar className="h-10 w-10 text-muted-foreground/30" />
+          <Calendar className="h-10 w-10 text-muted-foreground/30" />
         </div>
         <h3 className="text-xl font-semibold mb-2">Select a Restaurant</h3>
         <p className="text-muted-foreground max-w-sm">Pick a restaurant to start managing floor events and special occasions.</p>
@@ -175,7 +175,7 @@ export default function Events() {
           <h2 className="text-2xl font-bold tracking-tight">Event Horizon</h2>
           <p className="text-muted-foreground text-sm flex items-center gap-2">
             <Zap className="h-3.5 w-3.5" />
-            Programmatic floor events and recurring schedule management
+            Manage your Events here
           </p>
         </div>
         <Button onClick={() => setIsCreateDialogOpen(true)} className="rounded-xl h-11 px-6 shadow-lg shadow-primary/20 bg-black text-white hover:bg-black/90">
@@ -254,21 +254,21 @@ export default function Events() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               onClick={() => setEditingEvent(event)}
                               className="h-8 w-8"
                             >
-                               <Edit className="h-4 w-4" />
+                              <Edit className="h-4 w-4" />
                             </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               className="h-8 w-8 text-destructive"
                               onClick={(e) => openDeleteDialog(event.name, event.title, e)}
                             >
-                               <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>
@@ -291,32 +291,32 @@ export default function Events() {
         </CardContent>
       </Card>
 
-      <EventDialog 
-        open={isCreateDialogOpen} 
-        onClose={() => setIsCreateDialogOpen(false)} 
-        onSave={handleCreateEvent} 
+      <EventDialog
+        open={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        onSave={handleCreateEvent}
       />
-      
-      <EventDialog 
-        open={!!editingEvent} 
-        onClose={() => setEditingEvent(null)} 
-        event={editingEvent} 
-        onSave={(data: any) => handleUpdateEvent(editingEvent.name, data)} 
+
+      <EventDialog
+        open={!!editingEvent}
+        onClose={() => setEditingEvent(null)}
+        event={editingEvent}
+        onSave={(data: any) => handleUpdateEvent(editingEvent.name, data)}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="rounded-3xl border-none shadow-2xl p-0 overflow-hidden">
           <div className="p-8 pb-0">
-             <AlertDialogHeader className="space-y-3">
-               <div className="h-14 w-14 bg-red-100 rounded-2xl flex items-center justify-center mb-2">
-                 <AlertCircle className="h-8 w-8 text-red-600" />
-               </div>
-               <AlertDialogTitle className="text-2xl font-black tracking-tight text-red-600 uppercase italic">Terminate Stream?</AlertDialogTitle>
-               <AlertDialogDescription className="text-base font-semibold leading-relaxed">
-                 You are about to permanently purge <strong>{eventToDelete?.title}</strong> from the global shard cluster. 
-                 This action is irreversible and will deactivate associated floor controls.
-               </AlertDialogDescription>
-             </AlertDialogHeader>
+            <AlertDialogHeader className="space-y-3">
+              <div className="h-14 w-14 bg-red-100 rounded-2xl flex items-center justify-center mb-2">
+                <AlertCircle className="h-8 w-8 text-red-600" />
+              </div>
+              <AlertDialogTitle className="text-2xl font-black tracking-tight text-red-600 uppercase italic">Terminate Stream?</AlertDialogTitle>
+              <AlertDialogDescription className="text-base font-semibold leading-relaxed">
+                You are about to permanently purge <strong>{eventToDelete?.title}</strong> from the global shard cluster.
+                This action is irreversible and will deactivate associated floor controls.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
           </div>
           <AlertDialogFooter className="p-6 bg-muted/20 mt-4 flex justify-between sm:justify-start gap-4">
             <AlertDialogCancel onClick={() => setEventToDelete(null)} className="flex-1 rounded-xl h-11 font-black uppercase text-xs border-none shadow-none bg-card">Abort Command</AlertDialogCancel>
@@ -450,9 +450,9 @@ function EventDialog({ open, onClose, event, onSave }: any) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2 col-span-2">
               <Label htmlFor="title">Event Title</Label>
-              <Input 
-                id="title" 
-                value={formData.title} 
+              <Input
+                id="title"
+                value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 placeholder="Saturday Night Party"
                 required
@@ -461,9 +461,9 @@ function EventDialog({ open, onClose, event, onSave }: any) {
 
             <div className="space-y-2 col-span-2">
               <Label htmlFor="description">Description</Label>
-              <Textarea 
-                id="description" 
-                value={formData.description} 
+              <Textarea
+                id="description"
+                value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Describe the event details, activities, etc."
                 className="min-h-[100px]"
@@ -472,9 +472,9 @@ function EventDialog({ open, onClose, event, onSave }: any) {
 
             <div className="space-y-2">
               <Label htmlFor="category">Category</Label>
-              <Input 
-                id="category" 
-                value={formData.category} 
+              <Input
+                id="category"
+                value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 placeholder="e.g. Live Music, Brunch..."
               />
@@ -482,8 +482,8 @@ function EventDialog({ open, onClose, event, onSave }: any) {
 
             <div className="space-y-2">
               <Label htmlFor="is_active">Status</Label>
-              <Select 
-                value={formData.is_active ? 'active' : 'inactive'} 
+              <Select
+                value={formData.is_active ? 'active' : 'inactive'}
                 onValueChange={(val) => setFormData({ ...formData, is_active: val === 'active' })}
               >
                 <SelectTrigger id="is_active">
@@ -498,41 +498,41 @@ function EventDialog({ open, onClose, event, onSave }: any) {
 
             <div className="space-y-2">
               <Label htmlFor="date">Start Date</Label>
-              <DatePicker 
-                value={formData.date} 
+              <DatePicker
+                value={formData.date}
                 onChange={(val) => setFormData({ ...formData, date: val })}
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="repeat_till">End Date (Optional)</Label>
-              <DatePicker 
-                value={formData.repeat_till} 
+              <DatePicker
+                value={formData.repeat_till}
                 onChange={(val) => setFormData({ ...formData, repeat_till: val })}
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="time">Start Time</Label>
-              <TimePicker 
-                value={formData.time} 
+              <TimePicker
+                value={formData.time}
                 onChange={(e) => setFormData({ ...formData, time: e.target.value })}
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="end_time">End Time</Label>
-              <TimePicker 
-                value={formData.end_time} 
+              <TimePicker
+                value={formData.end_time}
                 onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
               />
             </div>
 
             <div className="space-y-2 col-span-2">
               <Label htmlFor="location">Location</Label>
-              <Input 
-                id="location" 
-                value={formData.location} 
+              <Input
+                id="location"
+                value={formData.location}
                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                 placeholder="Main Hall / Rooftop / Garden"
               />
@@ -540,9 +540,9 @@ function EventDialog({ open, onClose, event, onSave }: any) {
 
             <div className="space-y-2">
               <Label htmlFor="google_maps_link">Google Maps URL</Label>
-              <Input 
-                id="google_maps_link" 
-                value={formData.google_maps_link} 
+              <Input
+                id="google_maps_link"
+                value={formData.google_maps_link}
                 onChange={(e) => setFormData({ ...formData, google_maps_link: e.target.value })}
                 placeholder="https://maps.google.com/..."
               />
@@ -550,9 +550,9 @@ function EventDialog({ open, onClose, event, onSave }: any) {
 
             <div className="space-y-2">
               <Label htmlFor="registration_link">Registration Link (Optional)</Label>
-              <Input 
-                id="registration_link" 
-                value={formData.registration_link} 
+              <Input
+                id="registration_link"
+                value={formData.registration_link}
                 onChange={(e) => setFormData({ ...formData, registration_link: e.target.value })}
                 placeholder="https://eventbrite.com/..."
               />
@@ -560,18 +560,18 @@ function EventDialog({ open, onClose, event, onSave }: any) {
 
             <div className="flex items-center gap-4 pt-2 col-span-2">
               <div className="flex items-center space-x-2">
-                <Switch 
-                  id="featured" 
+                <Switch
+                  id="featured"
                   checked={formData.featured}
                   onCheckedChange={(val) => setFormData({ ...formData, featured: val })}
                 />
                 <Label htmlFor="featured">Featured Event</Label>
               </div>
-              
+
               <div className="flex items-center space-x-2 ml-auto">
                 <Label htmlFor="display_order">Display Order</Label>
-                <Input 
-                  id="display_order" 
+                <Input
+                  id="display_order"
                   type="number"
                   className="w-20"
                   value={formData.display_order}
@@ -586,10 +586,10 @@ function EventDialog({ open, onClose, event, onSave }: any) {
                 <div className="relative group rounded-xl overflow-hidden aspect-video border bg-muted">
                   <img src={formData.image_src} alt="Preview" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <Button 
-                      type="button" 
-                      variant="destructive" 
-                      size="sm" 
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
                       onClick={() => setFormData({ ...formData, image_src: '' })}
                       className="rounded-full h-8 w-8 p-0"
                     >
@@ -638,7 +638,7 @@ function EventDialog({ open, onClose, event, onSave }: any) {
                 <Label>Recurring Event</Label>
                 <p className="text-[10px] text-muted-foreground">Repeat this event weekly</p>
               </div>
-              <Switch 
+              <Switch
                 checked={formData.repeat_this_event}
                 onCheckedChange={(val) => setFormData({ ...formData, repeat_this_event: val })}
               />
@@ -651,8 +651,8 @@ function EventDialog({ open, onClose, event, onSave }: any) {
                   <div className="flex flex-wrap gap-3">
                     {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
                       <div key={day} className="flex items-center space-x-2">
-                        <Checkbox 
-                          id={`day-${day}`} 
+                        <Checkbox
+                          id={`day-${day}`}
                           checked={formData.recurring_days?.includes(day)}
                           onCheckedChange={() => toggleDay(day)}
                         />

@@ -18,7 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Plus, Edit, Trash2, Tag, Percent, DollarSign, Gift, Calendar, Users, TrendingUp, AlertCircle, Zap } from 'lucide-react'
+import { Plus, Edit, Trash2, Tag, Percent, DollarSign, Gift, Calendar, Users, TrendingUp, AlertCircle, Zap, X } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
 import { LockedFeature } from '@/components/FeatureGate/LockedFeature'
 import { DatePicker } from '@/components/ui/date-picker'
@@ -30,7 +30,6 @@ import { toast } from 'sonner'
 import { getFrappeError } from '@/lib/utils'
 import { useDataTable } from '@/hooks/useDataTable'
 import { DataPagination } from '@/components/ui/DataPagination'
-import { X } from 'lucide-react'
 
 const DAYS_OF_WEEK = [
   { label: 'Mon', value: 'monday' },
@@ -53,14 +52,14 @@ export default function Coupons() {
 
   const initialFilters = useMemo(() => {
     if (!selectedRestaurant) return []
-    const f: any[] = [['restaurant', '=', selectedRestaurant]]
+    const f: any[] = [{ fieldname: 'restaurant', operator: '=', value: selectedRestaurant }]
     
     if (filterType === 'active') {
-      f.push(['is_active', '=', 1])
+      f.push({ fieldname: 'is_active', operator: '=', value: 1 })
     } else if (filterType === 'inactive') {
-      f.push(['is_active', '=', 0])
+      f.push({ fieldname: 'is_active', operator: '=', value: 0 })
     } else if (filterType !== 'all') {
-      f.push(['offer_type', '=', filterType])
+      f.push({ fieldname: 'offer_type', operator: '=', value: filterType })
     }
     
     return f
@@ -79,7 +78,7 @@ export default function Coupons() {
     setSearchQuery
   } = useDataTable({
     doctype: 'Coupon',
-    fields: ['name', 'code', 'description', 'discount_type', 'discount_value', 'min_order_amount', 'is_active', 'valid_from', 'valid_until', 'max_uses', 'usage_count', 'offer_type', 'max_discount_cap', 'priority', 'restaurant', 'valid_days_of_week', 'valid_time_start', 'valid_time_end', 'can_stack', 'free_item', 'required_items', 'combo_price', 'category'],
+    fields: ['name', 'code', 'description', 'discount_type', 'discount_value', 'min_order_amount', 'is_active', 'valid_from', 'valid_until', 'max_uses', 'max_uses_per_user', 'usage_count', 'offer_type', 'max_discount_cap', 'priority', 'restaurant', 'valid_days_of_week', 'valid_time_start', 'valid_time_end', 'can_stack', 'free_item', 'required_items', 'combo_price', 'category'],
     initialFilters,
     orderBy: { field: 'creation', order: 'desc' },
     initialPageSize: 12,
@@ -237,7 +236,7 @@ export default function Coupons() {
                 Manage your discount coupons and offers
                 {totalCount > 0 && (
                   <span className="ml-2">
-                    (Showing {coupons.length} of {totalCount})
+                    (Showing {coupons?.length || 0} of {totalCount})
                   </span>
                 )}
               </CardDescription>
@@ -266,9 +265,9 @@ export default function Coupons() {
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading && !coupons.length ? (
+          {isLoading && !coupons?.length ? (
             <div className="text-center py-12 text-muted-foreground">Loading coupons...</div>
-          ) : !coupons || coupons.length === 0 ? (
+          ) : !coupons || coupons?.length === 0 ? (
             <EmptyState
               icon={Tag}
               title="No Coupons Found"
@@ -655,7 +654,7 @@ function CouponDialog({ open, onClose, coupon, onSave }: any) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="combo_price">Combo Price ({formatAmountNoDecimals(0).replace('0', '')})*</Label>
-                  <NumberInput id="combo_price"  value={formData.combo_price} onChange={(e) => setFormData({ ...formData, combo_price: parseFloat(e.target.value) })} required min="0" />
+                  <NumberInput id="combo_price"  value={formData.combo_price} onChange={(e: any) => setFormData({ ...formData, combo_price: parseFloat(e.target.value) || 0 })} required min="0" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="free_item">Gift Item (BOGO)</Label>
@@ -692,7 +691,7 @@ function CouponDialog({ open, onClose, coupon, onSave }: any) {
                 {formData.discount_type !== 'delivery' && (
                   <div className="space-y-2">
                     <Label htmlFor="discount_value">Discount Value *</Label>
-                    <NumberInput id="discount_value"  value={formData.discount_value} onChange={(e) => setFormData({ ...formData, discount_value: parseFloat(e.target.value) })} required min="0" />
+                    <NumberInput id="discount_value"  value={formData.discount_value} onChange={(e: any) => setFormData({ ...formData, discount_value: parseFloat(e.target.value) || 0 })} required min="0" />
                   </div>
                 )}
               </div>
@@ -715,11 +714,11 @@ function CouponDialog({ open, onClose, coupon, onSave }: any) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="discount_value">Discount Value *</Label>
-                <NumberInput id="discount_value"  value={formData.discount_value} onChange={(e) => setFormData({ ...formData, discount_value: parseFloat(e.target.value) })} required min="0" />
+                <NumberInput id="discount_value"  value={formData.discount_value} onChange={(e: any) => setFormData({ ...formData, discount_value: parseFloat(e.target.value) || 0 })} required min="0" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="max_discount_cap">Max Cap ({formatAmountNoDecimals(0).replace('0', '')})</Label>
-                <NumberInput id="max_discount_cap"  value={formData.max_discount_cap} onChange={(e) => setFormData({ ...formData, max_discount_cap: parseFloat(e.target.value) })} min="0" />
+                <NumberInput id="max_discount_cap"  value={formData.max_discount_cap} onChange={(e: any) => setFormData({ ...formData, max_discount_cap: parseFloat(e.target.value) || 0 })} min="0" />
               </div>
             </div>
           )}
@@ -727,11 +726,22 @@ function CouponDialog({ open, onClose, coupon, onSave }: any) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="min_order_amount">Min Order Amount ({formatAmountNoDecimals(0).replace('0', '')})</Label>
-              <NumberInput id="min_order_amount"  value={formData.min_order_amount} onChange={(e) => setFormData({ ...formData, min_order_amount: parseFloat(e.target.value) })} min="0" />
+              <NumberInput id="min_order_amount"  value={formData.min_order_amount} onChange={(e: any) => setFormData({ ...formData, min_order_amount: parseFloat(e.target.value) || 0 })} min="0" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="priority">Priority</Label>
-              <NumberInput id="priority"  value={formData.priority} onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) })} min="1" />
+              <NumberInput id="priority"  value={formData.priority} onChange={(e: any) => setFormData({ ...formData, priority: parseInt(e.target.value) || 1 })} min="1" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="max_uses">Total Usage Limit (0 for ∞)</Label>
+              <NumberInput id="max_uses" value={formData.max_uses} onChange={(e: any) => setFormData({ ...formData, max_uses: parseInt(e.target.value) || 0 })} min="0" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="max_uses_per_user">Limit Per Customer (0 for ∞)</Label>
+              <NumberInput id="max_uses_per_user" value={formData.max_uses_per_user} onChange={(e: any) => setFormData({ ...formData, max_uses_per_user: parseInt(e.target.value) || 0 })} min="0" />
             </div>
           </div>
 
